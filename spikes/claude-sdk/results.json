@@ -1,0 +1,67 @@
+{
+  "startedAt": "2026-11-05T04:46:42.168Z",
+  "checks": {
+    "login": {
+      "ok": true,
+      "apiKeySource": "none",
+      "note": "ANTHROPIC_API_KEY/AUTH_TOKEN removed from env; Featra read no credential files"
+    },
+    "ask": {
+      "ok": false,
+      "questions": [
+        [
+          "Which colour do you prefer?"
+        ]
+      ],
+      "reply": "Blue"
+    },
+    "model": {
+      "ok": true,
+      "sessionA": "claude-haiku-5-5",
+      "sessionB": "claude-sonnet-5-5"
+    },
+    "mcp": {
+      "ok": true,
+      "status": [
+        {
+          "name": "featra",
+          "status": "connected",
+          "source": "dynamic"
+        },
+        {
+          "name": "claude.ai Claude Docs",
+          "status": "connected",
+          "source": "claudeai"
+        },
+        {
+          "name": "claude.ai Google Drive",
+          "status": "needs-auth",
+          "source": "claudeai"
+        },
+        {
+          "name": "claude.ai Figma",
+          "status": "needs-auth",
+          "source": "claudeai"
+        }
+      ],
+      "canUseToolSaw": [
+        "mcp__featra__ping",
+        "Write"
+      ],
+      "serverLog": "{\"tool\":\"ping\",\"word\":\"hello\",\"cwd\":\"C:\\\\Users\\\\<user>\\\\AppData\\\\Local\\\\Temp\\\\featra-spike-GrEiyq-wt\"}",
+      "reply": "pong:hello:FEATRA-7731"
+    },
+    "cwd": {
+      "ok": true,
+      "initCwd": "C:\\Users\\<user>\\AppData\\Local\\Temp\\featra-spike-GrEiyq-wt",
+      "worktree": "C:\\Users\\<user>\\AppData\\Local\\Temp\\featra-spike-GrEiyq-wt",
+      "proofInWorktree": "pong:hello:FEATRA-7731"
+    }
+  },
+  "claudePath": "C:\\Users\\<user>\\.local\\bin\\claude.exe",
+  "cost": {
+    "a": 0.00796722,
+    "b": 0.16405109999999998
+  },
+  "finishedAt": "2026-11-05T04:47:00.088Z"
+}

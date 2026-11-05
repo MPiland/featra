@@ -1,0 +1,18 @@
+# Featra project settings
+version: 1
+hierarchy: epic-feature-pbi-task
+stages:
+  - { name: New, category: not-started }
+  - { name: Ready, category: not-started }
+  - { name: In Progress, category: active }
+  - { name: In Review, category: active }
+  - { name: Acceptance, category: active }
+  - { name: Done, category: done }
+progress: pbis        # pbis | tasks
+requireAccept: true   # Done also needs the user's Accept
+baseBranch: main
+worktrees: true
+mcp: true
+autoMerge: false      # M1b
+uat: false            # M1b
+knowledge: propose    # edit | propose | read-only

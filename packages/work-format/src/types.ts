@@ -1,0 +1,87 @@
+export type CardType = "epic" | "feature" | "pbi" | "bug";
+
+/** Why a card exists. `added` = created after its feature's scope baseline. */
+export type Origin = "planned" | "added" | "bug";
+
+/** Lifecycle of epics and features (PBIs and bugs use the project's stages instead). */
+export type ContainerStatus = "draft" | "approved" | "active" | "done" | "cancelled";
+
+/** PBIs and bugs use project stage names; `Cancelled` is always available. */
+export const CANCELLED = "Cancelled";
+
+export type HistoryField = "status" | "parent" | "evidence" | "accepted";
+
+/** Append-only record of a change, written at the card's owner (ADR 0002). */
+export interface HistoryEvent {
+  at: string;
+  field: HistoryField;
+  from: string | null;
+  to: string | null;
+  /** `user`, or `session:<id>` for agents, or `system` for CI/merge facts. */
+  by: string;
+}
+
+export interface ChecklistItem {
+  text: string;
+  done: boolean;
+}
+
+export interface AcceptanceCriterion extends ChecklistItem {
+  /** Reference to the test that proves this AC, e.g. `packages/x/test/y.test.ts > name`. */
+  test: string | null;
+}
+
+export interface BodySection {
+  heading: string;
+  content: string;
+}
+
+export interface Card {
+  id: string;
+  type: CardType;
+  title: string;
+  status: string;
+  parent: string | null;
+  order: number;
+  origin: Origin;
+  role: string | null;
+  agent: string | null;
+  model: string | null;
+  reasoning: string | null;
+  sessions: string[];
+  branch: string | null;
+  pr: string | null;
+  created: string;
+  history: HistoryEvent[];
+  description: string;
+  acs: AcceptanceCriterion[];
+  tasks: ChecklistItem[];
+  notes: string;
+  /** Unknown body sections, preserved in order after the known ones. */
+  extraSections: BodySection[];
+  /** Unknown frontmatter keys, preserved on round-trip. */
+  extra: Record<string, unknown>;
+}
+
+export type StageCategory = "not-started" | "active" | "done";
+
+export interface Stage {
+  name: string;
+  category: StageCategory;
+}
+
+export type ProgressMode = "pbis" | "tasks";
+export type KnowledgePermission = "edit" | "propose" | "read-only";
+
+export interface ProjectConfig {
+  version: number;
+  stages: Stage[];
+  progress: ProgressMode;
+  requireAccept: boolean;
+  baseBranch: string;
+  worktrees: boolean;
+  mcp: boolean;
+  autoMerge: boolean;
+  uat: boolean;
+  knowledge: KnowledgePermission;
+}

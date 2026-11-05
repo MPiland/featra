@@ -1,0 +1,243 @@
+import { parse, stringify } from "yaml";
+import type { AcceptanceCriterion, BodySection, Card, CardType, ChecklistItem, HistoryEvent, Origin } from "./types.ts";
+
+const KNOWN_KEYS = [
+  "id", "type", "title", "status", "parent", "order", "origin", "role", "agent", "model", "reasoning",
+  "sessions", "branch", "pr", "created", "history",
+] as const;
+const PBI_ONLY_KEYS = new Set(["role", "agent", "model", "reasoning", "sessions", "branch", "pr"]);
+const CARD_TYPES: CardType[] = ["epic", "feature", "pbi", "bug"];
+const ORIGINS: Origin[] = ["planned", "added", "bug"];
+
+const H_DESCRIPTION = "Description";
+const H_ACS = "Acceptance criteria";
+const H_TASKS = "Tasks";
+const H_NOTES = "Notes";
+const KNOWN_HEADINGS = new Set([H_DESCRIPTION, H_ACS, H_TASKS, H_NOTES]);
+
+export class CardParseError extends Error {
+  readonly source: string | undefined;
+  constructor(message: string, source?: string) {
+    super(source ? `${source}: ${message}` : message);
+    this.source = source;
+  }
+}
+
+/** True for card types that carry agent/branch fields and stage-based statuses. */
+export function isWorkItem(type: CardType): boolean {
+  return type === "pbi" || type === "bug";
+}
+
+export function parseCard(text: string, source?: string): Card {
+  const normalized = text.replace(/\r\n/g, "\n");
+  const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalized);
+  if (!match) throw new CardParseError("missing frontmatter", source);
+  let fm: Record<string, unknown>;
+  try {
+    fm = (parse(match[1]!) ?? {}) as Record<string, unknown>;
+  } catch (e) {
+    throw new CardParseError(`invalid frontmatter: ${(e as Error).message}`, source);
+  }
+  const body = parseBody(match[2] ?? "");
+
+  const type = fm.type as CardType;
+  if (!CARD_TYPES.includes(type)) throw new CardParseError(`unknown type "${String(fm.type)}"`, source);
+  if (typeof fm.id !== "string" || !fm.id) throw new CardParseError("missing id", source);
+  if (typeof fm.title !== "string") throw new CardParseError("missing title", source);
+  if (typeof fm.status !== "string") throw new CardParseError("missing status", source);
+  const origin = (fm.origin ?? "planned") as Origin;
+  if (!ORIGINS.includes(origin)) throw new CardParseError(`unknown origin "${String(fm.origin)}"`, source);
+
+  const extra: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(fm)) {
+    if (!(KNOWN_KEYS as readonly string[]).includes(k)) extra[k] = v;
+  }
+
+  return {
+    id: fm.id,
+    type,
+    title: fm.title,
+    status: fm.status,
+    parent: str(fm.parent),
+    order: typeof fm.order === "number" ? fm.order : 0,
+    origin,
+    role: str(fm.role),
+    agent: str(fm.agent),
+    model: str(fm.model),
+    reasoning: str(fm.reasoning),
+    sessions: Array.isArray(fm.sessions) ? fm.sessions.map(String) : [],
+    branch: str(fm.branch),
+    pr: str(fm.pr),
+    created: dateStr(fm.created) ?? "",
+    history: parseHistory(fm.history, source),
+    description: body.description,
+    acs: body.acs,
+    tasks: body.tasks,
+    notes: body.notes,
+    extraSections: body.extra,
+    extra,
+  };
+}
+
+export function serializeCard(card: Card): string {
+  const fm: Record<string, unknown> = {
+    id: card.id,
+    type: card.type,
+    title: card.title,
+    status: card.status,
+    parent: card.parent,
+    order: card.order,
+    origin: card.origin,
+  };
+  if (isWorkItem(card.type)) {
+    Object.assign(fm, {
+      role: card.role, agent: card.agent, model: card.model, reasoning: card.reasoning,
+      sessions: card.sessions, branch: card.branch, pr: card.pr,
+    });
+  }
+  fm.created = card.created;
+  fm.history = card.history.map((h) => ({ at: h.at, field: h.field, from: h.from, to: h.to, by: h.by }));
+  for (const [k, v] of Object.entries(card.extra)) {
+    if (!(k in fm) && !PBI_ONLY_KEYS.has(k)) fm[k] = v;
+  }
+
+  const yaml = stringify(fm, { lineWidth: 0, nullStr: "null" }).trimEnd();
+  const parts = ["---", yaml, "---", "", `## ${H_DESCRIPTION}`, "", card.description.trim(), ""];
+  if (isWorkItem(card.type) || card.acs.length || card.tasks.length) {
+    parts.push(`## ${H_ACS}`, "", ...card.acs.map(formatAc), "");
+    parts.push(`## ${H_TASKS}`, "", ...card.tasks.map((t) => `- [${t.done ? "x" : " "}] ${t.text}`), "");
+    parts.push(`## ${H_NOTES}`, "", ...(card.notes.trim() ? [card.notes.trim(), ""] : []));
+  } else if (card.notes.trim()) {
+    parts.push(`## ${H_NOTES}`, "", card.notes.trim(), "");
+  }
+  for (const s of card.extraSections) parts.push(`## ${s.heading}`, "", ...(s.content.trim() ? [s.content.trim(), ""] : []));
+  return collapseBlankRuns(parts.join("\n")).replace(/\n*$/, "\n");
+}
+
+function formatAc(ac: AcceptanceCriterion): string {
+  return `- [${ac.done ? "x" : " "}] ${ac.text}${ac.test ? ` (test: ${ac.test})` : ""}`;
+}
+
+interface ParsedBody {
+  description: string;
+  acs: AcceptanceCriterion[];
+  tasks: ChecklistItem[];
+  notes: string;
+  extra: BodySection[];
+}
+
+function parseBody(body: string): ParsedBody {
+  const sections: BodySection[] = [];
+  let current: BodySection | null = null;
+  const preamble: string[] = [];
+  for (const line of body.split("\n")) {
+    const h = /^## (.+?)\s*$/.exec(line);
+    if (h) {
+      current = { heading: h[1]!, content: "" };
+      sections.push(current);
+    } else if (current) {
+      current.content += line + "\n";
+    } else {
+      preamble.push(line);
+    }
+  }
+  const get = (heading: string) => sections.find((s) => s.heading === heading)?.content ?? "";
+  const pre = preamble.join("\n").trim();
+  const desc = get(H_DESCRIPTION).trim();
+  return {
+    description: [pre, desc].filter(Boolean).join("\n\n"),
+    acs: parseChecklist(get(H_ACS)).map(splitTestRef),
+    tasks: parseChecklist(get(H_TASKS)),
+    notes: get(H_NOTES).trim(),
+    extra: sections.filter((s) => !KNOWN_HEADINGS.has(s.heading)).map((s) => ({ heading: s.heading, content: s.content.trim() })),
+  };
+}
+
+function parseChecklist(content: string): ChecklistItem[] {
+  const items: ChecklistItem[] = [];
+  for (const line of content.split("\n")) {
+    const m = /^\s*[-*] \[( |x|X)\] (.*)$/.exec(line);
+    if (m) items.push({ done: m[1] !== " ", text: m[2]!.trim() });
+  }
+  return items;
+}
+
+function splitTestRef(item: ChecklistItem): AcceptanceCriterion {
+  const m = /^(.*?)\s*\(test: ([^)]+)\)\s*$/.exec(item.text);
+  return m ? { ...item, text: m[1]!, test: m[2]!.trim() } : { ...item, test: null };
+}
+
+function parseHistory(raw: unknown, source?: string): HistoryEvent[] {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) throw new CardParseError("history must be a list", source);
+  return raw.map((e, i) => {
+    const ev = e as Record<string, unknown>;
+    const at = dateStr(ev.at);
+    if (!at) throw new CardParseError(`history[${i}] missing "at"`, source);
+    return {
+      at,
+      field: (ev.field ?? "status") as HistoryEvent["field"],
+      from: str(ev.from),
+      to: str(ev.to),
+      by: typeof ev.by === "string" ? ev.by : "unknown",
+    };
+  });
+}
+
+function str(v: unknown): string | null {
+  return v === null || v === undefined ? null : String(v);
+}
+
+function dateStr(v: unknown): string | null {
+  if (v instanceof Date) return v.toISOString().replace(".000Z", "Z");
+  return v === null || v === undefined ? null : String(v);
+}
+
+function collapseBlankRuns(s: string): string {
+  return s.replace(/\n{3,}/g, "\n\n");
+}
+
+export interface NewCardInput {
+  id: string;
+  type: CardType;
+  title: string;
+  status: string;
+  parent?: string | null;
+  order?: number;
+  origin?: Origin;
+  role?: string | null;
+  agent?: string | null;
+  model?: string | null;
+  reasoning?: string | null;
+  description?: string;
+  acs?: AcceptanceCriterion[];
+  tasks?: ChecklistItem[];
+}
+
+/** A new card with defaults filled in and its creation recorded as the first history event. */
+export function newCard(input: NewCardInput, by: string, at: string): Card {
+  return {
+    id: input.id,
+    type: input.type,
+    title: input.title,
+    status: input.status,
+    parent: input.parent ?? null,
+    order: input.order ?? 0,
+    origin: input.origin ?? "planned",
+    role: input.role ?? null,
+    agent: input.agent ?? null,
+    model: input.model ?? null,
+    reasoning: input.reasoning ?? null,
+    sessions: [],
+    branch: null,
+    pr: null,
+    created: at,
+    history: [{ at, field: "status", from: null, to: input.status, by }],
+    description: input.description ?? "",
+    acs: input.acs ?? [],
+    tasks: input.tasks ?? [],
+    notes: "",
+    extraSections: [],
+    extra: {},
+  };
+}
