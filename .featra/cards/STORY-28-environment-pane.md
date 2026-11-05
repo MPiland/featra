@@ -32,6 +32,7 @@ As a builder, I see and control the session's git state, background tasks and co
 - [ ] Shows the PR's state and checks
 - [ ] Lists background tasks and open ports, each stoppable
 - [ ] Shows the session's context use, MCP servers, skills and plugins
+- [ ] The View menu toggles the Environment pane and shows its shortcut
 
 ## Tasks
 
