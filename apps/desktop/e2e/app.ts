@@ -76,10 +76,15 @@ export const chooseTrayItem = (app: ElectronApplication, label: string) =>
  * the window manager, and one that doesn't list `_NET_WM_STATE_HIDDEN` in `_NET_SUPPORTED` ignores it: WSLg's
  * doesn't, and xvfb has no window manager at all. There, even a framed Electron window stays unminimised.
  */
-export function windowManagerCanMinimize(): boolean {
+export const windowManagerCanMinimize = () => windowManagerSupports("_NET_WM_STATE_HIDDEN");
+
+/** Likewise for maximising (`_NET_WM_STATE_MAXIMIZED_VERT`): WSLg's window manager can; xvfb, with none, can't. */
+export const windowManagerCanMaximize = () => windowManagerSupports("_NET_WM_STATE_MAXIMIZED_VERT");
+
+function windowManagerSupports(atom: string): boolean {
   if (process.platform !== "linux") return true;
   try {
-    return execFileSync("xprop", ["-root", "_NET_SUPPORTED"], { encoding: "utf8" }).includes("_NET_WM_STATE_HIDDEN");
+    return execFileSync("xprop", ["-root", "_NET_SUPPORTED"], { encoding: "utf8" }).includes(atom);
   } catch {
     return false;
   }

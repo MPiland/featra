@@ -1,5 +1,5 @@
 import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
-import { launch, tempUserData } from "./app.ts";
+import { launch, tempUserData, windowManagerCanMaximize } from "./app.ts";
 
 /**
  * BUG-1 in the real window: the title bar's maximize button, View > Full Screen and the window itself agree on
@@ -12,6 +12,17 @@ const win = (app: ElectronApplication): Promise<Win> =>
     const w = BrowserWindow.getAllWindows()[0]!;
     return { fullScreen: w.isFullScreen(), maximized: w.isMaximized(), bounds: w.getBounds() };
   });
+/** The window as it is once the window manager has finished placing it (two reads 300 ms apart agree). */
+async function settled(app: ElectronApplication): Promise<Win> {
+  let last = await win(app);
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 300));
+    const now = await win(app);
+    if (JSON.stringify(now) === JSON.stringify(last)) return now;
+    last = now;
+  }
+  return last;
+}
 /** What the OS does on a title-bar double-click, Win+Up or a snap: change the window without asking the page. */
 const fromOs = (app: ElectronApplication, change: "maximize" | "unmaximize" | "enterFullScreen" | "leaveFullScreen") =>
   app.evaluate(({ BrowserWindow }, change) => {
@@ -49,7 +60,7 @@ test.describe("BUG-1: the maximize button and Full Screen follow the window", ()
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     try {
-      const before = await win(app);
+      const before = await settled(app);
       expect(before.fullScreen).toBe(false);
       await expectSizeButton(page, "Maximize", "maximize");
 
@@ -72,6 +83,8 @@ test.describe("BUG-1: the maximize button and Full Screen follow the window", ()
   });
 
   test("from a maximized window, one click in full screen returns to maximized", async () => {
+    // Without a window manager (xvfb) a window can't be maximized at all; the next tests prove the button stays true.
+    test.skip(!windowManagerCanMaximize(), "no window manager to maximize the window");
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     try {
@@ -126,6 +139,15 @@ test.describe("BUG-1: the maximize button and Full Screen follow the window", ()
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     try {
+      if (!windowManagerCanMaximize()) {
+        // No window manager (xvfb): maximize requests go nowhere, and the button must not claim otherwise.
+        await fromOs(app, "maximize");
+        await sizeButton(page).click();
+        await page.waitForTimeout(500);
+        expect((await win(app)).maximized).toBe(false);
+        await expectSizeButton(page, "Maximize", "maximize");
+        return;
+      }
       await fromOs(app, "maximize");
       await expect.poll(async () => (await win(app)).maximized).toBe(true);
       await expectSizeButton(page, RESTORE, "restore");
