@@ -13,7 +13,16 @@ import {
   type IpcMainEvent,
   type IpcMainInvokeEvent,
 } from "electron";
-import { EDIT_COMMANDS, IPC, normalizeUiState, THEME_CHOICES, type EditCommand, type ThemeChoice } from "@featra/client/bridge";
+import {
+  EDIT_COMMANDS,
+  IPC,
+  normalizeUiState,
+  sizeButtonAction,
+  THEME_CHOICES,
+  type EditCommand,
+  type ThemeChoice,
+  type WindowState,
+} from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
 import { createLifecycle, type Lifecycle } from "./lifecycle.ts";
 import { createLog, type Log } from "./log.ts";
@@ -85,10 +94,24 @@ function createWindow(): BrowserWindow {
     },
   });
   win.once("ready-to-show", () => win.show());
+  // Tell the page about every maximize and full-screen change, including the OS's own (title-bar double-click,
+  // Win+Up, snapping, leaving full screen), so the title bar and View > Full Screen never go stale (BUG-1).
+  const sendState = () => {
+    if (!win.isDestroyed()) win.webContents.send(IPC.windowStateChanged, windowState(win));
+  };
+  win.on("maximize", sendState);
+  win.on("unmaximize", sendState);
+  win.on("enter-full-screen", sendState);
+  win.on("leave-full-screen", sendState);
   if (clientUrl) void win.loadURL(clientUrl);
   else void win.loadFile(clientIndex);
   return win;
 }
+
+const windowState = (win: BrowserWindow): WindowState => ({
+  maximized: win.isMaximized(),
+  fullScreen: win.isFullScreen(),
+});
 
 interface MainDeps {
   store: UiStateStore;
@@ -103,10 +126,17 @@ function registerIpc({ store, lifecycle, log, troubleshoot }: MainDeps) {
   ipcMain.handle(IPC.uiStateLoad, () => store.load());
   ipcMain.handle(IPC.uiStateSave, (_e, state: unknown) => store.save(normalizeUiState(state)));
   ipcMain.on(IPC.windowMinimize, (e) => fromOurWindow(e)?.minimize());
+  ipcMain.handle(IPC.windowGetState, (e) => {
+    const win = fromOurWindow(e);
+    return win ? windowState(win) : undefined;
+  });
   ipcMain.on(IPC.windowToggleMaximize, (e) => {
     const win = fromOurWindow(e);
-    if (win?.isMaximized()) win.unmaximize();
-    else win?.maximize();
+    if (!win) return;
+    const action = sizeButtonAction(windowState(win));
+    if (action === "leaveFullScreen") win.setFullScreen(false);
+    else if (action === "unmaximize") win.unmaximize();
+    else win.maximize();
   });
   ipcMain.on(IPC.windowClose, (e) => fromOurWindow(e)?.close());
   ipcMain.on(IPC.windowToggleFullScreen, (e) => {

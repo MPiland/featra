@@ -1,8 +1,8 @@
-import type { FeatraBridge } from "../bridge.ts";
+import { sizeButtonFor, type FeatraBridge, type WindowState } from "../bridge.ts";
 import { toggleSidebarShortcutLabel } from "../shortcuts.ts";
 import type { MenuNode } from "../menu.ts";
 import { AppMenu } from "./AppMenu.tsx";
-import { BackIcon, CloseIcon, ForwardIcon, MaximizeIcon, MinimizeIcon, SidebarIcon } from "./icons.tsx";
+import { BackIcon, CloseIcon, ForwardIcon, MaximizeIcon, MinimizeIcon, RestoreIcon, SidebarIcon } from "./icons.tsx";
 
 export interface TitleBarProps {
   bridge: FeatraBridge;
@@ -14,6 +14,7 @@ export interface TitleBarProps {
   onBack: () => void;
   onForward: () => void;
   menu: readonly MenuNode[];
+  windowState: WindowState;
 }
 
 export function TitleBar(p: TitleBarProps) {
@@ -21,6 +22,7 @@ export function TitleBar(p: TitleBarProps) {
   // macOS keeps its native traffic lights; a plain browser has no window to control.
   const ownWindowControls = p.bridge.platform === "win32" || p.bridge.platform === "linux";
   const shortcut = toggleSidebarShortcutLabel(p.bridge.platform);
+  const size = sizeButtonFor(p.windowState, p.bridge.platform);
   return (
     <header className={isMac ? "titlebar mac" : "titlebar"}>
       <AppMenu nodes={p.menu} />
@@ -58,13 +60,31 @@ export function TitleBar(p: TitleBarProps) {
       {ownWindowControls && (
         <>
           <span className="sep" aria-hidden="true" />
-          <button type="button" className="tb" aria-label="Minimize" onClick={() => p.bridge.window.minimize()}>
+          <button
+            type="button"
+            className="tb"
+            aria-label="Minimize"
+            data-tip="Minimize"
+            onClick={() => p.bridge.window.minimize()}
+          >
             <MinimizeIcon />
           </button>
-          <button type="button" className="tb" aria-label="Maximize" onClick={() => p.bridge.window.toggleMaximize()}>
-            <MaximizeIcon />
+          <button
+            type="button"
+            className="tb"
+            aria-label={size.label}
+            data-tip={size.label}
+            onClick={() => p.bridge.window.toggleMaximize()}
+          >
+            {size.icon === "restore" ? <RestoreIcon /> : <MaximizeIcon />}
           </button>
-          <button type="button" className="tb close" aria-label="Close window" onClick={() => p.bridge.window.close()}>
+          <button
+            type="button"
+            className="tb close"
+            aria-label="Close window"
+            data-tip="Close"
+            onClick={() => p.bridge.window.close()}
+          >
             <CloseIcon />
           </button>
         </>

@@ -2,9 +2,9 @@ import type { ReactNode } from "react";
 import type { ViewId } from "../views.ts";
 
 /** Stroke icons from the approved mockup (docs/mockups/app.html). Decorative: the control carries the label. */
-function Icon({ children, size = 16 }: { children: ReactNode; size?: number }) {
+function Icon({ children, size = 16, name }: { children: ReactNode; size?: number; name?: string }) {
   return (
-    <svg className="i" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false">
+    <svg className="i" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false" data-icon={name}>
       {children}
     </svg>
   );
@@ -47,8 +47,15 @@ export const MinimizeIcon = () => (
   </Icon>
 );
 export const MaximizeIcon = () => (
-  <Icon>
+  <Icon name="maximize">
     <rect x="6" y="6" width="12" height="12" rx="1" />
+  </Icon>
+);
+/** Two overlapping squares: the window is maximized or full screen, and this puts it back. */
+export const RestoreIcon = () => (
+  <Icon name="restore">
+    <rect x="5" y="9" width="10" height="10" rx="1" />
+    <path d="M9 9V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-3" />
   </Icon>
 );
 export const CloseIcon = () => (

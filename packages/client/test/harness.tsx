@@ -1,12 +1,15 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { App } from "../src/App.tsx";
-import { DEFAULT_UI_STATE, type FeatraBridge, type UiState } from "../src/bridge.ts";
+import { act } from "react";
+import { DEFAULT_UI_STATE, DEFAULT_WINDOW_STATE, type FeatraBridge, type UiState, type WindowState } from "../src/bridge.ts";
 
 /** Fakes only the host platform: an in-memory store and recorded window calls. */
 export function fakeBridge(platform = "win32") {
   const saves: UiState[] = [];
   const calls: string[] = [];
+  let windowState: WindowState = { ...DEFAULT_WINDOW_STATE };
+  const listeners = new Set<(s: WindowState) => void>();
   const bridge: FeatraBridge = {
     platform,
     uiState: {
@@ -18,6 +21,11 @@ export function fakeBridge(platform = "win32") {
       toggleMaximize: () => void calls.push("toggleMaximize"),
       close: () => void calls.push("close"),
       toggleFullScreen: () => void calls.push("fullScreen"),
+      state: async () => windowState,
+      onStateChange: (listener) => {
+        listeners.add(listener);
+        return () => void listeners.delete(listener);
+      },
       setZoomFactor: (f) => void calls.push(`zoom:${f}`),
       setTheme: (t) => void calls.push(`theme:${t}`),
     },
@@ -33,7 +41,13 @@ export function fakeBridge(platform = "win32") {
       quit: () => void calls.push("quit"),
     },
   };
-  return { bridge, saves, calls };
+  /** What the host does when the window changes (the OS, F11 or the button): report the new state. */
+  const setWindowState = (s: Partial<WindowState>) =>
+    act(() => {
+      windowState = { ...windowState, ...s };
+      for (const l of listeners) l(windowState);
+    });
+  return { bridge, saves, calls, setWindowState };
 }
 
 /** Window calls the app makes on its own at startup (apply the stored zoom and theme); `actions()` skips them. */

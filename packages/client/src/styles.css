@@ -205,6 +205,13 @@ svg.i {
   z-index: 9;
   pointer-events: none;
 }
+/* The window controls sit at the window's right edge: keep their tooltips inside it. */
+.tb.close[data-tip]:hover::after,
+.tb.close[data-tip]:focus-visible::after {
+  left: auto;
+  right: 2px;
+  transform: none;
+}
 
 .ttl {
   margin: 0 0 0 10px;

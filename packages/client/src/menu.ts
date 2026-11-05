@@ -33,6 +33,8 @@ export interface MenuActions {
 export interface MenuContext {
   platform: string;
   sidebarShown: boolean;
+  /** The window is full screen: View > Full Screen shows a checkmark. */
+  fullScreen: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
   actions: MenuActions;
@@ -49,7 +51,14 @@ const fileManager = (platform: string) =>
  * aren't built yet are left out, not greyed; later stories add theirs (New Chat, New Project…, Open Folder…, pane
  * toggles, Keyboard Shortcuts, Find, Previous/Next Chat). Only Back and Forward grey out, when there's nowhere to go.
  */
-export function buildAppMenu({ platform, sidebarShown, canGoBack, canGoForward, actions: a }: MenuContext): MenuNode[] {
+export function buildAppMenu({
+  platform,
+  sidebarShown,
+  fullScreen,
+  canGoBack,
+  canGoForward,
+  actions: a,
+}: MenuContext): MenuNode[] {
   const key = (id: ShortcutId) => shortcutLabel(id, platform);
   const inWindow = platform !== "web"; // a plain browser tab can't close, quit, go full screen or troubleshoot itself
   const sep = (id: string): MenuNode => ({ kind: "separator", id });
@@ -77,7 +86,17 @@ export function buildAppMenu({ platform, sidebarShown, canGoBack, canGoForward, 
     item("view.zoomIn", "Zoom In", a.zoomIn, "zoomIn"),
     item("view.zoomOut", "Zoom Out", a.zoomOut, "zoomOut"),
   ];
-  if (inWindow) view.push(sep("view.sep2"), item("view.fullScreen", "Full Screen", a.toggleFullScreen, "fullScreen"));
+  if (inWindow) {
+    const k = key("fullScreen");
+    view.push(sep("view.sep2"), {
+      kind: "check",
+      id: "view.fullScreen",
+      label: "Full Screen",
+      ...(k ? { shortcut: k } : {}),
+      checked: fullScreen,
+      onSelect: a.toggleFullScreen,
+    });
+  }
   view.push(sep("view.sep3"), item("view.reload", "Reload", a.reload, "reload"));
 
   const go: MenuNode[] = [

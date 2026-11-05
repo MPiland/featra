@@ -2,7 +2,7 @@
 id: BUG-1
 type: bug
 title: Maximize button is wrong in full screen
-status: New
+status: In Progress
 parent: FEAT-13
 order: 0
 origin: bug
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-05T19:20:30Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:story-18
 ---
 
 ## Description

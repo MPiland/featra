@@ -32,6 +32,36 @@ export function normalizeUiState(raw: unknown): UiState {
 export type EditCommand = "undo" | "redo" | "cut" | "copy" | "paste" | "delete" | "selectAll";
 export const EDIT_COMMANDS: readonly EditCommand[] = ["undo", "redo", "cut", "copy", "paste", "delete", "selectAll"];
 
+/** Whether the window is maximized or full screen, as the OS has it. Main reports every change, whoever made it. */
+export interface WindowState {
+  maximized: boolean;
+  fullScreen: boolean;
+}
+
+export const DEFAULT_WINDOW_STATE: WindowState = { maximized: false, fullScreen: false };
+
+export function normalizeWindowState(raw: unknown): WindowState {
+  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return { maximized: r.maximized === true, fullScreen: r.fullScreen === true };
+}
+
+/**
+ * What the title bar's maximize button does. In full screen it leaves full screen, which puts the window back to
+ * the size and maximized state it had before; un-maximizing a full-screen window instead shrinks it and the OS
+ * snaps it back (BUG-1).
+ */
+export function sizeButtonAction(state: WindowState): "leaveFullScreen" | "unmaximize" | "maximize" {
+  if (state.fullScreen) return "leaveFullScreen";
+  return state.maximized ? "unmaximize" : "maximize";
+}
+
+/** The maximize button's label (and tooltip) and icon for the window's state, in the platform's words. */
+export function sizeButtonFor(state: WindowState, platform: string): { label: string; icon: "maximize" | "restore" } {
+  if (state.fullScreen) return { label: "Exit Full Screen", icon: "restore" };
+  if (state.maximized) return { label: platform === "win32" ? "Restore Down" : "Restore", icon: "restore" };
+  return { label: "Maximize", icon: "maximize" };
+}
+
 export interface AppInfo {
   name: string;
   version: string;
@@ -46,9 +76,13 @@ export interface FeatraBridge {
   };
   readonly window: {
     minimize(): void;
+    /** Maximize, restore, or leave full screen: see `sizeButtonAction`. */
     toggleMaximize(): void;
     close(): void;
     toggleFullScreen(): void;
+    state(): Promise<WindowState>;
+    /** Calls back on every change to the window's state; returns the unsubscribe. */
+    onStateChange(listener: (state: WindowState) => void): () => void;
     setZoomFactor(factor: number): void;
     /** Applied from the stored state; Settings > Appearance (STORY-20) will change it. */
     setTheme(theme: ThemeChoice): void;
@@ -76,6 +110,8 @@ export const IPC = {
   windowToggleMaximize: "window:toggle-maximize",
   windowClose: "window:close",
   windowToggleFullScreen: "window:toggle-full-screen",
+  windowGetState: "window:get-state",
+  windowStateChanged: "window:state-changed",
   windowSetZoom: "window:set-zoom",
   windowSetTheme: "window:set-theme",
   edit: "edit:run",
@@ -117,6 +153,8 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       toggleMaximize() {},
       close() {},
       toggleFullScreen() {},
+      state: async () => ({ ...DEFAULT_WINDOW_STATE }),
+      onStateChange: () => () => {},
       setZoomFactor: (factor) => {
         document.documentElement.style.zoom = String(factor);
       },

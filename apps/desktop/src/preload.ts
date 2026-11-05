@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { IPC, normalizeUiState, type FeatraBridge } from "@featra/client/bridge";
+import { IPC, normalizeUiState, normalizeWindowState, type FeatraBridge } from "@featra/client/bridge";
 
 const bridge: FeatraBridge = {
   platform: process.platform,
@@ -14,6 +14,12 @@ const bridge: FeatraBridge = {
     toggleMaximize: () => ipcRenderer.send(IPC.windowToggleMaximize),
     close: () => ipcRenderer.send(IPC.windowClose),
     toggleFullScreen: () => ipcRenderer.send(IPC.windowToggleFullScreen),
+    state: async () => normalizeWindowState(await ipcRenderer.invoke(IPC.windowGetState)),
+    onStateChange: (listener) => {
+      const handler = (_e: unknown, state: unknown) => listener(normalizeWindowState(state));
+      ipcRenderer.on(IPC.windowStateChanged, handler);
+      return () => void ipcRenderer.removeListener(IPC.windowStateChanged, handler);
+    },
     setZoomFactor: (factor) => ipcRenderer.send(IPC.windowSetZoom, factor),
     setTheme: (theme) => ipcRenderer.send(IPC.windowSetTheme, theme),
   },

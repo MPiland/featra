@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AppInfo, FeatraBridge, UiState } from "./bridge.ts";
+import { DEFAULT_WINDOW_STATE, type AppInfo, type FeatraBridge, type UiState, type WindowState } from "./bridge.ts";
 import { Dialog } from "./components/Dialog.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
@@ -26,6 +26,7 @@ export function App({ bridge, initialUiState }: AppProps) {
   const [ui, setUi] = useState(initialUiState);
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [info, setInfo] = useState<AppInfo | null>(null);
+  const [windowState, setWindowState] = useState<WindowState>(DEFAULT_WINDOW_STATE);
   const saved = useRef(initialUiState);
   const view = viewDef(currentView(nav));
   const collapsed = ui.sidebarCollapsed;
@@ -70,11 +71,12 @@ export function App({ bridge, initialUiState }: AppProps) {
       buildAppMenu({
         platform: bridge.platform,
         sidebarShown: !collapsed,
+        fullScreen: windowState.fullScreen,
         canGoBack: canGoBack(nav),
         canGoForward: canGoForward(nav),
         actions,
       }),
-    [bridge.platform, collapsed, nav, actions],
+    [bridge.platform, collapsed, windowState.fullScreen, nav, actions],
   );
 
   useEffect(() => {
@@ -84,6 +86,16 @@ export function App({ bridge, initialUiState }: AppProps) {
   }, [bridge, ui]);
 
   useEffect(() => bridge.window.setZoomFactor(ui.zoomFactor), [bridge, ui.zoomFactor]);
+  // The window's maximized and full-screen state comes from the host, which reports every change, the OS's too.
+  useEffect(() => {
+    let live = true;
+    const off = bridge.window.onStateChange((s) => live && setWindowState(s));
+    void bridge.window.state().then((s) => live && setWindowState(s));
+    return () => {
+      live = false;
+      off();
+    };
+  }, [bridge]);
   // The stored theme is applied as-is (System by default, so the OS decides); Settings (STORY-20) changes it.
   useEffect(() => {
     applyTheme(ui.theme);
@@ -136,6 +148,7 @@ export function App({ bridge, initialUiState }: AppProps) {
           onBack={back}
           onForward={forward}
           menu={menu}
+          windowState={windowState}
         />
         <div className={collapsed ? "app collapsed" : "app"}>
           <Sidebar collapsed={collapsed} current={view.id} onOpen={open} />
