@@ -53,7 +53,7 @@ describe("AC5: app menu", () => {
     expect(labels(menuAt(1))).toEqual(["BackAlt+Left", "ForwardAlt+Right", "Work", "Inbox", "Artifacts", "Plugins"]);
     await user.hover(item("Help"));
     expect(menus()).toHaveLength(2);
-    expect(labels(menuAt(1))).toEqual(["Troubleshooting", "About Featra"]);
+    expect(labels(menuAt(1))).toEqual(["Keyboard ShortcutsCtrl+/", "Troubleshooting", "About Featra"]);
     await user.hover(item("Troubleshooting"));
     expect(labels(menuAt(2))).toEqual([
       "Show Logs in File Explorer",
@@ -149,6 +149,8 @@ describe("AC5: app menu", () => {
     await user.keyboard("{ArrowLeft}{ArrowDown}{ArrowDown}"); // back to View, then down to Help
     expect(document.activeElement).toBe(item("Help"));
     await user.keyboard("{ArrowRight}");
+    expect(document.activeElement).toBe(item(/^Keyboard Shortcuts/));
+    await user.keyboard("{ArrowDown}");
     expect(document.activeElement).toBe(item("Troubleshooting"));
     await user.keyboard("{Enter}"); // Enter opens Troubleshooting and moves in
     expect(document.activeElement).toBe(item("Show Logs in File Explorer"));
@@ -282,10 +284,11 @@ describe("AC5: app menu", () => {
   });
 
   it("starts at the stored zoom and theme without re-saving them; the default theme follows the OS", () => {
-    const { calls, saves } = renderApp({ state: { zoomFactor: 1.25, theme: "dark" } });
+    const { calls, saves, appSaved } = renderApp({ state: { zoomFactor: 1.25 }, settings: { theme: "dark" } });
     expect(calls).toEqual(["zoom:1.25", "theme:dark"]);
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(saves).toEqual([]);
+    expect(appSaved()).toEqual([]);
 
     cleanup();
     const fresh = renderApp();
@@ -361,16 +364,6 @@ describe("AC5: app menu", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("Help has no Keyboard Shortcuts item and Ctrl+/ does nothing (shortcuts live in Settings, STORY-20)", async () => {
-    const { user, actions } = renderApp();
-    await openPath(user, "Help");
-    expect(labels(menuAt(1)).join()).not.toMatch(/Keyboard Shortcuts/i);
-    await user.keyboard("{Escape}");
-    await user.keyboard("{Control>}/{/Control}");
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(actions()).toEqual([]);
-  });
-
   it("Help: Troubleshooting shows the logs, toggles developer tools and clears the cache", async () => {
     const { user, actions } = renderApp();
     for (const name of ["Show Logs in File Explorer", "Toggle Developer Tools", "Clear Cache and Restart"]) {
@@ -411,7 +404,7 @@ describe("AC5: app menu", () => {
     await user.hover(item("View"));
     expect(labels(menuAt(1))).toEqual(["SidebarCtrl+B", "Actual SizeCtrl+0", "Zoom InCtrl+=", "Zoom OutCtrl+-", "ReloadF5"]);
     await user.hover(item("Help"));
-    expect(labels(menuAt(1))).toEqual(["About Featra"]);
+    expect(labels(menuAt(1))).toEqual(["Keyboard ShortcutsCtrl+/", "About Featra"]);
     await user.keyboard("{Escape}{Escape}{F11}{Control>}{Shift>}W{/Shift}{/Control}");
     expect(actions()).toEqual([]); // the browser keeps its own F11; a tab has no window to close
   });

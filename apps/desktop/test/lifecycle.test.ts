@@ -1,6 +1,7 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
-import { createLifecycle, TRAY_NOTICE, type LifecycleOptions, type ManagedWindow } from "../src/lifecycle.ts";
+import { NO_TRAY_REASON } from "@featra/client/bridge";
+import { closeToTraySupport, createLifecycle, TRAY_NOTICE, type LifecycleOptions, type ManagedWindow } from "../src/lifecycle.ts";
 
 /** Fakes only the OS window: records what the lifecycle asks of it. */
 class FakeWindow extends EventEmitter implements ManagedWindow {
@@ -144,5 +145,49 @@ describe("AC7: Linux", () => {
     expect(lc.closeHides).toBe(false);
     expect(win.tryClose()).toBe("closed");
     expect(log.notices).toEqual([]);
+  });
+});
+
+describe("STORY-20 AC6: the Close button setting applies without a restart", () => {
+  it("switching to Quit makes the next close quit, with no tray icon; switching back hides again", () => {
+    const { lc, win, log } = setup();
+    lc.setCloseToTray(false);
+    expect(lc.closeHides).toBe(false);
+    expect(lc.usesTray).toBe(false);
+    expect(win.tryClose()).toBe("closed");
+    expect(log.notices).toEqual([]);
+
+    win.show();
+    lc.setCloseToTray(true);
+    expect(lc.usesTray).toBe(true);
+    expect(win.tryClose()).toBe("kept");
+    expect(win.visible).toBe(false);
+    expect(log.notices).toEqual([TRAY_NOTICE]);
+  });
+
+  it("starting with Quit stored: close quits until the setting is switched to keep running", () => {
+    const { lc, win } = setup({ closeToTray: false });
+    expect(lc.usesTray).toBe(false);
+    expect(win.tryClose()).toBe("closed");
+    win.show();
+    lc.setCloseToTray(true);
+    expect(win.tryClose()).toBe("kept");
+  });
+
+  it("Linux without a tray: close always quits whatever the setting, and Settings shows why", () => {
+    const { lc, win } = setup({ platform: "linux", trayAvailable: false });
+    lc.setCloseToTray(true);
+    expect(lc.canCloseToTray).toBe(false);
+    expect(win.tryClose()).toBe("closed");
+    expect(closeToTraySupport(lc, "linux")).toEqual({ available: false, reason: NO_TRAY_REASON });
+  });
+
+  it("offers the tray on Windows and Linux with one, and the Dock on macOS", () => {
+    expect(closeToTraySupport(setup().lc, "win32")).toEqual({ available: true, place: "tray" });
+    expect(closeToTraySupport(setup({ platform: "linux" }).lc, "linux")).toEqual({ available: true, place: "tray" });
+    const mac = setup({ platform: "darwin", trayAvailable: false }).lc;
+    expect(closeToTraySupport(mac, "darwin")).toEqual({ available: true, place: "dock" });
+    mac.setCloseToTray(false);
+    expect(mac.closeHides).toBe(false);
   });
 });

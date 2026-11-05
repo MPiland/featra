@@ -122,11 +122,14 @@ describe("AC3: sidebar entries", () => {
     expect(viewTitle().textContent).toBe("Artifacts");
   });
 
-  it("shows a placeholder for each view", async () => {
+  it("shows a placeholder for each view not built yet; Settings shows its pages (STORY-20)", async () => {
     const { user } = renderApp();
-    for (const name of ENTRIES) {
+    for (const name of ENTRIES.filter((e) => e !== "Settings")) {
       await user.click(within(sidebar()).getByRole("button", { name }));
       expect(within(screen.getByRole("main")).getByText(/will show here/)).toBeTruthy();
     }
+    await user.click(within(sidebar()).getByRole("button", { name: "Settings" }));
+    expect(within(screen.getByRole("main")).queryByText(/will show here/)).toBeNull();
+    expect(within(screen.getByRole("main")).getByRole("navigation", { name: "Settings pages" })).toBeTruthy();
   });
 });

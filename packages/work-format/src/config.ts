@@ -1,4 +1,4 @@
-import { parse, stringify } from "yaml";
+import { isMap, isScalar, parse, parseDocument, stringify } from "yaml";
 import { CANCELLED, type ProjectConfig, type Stage, type StageCategory } from "./types.ts";
 
 export const DEFAULT_STAGES: Stage[] = [
@@ -27,15 +27,63 @@ const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
 
 export class ConfigError extends Error {}
 
-export function parseConfig(text: string): ProjectConfig {
-  const raw = (parse(text) ?? {}) as Record<string, unknown>;
-  const config: ProjectConfig = { ...DEFAULT_CONFIG, ...pick(raw) };
+const BOOLEAN_KEYS = ["requireAccept", "worktrees", "mcp", "autoMerge", "uat"] as const;
+const KNOWLEDGE = ["edit", "propose", "read-only"];
+
+/**
+ * Reads `.featra/config.yaml`. Keys the file leaves out come from `defaults`: Featra's own by default, or the user's
+ * app-wide defaults (Settings > Work defaults), which the file's keys override.
+ */
+export function parseConfig(text: string, defaults: ProjectConfig = DEFAULT_CONFIG): ProjectConfig {
+  const config: ProjectConfig = { ...defaults, ...configOverrides(text) };
   validateStages(config.stages);
-  if (config.progress !== "stories" && config.progress !== "tasks") {
-    throw new ConfigError(`progress must be "stories" or "tasks", got ${String(config.progress)}`);
-  }
   return config;
 }
+
+/**
+ * The keys the file sets itself, validated: a project's overrides of the app-wide defaults. Unknown keys are left
+ * out, as in `parseConfig`.
+ */
+export function configOverrides(text: string): Partial<ProjectConfig> {
+  const raw = parse(text) ?? {};
+  if (typeof raw !== "object" || Array.isArray(raw)) throw new ConfigError("config must be a mapping of settings");
+  const out = pick(raw as Record<string, unknown>);
+  if ("stages" in out) validateStages(out.stages);
+  if ("progress" in out && out.progress !== "stories" && out.progress !== "tasks") {
+    throw new ConfigError(`progress must be "stories" or "tasks", got ${String(out.progress)}`);
+  }
+  for (const key of BOOLEAN_KEYS) {
+    if (key in out && typeof out[key] !== "boolean") throw new ConfigError(`${key} must be true or false, got ${String(out[key])}`);
+  }
+  if ("knowledge" in out && !KNOWLEDGE.includes(out.knowledge as string)) {
+    throw new ConfigError(`knowledge must be one of ${KNOWLEDGE.join(", ")}, got ${String(out.knowledge)}`);
+  }
+  return out;
+}
+
+/**
+ * Sets one key in the config file's text, or removes it (`undefined`) so the app-wide default applies again. Edits
+ * the YAML document in place, so comments, layout and keys Featra doesn't know survive. Throws a ConfigError, and
+ * changes nothing, if the file can't be read or the result would not be a valid config.
+ */
+export function setConfigValue<K extends keyof ProjectConfig>(text: string, key: K, value: ProjectConfig[K] | undefined): string {
+  const doc = parseDocument(text.trim() ? text : NEW_CONFIG);
+  if (doc.errors.length > 0) throw new ConfigError(doc.errors[0]!.message);
+  if (doc.contents !== null && !isMap(doc.contents)) throw new ConfigError("config must be a mapping of settings");
+  configOverrides(text); // the file as it stands must be valid before it is edited
+  if (value === undefined) doc.delete(key);
+  else {
+    const node = doc.get(key, true);
+    // Keep a trailing comment ("progress: stories  # stories | tasks") by changing the scalar, not replacing it.
+    if (isScalar(node) && (value === null || typeof value !== "object")) node.value = value;
+    else doc.set(key, value);
+  }
+  const out = doc.toString();
+  configOverrides(out);
+  return out;
+}
+
+const NEW_CONFIG = "# Featra project settings\nversion: 1\n";
 
 export function serializeConfig(config: ProjectConfig): string {
   return "# Featra project settings\n" + stringify(config, { flowCollectionPadding: true });

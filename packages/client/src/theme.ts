@@ -1,4 +1,6 @@
-import type { ThemeChoice } from "./bridge.ts";
+/** System follows the OS; Light and Dark override it. */
+export type ThemeChoice = "system" | "light" | "dark";
+export const THEME_CHOICES: readonly ThemeChoice[] = ["system", "light", "dark"];
 
 /**
  * Light and Dark pin the palette with `data-theme` on <html>; System removes it so the

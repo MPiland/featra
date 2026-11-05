@@ -18,7 +18,8 @@ export default defineConfig(({ mode }) => {
         output: { format: "cjs", entryFileNames: "[name].cjs" },
       },
     },
-    ssr: { noExternal: ["@featra/client"] },
+    // Main runs from dist/ without the workspace: bundle the TypeScript packages and their dependencies.
+    ssr: { noExternal: ["@featra/client", "@featra/work-format", "yaml"] },
     test: {
       include: ["test/**/*.test.ts"],
     },

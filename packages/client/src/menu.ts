@@ -10,6 +10,8 @@ export type MenuNode =
 
 export interface MenuActions {
   openSettings(): void;
+  /** Opens Settings on its Keyboard shortcuts page. */
+  showKeyboardShortcuts(): void;
   closeWindow(): void;
   quit(): void;
   edit(command: EditCommand): void;
@@ -49,7 +51,7 @@ const fileManager = (platform: string) =>
 /**
  * The title bar's Menu, modelled on Claude's desktop app: File, Edit, View, Go, Help, in Title Case. Items that
  * aren't built yet are left out, not greyed; later stories add theirs (New Chat, New Project…, Open Folder…, pane
- * toggles, Keyboard Shortcuts, Find, Previous/Next Chat). Only Back and Forward grey out, when there's nowhere to go.
+ * toggles, Find, Previous/Next Chat). Only Back and Forward grey out, when there's nowhere to go.
  */
 export function buildAppMenu({
   platform,
@@ -106,9 +108,10 @@ export function buildAppMenu({
     ...GO_VIEWS.map((id) => item(`go.${id}`, VIEWS.find((v) => v.id === id)!.title, () => a.open(id))),
   ];
 
-  const help: MenuNode[] = [];
+  const help: MenuNode[] = [item("help.keyboardShortcuts", "Keyboard Shortcuts", a.showKeyboardShortcuts, "keyboardShortcuts")];
   if (inWindow) {
     help.push(
+      sep("help.sep0"),
       {
         kind: "submenu",
         id: "help.troubleshooting",
@@ -146,4 +149,38 @@ export function buildAppMenu({
     { kind: "submenu", id: "go", label: "Go", items: go },
     { kind: "submenu", id: "help", label: "Help", items: help },
   ];
+}
+
+/** One row of Settings > Keyboard shortcuts. */
+export interface ShortcutEntry {
+  /** The menu the item is in: File, Edit, View, Go or Help. */
+  area: string;
+  /** The item's name, without the menu's trailing ellipsis. */
+  name: string;
+  keys: string;
+}
+
+/**
+ * Every shortcut, by area, read from the menu itself so the page can never list a shortcut the menu doesn't have (or
+ * miss one it does): every shortcut Featra has is on a menu item.
+ */
+export function listShortcuts(menu: readonly MenuNode[]): ShortcutEntry[] {
+  const out: ShortcutEntry[] = [];
+  const walk = (area: string, nodes: readonly MenuNode[]) => {
+    for (const n of nodes) {
+      if (n.kind === "submenu") walk(area, n.items);
+      else if (n.kind !== "separator" && n.shortcut) out.push({ area, name: n.label.replace(/…$/, ""), keys: n.shortcut });
+    }
+  };
+  for (const top of menu) if (top.kind === "submenu") walk(top.label, top.items);
+  return out;
+}
+
+/** Search: every word must appear in the name, the keys or the area, ignoring case ("zoom", "ctrl+b", "view full"). */
+export function filterShortcuts(entries: readonly ShortcutEntry[], query: string): ShortcutEntry[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  return entries.filter((e) => {
+    const text = `${e.name} ${e.keys} ${e.area}`.toLowerCase();
+    return words.every((w) => text.includes(w));
+  });
 }
