@@ -234,13 +234,15 @@ if (!app.requestSingleInstanceLock()) {
     for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(windowBackground());
   });
 
-  // Don't lose the last sidebar toggle (or the notice flag) to a fast quit: let pending writes land first.
-  let flushedLog = false;
+  // Don't lose the last sidebar toggle (or the notice flag) to a fast quit: let pending writes land first. By
+  // will-quit the windows are closed and every quit handler has run, so finish with app.exit() rather than a second
+  // app.quit(): on Linux a re-entered quit after DevTools have been opened is sometimes dropped and the app hangs.
+  let exiting = false;
   app.on("will-quit", (e) => {
-    if (!store.pending && !appState.pending && flushedLog) return;
     e.preventDefault();
-    flushedLog = true;
-    void Promise.all([store.flush(), appState.flush(), log.flush()]).finally(() => app.quit());
+    if (exiting) return;
+    exiting = true;
+    void Promise.all([store.flush(), appState.flush(), log.flush()]).finally(() => app.exit(0));
   });
 
   // Only reached when close-to-tray is off or the app is quitting.

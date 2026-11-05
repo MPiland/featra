@@ -115,6 +115,26 @@ test.describe("AC6: close to tray", () => {
     }
   });
 
+  // Regression: on Linux, quitting after the developer tools had been opened used to hang (a re-entered app.quit()).
+  test("File > Exit still exits after Toggle Developer Tools has been used", async () => {
+    const profile = await tempUserData();
+    try {
+      const { app, page } = await launch(profile.dir);
+      await chooseFromMenu(page, "Help", "Troubleshooting", "Toggle Developer Tools");
+      await expect
+        .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.isDevToolsOpened()))
+        .toBe(true);
+      const exit = exited(app);
+      await chooseFromMenu(page, "File", "Exit").catch((e: Error) => {
+        if (!/has been closed/.test(e.message)) throw e;
+      });
+      expect(await exit).toBe(0);
+      expect(await readFile(join(profile.dir, "logs", "main.log"), "utf8")).toMatch(/Quitting\n$/);
+    } finally {
+      await profile.dispose();
+    }
+  });
+
   test("File > Close Window and Ctrl+Shift+W hide the window to the tray, like the close button", async () => {
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
@@ -134,7 +154,7 @@ test.describe("AC6: close to tray", () => {
     }
   });
 
-  test("Ctrl+Q does not quit on Windows: Exit has no shortcut", async () => {
+  test("Ctrl+Q does not quit on Windows and Linux: Exit has no shortcut", async () => {
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     try {
