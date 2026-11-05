@@ -1,12 +1,12 @@
 ---
-id: PBI-4
-type: pbi
-title: "Side panel views and edits a card"
+id: STORY-17
+type: story
+title: Read-only stage board
 status: New
-parent: "FEAT-2"
+parent: FEAT-7
 order: 3
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -24,16 +24,15 @@ history:
 
 ## Description
 
-Side panel views and edits a card.
+Read-only stage board.
 
 ## Acceptance criteria
 
-- [ ] Clicking a PBI opens a side panel with fields, ACs, tasks and notes; the list stays visible
-- [ ] Saving writes only to the owner copy and appends a history event for status or parent changes
+- [ ] A toggle shows in-flight stories as stage columns, for all features or one
+- [ ] Cards cannot be dragged; stages change only through agents, merges or the side panel
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
-

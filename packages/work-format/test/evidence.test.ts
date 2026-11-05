@@ -10,10 +10,10 @@ import {
   VERIFIED,
 } from "../src/index.ts";
 import type { Card } from "../src/index.ts";
-import { at, config, feature, moves, pbi } from "./fixtures.ts";
+import { at, config, feature, moves, story } from "./fixtures.ts";
 
 const withAcs = (n: number): Card => ({
-  ...pbi("PBI-1", "FEAT-1"),
+  ...story("STORY-1", "FEAT-1"),
   acs: Array.from({ length: n }, (_, i) => ({ text: `ac${i + 1}`, done: false, test: `t${i + 1}` })),
 });
 
@@ -64,6 +64,14 @@ describe("checkTransition", () => {
     expect(checkTransition(recordAcceptance(verified, true, "user", at(2)), "Done", config)).toEqual({ ok: true });
   });
 
+  it("a researcher story (no code, no CI) reaches Done on Accepted alone, even when the project doesn't require Accept", () => {
+    const research: Card = { ...withAcs(1), role: "researcher" };
+    for (const cfg of [config, { ...config, requireAccept: false }]) {
+      expect(checkTransition(research, "Done", cfg)).toMatchObject({ ok: false, reason: expect.stringMatching(/Accept/) });
+      expect(checkTransition(recordAcceptance(research, true, "user", at(2)), "Done", cfg)).toEqual({ ok: true });
+    }
+  });
+
   it("other stages and Cancelled need no evidence; unknown stages are refused", () => {
     expect(checkTransition(withAcs(1), "In Review", config)).toEqual({ ok: true });
     expect(checkTransition(withAcs(1), "Cancelled", config)).toEqual({ ok: true });
@@ -72,9 +80,9 @@ describe("checkTransition", () => {
 
   it("a feature is done only when its items are done and it is Accepted", () => {
     const f = feature("FEAT-1");
-    const open = [moves(pbi("PBI-1", "FEAT-1"), [1, "Done"]), pbi("PBI-2", "FEAT-1"), moves(pbi("PBI-3", "FEAT-1"), [1, "Cancelled"])];
-    expect(checkTransition(f, "done", config, open)).toMatchObject({ ok: false, reason: expect.stringMatching(/PBI-2/) });
-    const allDone = open.map((c) => (c.id === "PBI-2" ? moves(c, [2, "Done"]) : c));
+    const open = [moves(story("STORY-1", "FEAT-1"), [1, "Done"]), story("STORY-2", "FEAT-1"), moves(story("STORY-3", "FEAT-1"), [1, "Cancelled"])];
+    expect(checkTransition(f, "done", config, open)).toMatchObject({ ok: false, reason: expect.stringMatching(/STORY-2/) });
+    const allDone = open.map((c) => (c.id === "STORY-2" ? moves(c, [2, "Done"]) : c));
     expect(checkTransition(f, "done", config, allDone)).toMatchObject({ ok: false, reason: expect.stringMatching(/Accept/) });
     expect(checkTransition(recordAcceptance(f, true, "user", at(3)), "done", config, allDone)).toEqual({ ok: true });
     expect(checkTransition(f, "In Progress", config).ok).toBe(false);

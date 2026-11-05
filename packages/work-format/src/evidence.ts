@@ -58,15 +58,17 @@ const CONTAINER_STATUSES: ContainerStatus[] = ["draft", "approved", "active", "d
 
 /**
  * Whether a card may move to `to`.
- * - PBIs/bugs: the target must be a project stage or Cancelled; a done-category stage needs Verified,
- *   plus Accepted when the project requires it.
+ * - stories/bugs: the target must be a project stage or Cancelled; a done-category stage needs Verified,
+ *   plus Accepted when the project requires it. Researcher stories need Accepted only (no code, no CI).
  * - Features: `done` needs every non-cancelled item done, plus Accepted when required.
  */
 export function checkTransition(card: Card, to: string, config: ProjectConfig, cards: readonly Card[] = []): TransitionCheck {
-  if (card.type === "pbi" || card.type === "bug") {
+  if (card.type === "story" || card.type === "bug") {
     if (!isKnownStatus(to, config)) return { ok: false, reason: `"${to}" is not a stage in this project` };
     if (to !== CANCELLED && stageCategory(to, config) === "done") {
       const ev = evidenceState(card);
+      // Researcher stories produce findings, not code: there is no CI, so the user's Accept is the evidence.
+      if (card.role === "researcher") return ev.accepted ? { ok: true } : { ok: false, reason: "needs your Accept (research has no CI to verify)" };
       if (!ev.verified) return { ok: false, reason: "needs Verified: the PR's CI checks have not passed" };
       if (config.requireAccept && !ev.accepted) return { ok: false, reason: "needs your Accept" };
     }
@@ -75,7 +77,7 @@ export function checkTransition(card: Card, to: string, config: ProjectConfig, c
   if (!CONTAINER_STATUSES.includes(to as ContainerStatus)) return { ok: false, reason: `"${to}" is not a valid ${card.type} status` };
   if (card.type === "feature" && to === "done") {
     const open = cards.filter(
-      (c) => (c.type === "pbi" || c.type === "bug") && c.parent === card.id && c.status !== CANCELLED && stageCategory(c.status, config) !== "done",
+      (c) => (c.type === "story" || c.type === "bug") && c.parent === card.id && c.status !== CANCELLED && stageCategory(c.status, config) !== "done",
     );
     if (open.length) return { ok: false, reason: `${open.length} item(s) not done: ${open.map((c) => c.id).join(", ")}` };
     if (config.requireAccept && !evidenceState(card).accepted) return { ok: false, reason: "needs your Accept" };

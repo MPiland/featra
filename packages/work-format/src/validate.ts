@@ -11,7 +11,7 @@ const CONTAINER_STATUSES: ContainerStatus[] = ["draft", "approved", "active", "d
 const ALLOWED_PARENT: Record<CardType, { types: CardType[]; required: boolean }> = {
   epic: { types: [], required: false },
   feature: { types: ["epic"], required: false },
-  pbi: { types: ["feature"], required: true },
+  story: { types: ["feature"], required: true },
   bug: { types: ["feature"], required: false },
 };
 
@@ -27,7 +27,7 @@ export function validateCards(cards: readonly Card[], config: ProjectConfig): Ca
     const p = parseId(c.id);
     if (!p || p.prefix !== ID_PREFIX[c.type]) issues.push({ id: c.id, message: `id should look like ${ID_PREFIX[c.type]}-<n>` });
 
-    if (c.type === "pbi" || c.type === "bug") {
+    if (c.type === "story" || c.type === "bug") {
       if (!isKnownStatus(c.status, config)) issues.push({ id: c.id, message: `unknown stage "${c.status}"` });
     } else if (!CONTAINER_STATUSES.includes(c.status as ContainerStatus)) {
       issues.push({ id: c.id, message: `status must be one of ${CONTAINER_STATUSES.join(", ")}` });

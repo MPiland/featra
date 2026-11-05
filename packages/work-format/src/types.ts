@@ -1,12 +1,12 @@
-export type CardType = "epic" | "feature" | "pbi" | "bug";
+export type CardType = "epic" | "feature" | "story" | "bug";
 
 /** Why a card exists. `added` = created after its feature's scope baseline. */
 export type Origin = "planned" | "added" | "bug";
 
-/** Lifecycle of epics and features (PBIs and bugs use the project's stages instead). */
+/** Lifecycle of epics and features (stories and bugs use the project's stages instead). */
 export type ContainerStatus = "draft" | "approved" | "active" | "done" | "cancelled";
 
-/** PBIs and bugs use project stage names; `Cancelled` is always available. */
+/** stories and bugs use project stage names; `Cancelled` is always available. */
 export const CANCELLED = "Cancelled";
 
 export type HistoryField = "status" | "parent" | "evidence" | "accepted";
@@ -70,7 +70,7 @@ export interface Stage {
   category: StageCategory;
 }
 
-export type ProgressMode = "pbis" | "tasks";
+export type ProgressMode = "stories" | "tasks";
 export type KnowledgePermission = "edit" | "propose" | "read-only";
 
 export interface ProjectConfig {

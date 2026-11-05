@@ -5,8 +5,8 @@ const KNOWN_KEYS = [
   "id", "type", "title", "status", "parent", "order", "origin", "role", "agent", "model", "reasoning",
   "sessions", "branch", "pr", "created", "history",
 ] as const;
-const PBI_ONLY_KEYS = new Set(["role", "agent", "model", "reasoning", "sessions", "branch", "pr"]);
-const CARD_TYPES: CardType[] = ["epic", "feature", "pbi", "bug"];
+const STORY_ONLY_KEYS = new Set(["role", "agent", "model", "reasoning", "sessions", "branch", "pr"]);
+const CARD_TYPES: CardType[] = ["epic", "feature", "story", "bug"];
 const ORIGINS: Origin[] = ["planned", "added", "bug"];
 
 const H_DESCRIPTION = "Description";
@@ -25,7 +25,7 @@ export class CardParseError extends Error {
 
 /** True for card types that carry agent/branch fields and stage-based statuses. */
 export function isWorkItem(type: CardType): boolean {
-  return type === "pbi" || type === "bug";
+  return type === "story" || type === "bug";
 }
 
 export function parseCard(text: string, source?: string): Card {
@@ -98,7 +98,7 @@ export function serializeCard(card: Card): string {
   fm.created = card.created;
   fm.history = card.history.map((h) => ({ at: h.at, field: h.field, from: h.from, to: h.to, by: h.by }));
   for (const [k, v] of Object.entries(card.extra)) {
-    if (!(k in fm) && !PBI_ONLY_KEYS.has(k)) fm[k] = v;
+    if (!(k in fm) && !STORY_ONLY_KEYS.has(k)) fm[k] = v;
   }
 
   const yaml = stringify(fm, { lineWidth: 0, nullStr: "null" }).trimEnd();

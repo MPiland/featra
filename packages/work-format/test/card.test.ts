@@ -15,9 +15,9 @@ import {
 const REPO = join(import.meta.dirname, "..", "..", "..");
 const CARDS_DIR = join(REPO, ".featra", "cards");
 
-const PBI = `---
-id: PBI-7
-type: pbi
+const story = `---
+id: STORY-7
+type: story
 title: "Side panel: view and edit"
 status: In Progress
 parent: FEAT-2
@@ -29,7 +29,7 @@ model: claude-sonnet-5-5
 reasoning: high
 sessions:
   - s-1
-branch: feat-2/pbi-7
+branch: feat-2/story-7
 pr: https://github.com/o/r/pull/4
 created: 2026-11-04T23:00:00Z
 history:
@@ -71,10 +71,10 @@ See ADR 0002.
 
 describe("parseCard", () => {
   it("reads frontmatter, ACs with test refs, tasks, notes and unknown sections", () => {
-    const c = parseCard(PBI);
+    const c = parseCard(story);
     expect(c).toMatchObject({
-      id: "PBI-7",
-      type: "pbi",
+      id: "STORY-7",
+      type: "story",
       title: "Side panel: view and edit",
       status: "In Progress",
       parent: "FEAT-2",
@@ -101,15 +101,15 @@ describe("parseCard", () => {
   });
 
   it("accepts CRLF line endings", () => {
-    expect(parseCard(PBI.replace(/\n/g, "\r\n")).acs).toHaveLength(2);
+    expect(parseCard(story.replace(/\n/g, "\r\n")).acs).toHaveLength(2);
   });
 
   it.each([
     ["no frontmatter", "# hello"],
-    ["unknown type", PBI.replace("type: pbi", "type: story")],
-    ["missing id", PBI.replace("id: PBI-7\n", "")],
-    ["unknown origin", PBI.replace("origin: added", "origin: magic")],
-    ["history not a list", PBI.replace(/history:[\s\S]*?estimate/, "history: nope\nestimate")],
+    ["unknown type", story.replace("type: story", "type: widget")],
+    ["missing id", story.replace("id: STORY-7\n", "")],
+    ["unknown origin", story.replace("origin: added", "origin: magic")],
+    ["history not a list", story.replace(/history:[\s\S]*?estimate/, "history: nope\nestimate")],
   ])("rejects %s", (_, text) => {
     expect(() => parseCard(text, "x.md")).toThrow(CardParseError);
   });
@@ -117,31 +117,31 @@ describe("parseCard", () => {
 
 describe("serializeCard", () => {
   it("round-trips without losing anything", () => {
-    const c = parseCard(PBI);
+    const c = parseCard(story);
     expect(parseCard(serializeCard(c))).toEqual(c);
   });
 
   it("is stable: serializing a parsed serialization gives the same text", () => {
-    const once = serializeCard(parseCard(PBI));
+    const once = serializeCard(parseCard(story));
     expect(serializeCard(parseCard(once))).toBe(once);
   });
 
-  it("omits PBI-only fields and sections for epics and features", () => {
+  it("omits story-only fields and sections for epics and features", () => {
     const text = serializeCard(newCard({ id: "FEAT-1", type: "feature", title: "Login", status: "draft", parent: "EPIC-1" }, "user", "2026-11-04T23:00:00Z"));
     expect(text).not.toMatch(/^role:/m);
     expect(text).not.toMatch(/^## Acceptance criteria/m);
     expect(text).toMatch(/^## Description/m);
   });
 
-  it("writes PBI sections even when empty", () => {
-    const text = serializeCard(newCard({ id: "PBI-1", type: "pbi", title: "X", status: "New", parent: "FEAT-1" }, "user", "2026-11-04T23:00:00Z"));
+  it("writes story sections even when empty", () => {
+    const text = serializeCard(newCard({ id: "STORY-1", type: "story", title: "X", status: "New", parent: "FEAT-1" }, "user", "2026-11-04T23:00:00Z"));
     expect(text).toMatch(/^## Acceptance criteria\n\n## Tasks\n\n## Notes\n$/m);
   });
 });
 
 describe("newCard", () => {
   it("records creation as the first history event", () => {
-    const c = newCard({ id: "PBI-9", type: "pbi", title: "X", status: "New", parent: "FEAT-1" }, "session:a", "2026-11-04T23:00:00Z");
+    const c = newCard({ id: "STORY-9", type: "story", title: "X", status: "New", parent: "FEAT-1" }, "session:a", "2026-11-04T23:00:00Z");
     expect(c.history).toEqual([{ at: "2026-11-04T23:00:00Z", field: "status", from: null, to: "New", by: "session:a" }]);
   });
 });

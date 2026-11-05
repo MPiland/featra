@@ -4,7 +4,7 @@ import { CANCELLED, type Card, type CardType, type Origin, type ProgressMode, ty
 
 // Rollups are always computed from cards, never stored (ADR 0003).
 
-const isItem = (c: Card) => c.type === "pbi" || c.type === "bug";
+const isItem = (c: Card) => c.type === "story" || c.type === "bug";
 const ms = (iso: string) => Date.parse(iso);
 const iso = (t: number) => new Date(t).toISOString().replace(/\.\d{3}Z$/, "Z");
 
@@ -12,7 +12,7 @@ function isDone(status: string | null, config: ProjectConfig): boolean {
   return status !== null && stageCategory(status, config) === "done";
 }
 
-/** PBIs and bugs currently under a feature, excluding Cancelled ones. */
+/** stories and bugs currently under a feature, excluding Cancelled ones. */
 export function itemsOf(featureId: string, cards: readonly Card[]): Card[] {
   return cards.filter((c) => isItem(c) && c.parent === featureId && c.status !== CANCELLED);
 }
@@ -21,18 +21,18 @@ export interface Progress {
   done: number;
   total: number;
   unit: ProgressMode;
-  /** e.g. "6 of 10 PBIs done". Counts only: never a percentage of effort. */
+  /** e.g. "6 of 10 stories done". Counts only: never a percentage of effort. */
   label: string;
 }
 
 export function progressLabel(done: number, total: number, unit: ProgressMode | "features"): string {
-  const noun = unit === "pbis" ? "PBI" : unit === "tasks" ? "task" : "feature";
-  return `${done} of ${total} ${total === 1 ? noun : noun + "s"} done`;
+  const [one, many] = unit === "stories" ? ["story", "stories"] : unit === "tasks" ? ["task", "tasks"] : ["feature", "features"];
+  return `${done} of ${total} ${total === 1 ? one : many} done`;
 }
 
 /**
- * Feature progress as counts. In `tasks` mode a done PBI counts all its tasks as done,
- * so a PBI that finished without ticking boxes doesn't drag the count.
+ * Feature progress as counts. In `tasks` mode a done story counts all its tasks as done,
+ * so a story that finished without ticking boxes doesn't drag the count.
  */
 export function featureProgress(featureId: string, cards: readonly Card[], config: ProjectConfig): Progress {
   const items = itemsOf(featureId, cards);
@@ -40,7 +40,7 @@ export function featureProgress(featureId: string, cards: readonly Card[], confi
   let total = 0;
   for (const item of items) {
     const itemDone = isDone(item.status, config);
-    if (config.progress === "pbis") {
+    if (config.progress === "stories") {
       total += 1;
       if (itemDone) done += 1;
     } else {
@@ -137,7 +137,7 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
 }
 
 /** Origin for a new item under a feature: bugs are `bug`; anything after the baseline is `added`. */
-export function originForNewItem(featureId: string | null, type: "pbi" | "bug", cards: readonly Card[], config: ProjectConfig): Origin {
+export function originForNewItem(featureId: string | null, type: "story" | "bug", cards: readonly Card[], config: ProjectConfig): Origin {
   if (type === "bug") return "bug";
   if (featureId === null) return "planned";
   return scopeBaseline(featureId, cards, config) === null ? "planned" : "added";
@@ -151,7 +151,7 @@ export interface BurnUpPoint {
 
 /**
  * Burn-up series for a feature, built only from cards' `history[]` (never commit times),
- * so uncommitted changes are included. Counts items (PBIs and bugs). No forecast (ADR 0005).
+ * so uncommitted changes are included. Counts items (stories and bugs). No forecast (ADR 0005).
  * A point is emitted whenever scope or done changes.
  */
 export function burnUp(featureId: string, cards: readonly Card[], config: ProjectConfig): BurnUpPoint[] {

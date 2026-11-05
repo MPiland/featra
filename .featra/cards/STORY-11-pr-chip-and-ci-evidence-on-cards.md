@@ -1,12 +1,12 @@
 ---
-id: PBI-11
-type: pbi
-title: "PR chip and CI evidence on cards"
+id: STORY-11
+type: story
+title: PR chip and CI evidence on cards
 status: New
-parent: "FEAT-6"
+parent: FEAT-6
 order: 1
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -28,12 +28,11 @@ PR chip and CI evidence on cards.
 
 ## Acceptance criteria
 
-- [ ] A PBI's PR (opened via the user's `gh`) shows on the card as a chip linking to the PR with state and checks
-- [ ] Passing required checks marks the PBI Verified; passing AC tests mark those ACs Proven
+- [ ] A story's PR (opened via the user's `gh`) shows on the card as a chip linking to the PR with state and checks
+- [ ] Passing required checks marks the story Verified; passing AC tests mark those ACs Proven
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
-

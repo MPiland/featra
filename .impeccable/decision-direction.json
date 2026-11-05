@@ -1,0 +1,124 @@
+{
+  "title": "Choose Featra's visual world",
+  "question": "The shell stays familiar (sidebar, projects switcher, provider-grouped chats). This picks the world for the work view. Keep the roll, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Prompt Book",
+      "kicker": "THE ROLL",
+      "lineage": "Stage manager's prompt book and cue-light panel",
+      "thesis": "You call the show: agents are crew on cue, every PBI a cue with standby and go.",
+      "palette": ["#121315", "#f2efe6", "#3d7be0", "#e0a526", "#2f9a5e"],
+      "materials": ["ruled cue sheet", "cue-light dots", "pencil margin notes"],
+      "viewport": "Feature as a cue sheet: numbered PBI cues down the page, evidence as lit cue lights in the margin.",
+      "risk": "Theatre vocabulary leaks into labels and confuses non-theatre users.",
+      "raised": [
+        { "from": "challenger-catalog", "raise": "IDs set as catalog numbers: FEAT-1 and PBI-3 are the strongest type on a row." },
+        { "from": "challenger-timetable", "raise": "Counts and dates in tabular figures, aligned in strict columns." },
+        { "from": "challenger-specimen", "raise": "Evidence strength carried by type weight, not only colour." }
+      ],
+      "comp": ".impeccable/mocks/decision/assigned.webp"
+    },
+    {
+      "id": "model-pick",
+      "label": "Flight Strips",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Air traffic control flight progress strips and strip bays",
+      "thesis": "Each PBI is a strip handed between bays; you are the controller who clears it.",
+      "palette": ["#16191d", "#eceae3", "#f0c419", "#3a7bd5", "#2e9e62"],
+      "materials": ["printed strips", "strip holders", "grease-pencil marks"],
+      "viewport": "Feature rows as strip bays; PBI strips with callsign ID, agent, stage and evidence marks in fixed fields.",
+      "risk": "Fixed strip fields get cramped at 13-inch widths.",
+      "comp": ".impeccable/mocks/decision/model-pick.webp"
+    },
+    {
+      "id": "challenger-wayfinding",
+      "label": "Airport Wayfinding",
+      "verdict": "competitive",
+      "lineage": "Airport yellow-on-black sign systems",
+      "thesis": "Status as signage: what needs you reads from across the room.",
+      "palette": ["#141414", "#ffd200", "#ffffff", "#5a5a5a"],
+      "materials": ["sign panels", "pictograms", "high-contrast type"],
+      "viewport": "A 'Waiting on you' sign band above the feature list; arrows route each item to its next step.",
+      "case": "Fuses well for the Inbox and approvals; loses on calm for long sessions.",
+      "risk": "Yellow everywhere turns into alarm fatigue."
+    },
+    {
+      "id": "challenger-warm-app",
+      "label": "Warm Consumer App",
+      "verdict": "competitive",
+      "lineage": "Friendly consumer productivity apps",
+      "thesis": "Soft, warm, approachable: the PM view for people who are not engineers.",
+      "palette": ["#fbf7f1", "#2b2622", "#d9673f", "#7a9c6b"],
+      "materials": ["rounded cards", "warm neutrals", "soft shadows"],
+      "viewport": "Feature cards with friendly counts and avatars for each agent.",
+      "case": "Matches the vibecoder audience; loses on density for long sessions.",
+      "risk": "Reads like a to-do app, not a place where code ships."
+    },
+    {
+      "id": "challenger-specimen",
+      "label": "Type Specimen",
+      "verdict": "declined",
+      "lineage": "Variable-font specimen sheets",
+      "thesis": "Typography as the whole interface.",
+      "palette": ["#0e0e0e", "#f4f1ea", "#ff4f1f"],
+      "materials": ["weight axes", "large specimens"],
+      "viewport": "Feature titles set huge, weight tracking progress.",
+      "case": "Fuses poorly: builders scan status, not type.",
+      "risk": "Pretty, unscannable.",
+      "kept": "Evidence strength carried by type weight."
+    },
+    {
+      "id": "challenger-folio",
+      "label": "Botanical Folio",
+      "verdict": "declined",
+      "lineage": "Botanical plate folios",
+      "thesis": "Every feature a captioned plate.",
+      "palette": ["#f3eee2", "#2f3b2a", "#8a6d3b"],
+      "materials": ["plates", "captions", "rag paper"],
+      "viewport": "One feature per plate with captioned PBIs.",
+      "case": "Fuses poorly: too slow for a working tool.",
+      "risk": "Ornamental in an Operate surface.",
+      "kept": "Captioned evidence under each item."
+    },
+    {
+      "id": "challenger-catalog",
+      "label": "Factory Catalog",
+      "verdict": "declined",
+      "lineage": "Saville / Factory Records catalog sleeves",
+      "thesis": "Everything numbered like a catalog release.",
+      "palette": ["#e9e6df", "#111111", "#d6332a"],
+      "materials": ["catalog numbers", "flat colour fields"],
+      "viewport": "FEAT and PBI numbers as the dominant marks.",
+      "case": "Fuses partially: numbering yes, sleeve art no.",
+      "risk": "Style over function.",
+      "kept": "IDs as catalog numbers."
+    },
+    {
+      "id": "challenger-timetable",
+      "label": "Timetable Rack",
+      "verdict": "declined",
+      "lineage": "Raked airline timetable slide racks",
+      "thesis": "The schedule as a rack of slides.",
+      "palette": ["#1b2230", "#f2f2ee", "#e2a23b"],
+      "materials": ["slide cards", "tabular figures"],
+      "viewport": "Racked feature slides with time columns.",
+      "case": "Fuses poorly: implies a schedule, and Featra has no forecast.",
+      "risk": "Suggests dates the product refuses to promise.",
+      "kept": "Tabular figures in strict columns."
+    }
+  ],
+  "reroll": { "registers": ["safer", "bolder"] },
+  "buildPath": { "value": "code", "toggle": false },
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "What ADEs ship (Conductor, T3 Code, Codex app), executed impeccably.",
+    "palette": ["#0f1115", "#e6e7ea", "#5b8cff"],
+    "materials": ["neutral dark chrome", "monospace accents", "thin dividers"],
+    "viewport": "Sidebar, chat pane, and a tidy list view for the work, at full craft.",
+    "risk": "Indistinguishable from the other ADEs, including the work view.",
+    "comp": ".impeccable/mocks/decision/canon.webp"
+  },
+  "steer": true
+}

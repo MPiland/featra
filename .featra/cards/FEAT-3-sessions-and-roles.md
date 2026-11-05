@@ -1,10 +1,10 @@
 ---
 id: FEAT-3
 type: feature
-title: "Sessions and roles"
+title: Sessions and roles
 status: approved
-parent: "EPIC-1"
-order: 3
+parent: EPIC-1
+order: 4
 origin: planned
 created: 2026-11-04T23:00:00Z
 history:
@@ -18,3 +18,9 @@ history:
 ## Description
 
 Run Claude sessions inside Featra from role presets, with questions surfaced as cards.
+
+## Depends on
+
+- FEAT-1 Provider spike
+- FEAT-2 Cards, ownership and feature list
+- FEAT-13 App shell, projects and settings

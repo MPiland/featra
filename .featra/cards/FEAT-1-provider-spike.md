@@ -1,9 +1,9 @@
 ---
 id: FEAT-1
 type: feature
-title: "Provider spike"
+title: Provider spike
 status: approved
-parent: "EPIC-1"
+parent: EPIC-1
 order: 1
 origin: planned
 created: 2026-11-04T23:00:00Z
@@ -18,3 +18,7 @@ history:
 ## Description
 
 Prove the Claude Agent SDK works for Featra's needs before building on it.
+
+## Depends on
+
+- Nothing

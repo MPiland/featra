@@ -1,12 +1,12 @@
 ---
-id: PBI-13
-type: pbi
-title: "Bug routing"
+id: STORY-13
+type: story
+title: Bug routing
 status: New
-parent: "FEAT-6"
+parent: FEAT-6
 order: 3
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -30,11 +30,10 @@ Bug routing.
 
 - [ ] A regression caused by the in-progress feature becomes a bug card under it with origin `bug` and a bug icon
 - [ ] A bug with no in-progress cause goes to the project bug list
-- [ ] A problem in a PBI still being worked becomes a task on that PBI
+- [ ] A problem in a story still being worked becomes a task on that story
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
-

@@ -1,10 +1,10 @@
 ---
 id: FEAT-5
 type: feature
-title: "Delegation"
+title: Delegation
 status: approved
-parent: "EPIC-1"
-order: 5
+parent: EPIC-1
+order: 6
 origin: planned
 created: 2026-11-04T23:00:00Z
 history:
@@ -17,4 +17,8 @@ history:
 
 ## Description
 
-Approved features become a branch and PBI sessions in worktrees, visible live.
+Approved features become a branch and story sessions in worktrees, visible live.
+
+## Depends on
+
+- FEAT-4 Shaping

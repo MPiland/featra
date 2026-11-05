@@ -1,12 +1,12 @@
 ---
-id: PBI-16
-type: pbi
-title: "Feature burn-up chart"
+id: STORY-6
+type: story
+title: Edit role presets
 status: New
-parent: "FEAT-7"
+parent: FEAT-3
 order: 2
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -24,17 +24,15 @@ history:
 
 ## Description
 
-Feature burn-up chart.
+Edit role presets.
 
 ## Acceptance criteria
 
-- [ ] Burn-up shows scope and done lines over time built from cards' `history[]`
-- [ ] Changes that were never committed still appear in the chart
-- [ ] No forecast or completion date is shown
+- [ ] Five presets exist by default: Researcher, Analyst/Refiner, Dev Lead, Developer, QA
+- [ ] Each preset's prompt template, model and reasoning can be edited per project
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
-

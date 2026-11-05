@@ -1,12 +1,12 @@
 ---
-id: PBI-12
-type: pbi
-title: "Manual merge into feature branch"
+id: STORY-12
+type: story
+title: Manual merge into feature branch
 status: New
-parent: "FEAT-6"
+parent: FEAT-6
 order: 2
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -28,14 +28,13 @@ Manual merge into feature branch.
 
 ## Acceptance criteria
 
-- [ ] A Merge button merges the PBI's PR into the feature branch
-- [ ] On conflict the PBI returns to its session with the conflict details
+- [ ] A Merge button merges the story's PR into the feature branch
+- [ ] On conflict the story returns to its session with the conflict details
 - [ ] After merge, card ownership moves to the feature branch and the worktree is archived
-- [ ] Abandoning a PBI asks whether to keep its card as Cancelled or discard it
+- [ ] Abandoning a story asks whether to keep its card as Cancelled or discard it
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
-

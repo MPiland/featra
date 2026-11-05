@@ -3,7 +3,7 @@
 Date: 2026-11-04 · Status: accepted
 
 ## Context
-Cards are markdown files committed with the code, and each PBI is built in its own worktree off a feature branch. The
+Cards are markdown files committed with the code, and each story is built in its own worktree off a feature branch. The
 same card therefore exists in several branches at once. "Show the freshest copy" is not a rule: copies can conflict,
 and git history loses status changes that were never committed.
 
@@ -14,8 +14,8 @@ Each card has exactly one owning location at a time:
 |---|---|
 | Draft or backlog | main |
 | Active feature | its feature branch |
-| Active PBI | its worktree |
-| PBI after merge | the feature branch |
+| Active story | its worktree |
+| Story after merge | the feature branch |
 | Anything after feature merge | main |
 
 The app and the MCP write only to the owner; only the owner's copy is shown; edits to a stale copy are flagged, never

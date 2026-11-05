@@ -1,8 +1,8 @@
 ---
-id: PBI-1
-type: pbi
+id: STORY-1
+type: story
 title: Claude Agent SDK spike
-status: Acceptance
+status: Done
 parent: FEAT-1
 order: 1
 origin: planned
@@ -34,6 +34,11 @@ history:
     field: accepted
     from: null
     to: accepted
+    by: user
+  - at: 2026-11-05T15:19:02Z
+    field: status
+    from: Acceptance
+    to: Done
     by: user
 ---
 

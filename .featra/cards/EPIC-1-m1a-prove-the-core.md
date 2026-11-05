@@ -17,4 +17,4 @@ history:
 
 ## Description
 
-One complete loop with manual merges: shape → draft cards → spawn PBI sessions → live feature list with scope baseline and evidence states → PR/CI → burn-up → board. Success test: a builder can say what remains and what changed in scope without asking the orchestrator.
+One complete loop with manual merges: shape → draft cards → spawn story sessions → live feature list with scope baseline and evidence states → PR/CI → burn-up → board. Success test: a builder can say what remains and what changed in scope without asking the orchestrator.

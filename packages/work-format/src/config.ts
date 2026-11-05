@@ -13,7 +13,7 @@ export const DEFAULT_STAGES: Stage[] = [
 export const DEFAULT_CONFIG: ProjectConfig = {
   version: 1,
   stages: DEFAULT_STAGES,
-  progress: "pbis",
+  progress: "stories",
   requireAccept: true,
   baseBranch: "main",
   worktrees: true,
@@ -31,8 +31,8 @@ export function parseConfig(text: string): ProjectConfig {
   const raw = (parse(text) ?? {}) as Record<string, unknown>;
   const config: ProjectConfig = { ...DEFAULT_CONFIG, ...pick(raw) };
   validateStages(config.stages);
-  if (config.progress !== "pbis" && config.progress !== "tasks") {
-    throw new ConfigError(`progress must be "pbis" or "tasks", got ${String(config.progress)}`);
+  if (config.progress !== "stories" && config.progress !== "tasks") {
+    throw new ConfigError(`progress must be "stories" or "tasks", got ${String(config.progress)}`);
   }
   return config;
 }
@@ -62,7 +62,7 @@ function validateStages(stages: unknown): asserts stages is Stage[] {
   if (!(stages as Stage[]).some((s) => s.category === "done")) throw new ConfigError("at least one stage must be in the done category");
 }
 
-/** Category of a PBI/bug status. Cancelled and unknown statuses return null (they count toward nothing). */
+/** Category of a story/bug status. Cancelled and unknown statuses return null (they count toward nothing). */
 export function stageCategory(status: string, config: ProjectConfig): StageCategory | null {
   return config.stages.find((s) => s.name === status)?.category ?? null;
 }

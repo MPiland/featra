@@ -1,10 +1,10 @@
 ---
 id: FEAT-6
 type: feature
-title: "PRs, CI, merges and bugs"
+title: PRs, CI, merges and bugs
 status: approved
-parent: "EPIC-1"
-order: 6
+parent: EPIC-1
+order: 7
 origin: planned
 created: 2026-11-04T23:00:00Z
 history:
@@ -18,3 +18,7 @@ history:
 ## Description
 
 Evidence from GitHub on every card, manual merges, and bug routing.
+
+## Depends on
+
+- FEAT-5 Delegation

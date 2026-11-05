@@ -1,10 +1,10 @@
 ---
 id: FEAT-2
 type: feature
-title: "Cards, ownership and feature list"
+title: Cards, ownership and feature list
 status: approved
-parent: "EPIC-1"
-order: 2
+parent: EPIC-1
+order: 3
 origin: planned
 created: 2026-11-04T23:00:00Z
 history:
@@ -18,3 +18,8 @@ history:
 ## Description
 
 Markdown cards with single ownership, shown live as the home feature list.
+
+## Depends on
+
+- FEAT-1 Provider spike
+- FEAT-13 App shell, projects and settings

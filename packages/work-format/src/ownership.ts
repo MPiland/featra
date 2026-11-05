@@ -15,7 +15,7 @@ export interface FeatureBranchState {
 export interface WorktreeState {
   branch: string;
   path: string;
-  /** True once the PBI's work has been merged into its feature branch. */
+  /** True once the story's work has been merged into its feature branch. */
   merged: boolean;
 }
 
@@ -31,8 +31,8 @@ export const MAIN: OwnerLocation = { kind: "main" };
  * The single owning location of a card:
  * - epics, drafts and backlog cards: main
  * - a started feature (branch exists, not merged): its feature branch
- * - a PBI or bug with a live worktree: that worktree
- * - a PBI or bug whose worktree merged (or never existed) under a started feature: the feature branch
+ * - a story or bug with a live worktree: that worktree
+ * - a story or bug whose worktree merged (or never existed) under a started feature: the feature branch
  * - everything once its feature has merged to main: main
  */
 export function ownerOf(card: Pick<Card, "id" | "type" | "parent">, state: BranchState): OwnerLocation {
@@ -41,7 +41,7 @@ export function ownerOf(card: Pick<Card, "id" | "type" | "parent">, state: Branc
       return MAIN;
     case "feature":
       return activeFeature(card.id, state) ?? MAIN;
-    case "pbi":
+    case "story":
     case "bug": {
       const wt = state.worktrees[card.id];
       if (wt && !wt.merged) return { kind: "worktree", branch: wt.branch, path: wt.path };

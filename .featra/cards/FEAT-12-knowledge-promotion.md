@@ -1,9 +1,9 @@
 ---
 id: FEAT-12
 type: feature
-title: "Knowledge promotion"
+title: Knowledge promotion
 status: draft
-parent: "EPIC-2"
+parent: EPIC-2
 order: 12
 origin: planned
 created: 2026-11-04T23:00:00Z
@@ -17,4 +17,9 @@ history:
 
 ## Description
 
-On PBI completion, sessions promote durable facts per the permission setting.
+On story completion, sessions promote durable facts per the permission setting.
+
+## Depends on
+
+- FEAT-3 Sessions and roles
+- FEAT-6 PRs, CI, merges and bugs

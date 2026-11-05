@@ -1,9 +1,9 @@
 ---
 id: FEAT-9
 type: feature
-title: "Approval screen"
+title: Approval screen
 status: draft
-parent: "EPIC-2"
+parent: EPIC-2
 order: 9
 origin: planned
 created: 2026-11-04T23:00:00Z
@@ -18,3 +18,7 @@ history:
 ## Description
 
 ACs with proof, a plain-language summary of changes and a diff link; Approve merges to main.
+
+## Depends on
+
+- FEAT-6 PRs, CI, merges and bugs

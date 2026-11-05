@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { parentAt, recordAcceptance, recordEvidence, setParent, setStatus, statusAt, toIso } from "../src/index.ts";
-import { at, moves, pbi } from "./fixtures.ts";
+import { at, moves, story } from "./fixtures.ts";
 
 const t = (m: number) => Date.parse(at(m));
 
 describe("history", () => {
   it("setStatus appends an event and never rewrites earlier ones", () => {
-    const c0 = pbi("PBI-1", "FEAT-1");
+    const c0 = story("STORY-1", "FEAT-1");
     const c1 = setStatus(c0, "In Progress", "session:a", at(5));
     expect(c1.status).toBe("In Progress");
     expect(c1.history.slice(0, c0.history.length)).toEqual(c0.history);
@@ -15,13 +15,13 @@ describe("history", () => {
   });
 
   it("setStatus and setParent are no-ops when nothing changes", () => {
-    const c = pbi("PBI-1", "FEAT-1");
+    const c = story("STORY-1", "FEAT-1");
     expect(setStatus(c, "New", "user", at(1))).toBe(c);
     expect(setParent(c, "FEAT-1", "user", at(1))).toBe(c);
   });
 
   it("replays status and parent at a point in time", () => {
-    let c = moves(pbi("PBI-1", "FEAT-1", { created: 1 }), [10, "In Progress"], [20, "Done"]);
+    let c = moves(story("STORY-1", "FEAT-1", { created: 1 }), [10, "In Progress"], [20, "Done"]);
     c = setParent(c, "FEAT-2", "user", at(15));
     expect(statusAt(c, t(0))).toBeNull(); // before creation
     expect(statusAt(c, t(5))).toBe("New");
@@ -32,7 +32,7 @@ describe("history", () => {
   });
 
   it("records evidence and acceptance as events", () => {
-    let c = recordEvidence(pbi("PBI-1", "FEAT-1"), "verified", "system", at(3));
+    let c = recordEvidence(story("STORY-1", "FEAT-1"), "verified", "system", at(3));
     c = recordAcceptance(c, true, "user", at(4));
     expect(c.history.slice(-2).map((e) => [e.field, e.to])).toEqual([
       ["evidence", "verified"],

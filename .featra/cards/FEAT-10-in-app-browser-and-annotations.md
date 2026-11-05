@@ -1,9 +1,9 @@
 ---
 id: FEAT-10
 type: feature
-title: "In-app browser and annotations"
+title: In-app browser and annotations
 status: draft
-parent: "EPIC-2"
+parent: EPIC-2
 order: 10
 origin: planned
 created: 2026-11-04T23:00:00Z
@@ -18,3 +18,8 @@ history:
 ## Description
 
 Preview worktrees, annotate elements or regions with full capture, batch to the session tied to the preview.
+
+## Depends on
+
+- FEAT-3 Sessions and roles
+- FEAT-5 Delegation

@@ -1,12 +1,12 @@
 ---
-id: PBI-6
-type: pbi
-title: "Edit role presets"
+id: STORY-14
+type: story
+title: Accept and merge feature to main
 status: New
-parent: "FEAT-3"
-order: 2
+parent: FEAT-6
+order: 4
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -24,16 +24,15 @@ history:
 
 ## Description
 
-Edit role presets.
+Accept and merge feature to main.
 
 ## Acceptance criteria
 
-- [ ] Five presets exist by default: Researcher, Analyst/Refiner, Dev Lead, Developer, QA
-- [ ] Each preset's prompt template, model and reasoning can be edited per project
+- [ ] Merge to main is available only after the user Accepts the feature
+- [ ] After merge, all the feature's cards are owned by main and the feature is Done
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
-

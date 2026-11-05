@@ -1,12 +1,12 @@
 ---
-id: PBI-2
-type: pbi
-title: "Open a folder and initialise Featra"
+id: STORY-2
+type: story
+title: Open a folder and initialise Featra
 status: New
-parent: "FEAT-2"
+parent: FEAT-2
 order: 1
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -24,17 +24,16 @@ history:
 
 ## Description
 
-Open a folder and initialise Featra.
+As a builder, I open a folder and Featra sets it up for card-based work without touching my own files.
 
 ## Acceptance criteria
 
 - [ ] Opening a non-git folder offers git init; opening a repo without `.featra/` offers init
 - [ ] Init scaffolds `.featra/config.yaml`, `CONTEXT.md`, `docs/adr/`, `decisions.md`, `open-questions.md` without overwriting existing files
-- [ ] Agent instruction files (CLAUDE.md, AGENTS.md) are never created or edited
+- [ ] Init never creates or edits agent instruction files (CLAUDE.md, AGENTS.md) on its own
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
-

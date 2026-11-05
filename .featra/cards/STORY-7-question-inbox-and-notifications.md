@@ -1,12 +1,12 @@
 ---
-id: PBI-7
-type: pbi
-title: "Question inbox and notifications"
+id: STORY-7
+type: story
+title: Question inbox and notifications
 status: New
-parent: "FEAT-3"
+parent: FEAT-3
 order: 3
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -24,7 +24,7 @@ history:
 
 ## Description
 
-Question inbox and notifications.
+As a builder, I find every question and approval waiting on me in one Inbox and get notified.
 
 ## Acceptance criteria
 
@@ -37,4 +37,3 @@ Question inbox and notifications.
 - [ ] Break down when picked up
 
 ## Notes
-

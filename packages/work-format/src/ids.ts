@@ -1,6 +1,6 @@
 import type { Card, CardType } from "./types.ts";
 
-export const ID_PREFIX: Record<CardType, string> = { epic: "EPIC", feature: "FEAT", pbi: "PBI", bug: "BUG" };
+export const ID_PREFIX: Record<CardType, string> = { epic: "EPIC", feature: "FEAT", story: "STORY", bug: "BUG" };
 
 export function parseId(id: string): { prefix: string; n: number } | null {
   const m = /^([A-Z]+)-(\d+)$/.exec(id);

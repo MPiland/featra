@@ -1,4 +1,4 @@
-# Spike: Claude Agent SDK (PBI-1)
+# Spike: Claude Agent SDK (STORY-1)
 
 Run 2026-11-04 on Windows 11 with `@anthropic-ai/claude-agent-sdk` 0.3.318 and the user's installed Claude Code
 2.1.301 (`C:\Users\<user>\.local\bin\claude.exe`). Script: `spikes/claude-sdk/spike.mjs`; raw results:

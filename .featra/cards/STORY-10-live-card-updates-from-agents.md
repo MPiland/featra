@@ -1,12 +1,12 @@
 ---
-id: PBI-10
-type: pbi
-title: "Live card updates from agents"
+id: STORY-10
+type: story
+title: Live card updates from agents
 status: New
-parent: "FEAT-5"
+parent: FEAT-5
 order: 2
 origin: planned
-role: "developer"
+role: developer
 agent: claude
 model: null
 reasoning: null
@@ -37,4 +37,3 @@ Live card updates from agents.
 - [ ] Break down when picked up
 
 ## Notes
-
