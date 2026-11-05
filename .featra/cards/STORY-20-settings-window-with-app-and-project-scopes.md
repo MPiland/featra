@@ -35,6 +35,7 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - [ ] Settings… in the File menu (Ctrl+,) opens the Settings window
 - [ ] App settings include "Close button: keep running in the tray / quit", default keep running; it applies without a restart
 - [ ] Settings has a Keyboard shortcuts page listing every shortcut by area, searchable; Help > Keyboard shortcuts and Ctrl+/ open it
+- [ ] Settings > Appearance has a Theme choice (System, Light, Dark), default System; the choice survives a restart (moved here from the View menu)
 
 ## Tasks
 
