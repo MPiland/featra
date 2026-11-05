@@ -2,7 +2,7 @@
 id: STORY-20
 type: story
 title: Settings window with app and project scopes
-status: New
+status: In Progress
 parent: FEAT-13
 order: 3
 origin: planned
@@ -19,6 +19,11 @@ history:
     field: status
     from: null
     to: New
+    by: user
+  - at: 2026-11-05T21:07:13Z
+    field: status
+    from: New
+    to: In Progress
     by: user
 ---
 
