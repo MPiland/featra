@@ -20,3 +20,22 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   built-in type stripping without a build step.
 - 2026-11-05 — Researcher stories (no code, so no CI) reach Done on the user's Accept alone, whatever `requireAccept` says.
   All other stories still need Verified.
+- 2026-11-05 — STORY-18 app shell:
+  - The window is frameless and the client draws the title bar, with its own minimise/maximise/close on Windows and
+    Linux. macOS keeps its native traffic lights (`titleBarStyle: hiddenInset`).
+  - The Menu button opens an in-app menu: Toggle sidebar, Settings, Reload window, Toggle developer tools, Quit. The
+    AC doesn't say what the menu holds; later stories add to it.
+  - The title bar shows the view title only ("Work"). The mockup's "· manager" project suffix waits for STORY-19.
+  - Window chrome state (sidebar collapsed) is `ui-state.json` in Electron's `userData`, written by main
+    (atomic, flushed before quit), not renderer `localStorage`. `FEATRA_USER_DATA_DIR` overrides the folder. STORY-20
+    may fold it into app settings.
+  - Back/forward is an in-memory view history; it does not survive a restart.
+  - The light palette mirrors the dark mockup. Two colours differ from the mockup to meet AA: the menu shortcut hint uses
+    `--tx2` (the mockup's `--tx3` is 3.4:1 on a focused item in dark), and light `--ok` is `#186f3f`.
+  - No bundled webfont: Inter if the user has it, else Segoe UI / the system font. Nothing is fetched from Google Fonts.
+  - The client talks to the host only through the `FeatraBridge` contract (`packages/client/src/bridge.ts`); a plain
+    browser gets a localStorage fallback, which keeps the client usable for remote control later.
+  - Main and preload are bundled by Vite to CommonJS, preload on its own because a sandboxed preload can't require chunks.
+  - `pnpm test` runs Vitest and then the Electron e2e suite (which builds first); `pnpm test:unit` runs Vitest only.
+  - Releases younger than pnpm's `minimumReleaseAge` are held back with `overrides` (vite 8.3.5, jsdom 30) or a
+    lower range (electron ~45.2.2), not added to `minimumReleaseAgeExclude`.

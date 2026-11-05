@@ -2,3 +2,7 @@ packages:
   - "packages/*"
   - "apps/*"
   - "spikes/*"
+# Hold back releases younger than pnpm's minimumReleaseAge instead of excluding them from the check.
+overrides:
+  vite: 8.3.5
+  jsdom: ^30.1.3

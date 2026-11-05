@@ -1,0 +1,54 @@
+import { expect, test } from "@playwright/test";
+import { launch, tempUserData } from "./app.ts";
+
+const ENTRIES = ["Work", "Inbox", "Artifacts", "Plugins", "Settings"];
+
+/** STORY-18 journey: the window, its title bar and sidebar, and a collapsed sidebar surviving a restart. */
+test("app window: title bar, sidebar, Ctrl+B collapse survives restart", async () => {
+  const profile = await tempUserData();
+  try {
+    let { app, page } = await launch(profile.dir);
+    const bar = page.getByRole("banner");
+    const sidebar = page.getByRole("navigation", { name: "Featra" });
+    const toggle = bar.getByRole("button", { name: "Toggle sidebar" });
+
+    // Title bar: menu, toggle, back, forward and the current view's title.
+    for (const name of ["Menu", "Toggle sidebar", "Back", "Forward"]) {
+      await expect(bar.getByRole("button", { name })).toBeVisible();
+    }
+    await expect(bar.getByRole("heading", { level: 1 })).toHaveText("Work");
+    await expect(page).toHaveTitle("Featra · Work");
+
+    // Sidebar: every entry is there and opens its view.
+    await expect(sidebar.getByRole("button")).toHaveText(ENTRIES);
+    await sidebar.getByRole("button", { name: "Inbox" }).click();
+    await expect(bar.getByRole("heading", { level: 1 })).toHaveText("Inbox");
+    await bar.getByRole("button", { name: "Back" }).click();
+    await expect(bar.getByRole("heading", { level: 1 })).toHaveText("Work");
+
+    // Ctrl+B collapses it: zero width and out of the tab order.
+    await page.keyboard.press("Control+B");
+    await expect(toggle).toHaveAttribute("aria-expanded", "false");
+    await expect.poll(async () => (await sidebar.boundingBox())?.width ?? 0).toBe(0);
+    await page.getByRole("button", { name: "Menu" }).focus();
+    for (let i = 0; i < 12; i++) {
+      await page.keyboard.press("Tab");
+      expect(await sidebar.evaluate((nav) => nav.contains(document.activeElement))).toBe(false);
+    }
+
+    // Restart: still collapsed.
+    await app.close();
+    ({ app, page } = await launch(profile.dir));
+    const toggle2 = page.getByRole("banner").getByRole("button", { name: "Toggle sidebar" });
+    await expect(toggle2).toHaveAttribute("aria-expanded", "false");
+    const sidebar2 = page.getByRole("navigation", { name: "Featra", includeHidden: true });
+    expect((await sidebar2.boundingBox())?.width ?? 0).toBe(0);
+
+    // The toggle brings it back.
+    await toggle2.click();
+    await expect(page.getByRole("navigation", { name: "Featra" }).getByRole("button")).toHaveText(ENTRIES);
+    await app.close();
+  } finally {
+    await profile.dispose();
+  }
+});
