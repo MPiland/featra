@@ -29,8 +29,13 @@ Requires Node 24+ and pnpm.
 
 ```bash
 pnpm install
-pnpm test
+pnpm start        # build the client and desktop app, then launch Featra
+pnpm test         # unit tests, then the Electron end-to-end tests
+pnpm typecheck
 ```
+
+`pnpm dev:client` serves the UI in a browser with hot reload, for quick UI work. Electron loads that server instead of the
+built client when `FEATRA_CLIENT_URL=http://localhost:5174` is set. The first Electron launch downloads its binary.
 
 ## License
 

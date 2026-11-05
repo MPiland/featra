@@ -8,7 +8,11 @@
     "node": ">=24"
   },
   "scripts": {
-    "test": "vitest run",
+    "start": "pnpm --filter @featra/desktop start",
+    "dev:client": "pnpm --filter @featra/client dev",
+    "test": "vitest run && pnpm run test:e2e",
+    "test:unit": "vitest run",
+    "test:e2e": "pnpm --filter @featra/desktop test:e2e",
     "test:watch": "vitest",
     "typecheck": "pnpm -r --if-present run typecheck"
   },
