@@ -5,7 +5,8 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    "./bridge": "./src/bridge.ts"
+    "./bridge": "./src/bridge.ts",
+    "./zoom": "./src/zoom.ts"
   },
   "scripts": {
     "dev": "vite",

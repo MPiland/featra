@@ -1,46 +1,6 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { App } from "../src/App.tsx";
-import type { FeatraBridge, UiState } from "../src/bridge.ts";
-
-/** Fakes only the host platform: an in-memory store and recorded window calls. */
-function fakeBridge(platform = "win32") {
-  const saves: UiState[] = [];
-  const calls: string[] = [];
-  const bridge: FeatraBridge = {
-    platform,
-    uiState: {
-      load: async () => saves.at(-1) ?? { sidebarCollapsed: false },
-      save: async (s) => void saves.push(s),
-    },
-    window: {
-      minimize: () => void calls.push("minimize"),
-      toggleMaximize: () => void calls.push("toggleMaximize"),
-      close: () => void calls.push("close"),
-    },
-    app: {
-      reload: () => void calls.push("reload"),
-      toggleDevTools: () => void calls.push("toggleDevTools"),
-      quit: () => void calls.push("quit"),
-    },
-  };
-  return { bridge, saves, calls };
-}
-
-function renderApp(opts: { collapsed?: boolean; platform?: string } = {}) {
-  const fake = fakeBridge(opts.platform);
-  const user = userEvent.setup();
-  render(<App bridge={fake.bridge} initialUiState={{ sidebarCollapsed: opts.collapsed ?? false }} />);
-  return { ...fake, user };
-}
-
-const titleBar = () => screen.getByRole("banner");
-const viewTitle = () => screen.getByRole("heading", { level: 1 });
-const sidebar = () => document.getElementById("sidebar") as HTMLElement;
-const isCollapsed = () => sidebar().hasAttribute("inert"); // jsdom has no `inert` property; Chromium behaviour is proved in e2e
-const toggle = () => within(titleBar()).getByRole("button", { name: "Toggle sidebar" });
-const ENTRIES = ["Work", "Inbox", "Artifacts", "Plugins", "Settings"];
+import { collapsedState, ENTRIES, isCollapsed, renderApp, sidebar, titleBar, toggle, viewTitle } from "./harness.tsx";
 
 afterEach(cleanup);
 
@@ -73,44 +33,12 @@ describe("AC1: title bar", () => {
     expect(viewTitle().textContent).toBe("Inbox");
   });
 
-  it("the menu opens from the keyboard and runs its items", async () => {
-    const { user, calls } = renderApp();
-    within(titleBar()).getByRole("button", { name: "Menu" }).focus();
-    await user.keyboard("{Enter}");
-    const menu = screen.getByRole("menu");
-    const items = within(menu).getAllByRole("menuitem");
-    expect(items.map((i) => i.textContent)).toEqual([
-      "Toggle sidebarCtrl+B",
-      "Settings",
-      "Reload window",
-      "Toggle developer tools",
-      "Quit Featra",
-    ]);
-    expect(document.activeElement).toBe(items[0]);
-    await user.keyboard("{ArrowDown}{Enter}");
-    expect(viewTitle().textContent).toBe("Settings");
-    expect(screen.queryByRole("menu")).toBeNull();
-
-    await user.click(within(titleBar()).getByRole("button", { name: "Menu" }));
-    await user.keyboard("{End}{Enter}");
-    expect(calls).toEqual(["quit"]);
-  });
-
-  it("Escape closes the menu and returns focus to the button", async () => {
-    const { user } = renderApp();
-    const button = within(titleBar()).getByRole("button", { name: "Menu" });
-    await user.click(button);
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("menu")).toBeNull();
-    expect(document.activeElement).toBe(button);
-  });
-
   it("draws its own window controls on Windows and Linux, not on macOS", async () => {
-    const { user, calls } = renderApp();
+    const { user, actions } = renderApp();
     await user.click(screen.getByRole("button", { name: "Minimize" }));
     await user.click(screen.getByRole("button", { name: "Maximize" }));
     await user.click(screen.getByRole("button", { name: "Close window" }));
-    expect(calls).toEqual(["minimize", "toggleMaximize", "close"]);
+    expect(actions()).toEqual(["minimize", "toggleMaximize", "close"]);
     cleanup();
     renderApp({ platform: "darwin" });
     expect(screen.queryByRole("button", { name: "Close window" })).toBeNull();
@@ -126,11 +54,11 @@ describe("AC2: collapsing the sidebar", () => {
     await user.click(toggle());
     expect(toggle().getAttribute("aria-expanded")).toBe("false");
     expect(isCollapsed()).toBe(true);
-    expect(saves).toEqual([{ sidebarCollapsed: true }]);
+    expect(saves).toEqual([collapsedState(true)]);
 
     await user.click(toggle());
     expect(isCollapsed()).toBe(false);
-    expect(saves).toEqual([{ sidebarCollapsed: true }, { sidebarCollapsed: false }]);
+    expect(saves).toEqual([collapsedState(true), collapsedState(false)]);
   });
 
   it("Ctrl+B collapses and expands the sidebar and saves each change", async () => {
@@ -139,7 +67,7 @@ describe("AC2: collapsing the sidebar", () => {
     expect(isCollapsed()).toBe(true);
     await user.keyboard("{Control>}b{/Control}");
     expect(isCollapsed()).toBe(false);
-    expect(saves).toEqual([{ sidebarCollapsed: true }, { sidebarCollapsed: false }]);
+    expect(saves).toEqual([collapsedState(true), collapsedState(false)]);
   });
 
   it("Cmd+B does it on macOS", async () => {

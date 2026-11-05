@@ -13,8 +13,12 @@ const bridge: FeatraBridge = {
     minimize: () => ipcRenderer.send(IPC.windowMinimize),
     toggleMaximize: () => ipcRenderer.send(IPC.windowToggleMaximize),
     close: () => ipcRenderer.send(IPC.windowClose),
+    setZoomFactor: (factor) => ipcRenderer.send(IPC.windowSetZoom, factor),
+    setTheme: (theme) => ipcRenderer.send(IPC.windowSetTheme, theme),
   },
+  edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {
+    info: () => ipcRenderer.invoke(IPC.appInfo),
     reload: () => ipcRenderer.send(IPC.appReload),
     toggleDevTools: () => ipcRenderer.send(IPC.appToggleDevTools),
     quit: () => ipcRenderer.send(IPC.appQuit),

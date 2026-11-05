@@ -26,10 +26,15 @@
   --tip-bg: #1c1c1e;
   --tip-tx: #ffffff;
   --close-hover: #c42b1c;
+  --scrim: rgba(0, 0, 0, 0.32);
 }
 
+/*
+ * Theme: System follows prefers-color-scheme; View > Theme pins Light or Dark with data-theme on <html>
+ * (src/theme.ts). The dark block appears twice because CSS cannot share it between the two selectors.
+ */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     color-scheme: dark;
     --bg: #1c1c1e;
     --side: #161617;
@@ -51,7 +56,33 @@
     --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
     --tip-bg: #000000;
     --tip-tx: #ffffff;
+    --scrim: rgba(0, 0, 0, 0.55);
   }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1c1c1e;
+  --side: #161617;
+  --row: #262628;
+  --row2: #2e2e31;
+  --line: #2c2c2f;
+  --tx: #ececee;
+  --tx2: #a9a9ae;
+  --tx3: #8a8a90;
+  --acc: #7aa2ff;
+  --accbg: #3b5fcc;
+  --ok: #6fcf97;
+  --warn: #e7b65a;
+  --bad: #f0918a;
+  --pur: #b9a3ff;
+  --menu: #2a2a2d;
+  --menu-line: #38383c;
+  --menu-hover: #38383c;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --tip-bg: #000000;
+  --tip-tx: #ffffff;
+  --scrim: rgba(0, 0, 0, 0.55);
 }
 
 * {
@@ -245,6 +276,128 @@ svg.i {
   height: 1px;
   background: var(--menu-line);
   margin: 4px 2px;
+}
+
+.menu.top {
+  min-width: 180px;
+}
+
+/* Submenus open to the right of the item that owns them. */
+.mwrap {
+  position: relative;
+}
+
+.menu.sub {
+  top: -6px;
+  left: calc(100% + 4px);
+  min-width: 220px;
+}
+
+.mi.open {
+  background: var(--menu-hover);
+}
+
+.mi svg.i {
+  width: 14px;
+  height: 14px;
+}
+
+.mi .chev {
+  display: grid;
+  color: var(--tx2);
+}
+
+.mcheck {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  margin-left: -2px;
+}
+
+/* Dialogs */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: var(--scrim);
+  z-index: 50;
+}
+
+.dialog {
+  background: var(--menu);
+  color: var(--tx);
+  border: 1px solid var(--menu-line);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 18px 20px 16px;
+  width: min(420px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+}
+
+.dialog h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dialog p {
+  margin: 0 0 6px;
+  color: var(--tx2);
+}
+
+.dialog .about-name {
+  color: var(--tx);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.keys {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.keys th,
+.keys td {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--menu-line);
+  text-align: left;
+  font-weight: 400;
+}
+
+.keys td {
+  text-align: right;
+}
+
+kbd {
+  font: inherit;
+  font-size: 12px;
+  color: var(--tx2);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.btn {
+  padding: 6px 14px;
+  border-radius: 7px;
+  border: 1px solid var(--menu-line);
+  background: var(--row);
+  color: var(--tx);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--row2);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
 }
 
 /* Sidebar + main */

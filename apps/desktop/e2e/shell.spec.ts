@@ -1,10 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type ElectronApplication } from "@playwright/test";
 import { launch, tempUserData } from "./app.ts";
 
+const zoomFactor = (app: ElectronApplication) =>
+  app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor());
 const ENTRIES = ["Work", "Inbox", "Artifacts", "Plugins", "Settings"];
 
-/** STORY-18 journey: the window, its title bar and sidebar, and a collapsed sidebar surviving a restart. */
-test("app window: title bar, sidebar, Ctrl+B collapse survives restart", async () => {
+/**
+ * STORY-18 journey: the window, its title bar and sidebar, the app menu by keyboard, and a collapsed sidebar and
+ * zoom surviving a restart.
+ */
+test("app window: title bar, menu, sidebar; Ctrl+B collapse and zoom survive restart", async () => {
   const profile = await tempUserData();
   try {
     let { app, page } = await launch(profile.dir);
@@ -26,6 +31,24 @@ test("app window: title bar, sidebar, Ctrl+B collapse survives restart", async (
     await bar.getByRole("button", { name: "Back" }).click();
     await expect(bar.getByRole("heading", { level: 1 })).toHaveText("Work");
 
+    // Menu by keyboard: open it, walk to View, into its submenu, and zoom in.
+    await bar.getByRole("button", { name: "Menu" }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("menuitem", { name: "File" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "View" })).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    const viewMenu = page.getByRole("menu", { name: "View" });
+    await expect(viewMenu).toBeVisible();
+    await expect(viewMenu.getByRole("menuitem", { name: /^Toggle sidebar/ })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(viewMenu.getByRole("menuitem", { name: /^Zoom in/ })).toBeFocused();
+    await expect(viewMenu.getByRole("menuitem", { name: /^Zoom in/ })).toContainText("Ctrl+=");
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect.poll(() => zoomFactor(app)).toBe(1.1);
+
     // Ctrl+B collapses it: zero width and out of the tab order.
     await page.keyboard.press("Control+B");
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
@@ -41,6 +64,7 @@ test("app window: title bar, sidebar, Ctrl+B collapse survives restart", async (
     ({ app, page } = await launch(profile.dir));
     const toggle2 = page.getByRole("banner").getByRole("button", { name: "Toggle sidebar" });
     await expect(toggle2).toHaveAttribute("aria-expanded", "false");
+    await expect.poll(() => zoomFactor(app)).toBe(1.1);
     const sidebar2 = page.getByRole("navigation", { name: "Featra", includeHidden: true });
     expect((await sidebar2.boundingBox())?.width ?? 0).toBe(0);
 

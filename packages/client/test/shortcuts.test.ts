@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isToggleSidebarShortcut, type KeyInput } from "../src/shortcuts.ts";
+import { isToggleSidebarShortcut, matchShortcut, shortcutLabel, type KeyInput } from "../src/shortcuts.ts";
 
 const key = (over: Partial<KeyInput>): KeyInput => ({
   key: "b",
@@ -34,5 +34,54 @@ describe("toggle sidebar shortcut", () => {
     expect(isToggleSidebarShortcut(key({ ctrlKey: true, shiftKey: true }), "win32")).toBe(false);
     expect(isToggleSidebarShortcut(key({ ctrlKey: true, altKey: true }), "win32")).toBe(false);
     expect(isToggleSidebarShortcut(key({ key: "n", code: "KeyN", ctrlKey: true }), "win32")).toBe(false);
+  });
+});
+
+describe("app shortcuts", () => {
+  const ctrl = (k: string, code = "", over: Partial<KeyInput> = {}) => key({ key: k, code, ctrlKey: true, ...over });
+  const cmd = (k: string, code = "", over: Partial<KeyInput> = {}) => key({ key: k, code, metaKey: true, ...over });
+
+  it("matches zoom, settings and sidebar with Ctrl on Windows and Linux", () => {
+    for (const platform of ["win32", "linux"]) {
+      expect(matchShortcut(ctrl("b", "KeyB"), platform)).toBe("toggleSidebar");
+      expect(matchShortcut(ctrl("=", "Equal"), platform)).toBe("zoomIn");
+      expect(matchShortcut(ctrl("+", "Equal", { shiftKey: true }), platform)).toBe("zoomIn");
+      expect(matchShortcut(ctrl("+", "NumpadAdd"), platform)).toBe("zoomIn");
+      expect(matchShortcut(ctrl("-", "Minus"), platform)).toBe("zoomOut");
+      expect(matchShortcut(ctrl("-", "NumpadSubtract"), platform)).toBe("zoomOut");
+      expect(matchShortcut(ctrl("0", "Digit0"), platform)).toBe("zoomReset");
+      expect(matchShortcut(ctrl(",", "Comma"), platform)).toBe("settings");
+      expect(matchShortcut(cmd("=", "Equal"), platform)).toBeNull();
+    }
+  });
+
+  it("matches the same with Cmd on macOS, not Ctrl", () => {
+    expect(matchShortcut(cmd("=", "Equal"), "darwin")).toBe("zoomIn");
+    expect(matchShortcut(cmd(",", "Comma"), "darwin")).toBe("settings");
+    expect(matchShortcut(ctrl("=", "Equal"), "darwin")).toBeNull();
+  });
+
+  it("quits with Ctrl+Q only on Linux; Windows and macOS quit through the OS", () => {
+    expect(matchShortcut(ctrl("q", "KeyQ"), "linux")).toBe("quit");
+    expect(matchShortcut(ctrl("q", "KeyQ"), "win32")).toBeNull();
+    expect(matchShortcut(cmd("q", "KeyQ"), "darwin")).toBeNull();
+  });
+
+  it("leaves edit shortcuts and Alt or Shift chords to the browser", () => {
+    for (const k of ["c", "v", "x", "z", "y", "a"]) expect(matchShortcut(ctrl(k), "win32")).toBeNull();
+    expect(matchShortcut(ctrl("-", "Minus", { shiftKey: true }), "win32")).toBeNull();
+    expect(matchShortcut(ctrl("0", "Digit0", { altKey: true }), "win32")).toBeNull();
+    expect(matchShortcut(key({ key: "=" }), "win32")).toBeNull();
+  });
+
+  it("labels shortcuts for the platform", () => {
+    expect(shortcutLabel("zoomIn", "win32")).toBe("Ctrl+=");
+    expect(shortcutLabel("zoomIn", "darwin")).toBe("⌘=");
+    expect(shortcutLabel("quit", "win32")).toBe("Alt+F4");
+    expect(shortcutLabel("quit", "linux")).toBe("Ctrl+Q");
+    expect(shortcutLabel("quit", "darwin")).toBe("⌘Q");
+    expect(shortcutLabel("redo", "win32")).toBe("Ctrl+Y");
+    expect(shortcutLabel("redo", "linux")).toBe("Ctrl+Shift+Z");
+    expect(shortcutLabel("redo", "darwin")).toBe("⇧⌘Z");
   });
 });

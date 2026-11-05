@@ -1,6 +1,7 @@
 import type { FeatraBridge } from "../bridge.ts";
 import { toggleSidebarShortcutLabel } from "../shortcuts.ts";
-import { AppMenu, type MenuItem } from "./AppMenu.tsx";
+import type { MenuNode } from "../menu.ts";
+import { AppMenu } from "./AppMenu.tsx";
 import { BackIcon, CloseIcon, ForwardIcon, MaximizeIcon, MinimizeIcon, SidebarIcon } from "./icons.tsx";
 
 export interface TitleBarProps {
@@ -12,7 +13,7 @@ export interface TitleBarProps {
   canGoForward: boolean;
   onBack: () => void;
   onForward: () => void;
-  menuItems: readonly MenuItem[];
+  menu: readonly MenuNode[];
 }
 
 export function TitleBar(p: TitleBarProps) {
@@ -22,7 +23,7 @@ export function TitleBar(p: TitleBarProps) {
   const shortcut = toggleSidebarShortcutLabel(p.bridge.platform);
   return (
     <header className={isMac ? "titlebar mac" : "titlebar"}>
-      <AppMenu items={p.menuItems} />
+      <AppMenu nodes={p.menu} />
       <button
         type="button"
         className={p.sidebarCollapsed ? "tb" : "tb on"}

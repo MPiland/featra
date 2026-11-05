@@ -6,11 +6,21 @@ describe("stored UI state", () => {
     expect(normalizeUiState(null)).toEqual(DEFAULT_UI_STATE);
     expect(normalizeUiState("nope")).toEqual(DEFAULT_UI_STATE);
     expect(normalizeUiState({ sidebarCollapsed: "yes" })).toEqual(DEFAULT_UI_STATE);
-    expect(normalizeUiState({ sidebarCollapsed: true, extra: 1 })).toEqual({ sidebarCollapsed: true });
+    expect(normalizeUiState({ sidebarCollapsed: true, extra: 1 })).toEqual({ ...DEFAULT_UI_STATE, sidebarCollapsed: true });
+    expect(normalizeUiState({ theme: "sepia", zoomFactor: "big" })).toEqual(DEFAULT_UI_STATE);
+    expect(normalizeUiState({ zoomFactor: -1 })).toEqual(DEFAULT_UI_STATE);
+    expect(normalizeUiState({ zoomFactor: Number.POSITIVE_INFINITY })).toEqual(DEFAULT_UI_STATE);
   });
 
-  it("starts with the sidebar open", () => {
-    expect(DEFAULT_UI_STATE.sidebarCollapsed).toBe(false);
+  it("keeps a stored theme and snaps a stored zoom to the nearest step", () => {
+    for (const theme of ["system", "light", "dark"] as const) expect(normalizeUiState({ theme }).theme).toBe(theme);
+    expect(normalizeUiState({ zoomFactor: 1.25 }).zoomFactor).toBe(1.25);
+    expect(normalizeUiState({ zoomFactor: 1.3 }).zoomFactor).toBe(1.25);
+    expect(normalizeUiState({ zoomFactor: 9 }).zoomFactor).toBe(2);
+  });
+
+  it("starts with the sidebar open, at 100% zoom, following the OS theme", () => {
+    expect(DEFAULT_UI_STATE).toEqual({ sidebarCollapsed: false, zoomFactor: 1, theme: "system" });
   });
 });
 
@@ -22,8 +32,9 @@ describe("browser bridge", () => {
       getItem: (k: string) => storage.get(k) ?? null,
       setItem: (k: string, v: string) => void storage.set(k, v),
     } as Storage;
-    await browserBridge(fake).uiState.save({ sidebarCollapsed: true });
-    expect(await browserBridge(fake).uiState.load()).toEqual({ sidebarCollapsed: true });
+    const state = { sidebarCollapsed: true, zoomFactor: 1.5, theme: "dark" } as const;
+    await browserBridge(fake).uiState.save(state);
+    expect(await browserBridge(fake).uiState.load()).toEqual(state);
   });
 
   it("recovers from corrupt storage", async () => {

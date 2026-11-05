@@ -31,6 +31,16 @@ export const ForwardIcon = () => (
     <path d="M9 6l6 6-6 6" />
   </Icon>
 );
+export const ChevronRightIcon = () => (
+  <Icon size={14}>
+    <path d="M9 6l6 6-6 6" />
+  </Icon>
+);
+export const CheckIcon = () => (
+  <Icon size={14}>
+    <path d="M5 12l5 5 9-10" />
+  </Icon>
+);
 export const MinimizeIcon = () => (
   <Icon>
     <path d="M6 12h12" />

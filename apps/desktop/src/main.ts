@@ -1,6 +1,7 @@
 import { join } from "node:path";
-import { app, BrowserWindow, ipcMain, nativeTheme, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
-import { IPC, normalizeUiState } from "@featra/client/bridge";
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import { EDIT_COMMANDS, IPC, normalizeUiState, THEME_CHOICES, type EditCommand, type ThemeChoice } from "@featra/client/bridge";
+import { normalizeZoom } from "@featra/client/zoom";
 import { createUiStateStore, type UiStateStore } from "./ui-state-store.ts";
 
 // Tests (and anyone running a second profile) point userData at their own folder. Must happen before `ready`.
@@ -51,9 +52,28 @@ function registerIpc(store: UiStateStore) {
     else win?.maximize();
   });
   ipcMain.on(IPC.windowClose, (e) => fromOurWindow(e)?.close());
+  ipcMain.on(IPC.windowSetZoom, (e, factor: unknown) => e.sender.setZoomFactor(normalizeZoom(factor)));
+  ipcMain.on(IPC.windowSetTheme, (_e, theme: unknown) => {
+    if (THEME_CHOICES.includes(theme as ThemeChoice)) nativeTheme.themeSource = theme as ThemeChoice;
+  });
+  // The same webContents calls Electron's undo/redo/cut/copy/paste/selectAll menu roles make: they act on the
+  // focused field.
+  ipcMain.on(IPC.edit, (e, command: unknown) => {
+    if (EDIT_COMMANDS.includes(command as EditCommand)) e.sender[command as EditCommand]();
+  });
+  ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());
   ipcMain.on(IPC.appToggleDevTools, (e) => e.sender.toggleDevTools());
   ipcMain.on(IPC.appQuit, () => app.quit());
+}
+
+/**
+ * The menu lives in the client's title bar. Windows and Linux get no native menu (its default accelerators would
+ * fight the client's zoom and reload). macOS needs one for the menu bar, Cmd+Q and the system edit shortcuts.
+ */
+function setNativeMenu() {
+  if (process.platform !== "darwin") return Menu.setApplicationMenu(null);
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }]));
 }
 
 // The window only ever shows the bundled client: no navigation away, no pop-up windows.
@@ -93,5 +113,10 @@ if (!app.requestSingleInstanceLock()) {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 
-  void app.whenReady().then(createWindow);
+  void app.whenReady().then(async () => {
+    setNativeMenu();
+    // Apply a pinned theme before the window exists so its background matches from the first frame.
+    nativeTheme.themeSource = (await store.load()).theme;
+    createWindow();
+  });
 }
