@@ -17,7 +17,12 @@ epics in `.featra/cards/`.
   take the same card or story.
 - **Rebindable keyboard shortcuts** with conflict detection and per-platform defaults. M1 lists shortcuts read-only in
   Settings.
+- **Command palette** (View > Command Palette, Ctrl+K): every menu action and view, searchable.
+- **Search** (Go > Search…, Ctrl+Shift+K) across chats and cards.
 
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".
+- **Help menu links** that need a public repo and a release channel: Featra Docs (F1), View Changelog, Get Support,
+  Send Feedback, and Check for Updates.
+
