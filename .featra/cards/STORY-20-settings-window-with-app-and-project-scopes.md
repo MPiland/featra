@@ -33,6 +33,7 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - [ ] A project value that overrides an app default is labelled as an override and can be reset
 - [ ] Every setting is reachable and changeable by keyboard
 - [ ] Settings… in the File menu (Ctrl+,) opens the Settings window
+- [ ] App settings include "Close button: keep running in the tray / quit", default keep running; it applies without a restart
 
 ## Tasks
 
