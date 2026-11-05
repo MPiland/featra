@@ -90,6 +90,16 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     Linux (WSLg) a re-entered quit after the developer tools had been opened was sometimes dropped and the app hung
     (bug found on Linux; regression test in `tray.spec.ts`). By `will-quit` every window is closed and every quit
     handler has run, so nothing is skipped.
+  - BUG-1 (found by the user after STORY-18 was accepted): the title bar's maximize button didn't know the window's
+    state, so in full screen it un-maximized and the OS snapped the window back. Main now sends `{ maximized,
+    fullScreen }` on `maximize`, `unmaximize`, `enter-full-screen` and `leave-full-screen`, whoever caused them (the
+    button, F11, the menu, a title-bar double-click, Win+Up, snapping), and the client asks for it on load. The
+    button reads Maximize, Restore Down (Restore on Linux, the GNOME/KDE word) or Exit Full Screen, with a restore
+    icon for the last two and the same text as its tooltip; in full screen it leaves full screen, which puts back the
+    size and maximized state the window had. View > Full Screen is a checkmark item. The rules are `sizeButtonAction`
+    and `sizeButtonFor` in `packages/client/src/bridge.ts`.
+  - Maximising is up to the window manager too: WSLg's can, xvfb (none) can't. There the e2e test proves the button
+    keeps saying Maximize after a maximize request goes nowhere, instead of maximizing.
   - Minimise is up to the window manager. WSLg's does not advertise `_NET_WM_STATE_HIDDEN` and xvfb has none, so there
     `minimize()` has no effect, even on a framed window (checked with plain Electron). The tray test asserts that the
     title bar asked to minimise and then the outcome the WM supports (minimised, or still shown); the restore and focus
