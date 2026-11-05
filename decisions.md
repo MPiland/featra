@@ -23,3 +23,6 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
 - 2026-11-05 — Linux is a supported M1 platform alongside Windows and macOS. Each story's tests also run on Linux
   (Ubuntu under WSL2 on the dev machine). Linux trays often ignore a click, so the tray always has a right-click menu
   with Show Featra and Exit; when no tray is available, the close button quits instead of hiding the window.
+- 2026-11-05 — Agents get tools through MCP, so they work with any MCP-capable agent, not only Claude or Codex. Agents
+  driving the in-app browser is STORY-40 in M1b (FEAT-10). Desktop computer use goes on the roadmap. Both are off by
+  default, because tool definitions cost context tokens on every turn.
