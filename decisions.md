@@ -28,8 +28,8 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     is `packages/client/src/menu.ts`. There is no Help > Keyboard shortcuts and no Ctrl+/ yet: shortcuts live on a
     Settings page that STORY-20 builds, and both will open it then (user decision).
   - Shortcut labels follow each OS: Cmd on macOS (⌘, ⇧⌘Z for Redo), Ctrl+Y for Redo on Windows and Ctrl+Shift+Z on
-    Linux. Quit shows the OS's own shortcut: Alt+F4 on Windows (the OS handles it), ⌘Q on macOS (native app menu),
-    Ctrl+Q on Linux (handled by the client).
+    Linux. Quit is Ctrl+Q on Windows and Linux (handled by the client) and ⌘Q on macOS (native app menu). Alt+F4 is
+    close, which goes to the tray, so it is not shown as Quit (review fix).
   - Edit items send the command to main, which calls `webContents.undo/redo/cut/copy/paste/selectAll`, the same calls
     Electron's menu roles make. The menu puts focus back on the field the user was in before running an item. The
     keyboard shortcuts for editing are left to Chromium.

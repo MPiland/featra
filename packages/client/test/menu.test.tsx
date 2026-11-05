@@ -29,7 +29,7 @@ describe("AC5: app menu", () => {
     expect(labels(menuAt(0))).toEqual(["File", "Edit", "View", "Help"]);
 
     await user.hover(item("File"));
-    expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,", "QuitAlt+F4"]);
+    expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,", "QuitCtrl+Q"]);
     await user.hover(item("Edit"));
     expect(labels(menuAt(1))).toEqual([
       "UndoCtrl+Z",
@@ -150,12 +150,16 @@ describe("AC5: app menu", () => {
     expect(viewTitle().textContent).toBe("Settings");
   });
 
-  it("Ctrl+Q quits on Linux, where the OS has no quit shortcut of its own", async () => {
-    const { user, actions } = renderApp({ platform: "linux" });
-    await openPath(user, "File");
-    expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,", "QuitCtrl+Q"]);
-    await user.keyboard("{Escape}{Escape}{Control>}q{/Control}");
-    expect(actions()).toEqual(["quit"]);
+  it("Ctrl+Q quits on Windows and Linux; Alt+F4 is close (to the tray), so Quit never shows it", async () => {
+    for (const platform of ["win32", "linux"]) {
+      const { user, actions } = renderApp({ platform });
+      await openPath(user, "File");
+      expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,", "QuitCtrl+Q"]);
+      expect(labels(menuAt(1)).join()).not.toContain("Alt+F4");
+      await user.keyboard("{Escape}{Escape}{Control>}q{/Control}");
+      expect(actions()).toEqual(["quit"]);
+      cleanup();
+    }
   });
 
   it("Edit items run on the field that had focus when the menu was opened", async () => {

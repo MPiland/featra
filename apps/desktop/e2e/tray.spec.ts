@@ -101,6 +101,20 @@ test.describe("AC6: close to tray", () => {
     }
   });
 
+  test("Ctrl+Q quits for real (File > Quit's shortcut; Alt+F4 is close)", async () => {
+    const profile = await tempUserData();
+    try {
+      const { app, page } = await launch(profile.dir);
+      const exit = exited(app);
+      await page.keyboard.press("Control+Q").catch((e: Error) => {
+        if (!/has been closed/.test(e.message)) throw e;
+      });
+      expect(await exit).toBe(0);
+    } finally {
+      await profile.dispose();
+    }
+  });
+
   test("the tray's Quit Featra exits while the window is hidden", async () => {
     const profile = await tempUserData();
     try {

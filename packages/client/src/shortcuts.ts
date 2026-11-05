@@ -28,8 +28,9 @@ export function matchShortcut(e: KeyInput, platform: string): AppShortcut | null
   if (e.key === "-" || e.code === "NumpadSubtract") return "zoomOut";
   if (e.key === "0" || e.code === "Numpad0") return "zoomReset";
   if (e.key === ",") return "settings";
-  // macOS quits through its app menu (Cmd+Q) and Windows through Alt+F4; Linux needs Ctrl+Q from us.
-  if (platform === "linux" && (e.key.toLowerCase() === "q" || e.code === "KeyQ")) return "quit";
+  // macOS quits through its app menu (Cmd+Q). Windows and Linux get Ctrl+Q from us: Alt+F4 is close, which goes to
+  // the tray, so it can't be the quit shortcut.
+  if (!isMac(platform) && (e.key.toLowerCase() === "q" || e.code === "KeyQ")) return "quit";
   return null;
 }
 
@@ -49,7 +50,6 @@ const LABELS: Record<ShortcutId, [pc: string, mac: string]> = {
 };
 
 export function shortcutLabel(id: ShortcutId, platform: string): string {
-  if (id === "quit" && platform === "win32") return "Alt+F4";
   if (id === "redo" && platform === "linux") return "Ctrl+Shift+Z";
   return LABELS[id][isMac(platform) ? 1 : 0];
 }

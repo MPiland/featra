@@ -61,9 +61,10 @@ describe("app shortcuts", () => {
     expect(matchShortcut(ctrl("=", "Equal"), "darwin")).toBeNull();
   });
 
-  it("quits with Ctrl+Q only on Linux; Windows and macOS quit through the OS", () => {
+  it("quits with Ctrl+Q on Windows and Linux; macOS quits through its app menu (Cmd+Q)", () => {
     expect(matchShortcut(ctrl("q", "KeyQ"), "linux")).toBe("quit");
-    expect(matchShortcut(ctrl("q", "KeyQ"), "win32")).toBeNull();
+    expect(matchShortcut(ctrl("q", "KeyQ"), "win32")).toBe("quit");
+    expect(matchShortcut(ctrl("й", "KeyQ"), "win32")).toBe("quit"); // physical key on other layouts
     expect(matchShortcut(cmd("q", "KeyQ"), "darwin")).toBeNull();
   });
 
@@ -77,7 +78,7 @@ describe("app shortcuts", () => {
   it("labels shortcuts for the platform", () => {
     expect(shortcutLabel("zoomIn", "win32")).toBe("Ctrl+=");
     expect(shortcutLabel("zoomIn", "darwin")).toBe("⌘=");
-    expect(shortcutLabel("quit", "win32")).toBe("Alt+F4");
+    expect(shortcutLabel("quit", "win32")).toBe("Ctrl+Q"); // Alt+F4 closes to the tray, it does not quit
     expect(shortcutLabel("quit", "linux")).toBe("Ctrl+Q");
     expect(shortcutLabel("quit", "darwin")).toBe("⌘Q");
     expect(shortcutLabel("redo", "win32")).toBe("Ctrl+Y");
