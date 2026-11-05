@@ -130,16 +130,10 @@ test.describe("AC5: app menu", () => {
     }
   });
 
-  test("Keyboard shortcuts and About open as dialogs; Troubleshooting reloads the window", async () => {
+  test("About opens as a dialog; Troubleshooting reloads the window", async () => {
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     try {
-      await choose(page, "Help", "Keyboard shortcuts");
-      const keys = page.getByRole("dialog", { name: "Keyboard shortcuts" });
-      await expect(keys.getByRole("row", { name: /Zoom in/ })).toContainText("Ctrl+=");
-      await page.keyboard.press("Escape");
-      await expect(keys).toHaveCount(0);
-
       await choose(page, "Help", "About Featra");
       const about = page.getByRole("dialog", { name: "About Featra" });
       const version = await app.evaluate(({ app: electronApp }) => electronApp.getVersion());

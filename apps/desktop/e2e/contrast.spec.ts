@@ -59,7 +59,7 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           await page.keyboard.press("Escape");
           await expect(page.getByRole("menu")).toHaveCount(0);
         }
-        for (const name of ["Keyboard shortcuts", "About Featra"]) {
+        for (const name of ["About Featra"]) {
           await page.getByRole("button", { name: "Menu" }).click();
           await menuItem("Help").hover();
           await menuItem(name).click();

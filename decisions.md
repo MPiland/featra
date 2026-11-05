@@ -25,7 +25,8 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     Linux. macOS keeps its native traffic lights (`titleBarStyle: hiddenInset`).
   - The Menu button opens a standard File / Edit / View / Help menu with cascading submenus (sent back by the user;
     replaces the first flat developer menu). Only items that work today are listed; later stories add theirs. The model
-    is `packages/client/src/menu.ts`, and the Keyboard shortcuts dialog is generated from it, so the two can't drift.
+    is `packages/client/src/menu.ts`. There is no Help > Keyboard shortcuts and no Ctrl+/ yet: shortcuts live on a
+    Settings page that STORY-20 builds, and both will open it then (user decision).
   - Shortcut labels follow each OS: Cmd on macOS (⌘, ⇧⌘Z for Redo), Ctrl+Y for Redo on Windows and Ctrl+Shift+Z on
     Linux. Quit shows the OS's own shortcut: Alt+F4 on Windows (the OS handles it), ⌘Q on macOS (native app menu),
     Ctrl+Q on Linux (handled by the client).
@@ -40,7 +41,7 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - Theme Light/Dark sets `data-theme` on `<html>` (pinning the CSS tokens) and `nativeTheme.themeSource` (native
     surfaces, window background); System removes both overrides. Main applies the stored theme before the window opens.
   - In a plain browser tab the menu leaves out Quit and Troubleshooting, which can't work there.
-  - Keyboard shortcuts and About are modal dialogs: the app behind is inert, Tab stays inside, Escape closes, and focus
+  - About is a modal dialog: the app behind is inert, Tab stays inside, Escape closes, and focus
     returns to where it was. About reads the version from the desktop package (`app.getVersion()`).
   - The title bar shows the view title only ("Work"). The mockup's "· manager" project suffix waits for STORY-19.
   - Window chrome state (sidebar collapsed, zoom, theme) is `ui-state.json` in Electron's `userData`, written by main

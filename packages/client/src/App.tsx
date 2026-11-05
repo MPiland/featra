@@ -4,7 +4,7 @@ import { Dialog } from "./components/Dialog.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
-import { buildAppMenu, menuShortcuts, type MenuActions } from "./menu.ts";
+import { buildAppMenu, type MenuActions } from "./menu.ts";
 import { canGoBack, canGoForward, currentView, goBack, goForward, initialNav, navigate } from "./navigation.ts";
 import { matchShortcut, type AppShortcut } from "./shortcuts.ts";
 import { applyTheme } from "./theme.ts";
@@ -16,7 +16,7 @@ export interface AppProps {
   initialUiState: UiState;
 }
 
-type OpenDialog = "shortcuts" | "about" | null;
+type OpenDialog = "about" | null;
 
 const sameUiState = (a: UiState, b: UiState) =>
   a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor && a.theme === b.theme;
@@ -51,7 +51,6 @@ export function App({ bridge, initialUiState }: AppProps) {
       zoomOut: () => setZoom(zoomOut),
       zoomReset: () => setZoom(() => DEFAULT_ZOOM),
       setTheme,
-      showShortcuts: () => setDialog("shortcuts"),
       showAbout: () => setDialog("about"),
       reload: () => bridge.app.reload(),
       toggleDevTools: () => bridge.app.toggleDevTools(),
@@ -123,22 +122,6 @@ export function App({ bridge, initialUiState }: AppProps) {
           </main>
         </div>
       </div>
-      {dialog === "shortcuts" && (
-        <Dialog title="Keyboard shortcuts" onClose={() => setDialog(null)}>
-          <table className="keys">
-            <tbody>
-              {menuShortcuts(menu).map((s) => (
-                <tr key={s.label}>
-                  <th scope="row">{s.label}</th>
-                  <td>
-                    <kbd>{s.shortcut}</kbd>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Dialog>
-      )}
       {dialog === "about" && (
         <Dialog title="About Featra" onClose={() => setDialog(null)}>
           <p className="about-name">{info?.name ?? "Featra"}</p>

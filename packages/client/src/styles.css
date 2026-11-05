@@ -353,29 +353,6 @@ svg.i {
   font-weight: 600;
 }
 
-.keys {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.keys th,
-.keys td {
-  padding: 6px 0;
-  border-bottom: 1px solid var(--menu-line);
-  text-align: left;
-  font-weight: 400;
-}
-
-.keys td {
-  text-align: right;
-}
-
-kbd {
-  font: inherit;
-  font-size: 12px;
-  color: var(--tx2);
-}
-
 .dialog-actions {
   display: flex;
   justify-content: flex-end;

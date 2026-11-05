@@ -16,7 +16,6 @@ export interface MenuActions {
   zoomOut(): void;
   zoomReset(): void;
   setTheme(theme: ThemeChoice): void;
-  showShortcuts(): void;
   showAbout(): void;
   reload(): void;
   toggleDevTools(): void;
@@ -59,7 +58,6 @@ export function buildAppMenu({ platform, theme, actions: a }: MenuContext): Menu
   }
 
   const help: MenuNode[] = [
-    { kind: "item", id: "help.shortcuts", label: "Keyboard shortcuts", onSelect: a.showShortcuts },
     { kind: "item", id: "help.about", label: "About Featra", onSelect: a.showAbout },
   ];
   if (inWindow) {
@@ -112,11 +110,4 @@ export function buildAppMenu({ platform, theme, actions: a }: MenuContext): Menu
     },
     { kind: "submenu", id: "help", label: "Help", items: help },
   ];
-}
-
-/** Every item in the menu that has a shortcut, for the Keyboard shortcuts dialog. */
-export function menuShortcuts(menu: readonly MenuNode[]): { label: string; shortcut: string }[] {
-  return menu.flatMap((n) =>
-    n.kind === "submenu" ? menuShortcuts(n.items) : n.kind === "item" && n.shortcut ? [{ label: n.label, shortcut: n.shortcut }] : [],
-  );
 }

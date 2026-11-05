@@ -51,7 +51,7 @@ describe("AC5: app menu", () => {
     expect(labels(menuAt(2))).toEqual(["System", "Light", "Dark"]);
     await user.hover(item("Help"));
     expect(menus()).toHaveLength(2); // hovering another top-level item closes View and Theme
-    expect(labels(menuAt(1))).toEqual(["Keyboard shortcuts", "About Featra", "Troubleshooting"]);
+    expect(labels(menuAt(1))).toEqual(["About Featra", "Troubleshooting"]);
     await user.hover(item("Troubleshooting"));
     expect(labels(menuAt(2))).toEqual(["Reload window", "Toggle developer tools"]);
   });
@@ -229,25 +229,14 @@ describe("AC5: app menu", () => {
     expect(saves.map((s) => s.theme)).toEqual(["dark", "light", "system"]);
   });
 
-  it("Help: Keyboard shortcuts lists every shortcut in the menu, in a modal dialog", async () => {
+  it("Help: About Featra shows the name, version and MIT licence in a modal dialog", async () => {
     const { user } = renderApp();
     await openPath(user, "Help");
-    await user.click(item("Keyboard shortcuts"));
-    const dialog = screen.getByRole("dialog", { name: "Keyboard shortcuts" });
-    expect(within(dialog).getAllByRole("row").map((r) => r.textContent)).toEqual([
-      "Settings…Ctrl+,",
-      "QuitAlt+F4",
-      "UndoCtrl+Z",
-      "RedoCtrl+Y",
-      "CutCtrl+X",
-      "CopyCtrl+C",
-      "PasteCtrl+V",
-      "Select allCtrl+A",
-      "Toggle sidebarCtrl+B",
-      "Zoom inCtrl+=",
-      "Zoom outCtrl+-",
-      "Reset zoomCtrl+0",
-    ]);
+    await user.click(item("About Featra"));
+    const dialog = screen.getByRole("dialog", { name: "About Featra" });
+    expect(await within(dialog).findByText("Version 1.2.3")).toBeTruthy();
+    expect(within(dialog).getByText("Featra")).toBeTruthy();
+    expect(within(dialog).getByText(/MIT licence/)).toBeTruthy();
     expect(dialog.getAttribute("aria-modal")).toBe("true");
     expect(document.querySelector(".shell")!.hasAttribute("inert")).toBe(true);
     expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: "Close" }));
@@ -256,18 +245,21 @@ describe("AC5: app menu", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(document.querySelector(".shell")!.hasAttribute("inert")).toBe(false);
-  });
 
-  it("Help: About Featra shows the name, version and MIT licence", async () => {
-    const { user } = renderApp();
     await openPath(user, "Help");
     await user.click(item("About Featra"));
-    const dialog = screen.getByRole("dialog", { name: "About Featra" });
-    expect(await within(dialog).findByText("Version 1.2.3")).toBeTruthy();
-    expect(within(dialog).getByText("Featra")).toBeTruthy();
-    expect(within(dialog).getByText(/MIT licence/)).toBeTruthy();
-    await user.click(within(dialog).getByRole("button", { name: "Close" }));
+    await user.click(within(screen.getByRole("dialog", { name: "About Featra" })).getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("Help has no Keyboard shortcuts item and Ctrl+/ does nothing (shortcuts live in Settings, STORY-20)", async () => {
+    const { user, actions } = renderApp();
+    await openPath(user, "Help");
+    expect(labels(menuAt(1))).not.toContain("Keyboard shortcuts");
+    await user.keyboard("{Escape}");
+    await user.keyboard("{Control>}/{/Control}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(actions()).toEqual([]);
   });
 
   it("Help: Troubleshooting reloads the window and toggles developer tools", async () => {
@@ -284,6 +276,6 @@ describe("AC5: app menu", () => {
     await openPath(user, "File");
     expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,"]);
     await user.hover(item("Help"));
-    expect(labels(menuAt(1))).toEqual(["Keyboard shortcuts", "About Featra"]);
+    expect(labels(menuAt(1))).toEqual(["About Featra"]);
   });
 });

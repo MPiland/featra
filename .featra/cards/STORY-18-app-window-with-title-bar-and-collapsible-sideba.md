@@ -80,7 +80,7 @@ As a builder, I get a familiar ADE window: a title bar, a sidebar I can collapse
 - [x] Zoom in/out/reset, persisted
 - [x] Theme System/Light/Dark, persisted, overrides the OS
 - [x] Edit items act on the focused field
-- [x] Keyboard shortcuts and About dialogs, Troubleshooting submenu
+- [x] About dialog and Troubleshooting submenu (no Keyboard shortcuts item: STORY-20)
 - [x] Tests for each menu item; extend the journey test
 - [x] Close hides the window instead of quitting, behind one flag in main (default on)
 - [x] Tray icon (placeholder) with Show Featra / Quit Featra; left-click shows the window
