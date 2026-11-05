@@ -2,7 +2,7 @@
 id: STORY-18
 type: story
 title: App window with title bar and collapsible sidebar
-status: In Review
+status: In Progress
 parent: FEAT-13
 order: 1
 origin: planned
@@ -40,6 +40,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-18
+  - at: 2026-11-05T18:02:22Z
+    field: status
+    from: In Review
+    to: In Progress
+    by: user
 ---
 
 ## Description
@@ -53,6 +58,7 @@ As a builder, I get a familiar ADE window: a title bar, a sidebar I can collapse
 - [x] The sidebar has Work, Inbox, Artifacts, Plugins and Settings entries, each reachable by keyboard (test: packages/client/test/app.test.tsx::AC3: sidebar entries > reaches and opens every entry with Tab and Enter)
 - [x] The window follows the OS light or dark theme and meets WCAG AA contrast (test: apps/desktop/e2e/contrast.spec.ts::AC4: theme follows the OS and meets WCAG AA)
 - [x] The menu button opens File, Edit, View and Help submenus; every item shows its shortcut, and only items that work today are listed (test: packages/client/test/menu.test.tsx::AC5: app menu > opens File, Edit, View and Help submenus and shows each item's shortcut)
+- [ ] Closing the window keeps Featra running in the system tray; the tray icon reopens the window, and Quit (menu or tray) exits
 
 ## Tasks
 
@@ -71,6 +77,13 @@ As a builder, I get a familiar ADE window: a title bar, a sidebar I can collapse
 - [x] Edit items act on the focused field
 - [x] Keyboard shortcuts and About dialogs, Troubleshooting submenu
 - [x] Tests for each menu item; extend the journey test
+- [ ] Close hides the window instead of quitting, behind one flag in main (default on)
+- [ ] Tray icon (placeholder) with Show Featra / Quit Featra; left-click shows the window
+- [ ] One-time notice on first close, remembered
+- [ ] Quit from the menu or tray exits for real
+- [ ] Second launch shows the existing window
+- [ ] macOS: close hides, Dock icon reopens, no tray icon
+- [ ] Tests: close hides, tray Show restores, Quit exits, second launch focuses
 
 ## Notes
 
