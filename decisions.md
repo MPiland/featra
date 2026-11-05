@@ -121,3 +121,12 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
 - 2026-11-05 — Linux is a supported M1 platform alongside Windows and macOS. Each story's tests also run on Linux
   (Ubuntu under WSL2 on the dev machine). Linux trays often ignore a click, so the tray always has a right-click menu
   with Show Featra and Exit; when no tray is available, the close button quits instead of hiding the window.
+- 2026-11-05 — A one-off WSLg e2e failure is not a product bug. Reset App Data e2e failed once on WSLg while the Windows
+  suite ran on the same machine.
+  - Not reproduced in about 3,120 isolated menu.spec runs on WSLg, with and without diagnostics, plus the test alone ×20
+    and the full suite ×4. Two more isolated failures came without stderr, and possibly during other sessions' runs.
+  - It reproduced at once with the Windows suite running alongside (1 of 40). Stderr showed `X connection error
+    received` (Chromium `ui/gfx/x/connection.cc`): WSLg's X server dropped the app's connection, and Chromium shuts the
+    app down on that. No app code is involved, so assertions are unchanged and there is no product fix.
+  - Rule: run the WSLg e2e suite on its own, not alongside another Electron suite on the same machine. Investigate
+    immediately if it recurs in a run on its own.
