@@ -2,7 +2,7 @@
 id: FEAT-13
 type: feature
 title: App shell, projects and settings
-status: approved
+status: active
 parent: EPIC-1
 order: 2
 origin: planned
@@ -12,6 +12,11 @@ history:
     field: status
     from: null
     to: approved
+    by: user
+  - at: 2026-11-05T17:15:38Z
+    field: status
+    from: approved
+    to: active
     by: user
 ---
 
