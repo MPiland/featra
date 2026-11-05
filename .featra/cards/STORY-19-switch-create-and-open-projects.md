@@ -31,6 +31,7 @@ As a builder, I switch between my projects from the top of the sidebar, and add 
 - [ ] The project switcher lists known projects and switches Work and the chat list to the chosen one
 - [ ] New project… creates a folder and opens it; Open folder… adds an existing folder
 - [ ] Project settings… in the switcher opens Settings on that project
+- [ ] The File menu lists New project…, Open folder… and Project settings… with their shortcuts
 
 ## Tasks
 

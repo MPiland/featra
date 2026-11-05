@@ -32,6 +32,7 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - [ ] App settings are stored in the user's config folder; project settings in .featra/config.yaml
 - [ ] A project value that overrides an app default is labelled as an override and can be reset
 - [ ] Every setting is reachable and changeable by keyboard
+- [ ] Settings… in the File menu (Ctrl+,) opens the Settings window
 
 ## Tasks
 
