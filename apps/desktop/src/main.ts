@@ -1,8 +1,38 @@
 import { join } from "node:path";
-import { app, BrowserWindow, ipcMain, Menu, nativeTheme, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  nativeTheme,
+  Notification,
+  Tray,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+} from "electron";
 import { EDIT_COMMANDS, IPC, normalizeUiState, THEME_CHOICES, type EditCommand, type ThemeChoice } from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
-import { createUiStateStore, type UiStateStore } from "./ui-state-store.ts";
+import { createLifecycle, type Lifecycle } from "./lifecycle.ts";
+import { createAppStateStore, createUiStateStore, type UiStateStore } from "./ui-state-store.ts";
+
+/**
+ * Close sends Featra to the system tray (the Dock on macOS) instead of quitting, so agent sessions keep running.
+ * STORY-20 wires this to Settings; until then it is always on.
+ */
+const CLOSE_TO_TRAY = true;
+
+/**
+ * E2E runs set FEATRA_E2E=1. The only difference: OS notifications are recorded instead of shown, and the tray is
+ * reachable from the test (Playwright can't click the real notification area).
+ */
+const e2e = process.env.FEATRA_E2E === "1";
+interface TestHooks {
+  notices: string[];
+  tray?: Tray;
+  trayMenu?: Menu;
+}
+const testHooks: TestHooks = { notices: [] };
+if (e2e) (globalThis as { featraTest?: TestHooks }).featraTest = testHooks;
 
 // Tests (and anyone running a second profile) point userData at their own folder. Must happen before `ready`.
 const userDataDir = process.env.FEATRA_USER_DATA_DIR;
@@ -40,7 +70,7 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-function registerIpc(store: UiStateStore) {
+function registerIpc(store: UiStateStore, lifecycle: Lifecycle) {
   const fromOurWindow = (e: IpcMainEvent | IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);
 
   ipcMain.handle(IPC.uiStateLoad, () => store.load());
@@ -64,7 +94,7 @@ function registerIpc(store: UiStateStore) {
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());
   ipcMain.on(IPC.appToggleDevTools, (e) => e.sender.toggleDevTools());
-  ipcMain.on(IPC.appQuit, () => app.quit());
+  ipcMain.on(IPC.appQuit, () => lifecycle.quit());
 }
 
 /**
@@ -74,6 +104,23 @@ function registerIpc(store: UiStateStore) {
 function setNativeMenu() {
   if (process.platform !== "darwin") return Menu.setApplicationMenu(null);
   Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }]));
+}
+
+function showNotice(message: string) {
+  if (e2e) return void testHooks.notices.push(message);
+  if (Notification.isSupported()) new Notification({ title: "Featra", body: message }).show();
+}
+
+/** Placeholder icon until there is a logo (see decisions.md). Electron picks tray@2x.png on high-DPI screens. */
+function createTray(win: BrowserWindow, lifecycle: Lifecycle): Tray {
+  const tray = new Tray(join(__dirname, "../assets/tray.png"));
+  tray.setToolTip("Featra");
+  tray.on("click", () => lifecycle.reveal(win));
+  const menu = Menu.buildFromTemplate(lifecycle.trayMenu(win).map(({ label, click }) => ({ label, click })));
+  tray.setContextMenu(menu);
+  testHooks.tray = tray;
+  testHooks.trayMenu = menu;
+  return tray;
 }
 
 // The window only ever shows the bundled client: no navigation away, no pop-up windows.
@@ -86,37 +133,56 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
   const store = createUiStateStore(app.getPath("userData"));
-  registerIpc(store);
+  const appState = createAppStateStore(app.getPath("userData"));
+  let win: BrowserWindow | undefined;
+  let tray: Tray | undefined;
 
-  app.on("second-instance", () => {
-    const win = BrowserWindow.getAllWindows()[0];
-    if (win?.isMinimized()) win.restore();
-    win?.focus();
+  void app.whenReady().then(async () => {
+    if (process.platform === "win32") app.setAppUserModelId("dev.featra.app"); // notifications need it on Windows
+    setNativeMenu();
+    const [ui, remembered] = await Promise.all([store.load(), appState.load()]);
+    const lifecycle = createLifecycle({
+      platform: process.platform,
+      closeToTray: CLOSE_TO_TRAY,
+      noticeShown: remembered.trayNoticeShown,
+      notify: showNotice,
+      rememberNotice: () => void appState.save({ trayNoticeShown: true }),
+      exit: () => app.quit(),
+    });
+    registerIpc(store, lifecycle);
+    app.on("before-quit", () => lifecycle.onBeforeQuit());
+
+    // A second launch (Start menu, shortcut) brings back the running app's window instead of starting another app.
+    app.on("second-instance", () => {
+      if (win && !win.isDestroyed()) lifecycle.reveal(win);
+    });
+    // macOS: clicking the Dock icon brings the hidden window back.
+    app.on("activate", () => {
+      if (win && !win.isDestroyed()) lifecycle.reveal(win);
+      else lifecycle.manage((win = createWindow()));
+    });
+
+    // Apply a pinned theme before the window exists so its background matches from the first frame.
+    nativeTheme.themeSource = ui.theme;
+    win = createWindow();
+    lifecycle.manage(win);
+    if (lifecycle.usesTray) tray = createTray(win, lifecycle);
   });
 
   nativeTheme.on("updated", () => {
-    for (const win of BrowserWindow.getAllWindows()) win.setBackgroundColor(windowBackground());
+    for (const w of BrowserWindow.getAllWindows()) w.setBackgroundColor(windowBackground());
   });
 
-  // Don't lose the last sidebar toggle to a fast quit: let pending writes land first.
+  // Don't lose the last sidebar toggle (or the notice flag) to a fast quit: let pending writes land first.
   app.on("will-quit", (e) => {
-    if (!store.pending) return;
+    if (!store.pending && !appState.pending) return;
     e.preventDefault();
-    void store.flush().finally(() => app.quit());
+    void Promise.all([store.flush(), appState.flush()]).finally(() => app.quit());
   });
 
+  // Only reached when close-to-tray is off or the app is quitting.
   app.on("window-all-closed", () => {
+    tray?.destroy();
     if (process.platform !== "darwin") app.quit();
-  });
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
-  });
-
-  void app.whenReady().then(async () => {
-    setNativeMenu();
-    // Apply a pinned theme before the window exists so its background matches from the first frame.
-    nativeTheme.themeSource = (await store.load()).theme;
-    createWindow();
   });
 }

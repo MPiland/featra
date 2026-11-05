@@ -46,6 +46,21 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - Window chrome state (sidebar collapsed, zoom, theme) is `ui-state.json` in Electron's `userData`, written by main
     (atomic, flushed before quit), not renderer `localStorage`. `FEATRA_USER_DATA_DIR` overrides the folder. STORY-20
     may fold it into app settings.
+  - Close goes to the system tray (sent back by the user): the close button and Alt+F4 hide the window and the app keeps
+    running, so agent sessions carry on. It sits behind one flag in main, `CLOSE_TO_TRAY` (on), for STORY-20 to wire to
+    Settings; off, closing quits as before. The logic is `apps/desktop/src/lifecycle.ts`, free of Electron imports.
+  - Quit means quit: File > Quit, the tray's Quit Featra and any other quit (⌘Q, OS shutdown, `before-quit`) let the
+    window close for real. A second launch reveals the running window (`requestSingleInstanceLock`, per userData).
+  - The tray icon is a placeholder until there is a logo: a blue rounded square with a white "F"
+    (`apps/desktop/assets/tray.png`, `tray@2x.png`). Left-click shows the window; right-click offers Show Featra and
+    Quit Featra.
+  - The "still running in the system tray" notice is an OS notification on the first close only; that it was shown is
+    remembered in `app-state.json` in userData (main's own state, apart from `ui-state.json`).
+  - macOS: close hides the window and the app stays in the Dock; the Dock icon reopens it. No tray icon and no notice,
+    since staying in the Dock is the platform convention.
+  - E2E runs set `FEATRA_E2E=1`: main then records notifications instead of showing them and exposes its real Tray to
+    the test, which emits the tray's click and chooses its menu items (Playwright can't click the notification area).
+    Alt+F4 is proved through `BrowserWindow.close()`, the call the OS close takes.
   - Back/forward is an in-memory view history; it does not survive a restart.
   - The light palette mirrors the dark mockup. Two colours differ from the mockup to meet AA: the menu shortcut hint uses
     `--tx2` (the mockup's `--tx3` is 3.4:1 on a focused item in dark), and light `--ok` is `#186f3f`.

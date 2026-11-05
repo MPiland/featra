@@ -1,5 +1,5 @@
 import { expect, test, type ElectronApplication } from "@playwright/test";
-import { launch, tempUserData } from "./app.ts";
+import { clickTray, launch, notices, tempUserData, windowVisible } from "./app.ts";
 
 const zoomFactor = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor());
@@ -7,9 +7,9 @@ const ENTRIES = ["Work", "Inbox", "Artifacts", "Plugins", "Settings"];
 
 /**
  * STORY-18 journey: the window, its title bar and sidebar, the app menu by keyboard, and a collapsed sidebar and
- * zoom surviving a restart.
+ * zoom surviving a restart; closing to the tray and reopening from it.
  */
-test("app window: title bar, menu, sidebar; Ctrl+B collapse and zoom survive restart", async () => {
+test("app window: title bar, menu, sidebar; close to tray and reopen; Ctrl+B collapse and zoom survive restart", async () => {
   const profile = await tempUserData();
   try {
     let { app, page } = await launch(profile.dir);
@@ -47,6 +47,14 @@ test("app window: title bar, menu, sidebar; Ctrl+B collapse and zoom survive res
     await expect(viewMenu.getByRole("menuitem", { name: /^Zoom in/ })).toContainText("Ctrl+=");
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menu")).toHaveCount(0);
+    await expect.poll(() => zoomFactor(app)).toBe(1.1);
+
+    // Close sends it to the tray with a one-time notice; the tray icon brings the same window back.
+    await bar.getByRole("button", { name: "Close window" }).click();
+    await expect.poll(() => windowVisible(app)).toBe(false);
+    expect(await notices(app)).toEqual(["Featra is still running in the system tray"]);
+    await clickTray(app);
+    await expect.poll(() => windowVisible(app)).toBe(true);
     await expect.poll(() => zoomFactor(app)).toBe(1.1);
 
     // Ctrl+B collapses it: zero width and out of the tab order.

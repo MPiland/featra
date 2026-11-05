@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { DEFAULT_UI_STATE, type UiState } from "@featra/client/bridge";
-import { createUiStateStore } from "../src/ui-state-store.ts";
+import { createAppStateStore, createUiStateStore } from "../src/ui-state-store.ts";
 
 const sidebar = (sidebarCollapsed: boolean): UiState => ({ ...DEFAULT_UI_STATE, sidebarCollapsed });
 
@@ -71,5 +71,19 @@ describe("AC5: zoom and theme survive a restart", () => {
     const store = createUiStateStore(dir);
     await writeFile(store.file, JSON.stringify({ sidebarCollapsed: true }), "utf8");
     expect(await store.load()).toEqual({ sidebarCollapsed: true, zoomFactor: 1, theme: "system" });
+  });
+});
+
+describe("AC6: the tray notice is remembered across restarts", () => {
+  it("a fresh profile has not shown it; once saved, a restarted app knows it was shown", async () => {
+    expect(await createAppStateStore(dir).load()).toEqual({ trayNoticeShown: false });
+    await createAppStateStore(dir).save({ trayNoticeShown: true });
+    expect(await createAppStateStore(dir).load()).toEqual({ trayNoticeShown: true });
+  });
+
+  it("a damaged file loads as not shown", async () => {
+    const store = createAppStateStore(dir);
+    await writeFile(store.file, '{"trayNoticeShown": "yes"', "utf8");
+    expect(await store.load()).toEqual({ trayNoticeShown: false });
   });
 });
