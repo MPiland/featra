@@ -31,6 +31,7 @@ As a builder, I see all my chats in the sidebar grouped by provider and start a 
 - [ ] New chat starts a plain chat; a chat does not have to become a feature
 - [ ] Chats are grouped by provider, built from the providers the user has installed
 - [ ] A chat waiting on the user shows a status dot
+- [ ] The File menu has New chat (Ctrl+N)
 
 ## Tasks
 

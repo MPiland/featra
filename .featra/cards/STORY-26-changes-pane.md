@@ -30,6 +30,7 @@ As a builder, I review what a session changed against its feature branch and com
 
 - [ ] The pane lists changed files and shows each diff against the feature branch
 - [ ] A comment on a line is sent to the session as the user's message with file and line
+- [ ] The View menu toggles the Changes pane and shows its shortcut
 
 ## Tasks
 

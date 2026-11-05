@@ -108,3 +108,6 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - `pnpm test` runs Vitest and then the Electron e2e suite (which builds first); `pnpm test:unit` runs Vitest only.
   - Releases younger than pnpm's `minimumReleaseAge` are held back with `overrides` (vite 8.3.5, jsdom 30) or a
     lower range (electron ~45.2.2), not added to `minimumReleaseAgeExclude`.
+- 2026-11-05 — Linux is a supported M1 platform alongside Windows and macOS. Each story's tests also run on Linux
+  (Ubuntu under WSL2 on the dev machine). Linux trays often ignore a click, so the tray always has a right-click menu
+  with Show Featra and Exit; when no tray is available, the close button quits instead of hiding the window.

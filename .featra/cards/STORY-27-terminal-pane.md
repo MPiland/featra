@@ -30,6 +30,7 @@ As a builder, I open a terminal in the session's worktree without leaving the ch
 
 - [ ] The terminal opens in the session's working directory and keeps running while hidden
 - [ ] Ctrl+` toggles the terminal
+- [ ] The View menu toggles the Terminal pane and shows its shortcut
 
 ## Tasks
 
