@@ -78,8 +78,24 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     remembered in `app-state.json` in userData (main's own state, apart from `ui-state.json`).
   - macOS: close hides the window and the app stays in the Dock; the Dock icon reopens it. No tray icon and no notice,
     since staying in the Dock is the platform convention.
-  - E2E runs set `FEATRA_E2E=1`: main then records notifications and Show Logs' "show in File Explorer" instead of
-    doing them, a restart quits without relaunching (the test launches the next instance itself), and main exposes its
+  - Linux is a supported M1 platform: the window, title bar controls, menu and shortcuts are the Windows set (Redo
+    aside). Linux trays are StatusNotifierItems, so close goes to the tray only when a StatusNotifier host owns
+    `org.kde.StatusNotifierWatcher` on the session bus (KDE, most desktops, GNOME with the AppIndicator extension).
+    Main asks with `dbus-send ... NameHasOwner`, then `gdbus` if dbus-send is missing; if neither can run, there is no
+    tray. Without one (stock GNOME) close quits: an icon there would be invisible and the window unreachable. The check
+    is `hasTrayHost` in `apps/desktop/src/tray-support.ts`, with the command runner injected, and is logged at start.
+  - Linux trays often ignore clicks, so the tray always has its right-click menu; there, Show Featra is the restore
+    path the tests use.
+  - Quit finishes with `app.exit(0)` once the stores and log are flushed in `will-quit`, not a second `app.quit()`. On
+    Linux (WSLg) a re-entered quit after the developer tools had been opened was sometimes dropped and the app hung
+    (bug found on Linux; regression test in `tray.spec.ts`). By `will-quit` every window is closed and every quit
+    handler has run, so nothing is skipped.
+  - Minimise is up to the window manager. WSLg's does not advertise `_NET_WM_STATE_HIDDEN` and xvfb has none, so there
+    `minimize()` has no effect, even on a framed window (checked with plain Electron). The tray test asserts that the
+    title bar asked to minimise and then the outcome the WM supports (minimised, or still shown); the restore and focus
+    after Show Featra are asserted everywhere.
+  - E2E runs set `FEATRA_E2E=1`: main then records notifications and Show Logs' "show in folder" instead of doing
+    them, `FEATRA_E2E_TRAY=absent` fakes a desktop with no tray host, a restart quits without relaunching (the test launches the next instance itself), and main exposes its
     real Tray to the test, which emits the tray's click and chooses its menu items (Playwright can't click the
     notification area). Alt+F4 is proved through `BrowserWindow.close()`, the call the OS close takes.
   - Back/forward is an in-memory view history; it does not survive a restart.

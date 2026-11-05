@@ -74,6 +74,7 @@ As a builder, I get a familiar ADE window: a title bar, a sidebar I can collapse
 - [x] The window follows the OS light or dark theme and meets WCAG AA contrast (test: apps/desktop/e2e/contrast.spec.ts::AC4: theme follows the OS and meets WCAG AA)
 - [x] The menu button opens File, Edit, View, Go and Help, modelled on Claude's desktop menu, in Title Case. File: Settings… Ctrl+,, Close Window Ctrl+Shift+W (to tray), Exit (no shortcut on Windows/Linux; Quit Featra Cmd+Q on macOS). Edit: Undo, Redo, Cut, Copy, Paste, Delete, Select All. View: Sidebar (checkmark) Ctrl+B, Actual Size, Zoom In, Zoom Out, Full Screen F11, Reload F5. Go: Back Alt+Left, Forward Alt+Right, Work, Inbox, Artifacts, Plugins. Help: Troubleshooting (Show Logs in File Explorer, Toggle Developer Tools, Clear Cache and Restart, Reset App Data…), About Featra. No Theme submenu (theme moves to Settings, STORY-20). Items not built yet are hidden, not greyed (test: packages/client/test/menu.test.tsx::AC5: app menu > opens File, Edit, View, Go and Help, modelled on Claude's menu in Title Case, with each item's shortcut)
 - [x] Closing the window keeps Featra running in the system tray; the tray icon reopens the window, and Exit (menu or tray) exits (test: apps/desktop/e2e/tray.spec.ts::AC6: close to tray > close hides the window and the app keeps running; the notice shows once and is remembered)
+- [x] On Linux, the window, title bar controls, menu and shortcuts work as they do on Windows. The tray has a right-click menu with Show Featra and Exit. When no tray is available (for example stock GNOME), the close button quits instead of hiding the window. (test: apps/desktop/e2e/tray.spec.ts::AC6: close to tray > with no tray on the desktop (stock GNOME), close quits instead of hiding the window)
 
 ## Tasks
 
@@ -102,6 +103,11 @@ As a builder, I get a familiar ADE window: a title bar, a sidebar I can collapse
 - [x] Close Window (to tray), Full Screen, Reload, Back/Forward: each shortcut works from the keyboard
 - [x] Go menu: Back/Forward (greyed when there is nowhere to go) and the sidebar views
 - [x] Minimal main-process log in userData/logs for Show Logs
+- [x] Linux tray detection: StatusNotifier host on the session bus (dbus-send, then gdbus), injectable
+- [x] Linux without a tray: close quits, no tray icon or notice
+- [x] Linux tray: right-click menu is the restore path; WM-aware minimise test
+- [x] Exit after Toggle Developer Tools no longer hangs on Linux (regression test)
+- [x] Run the unit and e2e suites on Linux (WSLg and xvfb)
 
 ## Notes
 
