@@ -2,7 +2,7 @@
 id: STORY-18
 type: story
 title: App window with title bar and collapsible sidebar
-status: In Progress
+status: In Review
 parent: FEAT-13
 order: 1
 origin: planned
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: user
+  - at: 2026-11-05T17:41:46Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-18
 ---
 
 ## Description
