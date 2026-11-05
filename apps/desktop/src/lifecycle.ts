@@ -45,7 +45,7 @@ export interface Lifecycle {
   manage(win: ManagedWindow): void;
   /** Shows, un-minimises and focuses the window: tray click, Dock click, second launch. */
   reveal(win: ManagedWindow): void;
-  /** Quits for real (File > Quit, the tray's Quit). */
+  /** Quits for real (File > Exit, the tray's Exit). */
   quit(): void;
   /** Electron's `before-quit`: any quit (Cmd+Q, OS shutdown, `app.quit`) closes windows for real from here on. */
   onBeforeQuit(): void;
@@ -88,7 +88,7 @@ export function createLifecycle(o: LifecycleOptions): Lifecycle {
     },
     trayMenu: (win) => [
       { label: "Show Featra", click: () => lifecycle.reveal(win) },
-      { label: "Quit Featra", click: () => lifecycle.quit() },
+      { label: "Exit", click: () => lifecycle.quit() },
     ],
   };
   return lifecycle;

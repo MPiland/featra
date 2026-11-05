@@ -29,8 +29,8 @@ export function normalizeUiState(raw: unknown): UiState {
 }
 
 /** Text-editing commands; the host runs them on whatever field has focus. */
-export type EditCommand = "undo" | "redo" | "cut" | "copy" | "paste" | "selectAll";
-export const EDIT_COMMANDS: readonly EditCommand[] = ["undo", "redo", "cut", "copy", "paste", "selectAll"];
+export type EditCommand = "undo" | "redo" | "cut" | "copy" | "paste" | "delete" | "selectAll";
+export const EDIT_COMMANDS: readonly EditCommand[] = ["undo", "redo", "cut", "copy", "paste", "delete", "selectAll"];
 
 export interface AppInfo {
   name: string;
@@ -48,7 +48,9 @@ export interface FeatraBridge {
     minimize(): void;
     toggleMaximize(): void;
     close(): void;
+    toggleFullScreen(): void;
     setZoomFactor(factor: number): void;
+    /** Applied from the stored state; Settings > Appearance (STORY-20) will change it. */
     setTheme(theme: ThemeChoice): void;
   };
   edit(command: EditCommand): void;
@@ -56,6 +58,12 @@ export interface FeatraBridge {
     info(): Promise<AppInfo>;
     reload(): void;
     toggleDevTools(): void;
+    /** Shows the main process's log file in the OS file manager. */
+    showLogs(): void;
+    /** Clears Chromium's HTTP cache, then restarts the app. */
+    clearCacheAndRestart(): void;
+    /** Deletes stored state (window chrome, app state, web storage, cache), then restarts. Logs are kept. */
+    resetAppData(): void;
     quit(): void;
   };
 }
@@ -67,12 +75,16 @@ export const IPC = {
   windowMinimize: "window:minimize",
   windowToggleMaximize: "window:toggle-maximize",
   windowClose: "window:close",
+  windowToggleFullScreen: "window:toggle-full-screen",
   windowSetZoom: "window:set-zoom",
   windowSetTheme: "window:set-theme",
   edit: "edit:run",
   appInfo: "app:info",
   appReload: "app:reload",
   appToggleDevTools: "app:toggle-devtools",
+  appShowLogs: "app:show-logs",
+  appClearCacheAndRestart: "app:clear-cache-and-restart",
+  appResetAppData: "app:reset-app-data",
   appQuit: "app:quit",
 } as const;
 
@@ -104,6 +116,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       minimize() {},
       toggleMaximize() {},
       close() {},
+      toggleFullScreen() {},
       setZoomFactor: (factor) => {
         document.documentElement.style.zoom = String(factor);
       },
@@ -116,6 +129,9 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       info: async () => ({ name: "Featra", version: "dev" }),
       reload: () => window.location.reload(),
       toggleDevTools() {},
+      showLogs() {},
+      clearCacheAndRestart() {},
+      resetAppData() {},
       quit() {},
     },
   };

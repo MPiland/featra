@@ -87,3 +87,14 @@ describe("AC6: the tray notice is remembered across restarts", () => {
     expect(await store.load()).toEqual({ trayNoticeShown: false });
   });
 });
+
+describe("AC5: Reset App Data deletes the stored state", () => {
+  it("remove() deletes the file after queued saves, so a restart starts from defaults", async () => {
+    const store = createUiStateStore(dir);
+    void store.save(sidebar(true));
+    await store.remove();
+    expect(await createUiStateStore(dir).load()).toEqual(DEFAULT_UI_STATE);
+    await expect(readFile(store.file, "utf8")).rejects.toThrow();
+    await store.remove(); // nothing left to delete is fine
+  });
+});

@@ -49,7 +49,7 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           problems.push(...(await failures(page)));
         }
         const menuItem = (name: string | RegExp) => page.getByRole("menuitem", { name, exact: typeof name === "string" });
-        for (const path of [["File"], ["Edit"], ["View", "Theme"], ["Help", "Troubleshooting"]]) {
+        for (const path of [["File"], ["Edit"], ["View"], ["Go"], ["Help", "Troubleshooting"]]) {
           await page.getByRole("button", { name: "Menu" }).click();
           for (const name of path) await menuItem(name).hover();
           await expect(page.getByRole("menu")).toHaveCount(path.length + 1);
@@ -59,10 +59,13 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           await page.keyboard.press("Escape");
           await expect(page.getByRole("menu")).toHaveCount(0);
         }
-        for (const name of ["About Featra"]) {
+        for (const [name, path] of [
+          ["About Featra", ["Help", "About Featra"]],
+          ["Reset App Data?", ["Help", "Troubleshooting", "Reset App Data…"]],
+        ] as const) {
           await page.getByRole("button", { name: "Menu" }).click();
-          await menuItem("Help").hover();
-          await menuItem(name).click();
+          for (const step of path.slice(0, -1)) await menuItem(step).hover();
+          await menuItem(path.at(-1)!).click();
           const dialog = page.getByRole("dialog", { name });
           await expect(dialog).toBeVisible();
           if (name === "About Featra") await expect(dialog.getByText(/^Version \d/)).toBeVisible();

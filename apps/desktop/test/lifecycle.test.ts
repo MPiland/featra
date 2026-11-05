@@ -79,12 +79,12 @@ describe("AC6: close to tray", () => {
     win.tryClose();
     win.minimized = true;
     const items = lc.trayMenu(win);
-    expect(items.map((i) => i.label)).toEqual(["Show Featra", "Quit Featra"]);
+    expect(items.map((i) => i.label)).toEqual(["Show Featra", "Exit"]);
     items[0]!.click();
     expect(win).toMatchObject({ visible: true, minimized: false, focused: true });
   });
 
-  it("Quit (menu or tray) exits, and the window then closes for real", () => {
+  it("Exit (menu or tray) exits, and the window then closes for real", () => {
     const { lc, win, log } = setup();
     lc.trayMenu(win)[1]!.click();
     expect(log.exits).toBe(1);
@@ -92,7 +92,7 @@ describe("AC6: close to tray", () => {
     expect(win.tryClose()).toBe("closed");
 
     const menu = setup();
-    menu.lc.quit(); // File > Quit goes through the same call
+    menu.lc.quit(); // File > Exit goes through the same call
     expect(menu.log.exits).toBe(1);
     expect(menu.win.tryClose()).toBe("closed");
   });

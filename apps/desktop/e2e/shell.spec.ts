@@ -41,10 +41,11 @@ test("app window: title bar, menu, sidebar; close to tray and reopen; Ctrl+B col
     await page.keyboard.press("ArrowRight");
     const viewMenu = page.getByRole("menu", { name: "View" });
     await expect(viewMenu).toBeVisible();
-    await expect(viewMenu.getByRole("menuitem", { name: /^Toggle sidebar/ })).toBeFocused();
+    await expect(viewMenu.getByRole("menuitemcheckbox", { name: /^Sidebar/ })).toBeFocused();
     await page.keyboard.press("ArrowDown");
-    await expect(viewMenu.getByRole("menuitem", { name: /^Zoom in/ })).toBeFocused();
-    await expect(viewMenu.getByRole("menuitem", { name: /^Zoom in/ })).toContainText("Ctrl+=");
+    await page.keyboard.press("ArrowDown");
+    await expect(viewMenu.getByRole("menuitem", { name: /^Zoom In/ })).toBeFocused();
+    await expect(viewMenu.getByRole("menuitem", { name: /^Zoom In/ })).toContainText("Ctrl+=");
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menu")).toHaveCount(0);
     await expect.poll(() => zoomFactor(app)).toBe(1.1);

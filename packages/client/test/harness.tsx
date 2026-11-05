@@ -17,6 +17,7 @@ export function fakeBridge(platform = "win32") {
       minimize: () => void calls.push("minimize"),
       toggleMaximize: () => void calls.push("toggleMaximize"),
       close: () => void calls.push("close"),
+      toggleFullScreen: () => void calls.push("fullScreen"),
       setZoomFactor: (f) => void calls.push(`zoom:${f}`),
       setTheme: (t) => void calls.push(`theme:${t}`),
     },
@@ -26,6 +27,9 @@ export function fakeBridge(platform = "win32") {
       info: async () => ({ name: "Featra", version: "1.2.3" }),
       reload: () => void calls.push("reload"),
       toggleDevTools: () => void calls.push("toggleDevTools"),
+      showLogs: () => void calls.push("showLogs"),
+      clearCacheAndRestart: () => void calls.push("clearCacheAndRestart"),
+      resetAppData: () => void calls.push("resetAppData"),
       quit: () => void calls.push("quit"),
     },
   };

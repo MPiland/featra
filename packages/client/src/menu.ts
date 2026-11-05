@@ -1,77 +1,110 @@
-import type { EditCommand, ThemeChoice } from "./bridge.ts";
-import { shortcutLabel } from "./shortcuts.ts";
+import type { EditCommand } from "./bridge.ts";
+import { shortcutLabel, type ShortcutId } from "./shortcuts.ts";
+import { VIEWS, type ViewId } from "./views.ts";
 
 export type MenuNode =
-  | { kind: "item"; id: string; label: string; shortcut?: string; onSelect: () => void }
-  | { kind: "radio"; id: string; label: string; checked: boolean; onSelect: () => void }
+  | { kind: "item"; id: string; label: string; shortcut?: string; disabled?: boolean; onSelect: () => void }
+  | { kind: "check"; id: string; label: string; shortcut?: string; checked: boolean; onSelect: () => void }
   | { kind: "submenu"; id: string; label: string; items: MenuNode[] }
   | { kind: "separator"; id: string };
 
 export interface MenuActions {
   openSettings(): void;
+  closeWindow(): void;
   quit(): void;
   edit(command: EditCommand): void;
   toggleSidebar(): void;
+  zoomReset(): void;
   zoomIn(): void;
   zoomOut(): void;
-  zoomReset(): void;
-  setTheme(theme: ThemeChoice): void;
-  showAbout(): void;
+  toggleFullScreen(): void;
   reload(): void;
+  back(): void;
+  forward(): void;
+  open(view: ViewId): void;
+  showLogs(): void;
   toggleDevTools(): void;
+  clearCacheAndRestart(): void;
+  /** Asks first: the confirm dialog runs the reset. */
+  resetAppData(): void;
+  showAbout(): void;
 }
 
 export interface MenuContext {
   platform: string;
-  theme: ThemeChoice;
+  sidebarShown: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
   actions: MenuActions;
 }
 
+/** The views the Go menu opens: the sidebar's, except Settings, which is in File. */
+const GO_VIEWS: readonly ViewId[] = VIEWS.map((v) => v.id).filter((id) => id !== "settings");
+
+const fileManager = (platform: string) =>
+  platform === "darwin" ? "Finder" : platform === "win32" ? "File Explorer" : "File Manager";
+
 /**
- * The title bar's Menu: File, Edit, View, Help. Only items that work today are listed; later stories add theirs
- * (New chat, New project…, Open folder…, Project settings…, pane toggles).
+ * The title bar's Menu, modelled on Claude's desktop app: File, Edit, View, Go, Help, in Title Case. Items that
+ * aren't built yet are left out, not greyed; later stories add theirs (New Chat, New Project…, Open Folder…, pane
+ * toggles, Keyboard Shortcuts, Find, Previous/Next Chat). Only Back and Forward grey out, when there's nowhere to go.
  */
-export function buildAppMenu({ platform, theme, actions: a }: MenuContext): MenuNode[] {
-  const key = (id: Parameters<typeof shortcutLabel>[0]) => shortcutLabel(id, platform);
-  const inWindow = platform !== "web"; // a plain browser tab can't quit or open developer tools for itself
-  const edit = (id: EditCommand, label: string): MenuNode => ({
-    kind: "item",
-    id: `edit.${id}`,
-    label,
-    shortcut: key(id),
-    onSelect: () => a.edit(id),
-  });
-  const themeItem = (id: ThemeChoice, label: string): MenuNode => ({
-    kind: "radio",
-    id: `view.theme.${id}`,
-    label,
-    checked: theme === id,
-    onSelect: () => a.setTheme(id),
-  });
+export function buildAppMenu({ platform, sidebarShown, canGoBack, canGoForward, actions: a }: MenuContext): MenuNode[] {
+  const key = (id: ShortcutId) => shortcutLabel(id, platform);
+  const inWindow = platform !== "web"; // a plain browser tab can't close, quit, go full screen or troubleshoot itself
+  const sep = (id: string): MenuNode => ({ kind: "separator", id });
+  const item = (id: string, label: string, onSelect: () => void, shortcut?: ShortcutId, disabled = false): MenuNode => {
+    const k = shortcut && key(shortcut);
+    return { kind: "item", id, label, onSelect, ...(k ? { shortcut: k } : {}), ...(disabled ? { disabled } : {}) };
+  };
+  const edit = (command: EditCommand, label: string): MenuNode =>
+    item(`edit.${command}`, label, () => a.edit(command), command === "delete" ? undefined : command);
 
-  const file: MenuNode[] = [
-    { kind: "item", id: "file.settings", label: "Settings…", shortcut: key("settings"), onSelect: a.openSettings },
-  ];
+  const file: MenuNode[] = [item("file.settings", "Settings…", a.openSettings, "settings")];
   if (inWindow) {
-    file.push({ kind: "separator", id: "file.sep" });
-    file.push({ kind: "item", id: "file.quit", label: "Quit", shortcut: key("quit"), onSelect: a.quit });
+    file.push(
+      sep("file.sep1"),
+      item("file.closeWindow", "Close Window", a.closeWindow, "closeWindow"),
+      sep("file.sep2"),
+      item("file.quit", platform === "darwin" ? "Quit Featra" : "Exit", a.quit, "quit"),
+    );
   }
 
-  const help: MenuNode[] = [
-    { kind: "item", id: "help.about", label: "About Featra", onSelect: a.showAbout },
+  const view: MenuNode[] = [
+    { kind: "check", id: "view.sidebar", label: "Sidebar", shortcut: key("toggleSidebar"), checked: sidebarShown, onSelect: a.toggleSidebar },
+    sep("view.sep1"),
+    item("view.actualSize", "Actual Size", a.zoomReset, "zoomReset"),
+    item("view.zoomIn", "Zoom In", a.zoomIn, "zoomIn"),
+    item("view.zoomOut", "Zoom Out", a.zoomOut, "zoomOut"),
   ];
+  if (inWindow) view.push(sep("view.sep2"), item("view.fullScreen", "Full Screen", a.toggleFullScreen, "fullScreen"));
+  view.push(sep("view.sep3"), item("view.reload", "Reload", a.reload, "reload"));
+
+  const go: MenuNode[] = [
+    item("go.back", "Back", a.back, "back", !canGoBack),
+    item("go.forward", "Forward", a.forward, "forward", !canGoForward),
+    sep("go.sep"),
+    ...GO_VIEWS.map((id) => item(`go.${id}`, VIEWS.find((v) => v.id === id)!.title, () => a.open(id))),
+  ];
+
+  const help: MenuNode[] = [];
   if (inWindow) {
-    help.push({ kind: "separator", id: "help.sep" });
-    help.push({
-      kind: "submenu",
-      id: "help.troubleshooting",
-      label: "Troubleshooting",
-      items: [
-        { kind: "item", id: "help.reload", label: "Reload window", onSelect: a.reload },
-        { kind: "item", id: "help.devtools", label: "Toggle developer tools", onSelect: a.toggleDevTools },
-      ],
-    });
+    help.push(
+      {
+        kind: "submenu",
+        id: "help.troubleshooting",
+        label: "Troubleshooting",
+        items: [
+          item("help.showLogs", `Show Logs in ${fileManager(platform)}`, a.showLogs),
+          item("help.devTools", "Toggle Developer Tools", a.toggleDevTools),
+          item("help.clearCache", "Clear Cache and Restart", a.clearCacheAndRestart),
+          item("help.resetAppData", "Reset App Data…", a.resetAppData),
+        ],
+      },
+      sep("help.sep"),
+    );
   }
+  help.push(item("help.about", "About Featra", a.showAbout));
 
   return [
     { kind: "submenu", id: "file", label: "File", items: file },
@@ -82,32 +115,16 @@ export function buildAppMenu({ platform, theme, actions: a }: MenuContext): Menu
       items: [
         edit("undo", "Undo"),
         edit("redo", "Redo"),
-        { kind: "separator", id: "edit.sep" },
+        sep("edit.sep"),
         edit("cut", "Cut"),
         edit("copy", "Copy"),
         edit("paste", "Paste"),
-        edit("selectAll", "Select all"),
+        edit("delete", "Delete"),
+        edit("selectAll", "Select All"),
       ],
     },
-    {
-      kind: "submenu",
-      id: "view",
-      label: "View",
-      items: [
-        { kind: "item", id: "view.sidebar", label: "Toggle sidebar", shortcut: key("toggleSidebar"), onSelect: a.toggleSidebar },
-        { kind: "separator", id: "view.sep1" },
-        { kind: "item", id: "view.zoomIn", label: "Zoom in", shortcut: key("zoomIn"), onSelect: a.zoomIn },
-        { kind: "item", id: "view.zoomOut", label: "Zoom out", shortcut: key("zoomOut"), onSelect: a.zoomOut },
-        { kind: "item", id: "view.zoomReset", label: "Reset zoom", shortcut: key("zoomReset"), onSelect: a.zoomReset },
-        { kind: "separator", id: "view.sep2" },
-        {
-          kind: "submenu",
-          id: "view.theme",
-          label: "Theme",
-          items: [themeItem("system", "System"), themeItem("light", "Light"), themeItem("dark", "Dark")],
-        },
-      ],
-    },
+    { kind: "submenu", id: "view", label: "View", items: view },
+    { kind: "submenu", id: "go", label: "Go", items: go },
     { kind: "submenu", id: "help", label: "Help", items: help },
   ];
 }

@@ -30,8 +30,8 @@
 }
 
 /*
- * Theme: System follows prefers-color-scheme; View > Theme pins Light or Dark with data-theme on <html>
- * (src/theme.ts). The dark block appears twice because CSS cannot share it between the two selectors.
+ * Theme: System follows prefers-color-scheme; a stored Light or Dark (Settings > Appearance, STORY-20) pins it
+ * with data-theme on <html> (src/theme.ts). The dark block appears twice because CSS cannot share it between the two selectors.
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -314,6 +314,21 @@ svg.i {
   margin-left: -2px;
 }
 
+/* In a menu with a checkmark item, every label lines up after the checkmark's column. */
+.menu:has(> [role="none"] > [role="menuitemcheckbox"]) > [role="none"] > .mi:not([role="menuitemcheckbox"]) {
+  padding-left: 32px;
+}
+
+/* Back and Forward when there's nowhere to go. Still focusable, so arrowing through the menu finds them. */
+.mi[aria-disabled="true"] {
+  color: var(--tx3);
+  cursor: default;
+}
+
+.mi[aria-disabled="true"] .k {
+  color: var(--tx3);
+}
+
 /* Dialogs */
 .overlay {
   position: fixed;
@@ -356,6 +371,7 @@ svg.i {
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
   margin-top: 14px;
 }
 
@@ -370,6 +386,11 @@ svg.i {
 
 .btn:hover {
   background: var(--row2);
+}
+
+/* The confirm of a destructive action. */
+.btn.danger {
+  color: var(--bad);
 }
 
 .btn:focus-visible {

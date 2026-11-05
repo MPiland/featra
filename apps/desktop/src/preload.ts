@@ -13,6 +13,7 @@ const bridge: FeatraBridge = {
     minimize: () => ipcRenderer.send(IPC.windowMinimize),
     toggleMaximize: () => ipcRenderer.send(IPC.windowToggleMaximize),
     close: () => ipcRenderer.send(IPC.windowClose),
+    toggleFullScreen: () => ipcRenderer.send(IPC.windowToggleFullScreen),
     setZoomFactor: (factor) => ipcRenderer.send(IPC.windowSetZoom, factor),
     setTheme: (theme) => ipcRenderer.send(IPC.windowSetTheme, theme),
   },
@@ -21,6 +22,9 @@ const bridge: FeatraBridge = {
     info: () => ipcRenderer.invoke(IPC.appInfo),
     reload: () => ipcRenderer.send(IPC.appReload),
     toggleDevTools: () => ipcRenderer.send(IPC.appToggleDevTools),
+    showLogs: () => ipcRenderer.send(IPC.appShowLogs),
+    clearCacheAndRestart: () => ipcRenderer.send(IPC.appClearCacheAndRestart),
+    resetAppData: () => ipcRenderer.send(IPC.appResetAppData),
     quit: () => ipcRenderer.send(IPC.appQuit),
   },
 };

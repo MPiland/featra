@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AppInfo, FeatraBridge, ThemeChoice, UiState } from "./bridge.ts";
+import type { AppInfo, FeatraBridge, UiState } from "./bridge.ts";
 import { Dialog } from "./components/Dialog.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
@@ -16,7 +16,7 @@ export interface AppProps {
   initialUiState: UiState;
 }
 
-type OpenDialog = "about" | null;
+type OpenDialog = "about" | "resetAppData" | null;
 
 const sameUiState = (a: UiState, b: UiState) =>
   a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor && a.theme === b.theme;
@@ -39,27 +39,42 @@ export function App({ bridge, initialUiState }: AppProps) {
   }, []);
   const open = useCallback((v: ViewId) => setNav((n) => navigate(n, v)), []);
   const setZoom = useCallback((f: (z: number) => number) => setUi((s) => ({ ...s, zoomFactor: f(s.zoomFactor) })), []);
-  const setTheme = useCallback((theme: ThemeChoice) => setUi((s) => ({ ...s, theme })), []);
+  const back = useCallback(() => setNav(goBack), []);
+  const forward = useCallback(() => setNav(goForward), []);
 
   const actions: MenuActions = useMemo(
     () => ({
       openSettings: () => open("settings"),
+      closeWindow: () => bridge.window.close(),
       quit: () => bridge.app.quit(),
       edit: (command) => bridge.edit(command),
       toggleSidebar,
+      zoomReset: () => setZoom(() => DEFAULT_ZOOM),
       zoomIn: () => setZoom(zoomIn),
       zoomOut: () => setZoom(zoomOut),
-      zoomReset: () => setZoom(() => DEFAULT_ZOOM),
-      setTheme,
-      showAbout: () => setDialog("about"),
+      toggleFullScreen: () => bridge.window.toggleFullScreen(),
       reload: () => bridge.app.reload(),
+      back,
+      forward,
+      open,
+      showLogs: () => bridge.app.showLogs(),
       toggleDevTools: () => bridge.app.toggleDevTools(),
+      clearCacheAndRestart: () => bridge.app.clearCacheAndRestart(),
+      resetAppData: () => setDialog("resetAppData"),
+      showAbout: () => setDialog("about"),
     }),
-    [bridge, open, toggleSidebar, setZoom, setTheme],
+    [bridge, open, toggleSidebar, setZoom, back, forward],
   );
   const menu = useMemo(
-    () => buildAppMenu({ platform: bridge.platform, theme: ui.theme, actions }),
-    [bridge.platform, ui.theme, actions],
+    () =>
+      buildAppMenu({
+        platform: bridge.platform,
+        sidebarShown: !collapsed,
+        canGoBack: canGoBack(nav),
+        canGoForward: canGoForward(nav),
+        actions,
+      }),
+    [bridge.platform, collapsed, nav, actions],
   );
 
   useEffect(() => {
@@ -69,6 +84,7 @@ export function App({ bridge, initialUiState }: AppProps) {
   }, [bridge, ui]);
 
   useEffect(() => bridge.window.setZoomFactor(ui.zoomFactor), [bridge, ui.zoomFactor]);
+  // The stored theme is applied as-is (System by default, so the OS decides); Settings (STORY-20) changes it.
   useEffect(() => {
     applyTheme(ui.theme);
     bridge.window.setTheme(ui.theme);
@@ -80,16 +96,22 @@ export function App({ bridge, initialUiState }: AppProps) {
 
   useEffect(() => {
     const run: Record<AppShortcut, () => void> = {
-      toggleSidebar: actions.toggleSidebar,
       settings: actions.openSettings,
+      closeWindow: actions.closeWindow,
+      toggleSidebar: actions.toggleSidebar,
+      zoomReset: actions.zoomReset,
       zoomIn: actions.zoomIn,
       zoomOut: actions.zoomOut,
-      zoomReset: actions.zoomReset,
-      quit: actions.quit,
+      fullScreen: actions.toggleFullScreen,
+      reload: actions.reload,
+      back: actions.back,
+      forward: actions.forward,
     };
     const onKey = (e: KeyboardEvent) => {
       const shortcut = matchShortcut(e, bridge.platform);
       if (!shortcut) return;
+      // A plain browser tab keeps its own F11 and has no window to close.
+      if (bridge.platform === "web" && (shortcut === "fullScreen" || shortcut === "closeWindow")) return;
       e.preventDefault();
       run[shortcut]();
     };
@@ -111,8 +133,8 @@ export function App({ bridge, initialUiState }: AppProps) {
           onToggleSidebar={toggleSidebar}
           canGoBack={canGoBack(nav)}
           canGoForward={canGoForward(nav)}
-          onBack={() => setNav(goBack)}
-          onForward={() => setNav(goForward)}
+          onBack={back}
+          onForward={forward}
           menu={menu}
         />
         <div className={collapsed ? "app collapsed" : "app"}>
@@ -127,6 +149,28 @@ export function App({ bridge, initialUiState }: AppProps) {
           <p className="about-name">{info?.name ?? "Featra"}</p>
           <p>Version {info?.version ?? "…"}</p>
           <p>Released under the MIT licence.</p>
+        </Dialog>
+      )}
+      {dialog === "resetAppData" && (
+        <Dialog
+          title="Reset App Data?"
+          closeLabel="Cancel"
+          onClose={() => setDialog(null)}
+          actions={
+            <button
+              type="button"
+              className="btn danger"
+              onClick={() => {
+                setDialog(null);
+                bridge.app.resetAppData();
+              }}
+            >
+              Reset and Restart
+            </button>
+          }
+        >
+          <p>Featra forgets its window layout, zoom and other stored settings, then restarts.</p>
+          <p>Your projects and their files are not touched. Logs are kept.</p>
         </Dialog>
       )}
     </>

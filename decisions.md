@@ -23,13 +23,31 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
 - 2026-11-05 — STORY-18 app shell:
   - The window is frameless and the client draws the title bar, with its own minimise/maximise/close on Windows and
     Linux. macOS keeps its native traffic lights (`titleBarStyle: hiddenInset`).
-  - The Menu button opens a standard File / Edit / View / Help menu with cascading submenus (sent back by the user;
-    replaces the first flat developer menu). Only items that work today are listed; later stories add theirs. The model
-    is `packages/client/src/menu.ts`. There is no Help > Keyboard shortcuts and no Ctrl+/ yet: shortcuts live on a
-    Settings page that STORY-20 builds, and both will open it then (user decision).
-  - Shortcut labels follow each OS: Cmd on macOS (⌘, ⇧⌘Z for Redo), Ctrl+Y for Redo on Windows and Ctrl+Shift+Z on
-    Linux. Quit is Ctrl+Q on Windows and Linux (handled by the client) and ⌘Q on macOS (native app menu). Alt+F4 is
-    close, which goes to the tray, so it is not shown as Quit (review fix).
+  - The Menu button opens File / Edit / View / Go / Help, modelled on the Claude desktop app's menu, in Title Case
+    (sent back twice by the user; replaces the first flat developer menu and then a generic one). The model is
+    `packages/client/src/menu.ts`. Items not built yet are hidden, not greyed; later stories add theirs (New Chat, New
+    Project…, Open Folder…, pane toggles, Keyboard Shortcuts, Find, Previous/Next Chat). Only Back and Forward grey
+    out, when there is nowhere to go (user decision). There is no Keyboard Shortcuts item and no Ctrl+/ yet: shortcuts
+    live on a Settings page that STORY-20 builds.
+  - File: Settings… Ctrl+,, Close Window Ctrl+Shift+W (hides to the tray, like the close button), Exit. Exit has no
+    shortcut on Windows and Linux, as in Claude; Ctrl+Q is not bound, and Alt+F4 stays close-to-tray. macOS shows
+    "Quit Featra" ⌘Q (user decision).
+  - Edit: Undo, Redo, Cut, Copy, Paste, Delete, Select All. Delete has no shortcut label: the Delete key is Chromium's.
+  - View: Sidebar (a checkmark while shown) Ctrl+B, Actual Size Ctrl+0, Zoom In Ctrl+=, Zoom Out Ctrl+-, Full Screen
+    F11, Reload F5. Go: Back Alt+Left, Forward Alt+Right, then Work, Inbox, Artifacts and Plugins (the sidebar's views;
+    Settings is in File). Help: Troubleshooting › (Show Logs in File Explorer, Toggle Developer Tools, Clear Cache and
+    Restart, Reset App Data…), About Featra.
+  - Every shortcut the menu shows works from the keyboard too; the client handles them in one keydown listener. macOS
+    uses its own keys: ⌘W, ⌃⌘F, ⌘R, ⌘[ and ⌘]. Show Logs names the platform's file manager (File Explorer, Finder,
+    File Manager). Redo is Ctrl+Y on Windows, Ctrl+Shift+Z on Linux and ⇧⌘Z on macOS.
+  - No Theme submenu: theme moves to Settings > Appearance in STORY-20 (user decision). The stored theme and the
+    `setTheme` bridge stay for it; the default is System, so the app follows the OS until then.
+  - Featra writes a minimal main-process log, `userData/logs/main.log` (start, hide/show, troubleshooting, quit), so
+    Show Logs opens something real. Past 1 MB it is moved to `main.old.log` on the next start. Writes never throw.
+  - Clear Cache and Restart clears Chromium's HTTP cache and keeps stored settings. Reset App Data… asks first (Cancel
+    is focused), then clears web storage, the cache, `ui-state.json` and `app-state.json`, and restarts; projects and
+    the log are kept. Both log the step and relaunch (`app.relaunch()` + quit). The logic is
+    `apps/desktop/src/troubleshoot.ts`, free of Electron imports.
   - Edit items send the command to main, which calls `webContents.undo/redo/cut/copy/paste/selectAll`, the same calls
     Electron's menu roles make. The menu puts focus back on the field the user was in before running an item. The
     keyboard shortcuts for editing are left to Chromium.
@@ -38,9 +56,10 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     for the menu bar, ⌘Q and the system edit shortcuts.
   - Zoom steps are Chromium's (50%–200%). Zoom and theme are saved in `ui-state.json` with the sidebar state; unknown
     values fall back to 100% and System. A stored zoom between steps snaps to the nearest one.
-  - Theme Light/Dark sets `data-theme` on `<html>` (pinning the CSS tokens) and `nativeTheme.themeSource` (native
-    surfaces, window background); System removes both overrides. Main applies the stored theme before the window opens.
-  - In a plain browser tab the menu leaves out Quit and Troubleshooting, which can't work there.
+  - A stored Light/Dark theme sets `data-theme` on `<html>` (pinning the CSS tokens) and `nativeTheme.themeSource`
+    (native surfaces); System removes both overrides. Main applies the stored theme before the window opens.
+  - In a plain browser tab the menu leaves out Close Window, Exit, Full Screen and Troubleshooting, which can't work
+    there, and F11 and Ctrl+Shift+W are left to the browser.
   - About is a modal dialog: the app behind is inert, Tab stays inside, Escape closes, and focus
     returns to where it was. About reads the version from the desktop package (`app.getVersion()`).
   - The title bar shows the view title only ("Work"). The mockup's "· manager" project suffix waits for STORY-19.
@@ -50,18 +69,19 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - Close goes to the system tray (sent back by the user): the close button and Alt+F4 hide the window and the app keeps
     running, so agent sessions carry on. It sits behind one flag in main, `CLOSE_TO_TRAY` (on), for STORY-20 to wire to
     Settings; off, closing quits as before. The logic is `apps/desktop/src/lifecycle.ts`, free of Electron imports.
-  - Quit means quit: File > Quit, the tray's Quit Featra and any other quit (⌘Q, OS shutdown, `before-quit`) let the
-    window close for real. A second launch reveals the running window (`requestSingleInstanceLock`, per userData).
+  - Exit exits: File > Exit, the tray's Exit and any other quit (⌘Q, OS shutdown, `before-quit`) let the window close
+    for real. A second launch reveals the running window (`requestSingleInstanceLock`, per userData).
   - The tray icon is a placeholder until there is a logo: a blue rounded square with a white "F"
     (`apps/desktop/assets/tray.png`, `tray@2x.png`). Left-click shows the window; right-click offers Show Featra and
-    Quit Featra.
+    Exit.
   - The "still running in the system tray" notice is an OS notification on the first close only; that it was shown is
     remembered in `app-state.json` in userData (main's own state, apart from `ui-state.json`).
   - macOS: close hides the window and the app stays in the Dock; the Dock icon reopens it. No tray icon and no notice,
     since staying in the Dock is the platform convention.
-  - E2E runs set `FEATRA_E2E=1`: main then records notifications instead of showing them and exposes its real Tray to
-    the test, which emits the tray's click and chooses its menu items (Playwright can't click the notification area).
-    Alt+F4 is proved through `BrowserWindow.close()`, the call the OS close takes.
+  - E2E runs set `FEATRA_E2E=1`: main then records notifications and Show Logs' "show in File Explorer" instead of
+    doing them, a restart quits without relaunching (the test launches the next instance itself), and main exposes its
+    real Tray to the test, which emits the tray's click and chooses its menu items (Playwright can't click the
+    notification area). Alt+F4 is proved through `BrowserWindow.close()`, the call the OS close takes.
   - Back/forward is an in-memory view history; it does not survive a restart.
   - The light palette mirrors the dark mockup. Two colours differ from the mockup to meet AA: the menu shortcut hint uses
     `--tx2` (the mockup's `--tx3` is 3.4:1 on a focused item in dark), and light `--ok` is `#186f3f`.

@@ -76,7 +76,8 @@ export function sampleRenderedText(page: Page): Promise<(Sample & { kind: "text"
       const cs = getComputedStyle(el);
       return r.width > 0 && r.height > 0 && cs.visibility !== "hidden" && !el.closest("[inert]");
     };
-    const disabled = (el: Element) => !!el.closest(":disabled");
+    // WCAG 1.4.3 exempts inactive controls: native disabled and aria-disabled menu items alike.
+    const disabled = (el: Element) => !!el.closest(":disabled, [aria-disabled=true]");
     const describe = (el: Element) =>
       `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? `.${el.className.split(" ").join(".")}` : ""} "${(el.textContent ?? el.getAttribute("aria-label") ?? "").trim().slice(0, 40)}"`;
 

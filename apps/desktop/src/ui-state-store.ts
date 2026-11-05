@@ -1,4 +1,4 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DEFAULT_UI_STATE, normalizeUiState, type UiState } from "@featra/client/bridge";
 
@@ -6,6 +6,8 @@ export interface JsonStore<T> {
   readonly file: string;
   load(): Promise<T>;
   save(state: T): Promise<void>;
+  /** Deletes the file (Reset App Data), after any save already queued. */
+  remove(): Promise<void>;
   /** Resolves once every save issued so far is on disk. */
   flush(): Promise<void>;
   readonly pending: boolean;
@@ -27,6 +29,13 @@ export function createJsonStore<T>(dir: string, name: string, normalize: (raw: u
     await rename(tmp, file);
   };
 
+  const enqueue = (op: () => Promise<void>) => {
+    inFlight++;
+    const next = queue.then(op).finally(() => inFlight--);
+    queue = next.catch(() => {});
+    return next;
+  };
+
   return {
     file,
     async load() {
@@ -36,12 +45,8 @@ export function createJsonStore<T>(dir: string, name: string, normalize: (raw: u
         return normalize(undefined);
       }
     },
-    save(state) {
-      inFlight++;
-      const next = queue.then(() => write(state)).finally(() => inFlight--);
-      queue = next.catch(() => {});
-      return next;
-    },
+    save: (state) => enqueue(() => write(state)),
+    remove: () => enqueue(() => rm(file, { force: true })),
     flush: () => queue,
     get pending() {
       return inFlight > 0;

@@ -34,7 +34,7 @@ test.describe("AC6: close to tray", () => {
     try {
       let { app, page } = await launch(profile.dir);
       expect(await trayExists(app)).toBe(true);
-      expect(await trayMenuLabels(app)).toEqual(["Show Featra", "Quit Featra"]);
+      expect(await trayMenuLabels(app)).toEqual(["Show Featra", "Exit"]);
 
       await page.getByRole("button", { name: "Close window" }).click();
       await expect.poll(() => windowVisible(app)).toBe(false);
@@ -48,14 +48,14 @@ test.describe("AC6: close to tray", () => {
       await expect.poll(() => windowVisible(app)).toBe(false);
       expect(await notices(app)).toEqual([NOTICE]); // only on the first close
 
-      await chooseTrayItem(app, "Quit Featra");
+      await chooseTrayItem(app, "Exit");
       await exited(app);
 
       ({ app, page } = await launch(profile.dir));
       await page.getByRole("button", { name: "Close window" }).click();
       await expect.poll(() => windowVisible(app)).toBe(false);
       expect(await notices(app)).toEqual([]); // remembered from the last run
-      await chooseTrayItem(app, "Quit Featra");
+      await chooseTrayItem(app, "Exit");
       await exited(app);
     } finally {
       await profile.dispose();
@@ -86,13 +86,13 @@ test.describe("AC6: close to tray", () => {
     }
   });
 
-  test("File > Quit exits for real, even when close goes to the tray", async () => {
+  test("File > Exit exits for real, even when close goes to the tray", async () => {
     const profile = await tempUserData();
     try {
       const { app, page } = await launch(profile.dir);
       const exit = exited(app);
       // The app exits mid-click, so Playwright's click can only report that the page went away.
-      await chooseFromMenu(page, "File", "Quit").catch((e: Error) => {
+      await chooseFromMenu(page, "File", "Exit").catch((e: Error) => {
         if (!/has been closed/.test(e.message)) throw e;
       });
       expect(await exit).toBe(0);
@@ -101,27 +101,48 @@ test.describe("AC6: close to tray", () => {
     }
   });
 
-  test("Ctrl+Q quits for real (File > Quit's shortcut; Alt+F4 is close)", async () => {
+  test("File > Close Window and Ctrl+Shift+W hide the window to the tray, like the close button", async () => {
     const profile = await tempUserData();
+    const { app, page } = await launch(profile.dir);
     try {
-      const { app, page } = await launch(profile.dir);
-      const exit = exited(app);
-      await page.keyboard.press("Control+Q").catch((e: Error) => {
-        if (!/has been closed/.test(e.message)) throw e;
-      });
-      expect(await exit).toBe(0);
+      await chooseFromMenu(page, "File", "Close Window");
+      await expect.poll(() => windowVisible(app)).toBe(false);
+      expect(app.process().exitCode).toBeNull();
+      expect(await notices(app)).toEqual([NOTICE]);
+      await clickTray(app);
+      await expect.poll(() => windowVisible(app)).toBe(true);
+      await page.keyboard.press("Control+Shift+W");
+      await expect.poll(() => windowVisible(app)).toBe(false);
+      expect(app.process().exitCode).toBeNull();
     } finally {
+      await app.close();
       await profile.dispose();
     }
   });
 
-  test("the tray's Quit Featra exits while the window is hidden", async () => {
+  test("Ctrl+Q does not quit on Windows: Exit has no shortcut", async () => {
+    const profile = await tempUserData();
+    const { app, page } = await launch(profile.dir);
+    try {
+      await page.keyboard.press("Control+Q");
+      // Give a quit time to happen: the page and the window must still be there afterwards.
+      await page.getByRole("button", { name: "Menu" }).click();
+      await expect(page.getByRole("menu")).toBeVisible();
+      expect(app.process().exitCode).toBeNull();
+      expect(await windowVisible(app)).toBe(true);
+    } finally {
+      await app.close();
+      await profile.dispose();
+    }
+  });
+
+  test("the tray's Exit exits while the window is hidden", async () => {
     const profile = await tempUserData();
     try {
       const { app, page } = await launch(profile.dir);
       await page.getByRole("button", { name: "Close window" }).click();
       await expect.poll(() => windowVisible(app)).toBe(false);
-      await chooseTrayItem(app, "Quit Featra");
+      await chooseTrayItem(app, "Exit");
       expect(await exited(app)).toBe(0);
     } finally {
       await profile.dispose();

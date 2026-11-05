@@ -6,6 +6,8 @@ import {
   Menu,
   nativeTheme,
   Notification,
+  session,
+  shell,
   Tray,
   type IpcMainEvent,
   type IpcMainInvokeEvent,
@@ -13,6 +15,8 @@ import {
 import { EDIT_COMMANDS, IPC, normalizeUiState, THEME_CHOICES, type EditCommand, type ThemeChoice } from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
 import { createLifecycle, type Lifecycle } from "./lifecycle.ts";
+import { createLog, type Log } from "./log.ts";
+import { clearCacheAndRestart, resetAppData, type TroubleshootDeps } from "./troubleshoot.ts";
 import { createAppStateStore, createUiStateStore, type UiStateStore } from "./ui-state-store.ts";
 
 /**
@@ -22,16 +26,18 @@ import { createAppStateStore, createUiStateStore, type UiStateStore } from "./ui
 const CLOSE_TO_TRAY = true;
 
 /**
- * E2E runs set FEATRA_E2E=1. The only difference: OS notifications are recorded instead of shown, and the tray is
- * reachable from the test (Playwright can't click the real notification area).
+ * E2E runs set FEATRA_E2E=1. What differs is only where Featra meets the OS: notifications and "show in File Explorer"
+ * are recorded, a restart only quits (a relaunched app would escape the test), and the tray is reachable
+ * from the test (Playwright can't click the real notification area).
  */
 const e2e = process.env.FEATRA_E2E === "1";
 interface TestHooks {
   notices: string[];
+  shownInFolder: string[];
   tray?: Tray;
   trayMenu?: Menu;
 }
-const testHooks: TestHooks = { notices: [] };
+const testHooks: TestHooks = { notices: [], shownInFolder: [] };
 if (e2e) (globalThis as { featraTest?: TestHooks }).featraTest = testHooks;
 
 // Tests (and anyone running a second profile) point userData at their own folder. Must happen before `ready`.
@@ -70,7 +76,14 @@ function createWindow(): BrowserWindow {
   return win;
 }
 
-function registerIpc(store: UiStateStore, lifecycle: Lifecycle) {
+interface MainDeps {
+  store: UiStateStore;
+  lifecycle: Lifecycle;
+  log: Log;
+  troubleshoot: TroubleshootDeps;
+}
+
+function registerIpc({ store, lifecycle, log, troubleshoot }: MainDeps) {
   const fromOurWindow = (e: IpcMainEvent | IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);
 
   ipcMain.handle(IPC.uiStateLoad, () => store.load());
@@ -82,6 +95,10 @@ function registerIpc(store: UiStateStore, lifecycle: Lifecycle) {
     else win?.maximize();
   });
   ipcMain.on(IPC.windowClose, (e) => fromOurWindow(e)?.close());
+  ipcMain.on(IPC.windowToggleFullScreen, (e) => {
+    const win = fromOurWindow(e);
+    win?.setFullScreen(!win.isFullScreen());
+  });
   ipcMain.on(IPC.windowSetZoom, (e, factor: unknown) => e.sender.setZoomFactor(normalizeZoom(factor)));
   ipcMain.on(IPC.windowSetTheme, (_e, theme: unknown) => {
     if (THEME_CHOICES.includes(theme as ThemeChoice)) nativeTheme.themeSource = theme as ThemeChoice;
@@ -94,6 +111,12 @@ function registerIpc(store: UiStateStore, lifecycle: Lifecycle) {
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());
   ipcMain.on(IPC.appToggleDevTools, (e) => e.sender.toggleDevTools());
+  ipcMain.on(IPC.appShowLogs, () => {
+    // Flush first, so the file exists and holds everything logged so far.
+    void log.flush().then(() => (e2e ? void testHooks.shownInFolder.push(log.file) : shell.showItemInFolder(log.file)));
+  });
+  ipcMain.on(IPC.appClearCacheAndRestart, () => void clearCacheAndRestart(troubleshoot));
+  ipcMain.on(IPC.appResetAppData, () => void resetAppData(troubleshoot));
   ipcMain.on(IPC.appQuit, () => lifecycle.quit());
 }
 
@@ -134,6 +157,8 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   const store = createUiStateStore(app.getPath("userData"));
   const appState = createAppStateStore(app.getPath("userData"));
+  const log = createLog(join(app.getPath("userData"), "logs"));
+  log.info(`Featra ${app.getVersion()} started (${process.platform})`);
   let win: BrowserWindow | undefined;
   let tray: Tray | undefined;
 
@@ -149,8 +174,26 @@ if (!app.requestSingleInstanceLock()) {
       rememberNotice: () => void appState.save({ trayNoticeShown: true }),
       exit: () => app.quit(),
     });
-    registerIpc(store, lifecycle);
-    app.on("before-quit", () => lifecycle.onBeforeQuit());
+    registerIpc({
+      store,
+      lifecycle,
+      log,
+      troubleshoot: {
+        session: session.defaultSession,
+        stores: [store, appState],
+        log,
+        restart: () => {
+          if (!e2e) app.relaunch(); // the test launches the next instance itself, and checks the log for the restart
+          lifecycle.quit();
+        },
+      },
+    });
+    let loggedQuit = false;
+    app.on("before-quit", () => {
+      lifecycle.onBeforeQuit();
+      if (!loggedQuit) log.info("Quitting");
+      loggedQuit = true;
+    });
 
     // A second launch (Start menu, shortcut) brings back the running app's window instead of starting another app.
     app.on("second-instance", () => {
@@ -165,6 +208,8 @@ if (!app.requestSingleInstanceLock()) {
     // Apply a pinned theme before the window exists so its background matches from the first frame.
     nativeTheme.themeSource = ui.theme;
     win = createWindow();
+    win.on("hide", () => log.info("Window hidden"));
+    win.on("show", () => log.info("Window shown"));
     lifecycle.manage(win);
     if (lifecycle.usesTray) tray = createTray(win, lifecycle);
   });
@@ -174,10 +219,12 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   // Don't lose the last sidebar toggle (or the notice flag) to a fast quit: let pending writes land first.
+  let flushedLog = false;
   app.on("will-quit", (e) => {
-    if (!store.pending && !appState.pending) return;
+    if (!store.pending && !appState.pending && flushedLog) return;
     e.preventDefault();
-    void Promise.all([store.flush(), appState.flush()]).finally(() => app.quit());
+    flushedLog = true;
+    void Promise.all([store.flush(), appState.flush(), log.flush()]).finally(() => app.quit());
   });
 
   // Only reached when close-to-tray is off or the app is quitting.

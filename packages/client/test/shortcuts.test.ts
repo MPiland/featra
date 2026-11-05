@@ -61,10 +61,33 @@ describe("app shortcuts", () => {
     expect(matchShortcut(ctrl("=", "Equal"), "darwin")).toBeNull();
   });
 
-  it("quits with Ctrl+Q on Windows and Linux; macOS quits through its app menu (Cmd+Q)", () => {
-    expect(matchShortcut(ctrl("q", "KeyQ"), "linux")).toBe("quit");
-    expect(matchShortcut(ctrl("q", "KeyQ"), "win32")).toBe("quit");
-    expect(matchShortcut(ctrl("й", "KeyQ"), "win32")).toBe("quit"); // physical key on other layouts
+  it("matches Close Window, Full Screen, Reload, Back and Forward on Windows and Linux", () => {
+    for (const platform of ["win32", "linux", "web"]) {
+      expect(matchShortcut(ctrl("W", "KeyW", { shiftKey: true }), platform)).toBe("closeWindow");
+      expect(matchShortcut(key({ key: "F11", code: "F11" }), platform)).toBe("fullScreen");
+      expect(matchShortcut(key({ key: "F5", code: "F5" }), platform)).toBe("reload");
+      expect(matchShortcut(key({ key: "ArrowLeft", code: "ArrowLeft", altKey: true }), platform)).toBe("back");
+      expect(matchShortcut(key({ key: "ArrowRight", code: "ArrowRight", altKey: true }), platform)).toBe("forward");
+      expect(matchShortcut(ctrl("w", "KeyW"), platform)).toBeNull(); // Ctrl+W alone is too easy to hit
+      expect(matchShortcut(key({ key: "ArrowLeft", code: "ArrowLeft" }), platform)).toBeNull();
+      expect(matchShortcut(key({ key: "F5", code: "F5", ctrlKey: true }), platform)).toBeNull();
+    }
+  });
+
+  it("matches the macOS equivalents: Cmd+W, Ctrl+Cmd+F, Cmd+R, Cmd+[ and Cmd+]", () => {
+    expect(matchShortcut(cmd("w", "KeyW"), "darwin")).toBe("closeWindow");
+    expect(matchShortcut(key({ key: "f", code: "KeyF", ctrlKey: true, metaKey: true }), "darwin")).toBe("fullScreen");
+    expect(matchShortcut(cmd("r", "KeyR"), "darwin")).toBe("reload");
+    expect(matchShortcut(cmd("[", "BracketLeft"), "darwin")).toBe("back");
+    expect(matchShortcut(cmd("]", "BracketRight"), "darwin")).toBe("forward");
+    expect(matchShortcut(key({ key: "F11", code: "F11" }), "darwin")).toBeNull();
+  });
+
+  it("binds no Quit shortcut: Exit has none on Windows and Linux, and macOS's Cmd+Q is its app menu's", () => {
+    for (const platform of ["win32", "linux", "web"]) {
+      expect(matchShortcut(ctrl("q", "KeyQ"), platform)).toBeNull();
+      expect(matchShortcut(ctrl("й", "KeyQ"), platform)).toBeNull();
+    }
     expect(matchShortcut(cmd("q", "KeyQ"), "darwin")).toBeNull();
   });
 
@@ -78,9 +101,16 @@ describe("app shortcuts", () => {
   it("labels shortcuts for the platform", () => {
     expect(shortcutLabel("zoomIn", "win32")).toBe("Ctrl+=");
     expect(shortcutLabel("zoomIn", "darwin")).toBe("⌘=");
-    expect(shortcutLabel("quit", "win32")).toBe("Ctrl+Q"); // Alt+F4 closes to the tray, it does not quit
-    expect(shortcutLabel("quit", "linux")).toBe("Ctrl+Q");
+    expect(shortcutLabel("quit", "win32")).toBeUndefined(); // Exit has no shortcut; Alt+F4 closes to the tray
+    expect(shortcutLabel("quit", "linux")).toBeUndefined();
     expect(shortcutLabel("quit", "darwin")).toBe("⌘Q");
+    expect(shortcutLabel("closeWindow", "win32")).toBe("Ctrl+Shift+W");
+    expect(shortcutLabel("closeWindow", "darwin")).toBe("⌘W");
+    expect(shortcutLabel("fullScreen", "win32")).toBe("F11");
+    expect(shortcutLabel("fullScreen", "darwin")).toBe("⌃⌘F");
+    expect(shortcutLabel("reload", "win32")).toBe("F5");
+    expect(shortcutLabel("back", "win32")).toBe("Alt+Left");
+    expect(shortcutLabel("forward", "darwin")).toBe("⌘]");
     expect(shortcutLabel("redo", "win32")).toBe("Ctrl+Y");
     expect(shortcutLabel("redo", "linux")).toBe("Ctrl+Shift+Z");
     expect(shortcutLabel("redo", "darwin")).toBe("⇧⌘Z");

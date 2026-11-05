@@ -213,19 +213,23 @@ function MenuList(p: MenuListProps) {
         }
         return (
           <div key={node.id} role="none">
+            {/* A disabled item stays focusable, so arrowing through the menu still finds it (WAI-ARIA). */}
             <button
               type="button"
-              role={node.kind === "radio" ? "menuitemradio" : "menuitem"}
-              aria-checked={node.kind === "radio" ? node.checked : undefined}
+              role={node.kind === "check" ? "menuitemcheckbox" : "menuitem"}
+              aria-checked={node.kind === "check" ? node.checked : undefined}
+              aria-disabled={node.kind === "item" && node.disabled ? true : undefined}
               className="mi"
               tabIndex={-1}
               data-id={node.id}
               onMouseEnter={hover}
-              onClick={() => p.onRun(node)}
+              onClick={() => {
+                if (!(node.kind === "item" && node.disabled)) p.onRun(node);
+              }}
             >
-              {node.kind === "radio" && <span className="mcheck">{node.checked && <CheckIcon />}</span>}
+              {node.kind === "check" && <span className="mcheck">{node.checked && <CheckIcon />}</span>}
               {node.label}
-              {node.kind === "item" && node.shortcut && <span className="k">{node.shortcut}</span>}
+              {node.shortcut && <span className="k">{node.shortcut}</span>}
             </button>
           </div>
         );

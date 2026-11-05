@@ -36,6 +36,7 @@ export async function launch(userDataDir: string): Promise<{ app: ElectronApplic
  */
 interface TestHooks {
   notices: string[];
+  shownInFolder: string[];
   tray?: { emit(event: string): void; isDestroyed(): boolean };
   trayMenu?: { items: { label: string; click(): void }[] };
 }
@@ -49,6 +50,9 @@ export const windowFocused = (app: ElectronApplication) =>
 export const closeFromOs = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
 export const notices = (app: ElectronApplication) => app.evaluate(() => (globalThis as MainGlobal).featraTest.notices);
+/** Files Help > Troubleshooting > Show Logs asked the OS to show in File Explorer. */
+export const shownInFolder = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as MainGlobal).featraTest.shownInFolder);
 export const trayExists = (app: ElectronApplication) =>
   app.evaluate(() => {
     const tray = (globalThis as MainGlobal).featraTest.tray;
