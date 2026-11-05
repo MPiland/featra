@@ -22,6 +22,11 @@ export interface LifecycleOptions {
    * Off: closing the last window quits, as before.
    */
   closeToTray: boolean;
+  /**
+   * Whether the desktop shows tray icons (see tray-support.ts). Without one (stock GNOME) a hidden window could not be
+   * brought back, so close quits instead. Ignored on macOS, where the Dock reopens the window.
+   */
+  trayAvailable: boolean;
   /** Whether the one-time tray notice was already shown in an earlier run. */
   noticeShown: boolean;
   /** Shows an OS notification. */
@@ -38,8 +43,10 @@ export interface TrayMenuItem {
 }
 
 export interface Lifecycle {
-  /** A tray icon is shown on Windows and Linux; macOS keeps the app in the Dock instead. */
+  /** A tray icon is shown on Windows, and on Linux when it has a tray; macOS keeps the app in the Dock instead. */
   readonly usesTray: boolean;
+  /** Close hides the window (to the tray or the Dock) instead of quitting. */
+  readonly closeHides: boolean;
   readonly quitting: boolean;
   /** Takes over the window's close button and Alt+F4. */
   manage(win: ManagedWindow): void;
@@ -55,16 +62,19 @@ export interface Lifecycle {
 export function createLifecycle(o: LifecycleOptions): Lifecycle {
   let quitting = false;
   let noticeShown = o.noticeShown;
-  const usesTray = o.closeToTray && o.platform !== "darwin";
+  const mac = o.platform === "darwin";
+  const usesTray = o.closeToTray && !mac && o.trayAvailable;
+  const closeHides = o.closeToTray && (mac || usesTray);
 
   const lifecycle: Lifecycle = {
     usesTray,
+    closeHides,
     get quitting() {
       return quitting;
     },
     manage(win) {
       win.on("close", (e) => {
-        if (quitting || !o.closeToTray) return;
+        if (quitting || !closeHides) return;
         e.preventDefault();
         win.hide();
         if (usesTray && !noticeShown) {

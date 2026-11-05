@@ -37,6 +37,7 @@ function setup(over: Partial<LifecycleOptions> = {}) {
   const lc = createLifecycle({
     platform: "win32",
     closeToTray: true,
+    trayAvailable: true,
     noticeShown: false,
     notify: (m) => void log.notices.push(m),
     rememberNotice: () => void log.remembered++,
@@ -119,5 +120,29 @@ describe("AC6: close to tray", () => {
     expect(log.notices).toEqual([]);
     lc.reveal(win);
     expect(win).toMatchObject({ visible: true, focused: true });
+  });
+});
+
+describe("AC7: Linux", () => {
+  it("Linux with a tray: close hides to the tray, with the notice, and the tray has Show Featra and Exit", () => {
+    const { lc, win, log } = setup({ platform: "linux" });
+    expect(lc.usesTray).toBe(true);
+    expect(win.tryClose()).toBe("kept");
+    expect(log.notices).toEqual([TRAY_NOTICE]);
+    // Linux trays often ignore clicks, so the right-click menu must be able to restore and exit on its own.
+    const [show, exit] = lc.trayMenu(win);
+    expect([show!.label, exit!.label]).toEqual(["Show Featra", "Exit"]);
+    show!.click();
+    expect(win).toMatchObject({ visible: true, focused: true });
+    exit!.click();
+    expect(log.exits).toBe(1);
+  });
+
+  it("Linux without a tray (stock GNOME): close quits instead of hiding, and no tray icon or notice", () => {
+    const { lc, win, log } = setup({ platform: "linux", trayAvailable: false });
+    expect(lc.usesTray).toBe(false);
+    expect(lc.closeHides).toBe(false);
+    expect(win.tryClose()).toBe("closed");
+    expect(log.notices).toEqual([]);
   });
 });

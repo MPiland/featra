@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import {
   chooseTrayItem,
@@ -6,11 +8,14 @@ import {
   exited,
   launch,
   launchAgain,
+  minimizeCalls,
   notices,
+  recordMinimize,
   tempUserData,
   trayExists,
   trayMenuLabels,
   windowFocused,
+  windowManagerCanMinimize,
   windowVisible,
 } from "./app.ts";
 
@@ -75,11 +80,20 @@ test.describe("AC6: close to tray", () => {
       await expect.poll(() => windowFocused(app)).toBe(true);
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Inbox"); // same window, not a new one
 
+      const minimized = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isMinimized());
+      await recordMinimize(app);
       await page.getByRole("button", { name: "Minimize" }).click();
-      await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isMinimized())).toBe(true);
-      await clickTray(app);
+      await expect.poll(() => minimizeCalls(app)).toBe(1);
+      // Where the window manager can't minimise (WSLg, xvfb: see windowManagerCanMinimize), the request is all
+      // Featra can do, and the window stays where the user sees it; elsewhere it must really minimise.
+      if (windowManagerCanMinimize()) await expect.poll(minimized).toBe(true);
+      else expect(await minimized()).toBe(false);
+      // Linux trays often ignore clicks, so there the restore path is the right-click menu's Show Featra.
+      if (process.platform === "linux") await chooseTrayItem(app, "Show Featra");
+      else await clickTray(app);
       await expect.poll(() => windowVisible(app)).toBe(true);
-      await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isMinimized())).toBe(false);
+      await expect.poll(minimized).toBe(false);
+      await expect.poll(() => windowFocused(app)).toBe(true);
     } finally {
       await app.close();
       await profile.dispose();
@@ -144,6 +158,23 @@ test.describe("AC6: close to tray", () => {
       await expect.poll(() => windowVisible(app)).toBe(false);
       await chooseTrayItem(app, "Exit");
       expect(await exited(app)).toBe(0);
+    } finally {
+      await profile.dispose();
+    }
+  });
+
+  test("with no tray on the desktop (stock GNOME), close quits instead of hiding the window", async () => {
+    const profile = await tempUserData();
+    try {
+      // Fakes the platform: the desktop has no StatusNotifier host (detection itself is unit-tested).
+      const { app, page } = await launch(profile.dir, { FEATRA_E2E_TRAY: "absent" });
+      expect(await trayExists(app)).toBe(false);
+      const exit = exited(app);
+      await page.getByRole("button", { name: "Close window" }).click().catch((e: Error) => {
+        if (!/has been closed/.test(e.message)) throw e;
+      });
+      expect(await exit).toBe(0); // quit, with no tray notice first
+      expect(await readFile(join(profile.dir, "logs", "main.log"), "utf8")).toMatch(/No tray: close quits\n[^]*Quitting\n/);
     } finally {
       await profile.dispose();
     }

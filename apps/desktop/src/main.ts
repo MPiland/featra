@@ -1,3 +1,4 @@
+import { execFile } from "node:child_process";
 import { join } from "node:path";
 import {
   app,
@@ -16,6 +17,7 @@ import { EDIT_COMMANDS, IPC, normalizeUiState, THEME_CHOICES, type EditCommand, 
 import { normalizeZoom } from "@featra/client/zoom";
 import { createLifecycle, type Lifecycle } from "./lifecycle.ts";
 import { createLog, type Log } from "./log.ts";
+import { hasTrayHost, type RunCommand } from "./tray-support.ts";
 import { clearCacheAndRestart, resetAppData, type TroubleshootDeps } from "./troubleshoot.ts";
 import { createAppStateStore, createUiStateStore, type UiStateStore } from "./ui-state-store.ts";
 
@@ -37,6 +39,18 @@ interface TestHooks {
   tray?: Tray;
   trayMenu?: Menu;
 }
+/**
+ * Whether the desktop has a tray. E2E runs fake the answer (`FEATRA_E2E_TRAY=present|absent`, default present) so the
+ * tray tests run on any desktop and the no-tray path can be proved too; otherwise the session bus is asked.
+ */
+const runCommand: RunCommand = (command, args) =>
+  new Promise((resolve, reject) =>
+    execFile(command, [...args], { timeout: 2000 }, (err, stdout) => (err ? reject(err) : resolve(stdout))),
+  );
+const trayAvailable = (): Promise<boolean> =>
+  e2e
+    ? Promise.resolve(process.env.FEATRA_E2E_TRAY !== "absent" && process.platform !== "darwin")
+    : hasTrayHost(process.platform, runCommand);
 const testHooks: TestHooks = { notices: [], shownInFolder: [] };
 if (e2e) (globalThis as { featraTest?: TestHooks }).featraTest = testHooks;
 
@@ -165,10 +179,12 @@ if (!app.requestSingleInstanceLock()) {
   void app.whenReady().then(async () => {
     if (process.platform === "win32") app.setAppUserModelId("dev.featra.app"); // notifications need it on Windows
     setNativeMenu();
-    const [ui, remembered] = await Promise.all([store.load(), appState.load()]);
+    const [ui, remembered, hasTray] = await Promise.all([store.load(), appState.load(), trayAvailable()]);
+    if (process.platform !== "darwin") log.info(hasTray ? "Tray available" : "No tray: close quits");
     const lifecycle = createLifecycle({
       platform: process.platform,
       closeToTray: CLOSE_TO_TRAY,
+      trayAvailable: hasTray,
       noticeShown: remembered.trayNoticeShown,
       notify: showNotice,
       rememberNotice: () => void appState.save({ trayNoticeShown: true }),

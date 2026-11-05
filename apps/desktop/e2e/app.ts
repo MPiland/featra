@@ -1,4 +1,4 @@
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -16,8 +16,11 @@ export async function tempUserData(): Promise<{ dir: string; dispose: () => Prom
 }
 
 /** Launches the built app (run `pnpm --filter @featra/desktop build` first; `test:e2e` does). */
-export async function launch(userDataDir: string): Promise<{ app: ElectronApplication; page: Page }> {
-  const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1" } as Record<string, string>;
+export async function launch(
+  userDataDir: string,
+  extraEnv: Record<string, string> = {},
+): Promise<{ app: ElectronApplication; page: Page }> {
+  const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", ...extraEnv } as Record<string, string>;
   delete env.FEATRA_CLIENT_URL;
   delete env.ELECTRON_RUN_AS_NODE;
   const app = await electron.launch({
@@ -68,6 +71,35 @@ export const chooseTrayItem = (app: ElectronApplication, label: string) =>
   app.evaluate((_e, wanted) => {
     (globalThis as MainGlobal).featraTest.trayMenu!.items.find((i) => i.label === wanted)!.click();
   }, label);
+/**
+ * Whether the desktop's window manager can minimise windows. Windows always can. On X11, minimising is a request to
+ * the window manager, and one that doesn't list `_NET_WM_STATE_HIDDEN` in `_NET_SUPPORTED` ignores it: WSLg's
+ * doesn't, and xvfb has no window manager at all. There, even a framed Electron window stays unminimised.
+ */
+export function windowManagerCanMinimize(): boolean {
+  if (process.platform !== "linux") return true;
+  try {
+    return execFileSync("xprop", ["-root", "_NET_SUPPORTED"], { encoding: "utf8" }).includes("_NET_WM_STATE_HIDDEN");
+  } catch {
+    return false;
+  }
+}
+
+/** Records the window's `minimize()` calls: the request Featra makes of the window manager. */
+export const recordMinimize = (app: ElectronApplication) =>
+  app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows()[0]!;
+    const g = globalThis as { minimizeCalls?: number };
+    g.minimizeCalls = 0;
+    const real = win.minimize.bind(win);
+    win.minimize = () => {
+      g.minimizeCalls!++;
+      real();
+    };
+  });
+export const minimizeCalls = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as { minimizeCalls?: number }).minimizeCalls ?? 0);
+
 /** Resolves with the exit code once the app's process has exited. */
 export const exited = (app: ElectronApplication) =>
   new Promise<number | null>((resolve) => {
