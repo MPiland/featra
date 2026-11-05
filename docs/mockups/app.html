@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Featra · Work</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1c1c1e;--side:#161617;--row:#262628;--row2:#2e2e31;--line:#2c2c2f;--tx:#ececee;--tx2:#a9a9ae;--tx3:#8a8a90;--acc:#7aa2ff;--accbg:#3b5fcc;--ok:#6fcf97;--warn:#e7b65a;--bad:#f0918a;--pur:#b9a3ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.45 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+::selection{background:#34508f}
+.shell{display:grid;grid-template-rows:44px minmax(0,1fr);height:100vh;min-height:600px}
+.titlebar{display:flex;align-items:center;gap:4px;padding:0 6px 0 10px;background:var(--side);border-bottom:1px solid var(--line);user-select:none}
+.tb{width:32px;height:30px;border-radius:7px;display:grid;place-items:center;color:var(--tx2);background:none;border:0;cursor:pointer;position:relative}
+.tb:hover{background:var(--row);color:var(--tx)}
+.tb.on{background:var(--row2);color:var(--tx)}
+.tb:focus-visible{outline:2px solid var(--acc)}
+.tb[data-tip]:hover::after{content:attr(data-tip);position:absolute;top:34px;left:50%;transform:translateX(-50%);background:#000;color:#fff;font-size:11px;padding:3px 7px;border-radius:5px;white-space:nowrap;z-index:9}
+.ttl{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:7px;cursor:pointer;font-weight:500;margin-left:10px}
+.ttl:hover{background:var(--row)}
+.sep{width:1px;height:18px;background:var(--line);margin:0 6px}
+.menu{position:absolute;top:40px;background:#2a2a2d;border:1px solid #38383c;border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.5);padding:5px;min-width:230px;z-index:20;display:none}
+.menu.on{display:block}
+.mi{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:6px;cursor:pointer}
+.mi:hover{background:#38383c}
+.mi .k{margin-left:auto;color:var(--tx3);font-size:11px}
+.mi.danger{color:var(--bad)}
+.msep{height:1px;background:#38383c;margin:4px 2px}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;place-items:center;z-index:30}
+.scrim.on{display:grid}
+.dlg{width:440px;background:#262628;border:1px solid #38383c;border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.dlg h2{margin:0;font-size:16px;font-weight:600}
+.dlg ul{margin:0;padding-left:18px;color:var(--tx2);line-height:1.6}
+.app{display:grid;grid-template-columns:272px minmax(0,1fr);min-height:0;overflow:hidden;transition:grid-template-columns .2s cubic-bezier(.2,.8,.2,1)}
+.app.collapsed{grid-template-columns:0 minmax(0,1fr)}
+.app.collapsed .side{padding:0;border:0;overflow:hidden}
+/* panes */
+.panes{display:grid;grid-template-rows:minmax(0,1fr) auto;min-height:0}
+.dock{display:none}
+.dock.on{display:flex}
+.term{display:none;border-top:1px solid var(--line);background:#121213;height:190px;flex-direction:column}
+.term.on{display:flex}
+.term .bar2{display:flex;gap:14px;align-items:center;padding:6px 14px;border-bottom:1px solid var(--line);font-size:12px;color:var(--tx2)}
+.term pre{margin:0;padding:10px 14px;font:12px/1.6 'JetBrains Mono',monospace;color:#cfd2d8;overflow:auto}
+.diffl{font:12px/1.6 'JetBrains Mono',monospace;white-space:pre;overflow:auto;padding:4px 0}
+.diffl div{padding:0 12px}
+.diffl .a{background:#16301f;color:#a8e6bd}.diffl .r{background:#3a1c1c;color:#f3b4ae}.diffl .h{color:var(--tx3);background:#1b1b1d}
+.file{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px}
+.file.on{background:var(--row)}
+.envsec{display:flex;flex-direction:column;gap:6px}
+.envrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:8px}
+.ctx{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--tx2);padding:3px 9px;border-radius:7px;background:var(--row)}
+.ctx .m{width:36px;height:4px;border-radius:2px;background:#3a3a3e;overflow:hidden}
+.ctx .m i{display:block;height:100%;width:31%;background:var(--acc)}
+main{min-height:0}
+#v-work .content{flex:1;overflow:auto}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px}
+svg.i{width:16px;height:16px;flex:none;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* sidebar */
+.side{background:var(--side);display:flex;flex-direction:column;padding:12px 10px;gap:1px;border-right:1px solid var(--line)}
+.proj{display:flex;align-items:center;gap:10px;padding:8px;border-radius:8px}
+.proj:hover{background:var(--row)}
+.av{width:24px;height:24px;border-radius:6px;background:#33415f;color:#d3defc;display:grid;place-items:center;font-weight:600;font-size:12px}
+.newchat{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;color:var(--tx);margin:8px 0 6px}
+.newchat:hover{background:var(--row)}
+.nav{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:8px;color:var(--tx2)}
+.nav.on{background:var(--row);color:var(--tx)}
+.badge{margin-left:auto;font-size:11px;font-weight:600;color:#1d1608;background:var(--warn);border-radius:999px;padding:0 7px}
+.label{font-size:12px;color:var(--tx3);padding:18px 10px 6px}
+.chat{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:8px;color:var(--tx2);white-space:nowrap}
+.chat .t{overflow:hidden;text-overflow:ellipsis;flex:1}
+.chat:hover{background:var(--row)}
+.parent{color:var(--tx)}
+.caret{width:12px;height:12px;stroke-width:2.2;color:var(--tx3)}
+.dot{width:7px;height:7px;border-radius:50%;flex:none}
+.kids{position:relative;margin:2px 0 4px 18px;display:flex;flex-direction:column;gap:2px}
+.kid{display:flex;align-items:center;gap:8px;padding:7px 10px 7px 26px;border-radius:8px;color:var(--tx2);position:relative;white-space:nowrap}
+.kid::before{content:"";position:absolute;left:10px;top:7px;width:9px;height:9px;border-left:1.5px solid #4a4a4f;border-bottom:1.5px solid #4a4a4f;border-bottom-left-radius:4px}
+.kid.sel{background:var(--row);color:var(--tx)}
+.kid .t{overflow:hidden;text-overflow:ellipsis;flex:1}
+.tag{font-size:11px;color:var(--tx3)}
+
+/* main */
+main{display:flex;flex-direction:column;min-width:0;position:relative}
+.top{display:flex;align-items:center;gap:14px;padding:14px 28px}
+.tabs{display:flex;gap:2px}
+.tab{padding:5px 12px;border-radius:7px;color:var(--tx2)}
+.tab.on{background:var(--row);color:var(--tx)}
+.content{padding:6px 28px 28px;display:flex;flex-direction:column;gap:22px;max-width:1080px}
+.epic{display:flex;align-items:baseline;gap:10px}
+.epic h2{margin:0;font-size:13px;font-weight:600;color:var(--tx2)}
+.feat{display:flex;flex-direction:column}
+.fhead{display:flex;align-items:center;gap:16px;padding:10px 0 12px}
+.fhead h3{margin:0;font-size:16px;font-weight:600}
+.meta{color:var(--tx2)}
+.count{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:220px}
+.bar{display:flex;gap:2px;width:220px;height:5px}
+.bar span{border-radius:2px;background:#38383c}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;font-weight:500;color:var(--tx3);text-align:left;padding:0 12px 8px}
+td{padding:10px 12px;border-top:1px solid var(--line)}
+tbody tr:hover td{background:#222224}
+tr.sel td{background:#232a3a}
+.st{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+.add{color:var(--warn);font-size:12px;margin-left:6px}
+.collapsed{display:flex;align-items:center;gap:14px;padding:12px 0;border-top:1px solid var(--line)}
+.collapsed .n{font-weight:500}
+.draft{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:10px;background:#20263a}
+.btn{font:inherit;font-weight:500;height:32px;padding:0 14px;border-radius:8px;border:1px solid #3a3a3e;background:var(--row);color:var(--tx);display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.btn.pri{background:var(--accbg);border-color:var(--accbg);color:#fff}
+.btn:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+
+/* floating story card */
+.pop{position:absolute;top:60px;right:20px;bottom:20px;width:400px;background:#232325;border:1px solid #333336;border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.45),0 2px 8px rgba(0,0,0,.3);display:flex;flex-direction:column;overflow:hidden}
+.pop header{padding:16px 18px 14px;display:flex;flex-direction:column;gap:8px}
+.pop h2{margin:0;font-size:17px;font-weight:600}
+.story{margin:0;color:var(--tx2);line-height:1.55}
+.ev{display:flex;gap:14px;font-size:12px;color:var(--tx3)}
+.ev span{display:inline-flex;align-items:center;gap:5px}
+.ev .y{color:var(--ok)}
+.body{padding:4px 18px 16px;display:flex;flex-direction:column;gap:20px;overflow:auto}
+.sh{display:flex;justify-content:space-between;font-size:12px;font-weight:500;color:var(--tx2);margin-bottom:6px}
+.ac{display:flex;gap:10px;padding:8px 0}
+.ac + .ac{border-top:1px solid var(--line)}
+.proof{color:var(--tx3);font-size:12px;display:flex;gap:10px;margin-top:2px}
+.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.th{aspect-ratio:16/10;border-radius:6px;background:#18181a;border:1px solid var(--line);padding:6px;display:flex;flex-direction:column;gap:3px}
+.th i{display:block;height:3px;border-radius:2px;background:#3a3a3e}
+.tasks{display:flex;flex-direction:column;gap:6px}
+.task{display:flex;gap:10px;align-items:center}
+.chk{width:14px;height:14px;border-radius:4px;background:var(--accbg);display:grid;place-items:center}
+.foot{margin-top:auto;padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center}
+[data-open]{cursor:pointer}
+.view{display:none;min-height:0;flex:1}
+.view.on{display:flex}
+/* chat view */
+.chatwrap{display:grid;grid-template-columns:minmax(0,1fr) 360px;flex:1;min-height:0}
+.chatwrap.nocard{grid-template-columns:minmax(0,1fr) 0}
+.chatwrap.nocard .dock{display:none}
+.ch{display:flex;flex-direction:column;min-height:0;min-width:0}
+.chhead{display:flex;align-items:center;gap:12px;padding:12px 28px;border-bottom:1px solid var(--line)}
+.log{flex:1;overflow:auto;padding:24px 28px;display:flex;flex-direction:column;gap:18px}
+.log > *{max-width:720px;width:100%;margin:0 auto}
+.msg-u{align-self:flex-end;background:var(--row);border-radius:14px;padding:10px 14px;max-width:560px;margin-right:0}
+.msg-a{line-height:1.6;color:var(--tx)}
+.msg-a p{margin:0 0 8px}
+.tool{display:flex;align-items:center;gap:8px;color:var(--tx2);font-size:12px;padding:6px 10px;border-radius:8px;background:#212123;width:fit-content}
+.appr{border:1px solid #5a4a24;background:#2a2518;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.appr code{font-family:'JetBrains Mono',monospace;font-size:12px;background:#1b1810;border-radius:6px;padding:8px 10px;display:block;color:#f1e3c2}
+.composer{margin:0 28px 20px;border:1px solid #3a3a3e;border-radius:14px;background:#212123;padding:12px 14px;display:flex;flex-direction:column;gap:10px;max-width:720px;align-self:center;width:calc(100% - 56px)}
+.composer .ph{color:var(--tx3)}
+.chip{font-size:12px;color:var(--tx2);padding:3px 9px;border-radius:7px;background:var(--row)}
+.dock{border-left:1px solid var(--line);background:#1f1f21;flex-direction:column;min-height:0;overflow:auto}
+.chatwrap{grid-template-columns:minmax(0,1fr) 400px}
+.dock .pad{padding:16px 18px;display:flex;flex-direction:column;gap:18px}
+.ac.todo svg{color:var(--tx3)}
+.task .box0{width:14px;height:14px;border-radius:4px;border:1.5px solid #5a5a60}
+.wfilter{display:flex;gap:6px;flex-wrap:wrap}
+.fchip{font-size:12px;padding:4px 10px;border-radius:999px;background:var(--row);color:var(--tx2);cursor:pointer}
+.fchip.on{background:#2f3a55;color:var(--tx)}
+.epicblk{display:flex;flex-direction:column;gap:8px}
+.epich{display:flex;align-items:center;gap:8px;cursor:pointer;width:fit-content}
+.epich h2{margin:0;font-size:13px;font-weight:600}
+.epich .caret,.frow .caret{transition:transform .15s}
+.epicblk:not(.closed)>.epich .caret,.frow.open .caret{transform:rotate(90deg)}
+.epicblk.closed .fl{display:none}
+.fl{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.frow{display:grid;grid-template-columns:14px minmax(0,2.2fr) 1.2fr 1.3fr .7fr 1.3fr;gap:14px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);cursor:pointer}
+.frow:first-child{border-top:0}
+.frow.hdr{font-size:12px;color:var(--tx3);cursor:default;padding:8px 14px;background:#1a1a1c}
+.frow:not(.hdr):hover{background:#222224}
+.frow.open{background:#222225}
+.fn{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbar{display:inline-flex;gap:2px;width:64px;height:4px;margin-left:10px;vertical-align:middle}
+.mbar i{border-radius:2px;background:#38383c}
+.kidsbox{display:none;background:#19191b;padding:2px 14px 8px 42px;border-top:1px solid var(--line)}
+.kidsbox.on{display:block}
+.kidsbox th{padding-top:10px}
+.pop.off{display:none}
+.fp{display:flex;flex-direction:column;gap:2px}
+.fpr{display:flex;flex-direction:column;gap:5px;padding:10px 12px;border-radius:9px;cursor:pointer}
+.fpr:hover{background:var(--row)}
+.fpr .r1{display:flex;align-items:center;gap:8px}
+.fpr .r2{display:flex;gap:12px;font-size:12px;color:var(--tx2);padding-left:15px}
+.cbar{display:flex;gap:2px;height:5px}
+.cbar span{flex:1;border-radius:2px;background:#38383c}
+.workwrap{display:grid;grid-template-columns:minmax(0,1fr) 400px;flex:1;min-height:0}
+.workwrap.nocard{grid-template-columns:minmax(0,1fr) 0}
+.workwrap.nocard .pop{display:none}
+.workwrap .content{overflow:auto;min-height:0}
+.pop{position:static;width:auto;border:0;border-left:1px solid var(--line);border-radius:0;box-shadow:none;background:#1f1f21;min-height:0}
+.dock .pop{border-left:0;height:100%}
+.accard{border:1px solid #4a3f6e;background:#24203a;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.btn:disabled{opacity:.7;cursor:default}
+.workmain{display:flex;flex-direction:column;min-height:0;min-width:0}
+.workwrap .pop{grid-column:2;grid-row:1}
+.workwrap .workmain{grid-column:1;grid-row:1}
+.story[contenteditable]{border-radius:6px;padding:4px 6px;margin:0 -6px;outline:none}
+.story[contenteditable]:hover{background:#2a2a2d}
+.story[contenteditable]:focus{background:#1c1c1e;box-shadow:0 0 0 1px var(--acc);color:var(--tx)}
+.saved{font-size:12px;color:var(--ok)}
+.frow,.prow{grid-template-columns:14px minmax(0,2.2fr) 1.25fr 1.35fr .65fr 1.25fr}
+.kidsbox{padding:0}
+.prow{display:grid;gap:14px;align-items:center;padding:10px 14px;border-top:1px solid var(--line);cursor:pointer}
+.prow:first-child{border-top:0}
+.prow:hover{background:#222224}
+.prow.sel{background:#232a3a}
+.prow.phdr{font-size:12px;color:var(--tx3);cursor:default;padding:8px 14px}
+.prow.phdr:hover{background:none}
+.prow .pn,.prow.phdr span:nth-child(2){padding-left:18px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prog{display:inline-flex;align-items:center;gap:10px;min-width:0;width:100%}
+.prog .pl{font-weight:600;white-space:nowrap}
+.prog .meta{white-space:nowrap}
+.pbar{display:flex;gap:2px;height:5px;flex:1;max-width:120px;min-width:40px}
+.pbar i{border-radius:0;background:transparent}
+.pbar{gap:0 !important;border-radius:3px;overflow:hidden;background:#38383c}
+.epich .prog{width:auto;margin-left:6px}
+.epich .prog .pl{font-weight:400;color:var(--tx2)}
+.epich .pbar{width:140px;flex:none;max-width:none}
+.dp{border-top:1px solid var(--line)}
+.dp summary{list-style:none;display:flex;align-items:center;gap:8px;padding:10px 0;cursor:pointer}
+.dp summary::-webkit-details-marker{display:none}
+.dp[open] summary .caret{transform:rotate(90deg)}
+.dpb{padding:0 0 12px 20px;display:flex;flex-direction:column;gap:4px}
+.pop h2[contenteditable]{outline:none;border-radius:6px}
+.pop h2[contenteditable]:focus{box-shadow:0 0 0 1px var(--acc)}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="titlebar" style="position:relative">
+  <button class="tb" data-tip="Menu" aria-label="Menu"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h12M4 18h8"/></svg></button>
+  <button class="tb" id="sbt" data-tip="Toggle sidebar  Ctrl+B" aria-label="Toggle sidebar"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M9 5v14"/></svg></button>
+  <button class="tb" aria-label="Back"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+  <button class="tb" aria-label="Forward" style="opacity:.5"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+  <div class="ttl" id="ttl" role="button" aria-haspopup="menu"><span id="ttlt">Work · manager</span><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px;color:var(--tx3)"><path d="M6 9l6 6 6-6"/></svg></div>
+  <div class="menu" id="smenu" role="menu" style="left:150px">
+    <div class="mi"><svg class="i" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Rename<span class="k">F2</span></div>
+    <div class="mi"><svg class="i" viewBox="0 0 24 24"><path d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9"/></svg>Fork from here</div>
+    <div class="mi"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v10m0 0l-4-4m4 4l4-4M5 20h14"/></svg>Export transcript</div>
+    <div class="mi"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11h4M5 7l1 12h12l1-12M9 4h6"/></svg>Move to project…</div>
+    <div class="msep"></div>
+    <div class="mi" data-dlg="archive"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="4" rx="1"/><path d="M5 8v11h14V8M10 12h4"/></svg>Archive</div>
+    <div class="mi danger" data-dlg="delete"><svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M5 7l1 13h12l1-13M9 7V4h6v3"/></svg>Delete…</div>
+  </div>
+  <span style="flex:1"></span>
+  <button class="tb" data-pane="feat" data-tip="Feature progress" aria-label="Feature progress"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h3M4 12h3M4 18h3M10 6h10M10 12h7M10 18h4"/></svg></button>
+  <button class="tb" data-pane="work" data-tip="Work card" aria-label="Work card"><svg class="i" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/></svg></button>
+  <button class="tb" data-pane="diff" data-tip="Changes" aria-label="Changes"><svg class="i" viewBox="0 0 24 24"><path d="M6 3v18M18 3v18M3 8h6M15 16h6M18 13v6"/></svg></button>
+  <button class="tb" data-pane="term" data-tip="Terminal  Ctrl+`" aria-label="Terminal"><svg class="i" viewBox="0 0 24 24"><path d="M5 7l5 5-5 5M12 19h7"/></svg></button>
+  <button class="tb" data-pane="browser" data-tip="Browser" aria-label="Browser"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
+  <button class="tb" data-pane="env" data-tip="Environment: git, tasks, ports" aria-label="Environment"><svg class="i" viewBox="0 0 24 24"><path d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9"/></svg><span style="position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--warn)"></span></button>
+  <button class="tb" data-tip="More" aria-label="More"><svg class="i" viewBox="0 0 24 24"><path d="M5 12h.01M12 12h.01M19 12h.01" stroke-width="3"/></svg></button>
+  <span class="sep"></span>
+  <button class="tb" aria-label="Minimize"><svg class="i" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+  <button class="tb" aria-label="Maximize"><svg class="i" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></svg></button>
+  <button class="tb" aria-label="Close window"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</header>
+<div class="app" id="app">
+
+<nav class="side" aria-label="Featra">
+  <div class="proj" role="button" aria-haspopup="listbox" aria-label="Switch project">
+    <span class="av">M</span>
+    <span style="flex:1;font-weight:600">manager</span>
+    <svg class="i" viewBox="0 0 24 24" style="color:var(--tx3)"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4"/></svg>
+  </div>
+
+  <div class="newchat" role="button"><svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New chat</div>
+
+  <a class="nav on" data-open="work"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Work</a>
+  <a class="nav"><svg class="i" viewBox="0 0 24 24"><path d="M4 13l2-8h12l2 8v6H4zM4 13h5l1 2h4l1-2h5"/></svg>Inbox<span class="badge">2</span></a>
+  <a class="nav"><svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Artifacts</a>
+
+  <div class="label">Claude</div>
+  <div class="chat parent" data-open="lead"><span class="t">Cards, ownership, feature list</span><svg class="i caret" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg><span style="flex:none;width:4px"></span><span class="dot" style="background:var(--acc)"></span></div>
+  <div class="kids">
+    <div class="kid" data-open="pbi3"><span class="t">STORY-3 · Home feature list</span><span class="dot" style="background:var(--pur)" title="Waiting on your Accept"></span></div>
+    <div class="kid" data-open="pbi4"><span class="t">STORY-4 · Side panel edits</span><span class="dot" style="background:var(--warn)" title="Needs approval"></span></div>
+    <div class="kid"><span class="t">BUG-1 · Renamed card vanishes</span></div>
+  </div>
+  <div class="chat" data-open="draft"><span class="t">Sessions and roles</span><span class="dot" style="background:var(--acc)" title="Draft waiting on your review"></span></div>
+  <div class="chat"><span class="t">Which SQLite driver?</span></div>
+  <div class="chat"><span class="t">Old auth refactor</span><span class="tag">imported</span><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+
+  <div class="label">Codex</div>
+  <div class="chat"><span class="t">Lint cleanup</span><span class="tag">imported</span><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></div>
+
+  <div style="flex:1"></div>
+  <a class="nav"><svg class="i" viewBox="0 0 24 24"><path d="M9 4h6v4a2 2 0 1 1 0 0M4 9h4a2 2 0 1 1 0 0v6H4zM9 20v-4a2 2 0 1 0 0 0h6v4zM20 9v6h-4"/></svg>Plugins<span class="tag" style="margin-left:auto">2 on</span></a>
+  <a class="nav"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/></svg>Settings</a>
+</nav>
+
+<main>
+ <section class="view" id="v-pbi4" style="flex-direction:column">
+  <div class="chatwrap" id="wrap4">
+   <div class="ch">
+    <div class="log">
+      <div class="msg-u">Implement STORY-4. Criteria and tasks are on the card.</div>
+      <div class="msg-a"><p>Starting with the edit form. The card file is owned by this worktree, so writes go here and append to its history.</p></div>
+      <div class="tool"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edited 3 files · +184 −12</div>
+      <div class="tool"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M5 7l5 5-5 5M12 19h7"/></svg>Ran unit tests · 41 passed</div>
+      <div class="msg-a"><p>Task 4 of 6 done: the side panel saves title and stage edits, and each save appends a history event. Two criteria still need their tests.</p><p>Next I'll run the end-to-end test for “edit saves to the owner copy”.</p></div>
+      <div class="appr" role="group" aria-label="Approval needed">
+        <div style="display:flex;align-items:center;gap:8px"><svg class="i" viewBox="0 0 24 24" style="color:var(--warn)"><path d="M12 9v4M12 17h.01M10.3 4.2L2.5 18a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 4.2a2 2 0 0 0-3.4 0z"/></svg><span style="font-weight:600">Allow this command?</span><span style="flex:1"></span><span class="meta" style="font-size:12px">waiting 2 min · moves to Inbox after 10</span></div>
+        <code>pnpm --filter client exec playwright test side-panel</code>
+        <div style="display:flex;gap:8px"><button class="btn pri">Allow once</button><button class="btn">Always allow in this project</button><button class="btn">Deny</button></div>
+      </div>
+    </div>
+    <div class="composer">
+      <span class="ph">Message STORY-4…</span>
+      <div style="display:flex;gap:6px;align-items:center"><span class="chip">+</span><span class="chip">Developer</span><span class="chip">Sonnet</span><span class="chip">medium</span><span class="chip">Ask before edits</span><span style="flex:1"></span><span class="ctx" title="62k of 200k tokens used"><span class="m"><i></i></span>62k / 200k</span><span class="chip" style="background:var(--accbg);color:#fff">Send</span></div>
+    </div>
+    <div class="term" id="term">
+      <div class="bar2"><span style="color:var(--tx)">pbi-4</span><span>dev server</span><span>+ New</span><span style="flex:1"></span><span>.featra\worktrees\pbi-4</span></div>
+<pre>&gt; pnpm --filter client dev
+  VITE ready in 412 ms
+  ➜  Local:   http://localhost:5174/
+&gt; pnpm test --filter work-format
+  ✓ 76 tests passed (1.2s)
+PS pbi-4&gt; _</pre>
+    </div>
+   </div>
+   <aside class="dock" data-panel="diff" aria-label="Changes">
+    <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line)"><span style="font-weight:600">Changes</span><span class="meta">3 files · +184 −12</span><span style="flex:1"></span><span class="chip">vs feature/f1-cards</span></div>
+    <div style="padding:8px">
+      <div class="file on"><span style="color:var(--warn)">M</span><span style="flex:1" class="mono">client/src/SidePanel.tsx</span><span class="meta" style="font-size:12px">+142 −8</span></div>
+      <div class="file"><span style="color:var(--ok)">A</span><span style="flex:1" class="mono">client/src/useCardSave.ts</span><span class="meta" style="font-size:12px">+38</span></div>
+      <div class="file"><span style="color:var(--warn)">M</span><span style="flex:1" class="mono">server/src/cards.ts</span><span class="meta" style="font-size:12px">+4 −4</span></div>
+    </div>
+    <div class="diffl"><div class="h">@@ -41,8 +41,14 @@ export function SidePanel</div><div>  const card = useCard(id);</div><div class="r">- return &lt;CardView card={card} /&gt;;</div><div class="a">+ const save = useCardSave(card);</div><div class="a">+ if (!card.isOwnerCopy) {</div><div class="a">+   return &lt;CardView card={card} readOnly /&gt;;</div><div class="a">+ }</div><div class="a">+ return &lt;CardEditor card={card} onSave={save} /&gt;;</div><div>}</div></div>
+    <div style="margin-top:auto;padding:12px 14px;border-top:1px solid var(--line);display:flex;gap:8px"><button class="btn">Comment on lines</button><span style="flex:1"></span><button class="btn">Open in editor</button></div>
+   </aside>
+   <aside class="dock" data-panel="browser" aria-label="Browser">
+    <div style="display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line)"><svg class="i" viewBox="0 0 24 24" style="color:var(--tx3)"><path d="M15 6l-6 6 6 6"/></svg><svg class="i" viewBox="0 0 24 24" style="color:var(--tx3)"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v4h4"/></svg><span class="mono" style="flex:1;background:var(--row);border-radius:7px;padding:5px 9px;color:var(--tx2)">localhost:5174/work</span><span class="chip">1280</span></div>
+    <div style="flex:1;margin:10px;border-radius:8px;background:#f4f4f2;padding:14px;display:flex;flex-direction:column;gap:8px">
+      <div style="height:10px;width:40%;background:#d7d7d3;border-radius:3px"></div><div style="height:8px;width:80%;background:#e3e3df;border-radius:3px"></div><div style="height:8px;width:70%;background:#e3e3df;border-radius:3px"></div>
+      <div style="margin-top:8px;border:2px solid #3b5fcc;border-radius:6px;padding:10px;position:relative"><div style="height:8px;width:60%;background:#d7d7d3;border-radius:3px"></div><span style="position:absolute;top:-10px;right:-10px;width:20px;height:20px;border-radius:50%;background:#3b5fcc;color:#fff;font-size:11px;display:grid;place-items:center">1</span></div>
+    </div>
+    <div style="padding:10px 14px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center"><button class="btn">Annotate</button><span class="meta" style="font-size:12px">1 note · sends to STORY-4</span></div>
+   </aside>
+   <aside class="dock" data-panel="env" aria-label="Environment">
+    <div class="pad">
+     <div class="envsec"><div class="sh"><span>Git</span><span>worktree pbi-4</span></div>
+      <div class="envrow"><svg class="i" viewBox="0 0 24 24"><path d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9"/></svg><div style="flex:1;display:flex;flex-direction:column"><span class="mono">pbi-4</span><span class="meta" style="font-size:12px">2 ahead, 3 behind feature/f1-cards · 3 uncommitted</span></div></div>
+      <div style="display:flex;gap:8px"><button class="btn">Commit…</button><button class="btn">Push</button><button class="btn">Pull feature branch</button></div>
+      <div class="envrow"><span class="dot" style="background:var(--bad)"></span><span style="flex:1">PR #15 · conflicts with feature/f1-cards</span><span style="color:var(--acc)">Open</span></div>
+     </div>
+     <div class="envsec"><div class="sh"><span>Background tasks</span><span>2 running</span></div>
+      <div class="envrow"><span class="dot" style="background:var(--ok)"></span><span style="flex:1">Dev server</span><span class="mono" style="color:var(--tx3)">:5174</span><span style="color:var(--tx2)">Stop</span></div>
+      <div class="envrow"><span class="dot" style="background:var(--warn)"></span><span style="flex:1">playwright test side-panel</span><span class="meta" style="font-size:12px">waiting on approval</span></div>
+     </div>
+     <div class="envsec"><div class="sh"><span>Session</span></div>
+      <div class="envrow" style="flex-direction:column;align-items:stretch;gap:6px"><div style="display:flex;justify-content:space-between"><span>Context</span><span>62k of 200k tokens</span></div><div class="bar" style="width:100%"><span style="flex:31;background:var(--acc)"></span><span style="flex:69"></span></div><div class="meta" style="font-size:12px">MCP: featra · Skills: 4 · Plugins: 2</div></div>
+     </div>
+    </div>
+   </aside>
+   <aside class="dock on" data-panel="work" aria-label="STORY-4 card">
+    <div class="pad">
+     <div style="display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="color:var(--tx3)">STORY-4</span><span class="st" style="color:var(--warn)"><span class="dot" style="background:var(--warn)"></span>In progress</span><span style="flex:1"></span><button class="btn" aria-label="Close card" data-close-pane="work" style="height:26px;padding:0 4px;background:none;border:0"><svg class="i" viewBox="0 0 24 24" style="color:var(--tx2)"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <h2 style="margin:0;font-size:16px;font-weight:600">Side panel edits a card</h2>
+      <p class="story" contenteditable="true" spellcheck="true" title="Click to edit · saves when you click away">As a builder, I edit a card in the side panel and the change is saved to the card's owner copy with a history entry.</p>
+      <div class="ev"><span class="y"><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M5 12l5 5 9-10"/></svg>Reported</span><span><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="7"/></svg>Verified</span><span><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="7"/></svg>Proven</span><span><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="7"/></svg>Accepted</span></div>
+     </div>
+     <div>
+      <div class="sh"><span>Acceptance criteria</span><span>1 of 3 proven</span></div>
+      <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>Editing title or stage saves to the owner copy<div class="proof"><span>Test passed</span></div></div></div>
+      <div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>Each save appends a history event<div class="proof"><span>No test yet</span></div></div></div>
+      <div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>A non-owner copy is read-only in the panel<div class="proof"><span>No test yet</span></div></div></div>
+     </div>
+     <div>
+      <div class="sh"><span>Tasks</span><span>4 of 6</span></div>
+      <div class="tasks">
+       <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Edit form for title and stage</div>
+       <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Write to the owner copy</div>
+       <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Append history on save</div>
+       <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Unit tests for the save path</div>
+       <div class="task"><span class="box0"></span>Read-only mode for non-owner copies</div>
+       <div class="task"><span class="box0"></span>End-to-end test for the panel</div>
+      </div>
+     </div>
+     <div class="meta" style="font-size:12px">PR #15 · <span style="color:var(--bad)">conflicts with feature/f1-cards</span></div>
+    </div>
+   </aside>
+  </div>
+ </section>
+
+ <section class="view" id="v-pbi3" style="flex-direction:column">
+  <div class="chatwrap" id="wrap3">
+   <div class="ch">
+    <div class="log">
+      <div class="msg-u">Implement STORY-3. Criteria and tasks are on the card.</div>
+      <div class="msg-a"><p>Building the list from each card's owner copy, with live updates from the server.</p></div>
+      <div class="tool"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Edited 9 files · +612 −40</div>
+      <div class="tool"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M5 7l5 5-5 5M12 19h7"/></svg>Ran tests · 58 passed · 4 of 4 criteria proven</div>
+      <div class="tool"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9"/></svg>Opened PR #14 · checks passing</div>
+      <div class="msg-a"><p>All four criteria are proven and CI is green. Featra captured screenshots of the list for you. Have a look at the card, try the build if you like, then accept or tell me what to change.</p></div>
+      <div class="accard" role="group" aria-label="Waiting on your Accept">
+        <div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--pur)"></span><span style="font-weight:600">STORY-3 is ready for your Accept</span><span style="flex:1"></span><span class="meta" style="font-size:12px">Verified · Proven</span></div>
+        <div class="meta" style="font-size:12px">4 of 4 criteria proven · 7 of 7 tasks · PR #14 passing · 4 screenshots</div>
+        <div style="display:flex;gap:8px"><button class="btn pri" data-accept>Accept</button><button class="btn" data-dlg="sendback">Send back…</button><button class="btn">Preview the build</button></div>
+      </div>
+    </div>
+    <div class="composer"><span class="ph">Reply to STORY-3, or ask for a change…</span><div style="display:flex;gap:6px;align-items:center"><span class="chip">+</span><span class="chip">Developer</span><span class="chip">Sonnet</span><span class="chip">medium</span><span class="chip">Ask before edits</span><span style="flex:1"></span><span class="ctx" title="141k of 200k tokens used"><span class="m"><i style="width:70%"></i></span>141k / 200k</span><span class="chip" style="background:var(--accbg);color:#fff">Send</span></div></div>
+   </div>
+  <aside class="dock on" data-panel="work" aria-label="STORY-3 card"><div class="pop">
+    <header>
+      <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="color:var(--tx3)">STORY-3</span><span class="meta">in Cards, ownership, feature list</span><span style="flex:1"></span><button class="btn" data-close-pane="work" aria-label="Close" style="height:28px;padding:0 6px;background:none;border:0"><svg class="i" viewBox="0 0 24 24" style="color:var(--tx2)"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <h2>Home feature list</h2>
+      <p class="story" contenteditable="true" spellcheck="true" title="Click to edit · saves when you click away">As a builder, I open a project and see its epics, features and stories with live counts, so I know what remains without asking.</p>
+      <div class="ev"><span class="y"><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M5 12l5 5 9-10"/></svg>Verified</span><span class="y"><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M5 12l5 5 9-10"/></svg>Proven</span><span><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="7"/></svg>Accepted</span></div>
+    </header>
+    <div class="body">
+      <div>
+        <div class="sh"><span>Acceptance criteria</span><span>4 of 4 proven</span></div>
+        <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>Epics, features and stories show from each card's owner copy<div class="proof"><span>Test passed</span><span style="color:var(--acc)">2 screenshots</span></div></div></div>
+        <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>Editing a card file outside the app updates the list<div class="proof"><span>Test passed</span></div></div></div>
+        <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>Each feature shows "N of M stories done" and "+N added"<div class="proof"><span>Test passed</span><span style="color:var(--acc)">1 screenshot</span></div></div></div>
+        <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>A draft feature shows a Review button<div class="proof"><span>Test passed</span><span style="color:var(--acc)">1 screenshot</span></div></div></div>
+      </div>
+      <div>
+        <div class="sh"><span>Screenshots</span><span style="color:var(--acc)">Preview the build</span></div>
+        <div class="thumbs" aria-label="4 screenshots">
+          <div class="th"><i style="width:60%"></i><i></i><i style="width:80%"></i><i style="width:70%"></i></div>
+          <div class="th"><i style="width:40%"></i><i style="width:90%"></i><i></i><i style="width:50%"></i></div>
+          <div class="th"><i style="width:70%"></i><i style="width:60%"></i><i style="width:85%"></i></div>
+        </div>
+      </div>
+      <div>
+        <div class="sh"><span>Tasks</span><span>7 of 7</span></div>
+        <div class="tasks">
+          <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Query the card index by owner</div>
+          <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Feature list with collapsible epics</div>
+          <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Live updates from the server</div>
+          <div class="task meta" style="padding-left:24px">4 more done</div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><button class="btn pri" data-accept>Accept</button><button class="btn" data-dlg="sendback">Send back…</button><span style="flex:1"></span><span class="meta" style="font-size:12px;color:var(--acc)" data-open="work">Open in Work</span></div>
+  </div></aside>
+  </div>
+ </section>
+
+ <section class="view" id="v-draft" style="flex-direction:column">
+  <div class="chatwrap" id="wrapD">
+   <div class="ch">
+    <div class="log">
+      <div class="msg-u">Next I want to run agent sessions inside the app, with roles like Developer and QA.</div>
+      <div class="msg-a"><p>A few questions before I draft anything. Should roles be fixed, or editable per project? And when an agent asks you something and you're away, where should it wait?</p></div>
+      <div class="msg-u">Editable per project. If I'm away, it should wait in the Inbox and notify me.</div>
+      <div class="msg-a"><p>That gives three stories: start a session from a role, edit presets, and the question inbox. I've written criteria for each so a developer knows exactly what done looks like.</p></div>
+      <div class="tool"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Drafted feature · Sessions and roles · 3 stories, 9 criteria, 17 tasks</div>
+      <div class="accard" style="border-color:#2f4a8a;background:#1d2538" role="group" aria-label="Draft waiting on your review">
+        <div style="display:flex;align-items:center;gap:8px"><span class="dot" style="background:var(--acc)"></span><span style="font-weight:600">Draft ready for your review</span><span style="flex:1"></span><span class="meta" style="font-size:12px">nothing starts until you approve</span></div>
+        <div class="meta" style="font-size:12px">Edit anything in the card on the right, or tell me what to change here.</div>
+        <div style="display:flex;gap:8px"><button class="btn pri" data-approve>Approve and start</button><button class="btn" data-dlg="sendback">Send back…</button></div>
+      </div>
+    </div>
+    <div class="composer"><span class="ph">Tell the Dev Lead what to change…</span><div style="display:flex;gap:6px;align-items:center"><span class="chip">+</span><span class="chip">Dev Lead</span><span class="chip">Opus</span><span class="chip">high</span><span style="flex:1"></span><span class="ctx" title="46k of 200k tokens used"><span class="m"><i style="width:23%"></i></span>46k / 200k</span><span class="chip" style="background:var(--accbg);color:#fff">Send</span></div></div>
+   </div>
+   <aside class="dock on" data-panel="work" aria-label="Draft feature"><div class="pop">
+    <header>
+      <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="color:var(--tx3)">FEAT-2</span><span class="st" style="color:var(--acc);font-size:12px"><span class="dot" style="background:var(--acc)"></span>Draft · waiting on your review</span><span style="flex:1"></span><button class="btn" data-close-pane="work" aria-label="Close" style="height:28px;padding:0 6px;background:none;border:0"><svg class="i" viewBox="0 0 24 24" style="color:var(--tx2)"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <h2 contenteditable="true">Sessions and roles</h2>
+      <p class="story" contenteditable="true" title="Click to edit · saves when you click away">Start agent sessions from role presets, answer their questions in the app, and never miss one waiting on you.</p>
+      <div class="meta" style="font-size:12px">Epic M1a · 3 stories · 9 criteria · 17 tasks · depends on Cards, ownership, feature list</div>
+    </header>
+    <div class="body">
+     <div>
+      <div class="sh"><span>Stories</span><span style="color:var(--acc)">+ Add story</span></div>
+      <details class="dp" open><summary><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span style="flex:1">Start a session from a role</span><span class="meta" style="font-size:12px">3 criteria · 7 tasks</span></summary>
+       <div class="dpb"><p class="story" contenteditable="true" title="Click to edit · saves when you click away">As a builder, I start a chat from a role preset and the agent runs with that role, model and effort.</p><div class="sh" style="margin-top:4px"><span>Acceptance criteria</span><span style="color:var(--acc)">+ Add</span></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>A chat starts with the preset's prompt, model and effort</div></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>Tool approvals appear inline in the chat</div></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>AskUserQuestion shows as a question card</div></div></div></details>
+      <details class="dp"><summary><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span style="flex:1">Edit role presets</span><span class="meta" style="font-size:12px">2 criteria · 4 tasks</span></summary>
+       <div class="dpb"><p class="story" contenteditable="true" title="Click to edit · saves when you click away">As a builder, I change a role's prompt, model and effort and new chats use it.</p><div class="sh" style="margin-top:4px"><span>Acceptance criteria</span><span style="color:var(--acc)">+ Add</span></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>Edits save to the project's presets</div></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>New chats use the edited preset</div></div></div></details>
+      <details class="dp"><summary><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span style="flex:1">Question inbox and notifications</span><span class="meta" style="font-size:12px">4 criteria · 6 tasks</span></summary>
+       <div class="dpb"><p class="story" contenteditable="true" title="Click to edit · saves when you click away">As a builder, I see every question waiting on me in one place and get notified.</p><div class="sh" style="margin-top:4px"><span>Acceptance criteria</span><span style="color:var(--acc)">+ Add</span></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>Unanswered questions move to the Inbox after a wait</div></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>A desktop notification fires for each new question</div></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>Answers are logged to decisions.md</div></div><div class="ac todo"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg><div>Open questions are listed in open-questions.md</div></div></div></details>
+     </div>
+     <p class="meta" style="margin:0;font-size:12px">Approving creates branch feature/f2-sessions and lets the Dev Lead start the story sessions. This draft becomes the scope baseline; anything added later counts as "+N added".</p>
+    </div>
+    <div class="foot"><button class="btn pri" data-approve>Approve and start</button><button class="btn" data-dlg="sendback">Send back…</button><span style="flex:1"></span><button class="btn" data-reject style="background:none;border:0;color:var(--bad)">Reject</button></div>
+   </div></aside>
+  </div>
+ </section>
+
+ <section class="view" id="v-lead" style="flex-direction:column">
+  <div class="chatwrap nocard" id="wrapL">
+   <div class="ch">
+    <div class="log">
+      <div class="msg-u">I want to see features, stories and progress for a project without asking you for a summary.</div>
+      <div class="msg-a"><p>I drafted one feature with 4 stories, each with acceptance criteria and tasks. It's waiting for your review in Work.</p></div>
+      <div class="tool"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Drafted feature · 4 stories, 12 criteria, 24 tasks</div>
+      <div class="msg-u">Approved. Go.</div>
+      <div class="tool"><svg class="i" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9"/></svg>Created feature/f1-cards · started 3 story sessions</div>
+      <div class="msg-a"><p>STORY-3 is finished and waiting on your Accept. STORY-4 has a merge conflict with STORY-3's changes; I've asked it to rebase once its tests pass. You reported a bug yesterday. I think STORY-2 caused it, so I filed it under this feature as BUG-1.</p></div>
+    </div>
+    <div class="composer"><span class="ph">Message the Dev Lead…</span><div style="display:flex;gap:6px;align-items:center"><span class="chip">+</span><span class="chip">Dev Lead</span><span class="chip">Opus</span><span class="chip">high</span><span style="flex:1"></span><span class="ctx" title="118k of 200k tokens used"><span class="m"><i style="width:59%"></i></span>118k / 200k</span><span class="chip" style="background:var(--accbg);color:#fff">Send</span></div></div>
+   </div>
+   <aside class="dock" data-panel="feat" aria-label="Feature progress">
+    <div class="pad">
+     <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="color:var(--tx3)">FEAT-1</span><span class="meta">Feature progress</span><span style="flex:1"></span><button class="btn" data-close-pane="feat" aria-label="Close" style="height:28px;padding:0 6px;background:none;border:0"><svg class="i" viewBox="0 0 24 24" style="color:var(--tx2)"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+     <div style="display:flex;flex-direction:column;gap:8px">
+      <h2 style="margin:0;font-size:17px;font-weight:600">Cards, ownership, feature list</h2>
+      <div><b style="font-weight:600">1 of 5</b> <span class="meta">stories done · 14 of 26 tasks</span></div>
+      <div class="cbar" aria-hidden="true"><span style="background:var(--ok)"></span><span style="background:var(--pur)"></span><span style="background:var(--warn)"></span><span style="background:var(--warn)"></span><span></span></div>
+      <div style="font-size:12px"><span style="color:var(--warn)">+1 added since start</span> <span class="meta">·</span> <span style="color:var(--bad)">1 bug</span> <span class="meta">· branch feature/f1-cards</span></div>
+     </div>
+     <div class="fp">
+      <div class="sh" style="padding:0 12px"><span>Stories</span><span style="color:var(--acc);cursor:pointer" data-open="work">Open in Work</span></div>
+      <div class="fpr"><div class="r1"><span class="dot" style="background:var(--ok)"></span><span style="flex:1">Open a folder and init</span><span class="meta" style="font-size:12px">Done</span></div><div class="r2"><span>Criteria 3/3</span><span>Tasks 6/6</span><span>#12 merged</span></div></div>
+      <div class="fpr" data-open="pbi3"><div class="r1"><span class="dot" style="background:var(--pur)"></span><span style="flex:1">Home feature list</span><span style="font-size:12px;color:var(--pur)">Needs your Accept</span></div><div class="r2"><span>Criteria 4/4</span><span>Tasks 7/7</span><span>#14 <span style="color:var(--ok)">passing</span></span></div></div>
+      <div class="fpr" data-open="pbi4"><div class="r1"><span class="dot" style="background:var(--warn)"></span><span style="flex:1">Side panel edits a card</span><span class="meta" style="font-size:12px">In progress</span></div><div class="r2"><span>Criteria 1/3</span><span>Tasks 4/6</span><span>#15 <span style="color:var(--bad)">conflict</span></span><span style="color:var(--warn)">waiting on you</span></div></div>
+      <div class="fpr"><div class="r1"><svg class="i" viewBox="0 0 24 24" style="color:var(--bad);width:14px;height:14px"><path d="M8 8a4 4 0 0 1 8 0v1H8zM6 13h12M7 9h10v6a5 5 0 0 1-10 0zM4 9l3 2M20 9l-3 2M4 19l3-2M20 19l-3-2"/></svg><span style="flex:1">Renamed card vanishes from list</span><span class="meta" style="font-size:12px">In progress</span></div><div class="r2"><span>Criteria 0/1</span><span>Tasks 1/2</span><span>no PR yet</span></div></div>
+      <div class="fpr"><div class="r1"><span class="dot" style="background:#5a5a60"></span><span style="flex:1">Flag edits to a non-owner copy <span class="add" style="margin:0">added</span></span><span class="meta" style="font-size:12px">Ready</span></div><div class="r2"><span>Criteria 0/2</span><span>Tasks 0/3</span><span>not started</span></div></div>
+     </div>
+     <p class="meta" style="margin:0;font-size:12px">Shown only for chats that coordinate a feature. Updates live from the cards; no agent tokens.</p>
+    </div>
+   </aside>
+  </div>
+ </section>
+
+ <section class="view on" id="v-work" style="flex-direction:column">
+  <div class="workwrap" id="wrapW">
+  <div class="workmain">
+  <div class="top">
+    <h1 style="margin:0;font-size:15px;font-weight:600">Work</h1>
+    <div class="tabs" role="tablist"><span class="tab on" role="tab" aria-selected="true">List</span><span class="tab" role="tab">Board</span><span class="tab" role="tab">Burn-up</span></div>
+  </div>
+
+  <div class="content">
+    <div class="wfilter" role="tablist"><span class="fchip on">All features</span><span class="fchip">In progress · 1</span><span class="fchip">Needs review · 1</span><span class="fchip">Backlog · 9</span><span class="fchip">Done · 1</span></div>
+
+    <section class="epicblk">
+      <div class="epich"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><h2>M1a · Prove the core</h2><span class="meta">epic</span><span class="prog"><span class="pl">1 of 7 features done</span><span class="pbar" aria-hidden="true"><i style="flex:1;background:var(--ok)"></i><i style="flex:1;background:var(--warn)"></i><i style="flex:1;background:var(--acc)"></i><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i></span></span></div>
+      <div class="fl">
+        <div class="frow hdr"><span></span><span>Feature</span><span>Status</span><span>Progress</span><span>Tasks</span><span>Scope</span></div>
+        <div class="frow"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span class="fn">Provider spike</span><span><span class="st"><span class="dot" style="background:var(--ok)"></span>Done</span></span><span><span class="prog"><span class="pl">1 of 1</span><span class="pbar" aria-hidden="true"><i style="flex:1;background:var(--ok)"></i></span></span></span><span>5 / 5</span><span><span class="meta">—</span></span></div>
+        <div class="frow open"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span class="fn">Cards, ownership, feature list</span><span><span class="st"><span class="dot" style="background:var(--warn)"></span>In progress</span></span><span><span class="prog"><span class="pl">1 of 5</span><span class="pbar" title="1 done · 1 needs your Accept · 2 in progress · 1 not started" aria-hidden="true"><i style="flex:1;background:var(--ok)"></i><i style="flex:1;background:var(--pur)"></i><i style="flex:1;background:var(--warn)"></i><i style="flex:1;background:var(--warn)"></i><i style="flex:1"></i></span></span></span><span>14 / 26</span><span><span style="color:var(--warn)">+1 added</span> · <span style="color:var(--bad)">1 bug</span></span></div>
+        <div class="kidsbox on">
+          <div class="prow phdr"><span></span><span>Story</span><span>Stage</span><span>Criteria</span><span>Tasks</span><span>PR</span></div>
+          <div class="prow"><span></span><span class="pn">Open a folder and init</span><span><span class="st"><span class="dot" style="background:var(--ok)"></span>Done</span></span><span><span class="meta">3 / 3</span></span><span><span class="meta">6 / 6</span></span><span><span class="meta">#12 merged</span></span></div>
+          <div class="prow sel" data-pop><span></span><span class="pn">Home feature list</span><span><span class="st" style="color:var(--pur)"><span class="dot" style="background:var(--pur)"></span>Needs your Accept</span></span><span>4 / 4</span><span>7 / 7</span><span>#14 <span style="color:var(--ok)">passing</span></span></div>
+          <div class="prow" data-open="pbi4"><span></span><span class="pn">Side panel edits a card</span><span><span class="st"><span class="dot" style="background:var(--warn)"></span>In progress</span></span><span>1 / 3</span><span>4 / 6</span><span>#15 <span style="color:var(--bad)">conflict</span></span></div>
+          <div class="prow"><span></span><span class="pn"><svg class="i" viewBox="0 0 24 24" style="color:var(--bad);width:14px;height:14px;vertical-align:-2px;margin-right:6px"><path d="M8 8a4 4 0 0 1 8 0v1H8zM6 13h12M7 9h10v6a5 5 0 0 1-10 0zM4 9l3 2M20 9l-3 2M4 19l3-2M20 19l-3-2"/></svg>Renamed card vanishes from list</span><span><span class="st"><span class="dot" style="background:var(--warn)"></span>In progress</span></span><span>0 / 1</span><span>1 / 2</span><span><span class="meta">—</span></span></div>
+          <div class="prow"><span></span><span class="pn">Flag edits to a non-owner copy<span class="add">added</span></span><span><span class="meta"><span class="st"><span class="dot" style="background:#5a5a60"></span>Ready</span></span></span><span><span class="meta">0 / 2</span></span><span><span class="meta">0 / 3</span></span><span><span class="meta">—</span></span></div>
+        </div>
+        <div class="frow"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span class="fn">Sessions and roles</span><span><span class="st" style="color:var(--acc)"><span class="dot" style="background:var(--acc)"></span>Draft · review</span></span><span><span class="prog"><span class="meta">0 of 3</span><span class="pbar" aria-hidden="true"><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i></span></span></span><span>0 / 17</span><span><button class="btn pri" data-open="draft" style="height:26px;padding:0 10px;font-size:12px">Review draft</button></span></div>
+        <div class="frow"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span class="fn">Shaping</span><span><span class="meta"><span class="st"><span class="dot" style="background:#5a5a60"></span>Backlog</span></span></span><span><span class="prog"><span class="meta">0 of 1</span><span class="pbar" aria-hidden="true"><i style="flex:1"></i></span></span></span><span class="meta">—</span><span><span class="meta">—</span></span></div>
+        <div class="frow"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span class="fn">Delegation</span><span><span class="meta"><span class="st"><span class="dot" style="background:#5a5a60"></span>Backlog</span></span></span><span><span class="prog"><span class="meta">0 of 2</span><span class="pbar" aria-hidden="true"><i style="flex:1"></i><i style="flex:1"></i></span></span></span><span class="meta">—</span><span><span class="meta">—</span></span></div>
+        <div class="frow"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span class="fn">PRs, CI, manual merge, bugs</span><span><span class="meta"><span class="st"><span class="dot" style="background:#5a5a60"></span>Backlog</span></span></span><span><span class="prog"><span class="meta">0 of 4</span><span class="pbar" aria-hidden="true"><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i></span></span></span><span class="meta">—</span><span><span class="meta">—</span></span></div>
+        <div class="frow"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><span class="fn">Progress</span><span><span class="meta"><span class="st"><span class="dot" style="background:#5a5a60"></span>Backlog</span></span></span><span><span class="prog"><span class="meta">0 of 3</span><span class="pbar" aria-hidden="true"><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i></span></span></span><span class="meta">—</span><span><span class="meta">—</span></span></div>
+      </div>
+    </section>
+
+    <section class="epicblk closed">
+      <div class="epich"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><h2>M1b · Automation and review</h2><span class="meta">epic</span><span class="prog"><span class="meta">0 of 5 features done</span><span class="pbar" aria-hidden="true"><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i><i style="flex:1"></i></span></span></div>
+    </section>
+    <section class="epicblk closed">
+      <div class="epich"><svg class="i caret" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg><h2>No epic</h2><span class="meta">2 bugs in the project bug list</span></div>
+    </section>
+  </div>
+  </div>
+  <aside class="pop" id="pop" aria-label="Home feature list" role="dialog">
+    <header>
+      <div style="display:flex;align-items:center;gap:8px"><span class="mono" style="color:var(--tx3)">STORY-3</span><span class="meta">in Cards, ownership, feature list</span><span style="flex:1"></span><button class="btn" data-close-pop aria-label="Close" style="height:28px;padding:0 6px;background:none;border:0"><svg class="i" viewBox="0 0 24 24" style="color:var(--tx2)"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+      <h2>Home feature list</h2>
+      <p class="story" contenteditable="true" spellcheck="true" title="Click to edit · saves when you click away">As a builder, I open a project and see its epics, features and stories with live counts, so I know what remains without asking.</p>
+      <div class="ev"><span class="y"><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M5 12l5 5 9-10"/></svg>Verified</span><span class="y"><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M5 12l5 5 9-10"/></svg>Proven</span><span><svg class="i" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="7"/></svg>Accepted</span></div>
+    </header>
+    <div class="body">
+      <div>
+        <div class="sh"><span>Acceptance criteria</span><span>4 of 4 proven</span></div>
+        <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>Epics, features and stories show from each card's owner copy<div class="proof"><span>Test passed</span><span style="color:var(--acc)">2 screenshots</span></div></div></div>
+        <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>Editing a card file outside the app updates the list<div class="proof"><span>Test passed</span></div></div></div>
+        <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>Each feature shows "N of M stories done" and "+N added"<div class="proof"><span>Test passed</span><span style="color:var(--acc)">1 screenshot</span></div></div></div>
+        <div class="ac"><svg class="i" viewBox="0 0 24 24" style="color:var(--ok)"><path d="M5 12l5 5 9-10"/></svg><div>A draft feature shows a Review button<div class="proof"><span>Test passed</span><span style="color:var(--acc)">1 screenshot</span></div></div></div>
+      </div>
+      <div>
+        <div class="sh"><span>Screenshots</span><span style="color:var(--acc)">Preview the build</span></div>
+        <div class="thumbs" aria-label="4 screenshots">
+          <div class="th"><i style="width:60%"></i><i></i><i style="width:80%"></i><i style="width:70%"></i></div>
+          <div class="th"><i style="width:40%"></i><i style="width:90%"></i><i></i><i style="width:50%"></i></div>
+          <div class="th"><i style="width:70%"></i><i style="width:60%"></i><i style="width:85%"></i></div>
+        </div>
+      </div>
+      <div>
+        <div class="sh"><span>Tasks</span><span>7 of 7</span></div>
+        <div class="tasks">
+          <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Query the card index by owner</div>
+          <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Feature list with collapsible epics</div>
+          <div class="task"><span class="chk"><svg class="i" viewBox="0 0 24 24" style="width:10px;height:10px;color:#fff;stroke-width:3"><path d="M5 12l5 5 9-10"/></svg></span>Live updates from the server</div>
+          <div class="task meta" style="padding-left:24px">4 more done</div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><button class="btn pri" data-accept>Accept</button><button class="btn" data-dlg="sendback">Send back…</button><span style="flex:1"></span><span class="meta" style="font-size:12px;color:var(--acc)" data-open="pbi3">Open chat</span></div>
+  </aside>
+  </div>
+ </section>
+</main>
+</div>
+</div>
+
+<div class="scrim" id="dlg-delete" role="dialog" aria-modal="true" aria-labelledby="dd-t">
+ <div class="dlg">
+  <h2 id="dd-t">STORY-4 can't be deleted yet</h2>
+  <p style="margin:0;color:var(--tx2)">Deleting removes the transcript for good. This session still owns work:</p>
+  <ul><li>Worktree pbi-4 has 3 uncommitted changes</li><li>PR #15 is open against feature/f1-cards</li><li>The STORY-4 card is owned by this worktree</li><li>A command is waiting on your approval</li></ul>
+  <p style="margin:0;color:var(--tx2)">Finish or cancel STORY-4 first, or archive the session to hide it and keep everything.</p>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-x>Cancel</button><button class="btn" data-x>Cancel STORY-4…</button><button class="btn pri" data-x>Archive instead</button></div>
+ </div>
+</div>
+<div class="scrim" id="dlg-sendback" role="dialog" aria-modal="true" aria-labelledby="sb-t">
+ <div class="dlg">
+  <h2 id="sb-t">Send STORY-3 back</h2>
+  <p style="margin:0;color:var(--tx2)">Tell the developer what isn't right. This goes to STORY-3's session as your message and is logged on the card's history.</p>
+  <textarea id="sb-why" rows="4" placeholder="What needs to change? e.g. The list doesn't keep my collapsed epics after a refresh." style="font:inherit;color:var(--tx);background:#1c1c1e;border:1px solid #3a3a3e;border-radius:8px;padding:10px;resize:vertical"></textarea>
+  <label id="sb-crit" style="display:flex;gap:8px;align-items:center;color:var(--tx2);font-size:12px"><input type="checkbox" checked> Add it as a new acceptance criterion</label>
+  <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center"><span class="meta" style="font-size:12px;margin-right:auto" id="sb-hint">A reason is required</span><button class="btn" data-x>Cancel</button><button class="btn pri" id="sb-go" data-x disabled>Send back</button></div>
+ </div>
+</div>
+<div class="scrim" id="dlg-archive" role="dialog" aria-modal="true" aria-labelledby="da-t">
+ <div class="dlg">
+  <h2 id="da-t">Archive STORY-4 while it's running?</h2>
+  <p style="margin:0;color:var(--tx2)">The agent is mid-task and a command is waiting on you. Archiving stops the session and keeps the worktree, the card and PR #15. You can unarchive it later and continue.</p>
+  <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-x>Cancel</button><button class="btn pri" data-x>Stop and archive</button></div>
+ </div>
+</div>
+
+<script>
+const titles={work:'Work · manager',pbi4:'STORY-4 · Side panel edits a card',lead:'Cards, ownership, feature list',pbi3:'STORY-3 · Home feature list',draft:'Sessions and roles'};
+let view='work';
+const $=s=>document.querySelector(s),$$=s=>document.querySelectorAll(s);
+const wrapOf=()=>view==='lead'?$('#wrapL'):view==='pbi3'?$('#wrap3'):view==='draft'?$('#wrapD'):$('#wrap4');
+const paneViews={feat:['lead'],work:['pbi4','pbi3','draft'],diff:['pbi4'],term:['pbi4'],browser:['pbi4'],env:['pbi4']};
+function syncPanes(){
+  ['#wrap4','#wrapL','#wrap3','#wrapD'].forEach(id=>{const w=$(id); w.classList.toggle('nocard',![...w.querySelectorAll('.dock')].some(d=>d.classList.contains('on')));});
+  $$('[data-pane]').forEach(b=>{const p=b.dataset.pane;
+    b.classList.toggle('on', p==='term'? $('#term').classList.contains('on') : !!wrapOf().querySelector('.dock.on[data-panel="'+p+'"]'));
+    b.style.display = paneViews[p].includes(view) ? '' : 'none';});
+}
+document.addEventListener('click',e=>{
+  const m=$('#smenu');
+  if(e.target.closest('#ttl')){ if(view!=='work') m.classList.toggle('on'); return; }
+  if(!e.target.closest('#smenu')) m.classList.remove('on');
+  const dl=e.target.closest('[data-dlg]'); if(dl){ m.classList.remove('on'); if(dl.dataset.dlg==='sendback'){ const d=view==='draft'; $('#sb-t').textContent=d?'Send the draft back to the Dev Lead':'Send STORY-3 back'; $('#sb-crit').style.display=d?'none':''; } $('#dlg-'+dl.dataset.dlg).classList.add('on'); return; }
+  if(e.target.closest('[data-x]')||e.target.classList.contains('scrim')){ $$('.scrim').forEach(s=>s.classList.remove('on')); return; }
+  if(e.target.closest('#sbt')){ $('#app').classList.toggle('collapsed'); $('#sbt').classList.toggle('on'); return; }
+  const cp=e.target.closest('[data-close-pane]'); if(cp){ wrapOf().querySelector('.dock[data-panel="'+cp.dataset.closePane+'"]').classList.remove('on'); syncPanes(); return; }
+  if(e.target.closest('[data-close-pop]')){ $('#wrapW').classList.add('nocard'); return; }
+  if(e.target.closest('[data-approve]')){ $$('[data-approve]').forEach(x=>{x.textContent='Approved · starting';x.disabled=true;x.classList.remove('pri');}); $$('#v-draft [data-dlg="sendback"], #v-draft [data-reject]').forEach(x=>x.style.display='none'); $$('.chat[data-open="draft"] .dot').forEach(d=>d.style.background='var(--warn)'); return; }
+  if(e.target.closest('[data-accept]')){ $$('[data-accept]').forEach(x=>{x.textContent='Accepted';x.disabled=true;x.classList.remove('pri');}); $$('#v-pbi3 [data-dlg="sendback"], #pop [data-dlg="sendback"]').forEach(x=>x.style.display='none'); $$('.kid[data-open="pbi3"] .dot').forEach(d=>d.style.background='var(--ok)'); return; }
+  if(e.target.closest('[data-pop]')){ $('#wrapW').classList.remove('nocard'); return; }
+  const fr=e.target.closest('.frow:not(.hdr)'); if(fr && !e.target.closest('button')){ const k=fr.nextElementSibling; if(k&&k.classList.contains('kidsbox')){fr.classList.toggle('open');k.classList.toggle('on');} return; }
+  const eh=e.target.closest('.epich'); if(eh){ eh.parentElement.classList.toggle('closed'); return; }
+  const fc=e.target.closest('.fchip'); if(fc){ $$('.fchip').forEach(x=>x.classList.remove('on')); fc.classList.add('on'); return; }
+  const pb=e.target.closest('[data-pane]');
+  if(pb){ const p=pb.dataset.pane;
+    if(p==='term'){ $('#term').classList.toggle('on'); }
+    else { const w=wrapOf(); const d=w.querySelector('.dock[data-panel="'+p+'"]'); const was=d.classList.contains('on');
+      w.querySelectorAll('.dock').forEach(x=>x.classList.remove('on')); if(!was) d.classList.add('on'); }
+    syncPanes(); return; }
+  const el=e.target.closest('[data-open]'); if(!el) return;
+  view=el.dataset.open;
+  $$('.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+view));
+  $$('.side [data-open]').forEach(n=>{n.classList.remove('on','sel'); n.style.background='';});
+  const side=$('.side [data-open="'+view+'"]');
+  if(side) side.classList.add(side.classList.contains('kid')?'sel':'on');
+  if(view==='lead'||view==='draft') side.style.background='var(--row)';
+  $('#ttlt').textContent=titles[view];
+  syncPanes();
+});
+document.addEventListener('keydown',e=>{ if(e.ctrlKey&&e.key==='b'){e.preventDefault();$('#sbt').click();} if(e.key==='Escape'){$$('.scrim').forEach(s=>s.classList.remove('on'));$('#smenu').classList.remove('on');} });
+document.addEventListener('input',e=>{ if(e.target.id==='sb-why'){ const ok=e.target.value.trim().length>0; $('#sb-go').disabled=!ok; $('#sb-hint').textContent=ok?'':'A reason is required'; } });
+document.addEventListener('focusout',e=>{ const st=e.target.closest&&e.target.closest('.story[contenteditable]'); if(!st) return;
+  let m=st.nextElementSibling; if(!(m&&m.classList.contains('saved'))){ m=document.createElement('span'); m.className='saved'; st.after(m); }
+  m.textContent='Saved to the card · history updated'; setTimeout(()=>m.remove(),2200); });
+syncPanes();
+</script>
+</body>
+</html>
