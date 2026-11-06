@@ -227,3 +227,10 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   through PowerShell, test-only, no npm dependency). Product code is unchanged: it still has to call `show()` and
   `focus()` itself, and the tests prove it. Focus tests assert both Chromium's `isFocused()` and the OS foreground window
   (`windowInForeground`), because `isFocused()` can say true while another app is in front (user decision).
+- 2026-11-06 — BUG-3 (e2e foreground grant under the lock): only the process that got the last input can pass on the
+  foreground right, so BUG-2's AttachThreadInput grant failed whenever someone was using another app. The harness now
+  sends a zero-distance mouse move (SendInput) before AllowSetForegroundWindow, which makes the helper the last-input
+  process, as a real tray click makes Explorer. The user32 calls go to one long-lived PowerShell per test worker
+  (`e2e/user32-helper.ps1`, about 8 ms a call) instead of one PowerShell per call. The two focus tests start a
+  busy-user window (`e2e/busy-user.ps1`) that keeps getting input, so the lock is on in every run instead of only when
+  someone happens to be at the desktop.
