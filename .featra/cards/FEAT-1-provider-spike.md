@@ -2,7 +2,7 @@
 id: FEAT-1
 type: feature
 title: Provider spike
-status: approved
+status: done
 parent: EPIC-1
 order: 1
 origin: planned
@@ -12,6 +12,16 @@ history:
     field: status
     from: null
     to: approved
+    by: user
+  - at: 2026-11-06T22:00:19.903Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-06T22:00:19.903Z
+    field: status
+    from: approved
+    to: done
     by: user
 ---
 
