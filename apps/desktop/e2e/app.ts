@@ -62,8 +62,8 @@ export async function launch(
 interface TestHooks {
   notices: string[];
   shownInFolder: string[];
-  tray?: { emit(event: string): void; isDestroyed(): boolean };
-  trayMenu?: { items: { label: string; click(): void }[] };
+  tray?: { emit: (event: string) => void; isDestroyed: () => boolean };
+  trayMenu?: { items: { label: string; click: () => void }[] };
 }
 type MainGlobal = typeof globalThis & { featraTest: TestHooks };
 

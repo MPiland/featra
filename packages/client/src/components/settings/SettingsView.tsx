@@ -13,8 +13,8 @@ export interface SettingsViewProps {
   bridge: FeatraBridge;
   snapshot: SettingsSnapshot;
   page: SettingsPage;
-  onPage(page: SettingsPage): void;
-  onAppChange(settings: AppSettings): void;
+  onPage: (page: SettingsPage) => void;
+  onAppChange: (settings: AppSettings) => void;
   shortcuts: readonly ShortcutEntry[];
 }
 

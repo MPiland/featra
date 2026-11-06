@@ -7,7 +7,7 @@ export interface DropdownProps {
   name: string;
   value: string;
   options: readonly ChoiceDef<string>[];
-  onChange(value: string): void;
+  onChange: (value: string) => void;
 }
 
 /**

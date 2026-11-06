@@ -6,12 +6,12 @@ import type { Log } from "./log.ts";
 
 export interface TroubleshootDeps {
   /** Electron's `session.defaultSession`. */
-  session: { clearCache(): Promise<void>; clearStorageData(): Promise<void> };
+  session: { clearCache: () => Promise<void>; clearStorageData: () => Promise<void> };
   /** Featra's own state files (window chrome, app state). */
-  stores: readonly { remove(): Promise<void> }[];
+  stores: readonly { remove: () => Promise<void> }[];
   log: Log;
   /** Starts a new instance and quits this one for real. */
-  restart(): void;
+  restart: () => void;
 }
 
 /** Clear Cache and Restart: Chromium's HTTP cache only; stored settings stay. */

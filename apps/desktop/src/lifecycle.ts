@@ -9,12 +9,12 @@ export const TRAY_NOTICE = "Featra is still running in the system tray";
 
 /** The parts of a BrowserWindow the lifecycle uses. */
 export interface ManagedWindow {
-  on(event: "close", listener: (e: { preventDefault(): void }) => void): unknown;
-  hide(): void;
-  show(): void;
-  focus(): void;
-  restore(): void;
-  isMinimized(): boolean;
+  on: (event: "close", listener: (e: { preventDefault: () => void }) => void) => unknown;
+  hide: () => void;
+  show: () => void;
+  focus: () => void;
+  restore: () => void;
+  isMinimized: () => boolean;
 }
 
 export interface LifecycleOptions {
@@ -32,16 +32,16 @@ export interface LifecycleOptions {
   /** Whether the one-time tray notice was already shown in an earlier run. */
   noticeShown: boolean;
   /** Shows an OS notification. */
-  notify(message: string): void;
+  notify: (message: string) => void;
   /** Remembers that the notice was shown. */
-  rememberNotice(): void;
+  rememberNotice: () => void;
   /** Exits the app (Electron's `app.quit`). */
-  exit(): void;
+  exit: () => void;
 }
 
 export interface TrayMenuItem {
   label: string;
-  click(): void;
+  click: () => void;
 }
 
 export interface Lifecycle {
@@ -56,16 +56,16 @@ export interface Lifecycle {
   readonly closeHides: boolean;
   readonly quitting: boolean;
   /** Takes over the window's close button and Alt+F4. */
-  manage(win: ManagedWindow): void;
+  manage: (win: ManagedWindow) => void;
   /** Shows, un-minimises and focuses the window: tray click, Dock click, second launch. */
-  reveal(win: ManagedWindow): void;
+  reveal: (win: ManagedWindow) => void;
   /** Quits for real (File > Exit, the tray's Exit). */
-  quit(): void;
+  quit: () => void;
   /** The Close button setting changed: applies to the next close, no restart needed. */
-  setCloseToTray(on: boolean): void;
+  setCloseToTray: (on: boolean) => void;
   /** Electron's `before-quit`: any quit (Cmd+Q, OS shutdown, `app.quit`) closes windows for real from here on. */
-  onBeforeQuit(): void;
-  trayMenu(win: ManagedWindow): TrayMenuItem[];
+  onBeforeQuit: () => void;
+  trayMenu: (win: ManagedWindow) => TrayMenuItem[];
 }
 
 export function createLifecycle(o: LifecycleOptions): Lifecycle {

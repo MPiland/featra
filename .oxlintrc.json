@@ -16,6 +16,7 @@
     "typescript/no-explicit-any": "error",
     "typescript/no-non-null-assertion": "error",
     "typescript/consistent-type-imports": "error",
+    "typescript/method-signature-style": ["error", "property"],
     "typescript/switch-exhaustiveness-check": "error",
     "import/no-cycle": "error",
     "import/no-self-import": "error",

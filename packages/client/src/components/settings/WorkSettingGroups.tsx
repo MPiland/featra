@@ -11,10 +11,10 @@ export interface WorkSettingGroupsProps {
   /** Prefixes the controls' ids, so each scope's are distinct: `app-progress`, `project-progress`. */
   scope: SettingsScope;
   values: WorkSettings;
-  onChange(key: WorkSettingKey, value: WorkValue): void;
+  onChange: (key: WorkSettingKey, value: WorkValue) => void;
   disabled?: boolean;
   /** The override mark for a key, where the project overrides it. */
-  override?(key: WorkSettingKey): OverrideMark | undefined;
+  override?: (key: WorkSettingKey) => OverrideMark | undefined;
 }
 
 /** The work settings in their groups: the app's defaults or one project's values. */
@@ -40,7 +40,7 @@ function WorkSettingRow(props: {
   id: string;
   def: WorkSettingDef;
   value: WorkValue;
-  onChange(value: WorkValue): void;
+  onChange: (value: WorkValue) => void;
   disabled: boolean | undefined;
   override: OverrideMark | undefined;
 }) {

@@ -129,9 +129,9 @@ interface MainDeps {
   troubleshoot: TroubleshootDeps;
   settings: {
     store: SettingsStore;
-    current(): AppSettings;
+    current: () => AppSettings;
     /** Stores new app settings and applies them: the close button at once (the page applies the theme). */
-    apply(next: AppSettings): Promise<void>;
+    apply: (next: AppSettings) => Promise<void>;
     project: ProjectRef | null;
   };
 }

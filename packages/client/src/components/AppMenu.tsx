@@ -171,9 +171,9 @@ interface MenuListProps {
   nodes: readonly MenuNode[];
   depth: number;
   path: readonly string[];
-  onRun(node: Extract<MenuNode, { onSelect: () => void }>): void;
-  onOpenSub(depth: number, id: string, focusFirst: boolean): void;
-  onHoverLeaf(depth: number): void;
+  onRun: (node: Extract<MenuNode, { onSelect: () => void }>) => void;
+  onOpenSub: (depth: number, id: string, focusFirst: boolean) => void;
+  onHoverLeaf: (depth: number) => void;
 }
 
 function MenuList(p: MenuListProps) {

@@ -9,27 +9,27 @@ export type MenuNode =
   | { kind: "separator"; id: string };
 
 export interface MenuActions {
-  openSettings(): void;
+  openSettings: () => void;
   /** Opens Settings on its Keyboard shortcuts page. */
-  showKeyboardShortcuts(): void;
-  closeWindow(): void;
-  quit(): void;
-  edit(command: EditCommand): void;
-  toggleSidebar(): void;
-  zoomReset(): void;
-  zoomIn(): void;
-  zoomOut(): void;
-  toggleFullScreen(): void;
-  reload(): void;
-  back(): void;
-  forward(): void;
-  open(view: ViewId): void;
-  showLogs(): void;
-  toggleDevTools(): void;
-  clearCacheAndRestart(): void;
+  showKeyboardShortcuts: () => void;
+  closeWindow: () => void;
+  quit: () => void;
+  edit: (command: EditCommand) => void;
+  toggleSidebar: () => void;
+  zoomReset: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  toggleFullScreen: () => void;
+  reload: () => void;
+  back: () => void;
+  forward: () => void;
+  open: (view: ViewId) => void;
+  showLogs: () => void;
+  toggleDevTools: () => void;
+  clearCacheAndRestart: () => void;
   /** Asks first: the confirm dialog runs the reset. */
-  resetAppData(): void;
-  showAbout(): void;
+  resetAppData: () => void;
+  showAbout: () => void;
 }
 
 export interface MenuContext {

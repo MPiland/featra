@@ -5,7 +5,7 @@ import { appDefaultText } from "../../settings-pages.ts";
 export interface OverrideMark {
   defaultLabel: string;
   resetLabel: string;
-  onReset(): void;
+  onReset: () => void;
 }
 
 /** How the row's control names itself and finds its description: pass these to the control's aria attributes. */
@@ -21,7 +21,7 @@ export interface SettingRowProps {
   /** A note under the description: why the control is disabled. */
   status?: string | undefined;
   override?: OverrideMark | undefined;
-  children(aria: RowAria): ReactNode;
+  children: (aria: RowAria) => ReactNode;
 }
 
 /** One setting: its label and a short description on the left, the control on the right. */

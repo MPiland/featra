@@ -4,12 +4,12 @@ import { DEFAULT_UI_STATE, normalizeUiState, type UiState } from "@featra/client
 
 export interface JsonStore<T> {
   readonly file: string;
-  load(): Promise<T>;
-  save(state: T): Promise<void>;
+  load: () => Promise<T>;
+  save: (state: T) => Promise<void>;
   /** Deletes the file (Reset App Data), after any save already queued. */
-  remove(): Promise<void>;
+  remove: () => Promise<void>;
   /** Resolves once every save issued so far is on disk. */
-  flush(): Promise<void>;
+  flush: () => Promise<void>;
   readonly pending: boolean;
 }
 

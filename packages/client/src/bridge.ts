@@ -79,48 +79,48 @@ export interface FeatraBridge {
   /** `process.platform` of the host: "win32", "darwin", "linux", or "web" outside Electron. */
   readonly platform: string;
   readonly uiState: {
-    load(): Promise<UiState>;
-    save(state: UiState): Promise<void>;
+    load: () => Promise<UiState>;
+    save: (state: UiState) => Promise<void>;
   };
   readonly window: {
-    minimize(): void;
+    minimize: () => void;
     /** Maximize, restore, or leave full screen: see `sizeButtonAction`. */
-    toggleMaximize(): void;
-    close(): void;
-    toggleFullScreen(): void;
-    state(): Promise<WindowState>;
+    toggleMaximize: () => void;
+    close: () => void;
+    toggleFullScreen: () => void;
+    state: () => Promise<WindowState>;
     /** Calls back on every change to the window's state; returns the unsubscribe. */
-    onStateChange(listener: (state: WindowState) => void): () => void;
-    setZoomFactor(factor: number): void;
+    onStateChange: (listener: (state: WindowState) => void) => () => void;
+    setZoomFactor: (factor: number) => void;
     /** Pins native surfaces to the app setting's theme (System lets the OS decide). */
-    setTheme(theme: ThemeChoice): void;
+    setTheme: (theme: ThemeChoice) => void;
   };
   readonly settings: {
     /** App settings, what the close button can do here, and the projects the Project scope can pick from. */
-    load(): Promise<SettingsSnapshot>;
+    load: () => Promise<SettingsSnapshot>;
     /** Stores app settings; the host applies them at once (the close button among them, without a restart). */
-    saveApp(settings: AppSettings): Promise<void>;
+    saveApp: (settings: AppSettings) => Promise<void>;
     /** A project's overrides, read from its `.featra/config.yaml`. */
-    loadProject(dir: string): Promise<ProjectSettings>;
+    loadProject: (dir: string) => Promise<ProjectSettings>;
     /** Overrides one work setting in the project's config file, or removes the override (`null`). */
-    setProjectValue<K extends WorkSettingKey>(
+    setProjectValue: <K extends WorkSettingKey>(
       dir: string,
       key: K,
       value: WorkSettings[K] | null,
-    ): Promise<ProjectSettings>;
+    ) => Promise<ProjectSettings>;
   };
-  edit(command: EditCommand): void;
+  edit: (command: EditCommand) => void;
   readonly app: {
-    info(): Promise<AppInfo>;
-    reload(): void;
-    toggleDevTools(): void;
+    info: () => Promise<AppInfo>;
+    reload: () => void;
+    toggleDevTools: () => void;
     /** Shows the main process's log file in the OS file manager. */
-    showLogs(): void;
+    showLogs: () => void;
     /** Clears Chromium's HTTP cache, then restarts the app. */
-    clearCacheAndRestart(): void;
+    clearCacheAndRestart: () => void;
     /** Deletes stored state (window chrome, app state, web storage, cache), then restarts. Logs are kept. */
-    resetAppData(): void;
-    quit(): void;
+    resetAppData: () => void;
+    quit: () => void;
   };
 }
 
