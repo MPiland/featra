@@ -40,3 +40,7 @@ Two e2e tests have each failed once on WSLg (Ubuntu), with nothing else running.
 - [ ] Fix the cause, in the product or in the test's isolation, without weakening any assertion
 
 ## Notes
+- 2026-11-06 (STORY-2 review): `menu.spec.ts` "Edit items act on the focused field" failed again on WSLg, 1 of 4 runs.
+- 2026-11-06 (STORY-2 review, Windows): `tray.spec.ts:220` "launching Featra again shows the running app's window"
+  failed `windowInForeground` 2 of 7 runs on 94de547, then 0 of 150 on 8a43e99 (the developer's 60 plus 90 of mine).
+  Not reproduced. If it comes back, it's likely BUG-2's foreground lock, not WSLg.
