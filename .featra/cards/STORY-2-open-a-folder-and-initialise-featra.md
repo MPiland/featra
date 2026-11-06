@@ -67,6 +67,12 @@ As a builder, I open a folder and Featra sets it up for card-based work without 
 - Not checked: the e2e on WSLg (left to the Dev Lead, per the brief). No installer exists yet; ADR 0015 notes that
   packaging must check the forked `server.cjs` loads from the asar.
 - E2E: Windows 32 passed (2 new in setup.spec.ts). Unit and integration: 408 passed.
+- Review fix: the server's exit was logged after "Quitting" (tray.spec.ts "File > Exit … Developer Tools"). A server
+  main stops now logs nothing, so "Quitting" stays last. Regression test: `apps/desktop/test/server-process.test.ts`
+  ("a stop main asks for logs nothing").
+- Review: the second-instance foreground failure (tray.spec.ts:220) did not reproduce here in 60 runs (full tray file
+  x5 three times, the test x25, and x20 under CPU load). The second instance exits at the single-instance lock, before
+  any server code runs; nothing in this story takes the foreground.
 
 ## Tests
 

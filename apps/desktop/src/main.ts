@@ -120,8 +120,9 @@ if (!app.requestSingleInstanceLock()) {
     let loggedQuit = false;
     app.on("before-quit", () => {
       lifecycle.onBeforeQuit();
+      // A server main stops logs nothing, so "Quitting" stays the log's last line.
+      void server.stop();
       if (!loggedQuit) log.info("Quitting");
-      server.stop();
       loggedQuit = true;
     });
 

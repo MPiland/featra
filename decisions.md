@@ -251,3 +251,6 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - Git runs with `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and the other repo overrides removed from its env, so a
     caller's env (a git hook, for one) can't point it at another repository. A git error other than "not a git
     repository" (dubious ownership, for one) is shown as an error, not as an offer to run `git init`.
+  - A server main stops (on quit) logs nothing: not the stop, nor the child's exit, stderr or messages after it. The
+    stop is part of quitting, so "Quitting" stays the log's last line, right after the line that caused it (e2e checks
+    both). A server that exits on its own is still logged with its exit code.

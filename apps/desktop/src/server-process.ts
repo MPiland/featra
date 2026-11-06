@@ -14,7 +14,11 @@ export interface ServerProcess {
   endpoint: () => Promise<ServerEndpoint | null>;
   /** The folders the page may act on. Resolves once the server has the list. */
   setProjects: (dirs: string[]) => Promise<void>;
-  stop: () => void;
+  /**
+   * Stops the server. A stop main asked for is expected, so nothing about it is logged, neither now nor when the child
+   * exits: a quit's "Quitting" stays the log's last line. Resolves when the child has exited.
+   */
+  stop: () => Promise<void>;
 }
 
 export interface ServerProcessDeps {
@@ -32,6 +36,9 @@ const send = (child: ChildProcess, message: HostMessage) => child.connected && c
 interface Running {
   child: ChildProcess;
   ready: Promise<ServerEndpoint | null>;
+  exited: Promise<void>;
+  /** Stops logging what this child does: main has stopped it on purpose. */
+  silence: () => void;
 }
 
 export function createServerProcess({ script, execPath, log }: ServerProcessDeps): ServerProcess {
@@ -48,11 +55,14 @@ export function createServerProcess({ script, execPath, log }: ServerProcessDeps
       stdio: ["ignore", "ignore", "pipe", "ipc"],
       serialization: "json",
     });
+    let quiet = false;
+    const say = (message: string) => quiet || log(message);
+    const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()));
     child.stderr?.setEncoding("utf8");
-    child.stderr?.on("data", (text: string) => log(`Server: ${text.trim()}`));
+    child.stderr?.on("data", (text: string) => say(`Server: ${text.trim()}`));
     const ready = new Promise<ServerEndpoint | null>((resolve) => {
       const timer = setTimeout(() => {
-        log("Server didn't start in time");
+        say("Server didn't start in time");
         resolve(null);
       }, START_TIMEOUT_MS);
       const done = (endpoint: ServerEndpoint | null) => {
@@ -61,39 +71,39 @@ export function createServerProcess({ script, execPath, log }: ServerProcessDeps
       };
       child.on("message", (raw) => {
         const message = parseServerMessage(raw);
-        if (!message) return log("Server: ignored a malformed message");
+        if (!message) return say("Server: ignored a malformed message");
         switch (message.type) {
           case "listening":
-            log(`Server listening on ${SERVER_HOST}:${message.port}`);
+            say(`Server listening on ${SERVER_HOST}:${message.port}`);
             return done({ url: `ws://${SERVER_HOST}:${message.port}${SERVER_PATH}`, token });
           case "failed":
-            log(`Server failed to start: ${message.error}`);
+            say(`Server failed to start: ${message.error}`);
             return done(null);
           case "projects-ack":
             acks.get(message.seq)?.();
             acks.delete(message.seq);
             return;
           case "log":
-            return log(`Server: ${message.message}`);
+            return say(`Server: ${message.message}`);
           default:
             return message satisfies never;
         }
       });
       child.once("error", (err) => {
-        log(`Server process error: ${err.message}`);
+        say(`Server process error: ${err.message}`);
         done(null);
       });
       child.once("exit", (code, signal) => {
         if (running?.child === child) running = null;
         for (const ack of acks.values()) ack(); // nothing to wait for: a new server gets the list when it starts
         acks.clear();
-        log(`Server stopped (${signal ?? `exit code ${code}`})`);
+        say(`Server stopped (${signal ?? `exit code ${code}`})`);
         done(null);
       });
     });
     send(child, { type: "start", token });
     void sendProjects(child);
-    return { child, ready };
+    return { child, ready, exited, silence: () => (quiet = true) };
   }
 
   function sendProjects(child: ChildProcess): Promise<void> {
@@ -116,10 +126,14 @@ export function createServerProcess({ script, execPath, log }: ServerProcessDeps
       return sendProjects(current().child);
     },
     stop() {
-      const child = running?.child;
+      const stopping = running;
       running = null;
+      if (!stopping) return Promise.resolve();
+      stopping.silence();
       // Closing the IPC channel tells the server to close its sockets and exit.
-      if (child?.connected) child.disconnect();
+      if (stopping.child.connected) stopping.child.disconnect();
+      else if (stopping.child.exitCode === null) stopping.child.kill();
+      return stopping.exited;
     },
   };
 }

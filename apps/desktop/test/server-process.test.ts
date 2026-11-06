@@ -75,13 +75,24 @@ describe("the server child process", () => {
     expect(await setup.status(second)).toEqual({ state: "no-featra" });
   }, 20_000);
 
+  // Regression (STORY-2 review): the exit of a server main stopped was logged after "Quitting", which must stay last.
+  it("a stop main asks for logs nothing, then or when the child exits", async () => {
+    await server.endpoint();
+    const before = logged.length;
+    await server.stop(); // resolves once the child has exited
+    // A margin for a host whose stop doesn't wait for the exit: the exit line, if any, lands within it.
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    await server.stop();
+    expect(logged.slice(before)).toEqual([]);
+  }, 20_000);
+
   it("refuses a client with an old token, and a stopped server comes back on next use", async () => {
     const dir = await folder(true);
     await server.setProjects([dir]);
     const before = await server.endpoint();
     const live = client();
     expect(await serverSetup(live).status(dir)).toEqual({ state: "no-featra" });
-    server.stop();
+    void server.stop();
 
     const after = await server.endpoint();
     expect(after?.token).not.toBe(before?.token);
