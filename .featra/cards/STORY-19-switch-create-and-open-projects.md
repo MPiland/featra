@@ -2,7 +2,7 @@
 id: STORY-19
 type: story
 title: Switch, create and open projects
-status: In Review
+status: Done
 parent: FEAT-13
 order: 5
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:story-19
+  - at: 2026-11-06T16:09:31Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-06T16:09:31Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
