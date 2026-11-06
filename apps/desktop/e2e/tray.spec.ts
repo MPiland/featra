@@ -15,6 +15,7 @@ import {
   trayExists,
   trayMenuLabels,
   windowFocused,
+  windowInForeground,
   windowManagerCanMinimize,
   windowVisible,
 } from "./app.ts";
@@ -81,6 +82,7 @@ test.describe("AC6: close to tray", () => {
       await chooseTrayItem(app, "Show Featra");
       await expect.poll(() => windowVisible(app)).toBe(true);
       await expect.poll(() => windowFocused(app)).toBe(true);
+      await expect.poll(() => windowInForeground(app)).toBe(true); // in front for real, not only to Chromium
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Inbox"); // same window, not a new one
 
       const minimized = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.isMinimized());
@@ -97,6 +99,7 @@ test.describe("AC6: close to tray", () => {
       await expect.poll(() => windowVisible(app)).toBe(true);
       await expect.poll(minimized).toBe(false);
       await expect.poll(() => windowFocused(app)).toBe(true);
+      await expect.poll(() => windowInForeground(app)).toBe(true); // in front for real, not only to Chromium
     } finally {
       await app.close();
       await profile.dispose();
@@ -218,9 +221,10 @@ test.describe("AC6: close to tray", () => {
       await page.getByRole("button", { name: "Close window" }).click();
       await expect.poll(() => windowVisible(app)).toBe(false);
 
-      await launchAgain(profile.dir); // the second process hands over to the first and exits
+      await launchAgain(profile.dir, app); // the second process hands over to the first and exits
       await expect.poll(() => windowVisible(app)).toBe(true);
       await expect.poll(() => windowFocused(app)).toBe(true);
+      await expect.poll(() => windowInForeground(app)).toBe(true); // in front for real, not only to Chromium
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Inbox");
       expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
     } finally {
