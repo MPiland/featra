@@ -4,7 +4,7 @@ type: story
 title: Switch, create and open projects
 status: New
 parent: FEAT-13
-order: 2
+order: 5
 origin: planned
 role: developer
 agent: claude
