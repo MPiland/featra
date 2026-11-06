@@ -62,6 +62,8 @@ export async function launch(
 interface TestHooks {
   notices: string[];
   shownInFolder: string[];
+  folderPicks: string[];
+  folderDialogs: string[];
   tray?: { emit: (event: string) => void; isDestroyed: () => boolean };
   trayMenu?: { items: { label: string; click: () => void }[] };
 }
@@ -78,6 +80,14 @@ export const notices = (app: ElectronApplication) => app.evaluate(() => (globalT
 /** Files Help > Troubleshooting > Show Logs asked the OS to show in File Explorer. */
 export const shownInFolder = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.shownInFolder);
+/** Queues the folders the next folder dialogs return (Playwright can't drive the OS picker); then they cancel. */
+export const queueFolderPicks = (app: ElectronApplication, ...dirs: string[]) =>
+  app.evaluate((_e, picks) => {
+    (globalThis as MainGlobal).featraTest.folderPicks.push(...picks);
+  }, dirs);
+/** Titles of the folder dialogs Featra opened. */
+export const folderDialogs = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as MainGlobal).featraTest.folderDialogs);
 export const trayExists = (app: ElectronApplication) =>
   app.evaluate(() => {
     const tray = (globalThis as MainGlobal).featraTest.tray;

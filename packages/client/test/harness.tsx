@@ -11,6 +11,8 @@ import {
   type CloseToTraySupport,
   type FeatraBridge,
   type ProjectRef,
+  type ProjectsResult,
+  type ProjectsSnapshot,
   type SettingsSnapshot,
   type UiState,
   type WindowState,
@@ -18,11 +20,19 @@ import {
 } from "../src/bridge.ts";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
+/** Where New Project… suggests a folder by default. */
+export const LOCATION = "/home/me";
 
 export interface HostOptions {
   closeToTray?: CloseToTraySupport;
   /** The current project, or null for none. Default: PROJECT. */
   project?: ProjectRef | null;
+  /** Every known project. Default: the current one only. */
+  projects?: ProjectRef[];
+  /** Folders the folder dialog returns, in turn; then it is cancelled. */
+  folderPicks?: string[];
+  /** What the host answers to a switch, an open or a create, by folder: a refusal such as a folder that is gone. */
+  refusals?: Record<string, string>;
   /** What each project's config file overrides, by folder. */
   projectFiles?: Record<string, WorkOverrides>;
   /** A project whose config file can't be read: its error. */
@@ -32,6 +42,7 @@ export interface HostOptions {
 }
 
 const noop = () => {};
+const ref = (dir: string): ProjectRef => ({ dir, name: dir.split("/").at(-1) ?? dir });
 
 /** Fakes only the host platform: in-memory stores (userData, the projects' config files) and recorded window calls. */
 export function fakeBridge(platform = "win32", host: HostOptions = {}) {
@@ -45,6 +56,18 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     error: host.brokenProjects?.[dir] ?? null,
   });
   const calls: string[] = [];
+  const known: ProjectRef[] = [...(host.projects ?? (project ? [project] : []))];
+  let current = project;
+  const folderPicks = [...(host.folderPicks ?? [])];
+  const list = (): ProjectsSnapshot => ({ current, projects: [...known], location: LOCATION });
+  /** The host makes `dir` current (adding it to the list), unless a test made it refuse. */
+  const makeCurrent = async (dir: string): Promise<ProjectsResult> => {
+    const refusal = host.refusals?.[dir];
+    if (refusal) return { ok: false, error: refusal };
+    current = known.find((p) => p.dir === dir) ?? ref(dir);
+    if (!known.includes(current)) known.push(current);
+    return { ok: true, projects: list() };
+  };
   let windowState: WindowState = { ...DEFAULT_WINDOW_STATE };
   const listeners = new Set<(s: WindowState) => void>();
   let releaseWrites: () => void = noop;
@@ -72,8 +95,6 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       load: async (): Promise<SettingsSnapshot> => ({
         app: appSaves.at(-1) ?? DEFAULT_APP_SETTINGS,
         closeToTray: host.closeToTray === undefined ? { available: true, place: "tray" } : host.closeToTray,
-        currentProject: project,
-        projects: project ? [project] : [],
       }),
       saveApp: async (s) => void appSaves.push(s),
       loadProject: async (dir) => projectSettings(dir),
@@ -85,6 +106,26 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
         else next[key] = value;
         projectFiles.set(dir, normalizeWorkOverrides(next));
         return projectSettings(dir);
+      },
+    },
+    projects: {
+      list: async () => list(),
+      switchTo: async (dir) => {
+        calls.push(`switchTo:${dir}`);
+        return makeCurrent(dir);
+      },
+      openFolder: async () => {
+        calls.push("folderDialog:Open Folder");
+        const dir = folderPicks.shift();
+        return dir === undefined ? null : makeCurrent(dir);
+      },
+      chooseLocation: async (from) => {
+        calls.push(`folderDialog:Choose Location:${from}`);
+        return folderPicks.shift() ?? null;
+      },
+      create: async (location, name) => {
+        calls.push(`create:${location}:${name}`);
+        return makeCurrent(`${location}/${name.trim()}`);
       },
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.
@@ -111,6 +152,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     appSaves,
     projectFiles,
     calls,
+    list,
     setWindowState,
     releaseWrites: () => act(async () => releaseWrites()),
   };
@@ -141,11 +183,11 @@ export function renderApp(
           ? null
           : { available: true, place: opts.platform === "darwin" ? "dock" : "tray" }
         : opts.closeToTray,
-    currentProject: opts.project === undefined ? PROJECT : opts.project,
-    projects: opts.project === undefined ? [PROJECT] : opts.project ? [opts.project] : [],
   };
   const startupSaves = fake.appSaves.length;
-  render(<App bridge={fake.bridge} initialUiState={initial} initialSettings={snapshot} />);
+  render(
+    <App bridge={fake.bridge} initialUiState={initial} initialSettings={snapshot} initialProjects={fake.list()} />,
+  );
   const actions = () => fake.calls.slice(startupCalls(initial, app).length);
   /** App settings the UI saved after startup. */
   const appSaved = () => fake.appSaves.slice(startupSaves);

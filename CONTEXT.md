@@ -39,6 +39,13 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   - **Proven** — the AC's linked test passed.
   - **Accepted** — the user signed off.
 
+## Projects
+
+- **Project** — a folder Featra works in, normally holding `.featra/`. Featra keeps a list of known projects; one is
+  current, and Work, the chat list and Project settings follow it.
+- **Project switcher** — the control at the top of the sidebar that lists known projects and offers New Project…, Open
+  Folder… and Project Settings….
+
 ## Agents
 
 - **Session** — one running agent conversation inside Featra (e.g. a Claude Code session via the Agent SDK).

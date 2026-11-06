@@ -3,6 +3,8 @@ import {
   IPC,
   normalizeAppSettings,
   normalizeProjectSettings,
+  normalizeProjects,
+  normalizeProjectsResult,
   normalizeSettingsSnapshot,
   normalizeUiState,
   normalizeWindowState,
@@ -39,6 +41,20 @@ const bridge: FeatraBridge = {
     loadProject: async (dir) => normalizeProjectSettings(await ipcRenderer.invoke(IPC.settingsLoadProject, dir), dir),
     setProjectValue: async (dir, key, value) =>
       normalizeProjectSettings(await ipcRenderer.invoke(IPC.settingsSetProjectValue, dir, key, value), dir),
+  },
+  projects: {
+    list: async () => normalizeProjects(await ipcRenderer.invoke(IPC.projectsList)),
+    switchTo: async (dir) => normalizeProjectsResult(await ipcRenderer.invoke(IPC.projectsSwitch, dir)),
+    openFolder: async () => {
+      const result: unknown = await ipcRenderer.invoke(IPC.projectsOpenFolder);
+      return result === null ? null : normalizeProjectsResult(result);
+    },
+    chooseLocation: async (from) => {
+      const dir: unknown = await ipcRenderer.invoke(IPC.projectsChooseLocation, from);
+      return typeof dir === "string" && dir ? dir : null;
+    },
+    create: async (location, name) =>
+      normalizeProjectsResult(await ipcRenderer.invoke(IPC.projectsCreate, location, name)),
   },
   edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {

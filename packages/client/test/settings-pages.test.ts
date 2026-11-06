@@ -13,8 +13,6 @@ import {
 const snapshot = (closeToTray: SettingsSnapshot["closeToTray"]): SettingsSnapshot => ({
   app: DEFAULT_APP_SETTINGS,
   closeToTray,
-  currentProject: null,
-  projects: [],
 });
 
 describe("settings pages", () => {

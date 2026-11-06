@@ -24,8 +24,9 @@ test("app window: title bar, menu, sidebar; close to tray and reopen; Ctrl+B col
     await expect(bar.getByRole("heading", { level: 1 })).toHaveText("Work");
     await expect(page).toHaveTitle("Featra · Work");
 
-    // Sidebar: every entry is there and opens its view.
-    await expect(sidebar.getByRole("button")).toHaveText(ENTRIES);
+    // Sidebar: the project switcher (STORY-19), then every entry, which opens its view.
+    await expect(sidebar.getByRole("button")).toHaveText([/No project$/, ...ENTRIES]);
+    await expect(sidebar.getByRole("button").first()).toHaveAccessibleName("Switch project: No project");
     await sidebar.getByRole("button", { name: "Inbox" }).click();
     await expect(bar.getByRole("heading", { level: 1 })).toHaveText("Inbox");
     await bar.getByRole("button", { name: "Back" }).click();
@@ -79,7 +80,10 @@ test("app window: title bar, menu, sidebar; close to tray and reopen; Ctrl+B col
 
     // The toggle brings it back.
     await toggle2.click();
-    await expect(page.getByRole("navigation", { name: "Featra" }).getByRole("button")).toHaveText(ENTRIES);
+    await expect(page.getByRole("navigation", { name: "Featra" }).getByRole("button")).toHaveText([
+      /No project$/,
+      ...ENTRIES,
+    ]);
     await app.close();
   } finally {
     await profile.dispose();

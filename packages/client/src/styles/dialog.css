@@ -66,3 +66,53 @@
   outline: 2px solid var(--acc);
   outline-offset: 2px;
 }
+
+/* The confirm of a dialog that creates something. */
+.btn.primary {
+  background: var(--accbg);
+  border-color: var(--accbg);
+  color: #ffffff;
+}
+
+.btn.primary:hover {
+  filter: brightness(1.08);
+}
+
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* A dialog's fields: each label over its field. */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form label {
+  margin-top: 6px;
+  color: var(--tx2);
+  font-size: 12px;
+}
+
+.form .text-field {
+  width: 100%;
+}
+
+.form-row {
+  display: flex;
+  gap: 8px;
+}
+
+.form-row .text-field {
+  flex: 1;
+  min-width: 0;
+}
+
+.dialog .form-error {
+  min-height: 18px;
+  margin: 2px 0 0;
+  color: var(--bad);
+  font-size: 12px;
+}

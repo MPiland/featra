@@ -10,7 +10,7 @@ export function ShortcutsPage({ shortcuts }: { shortcuts: readonly ShortcutEntry
     <>
       <input
         type="search"
-        className="settings-search"
+        className="text-field settings-search"
         aria-label="Search shortcuts"
         placeholder="Search shortcuts"
         value={query}

@@ -86,7 +86,9 @@
 }
 
 /* In a menu with a checkmark item, every label lines up after the checkmark's column. */
-.menu:has(> [role="none"] > [role="menuitemcheckbox"]) > [role="none"] > .mi:not([role="menuitemcheckbox"]) {
+.menu:has(> [role="none"] > :is([role="menuitemcheckbox"], [role="menuitemradio"]))
+  > [role="none"]
+  > .mi:not([role="menuitemcheckbox"], [role="menuitemradio"]) {
   padding-left: 32px;
 }
 
@@ -98,4 +100,12 @@
 
 .mi[aria-disabled="true"] .k {
   color: var(--tx3);
+}
+
+/* The project switcher's menu: under the switcher, as wide as the sidebar allows. */
+.menu.proj-menu {
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 0;
 }

@@ -92,12 +92,12 @@ describe("AC2: collapsing the sidebar", () => {
 });
 
 describe("AC3: sidebar entries", () => {
-  it("lists Work, Inbox, Artifacts, Plugins and Settings", () => {
+  it("lists Work, Inbox, Artifacts, Plugins and Settings, under the project switcher (STORY-19)", () => {
     renderApp();
     const names = within(sidebar())
       .getAllByRole("button")
-      .map((b) => b.textContent);
-    expect(names).toEqual(ENTRIES);
+      .map((b) => b.getAttribute("aria-label") ?? b.textContent);
+    expect(names).toEqual(["Switch project: manager", ...ENTRIES]);
   });
 
   it("reaches and opens every entry with Tab and Enter", async () => {

@@ -1,14 +1,23 @@
 import type { EditCommand } from "./bridge.ts";
+import { PROJECT_LABELS } from "./projects.ts";
 import { shortcutLabel, type ShortcutId } from "./shortcuts.ts";
 import { viewDef, VIEWS, type ViewId } from "./views.ts";
 
 export type MenuNode =
   | { kind: "item"; id: string; label: string; shortcut?: string; disabled?: boolean; onSelect: () => void }
   | { kind: "check"; id: string; label: string; shortcut?: string; checked: boolean; onSelect: () => void }
+  /** One of a set of choices, such as a project in the project switcher. */
+  | { kind: "radio"; id: string; label: string; shortcut?: string; checked: boolean; onSelect: () => void }
   | { kind: "submenu"; id: string; label: string; items: MenuNode[] }
   | { kind: "separator"; id: string };
 
 export interface MenuActions {
+  /** Opens the New Project dialog. */
+  newProject: () => void;
+  /** Asks for a folder and opens it as a project. */
+  openFolder: () => void;
+  /** Opens Settings on the current project's page. */
+  projectSettings: () => void;
   openSettings: () => void;
   /** Opens Settings on its Keyboard shortcuts page. */
   showKeyboardShortcuts: () => void;
@@ -52,8 +61,8 @@ const fileManager = (platform: string) =>
 
 /**
  * The title bar's Menu, modelled on Claude's desktop app: File, Edit, View, Go, Help, in Title Case. Items that
- * aren't built yet are left out, not greyed; later stories add theirs (New Chat, New Project…, Open Folder…, pane
- * toggles, Find, Previous/Next Chat). Only Back and Forward grey out, when there's nowhere to go.
+ * aren't built yet are left out, not greyed; later stories add theirs (New Chat, pane toggles, Find, Previous/Next
+ * Chat). Only Back and Forward grey out, when there's nowhere to go.
  */
 export function buildAppMenu({
   platform,
@@ -72,7 +81,18 @@ export function buildAppMenu({
   const edit = (command: EditCommand, label: string): MenuNode =>
     item(`edit.${command}`, label, () => a.edit(command), command === "delete" ? undefined : command);
 
-  const file: MenuNode[] = [item("file.settings", "Settings…", a.openSettings, "settings")];
+  // A browser tab has no folders to open or create.
+  const file: MenuNode[] = inWindow
+    ? [
+        item("file.newProject", PROJECT_LABELS.newProject, a.newProject, "newProject"),
+        item("file.openFolder", PROJECT_LABELS.openFolder, a.openFolder, "openFolder"),
+        sep("file.sep0"),
+      ]
+    : [];
+  file.push(
+    item("file.projectSettings", PROJECT_LABELS.projectSettings, a.projectSettings, "projectSettings"),
+    item("file.settings", "Settings…", a.openSettings, "settings"),
+  );
   if (inWindow) {
     file.push(
       sep("file.sep1"),

@@ -11,7 +11,7 @@ export const labels = (menu: HTMLElement) =>
   Array.from(menu.querySelectorAll<HTMLElement>("[role^=menuitem]"))
     .filter((i) => i.closest("[role=menu]") === menu)
     .map((i) => i.textContent);
-export const item = (name: string | RegExp) =>
+export const item = (name: string | RegExp | ((accessibleName: string) => boolean)) =>
   screen.queryByRole("menuitem", { name }) ?? screen.getByRole("menuitemcheckbox", { name });
 
 /** Opens the menu (if closed) and hovers through the named submenus. */

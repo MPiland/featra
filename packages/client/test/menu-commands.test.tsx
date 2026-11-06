@@ -209,7 +209,8 @@ describe("AC5: app menu", () => {
   it("in a plain browser tab, lists only what works there: no Close Window, Exit, Full Screen or Troubleshooting", async () => {
     const { user, actions } = renderApp({ platform: "web" });
     await openPath(user, "File");
-    expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,"]);
+    // A tab has no folders to create or open; Project Settings… still opens the Project page (STORY-19).
+    expect(labels(menuAt(1))).toEqual(["Project Settings…Ctrl+Shift+,", "Settings…Ctrl+,"]);
     await user.hover(item("View"));
     expect(labels(menuAt(1))).toEqual([
       "SidebarCtrl+B",
@@ -221,6 +222,9 @@ describe("AC5: app menu", () => {
     await user.hover(item("Help"));
     expect(labels(menuAt(1))).toEqual(["Keyboard ShortcutsCtrl+/", "About Featra"]);
     await user.keyboard("{Escape}{Escape}{F11}{Control>}{Shift>}W{/Shift}{/Control}");
-    expect(actions()).toEqual([]); // the browser keeps its own F11; a tab has no window to close
+    await user.keyboard("{Control>}o{/Control}{Control>}{Shift>}N{/Shift}{/Control}");
+    // The browser keeps its own F11, Ctrl+O and Ctrl+Shift+N; a tab has no window to close.
+    expect(actions()).toEqual([]);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

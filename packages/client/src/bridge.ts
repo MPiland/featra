@@ -14,10 +14,12 @@ import {
   type WorkSettingKey,
   type WorkSettings,
 } from "./settings.ts";
+import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./projects.ts";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
+export * from "./projects.ts";
 export * from "./settings.ts";
 
 /** Window chrome state that survives a restart. The theme is an app setting (Settings > Appearance), not chrome. */
@@ -110,6 +112,18 @@ export interface FeatraBridge {
       value: WorkSettings[K] | null,
     ) => Promise<ProjectSettings>;
   };
+  readonly projects: {
+    /** The known projects and the current one. */
+    list: () => Promise<ProjectsSnapshot>;
+    /** Makes a known project the current one. */
+    switchTo: (dir: string) => Promise<ProjectsResult>;
+    /** Asks for a folder (the OS folder dialog), adds it and switches to it. Null when the user cancels. */
+    openFolder: () => Promise<ProjectsResult | null>;
+    /** Asks for a folder to create a new project in, starting at `from`. Null when the user cancels. */
+    chooseLocation: (from: string) => Promise<string | null>;
+    /** Creates the folder `name` in `location`, adds it and switches to it. */
+    create: (location: string, name: string) => Promise<ProjectsResult>;
+  };
   edit: (command: EditCommand) => void;
   readonly app: {
     info: () => Promise<AppInfo>;
@@ -149,6 +163,11 @@ export const IPC = {
   settingsSaveApp: "settings:save-app",
   settingsLoadProject: "settings:load-project",
   settingsSetProjectValue: "settings:set-project-value",
+  projectsList: "projects:list",
+  projectsSwitch: "projects:switch",
+  projectsOpenFolder: "projects:open-folder",
+  projectsChooseLocation: "projects:choose-location",
+  projectsCreate: "projects:create",
 } as const;
 
 declare global {
@@ -160,8 +179,9 @@ declare global {
 const STORAGE_KEY = "featra.ui-state";
 const SETTINGS_KEY = "featra.settings";
 
-const noProject = (dir: string): ProjectSettings =>
-  normalizeProjectSettings({ error: "No project folder in a browser tab." }, dir);
+const NO_FOLDERS = "No project folder in a browser tab.";
+const noProject = (dir: string): ProjectSettings => normalizeProjectSettings({ error: NO_FOLDERS }, dir);
+const noFolders: ProjectsResult = { ok: false, error: NO_FOLDERS };
 
 /**
  * Used when the UI runs in a plain browser: state lives in localStorage and there is no window to control, nor a
@@ -202,13 +222,19 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       setTheme() {},
     },
     settings: {
-      load: async () =>
-        normalizeSettingsSnapshot({ app: readSettings(), closeToTray: null, currentProject: null, projects: [] }),
+      load: async () => normalizeSettingsSnapshot({ app: readSettings(), closeToTray: null }),
       async saveApp(settings) {
         storage.setItem(SETTINGS_KEY, JSON.stringify(normalizeAppSettings(settings)));
       },
       loadProject: async (dir) => noProject(dir),
       setProjectValue: async (dir) => noProject(dir),
+    },
+    projects: {
+      list: async () => ({ ...EMPTY_PROJECTS }),
+      switchTo: async () => noFolders,
+      openFolder: async () => noFolders,
+      chooseLocation: async () => null,
+      create: async () => noFolders,
     },
     edit: (command) => {
       document.execCommand(command);

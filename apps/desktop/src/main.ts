@@ -4,7 +4,8 @@ import { registerIpc } from "./ipc.ts";
 import { createLifecycle } from "./lifecycle.ts";
 import { createLog } from "./log.ts";
 import { setNativeMenu } from "./native-menu.ts";
-import { createSettingsStore, findProject } from "./settings-store.ts";
+import { createProjectRegistry, findProject } from "./project-registry.ts";
+import { createSettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 import { createTray, destroyTray, trayAvailable } from "./tray.ts";
 import { createAppStateStore, createUiStateStore } from "./ui-state-store.ts";
@@ -37,6 +38,12 @@ if (!app.requestSingleInstanceLock()) {
   const appState = createAppStateStore(app.getPath("userData"));
   const settingsStore = createSettingsStore(app.getPath("userData"));
   const log = createLog(join(app.getPath("userData"), "logs"));
+  // Not among Reset App Data's stores: the user's projects are kept.
+  const projects = createProjectRegistry({
+    dir: app.getPath("userData"),
+    platform: process.platform,
+    fallbackLocation: app.getPath("documents"),
+  });
   log.info(`Featra ${app.getVersion()} started (${process.platform})`);
   let win: BrowserWindow | undefined;
   let tray: Tray | undefined;
@@ -44,12 +51,13 @@ if (!app.requestSingleInstanceLock()) {
   void app.whenReady().then(async () => {
     if (process.platform === "win32") app.setAppUserModelId("dev.featra.app"); // notifications need it on Windows
     setNativeMenu();
-    const [remembered, hasTray, stored, project] = await Promise.all([
+    const [remembered, hasTray, stored] = await Promise.all([
       appState.load(),
       trayAvailable(),
       settingsStore.load(),
-      findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR),
+      findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR).then(projects.start),
     ]);
+    const project = projects.current();
     let appSettings = stored;
     if (process.platform !== "darwin") log.info(hasTray ? "Tray available" : "No tray: close quits");
     log.info(project ? `Project: ${project.dir}` : "No project");
@@ -75,10 +83,10 @@ if (!app.requestSingleInstanceLock()) {
       store,
       lifecycle,
       log,
+      projects,
       settings: {
         store: settingsStore,
         current: () => appSettings,
-        project,
         async apply(next) {
           const closeChanged = next.closeButton !== appSettings.closeButton;
           appSettings = next;
@@ -138,7 +146,13 @@ if (!app.requestSingleInstanceLock()) {
     e.preventDefault();
     if (exiting) return;
     exiting = true;
-    void Promise.all([store.flush(), appState.flush(), settingsStore.flush(), log.flush()]).finally(() => app.exit(0));
+    void Promise.all([
+      store.flush(),
+      appState.flush(),
+      settingsStore.flush(),
+      projects.store.flush(),
+      log.flush(),
+    ]).finally(() => app.exit(0));
   });
 
   // Only reached when close-to-tray is off or the app is quitting.

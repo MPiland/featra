@@ -106,3 +106,13 @@
   background: var(--line);
   margin: 0 6px;
 }
+
+/* The current project after the view title: "Work · manager". */
+.ttl-proj {
+  margin-left: -6px;
+  font-size: 13px;
+  color: var(--tx2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

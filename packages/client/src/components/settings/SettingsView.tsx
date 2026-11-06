@@ -1,5 +1,6 @@
 import type { FeatraBridge } from "../../bridge.ts";
 import type { ShortcutEntry } from "../../menu.ts";
+import type { ProjectsSnapshot } from "../../projects.ts";
 import type { AppSettings, SettingsSnapshot } from "../../settings.ts";
 import { SCOPE_TITLES, settingsPages, type SettingsPage, type SettingsScope } from "../../settings-pages.ts";
 import { AppearancePage } from "./AppearancePage.tsx";
@@ -12,6 +13,9 @@ import { WorkDefaultsPage } from "./WorkDefaultsPage.tsx";
 export interface SettingsViewProps {
   bridge: FeatraBridge;
   snapshot: SettingsSnapshot;
+  projects: ProjectsSnapshot;
+  /** Changes when the Project page should start over on the current project. */
+  projectKey: string;
   page: SettingsPage;
   onPage: (page: SettingsPage) => void;
   onAppChange: (settings: AppSettings) => void;
@@ -21,7 +25,8 @@ export interface SettingsViewProps {
 const SCOPES: readonly SettingsScope[] = ["app", "project"];
 
 /** Settings: the page list, by scope, and the chosen page. */
-export function SettingsView({ bridge, snapshot, page, onPage, onAppChange, shortcuts }: SettingsViewProps) {
+export function SettingsView(props: SettingsViewProps) {
+  const { bridge, snapshot, projects, projectKey, page, onPage, onAppChange, shortcuts } = props;
   const pages = settingsPages(snapshot);
   const current = pages.find((p) => p.id === page) ?? pages[0];
   return (
@@ -54,7 +59,13 @@ export function SettingsView({ bridge, snapshot, page, onPage, onAppChange, shor
       <section className="settings-page" aria-labelledby="settings-page-title">
         <div className="settings-content">
           {current?.id === "project" ? (
-            <ProjectPage bridge={bridge} snapshot={snapshot} title={current.title} />
+            <ProjectPage
+              key={projectKey}
+              bridge={bridge}
+              snapshot={snapshot}
+              projects={projects}
+              title={current.title}
+            />
           ) : (
             current && (
               <>

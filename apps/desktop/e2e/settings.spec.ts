@@ -121,7 +121,7 @@ test.describe("STORY-20: Settings", () => {
       await page.keyboard.press("Control+,");
       await pages(page).getByRole("list", { name: "Project" }).getByRole("button", { name: "Workflow" }).click();
       const name = project.dir.split(/[\\/]/).at(-1)!;
-      const picker = page.getByRole("button", { name: `Project: ${name}` });
+      const picker = page.getByRole("button", { name: `Project: ${name}`, exact: true });
       await picker.click();
       await expect(page.getByRole("listbox", { name: "Project" }).getByRole("option")).toHaveText([name]);
       await page.keyboard.press("Escape");
