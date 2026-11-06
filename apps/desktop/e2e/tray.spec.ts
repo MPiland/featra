@@ -19,6 +19,7 @@ import {
   windowManagerCanMinimize,
   windowVisible,
 } from "./app.ts";
+import { busyUserInFront } from "./foreground.ts";
 
 /**
  * AC6 in the real app. The tray icon is Electron's real Tray; only the OS side of it is driven from the test
@@ -74,11 +75,13 @@ test.describe("AC6: close to tray", () => {
   test("the tray's Show Featra and a tray click restore and focus the window", async () => {
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
+    let busy: { dispose: () => void } | undefined;
     try {
       await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Inbox" }).click();
       await page.getByRole("button", { name: "Close window" }).click();
       await expect.poll(() => windowVisible(app)).toBe(false);
 
+      busy = await busyUserInFront(); // someone is working in another app: Windows' foreground lock is on
       await chooseTrayItem(app, "Show Featra");
       await expect.poll(() => windowVisible(app)).toBe(true);
       await expect.poll(() => windowFocused(app)).toBe(true);
@@ -101,6 +104,7 @@ test.describe("AC6: close to tray", () => {
       await expect.poll(() => windowFocused(app)).toBe(true);
       await expect.poll(() => windowInForeground(app)).toBe(true); // in front for real, not only to Chromium
     } finally {
+      busy?.dispose();
       await app.close();
       await profile.dispose();
     }
@@ -216,11 +220,13 @@ test.describe("AC6: close to tray", () => {
   test("launching Featra again shows the running app's window instead of starting a second app", async () => {
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
+    let busy: { dispose: () => void } | undefined;
     try {
       await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Inbox" }).click();
       await page.getByRole("button", { name: "Close window" }).click();
       await expect.poll(() => windowVisible(app)).toBe(false);
 
+      busy = await busyUserInFront(); // someone is working in another app: Windows' foreground lock is on
       await launchAgain(profile.dir, app); // the second process hands over to the first and exits
       await expect.poll(() => windowVisible(app)).toBe(true);
       await expect.poll(() => windowFocused(app)).toBe(true);
@@ -228,6 +234,7 @@ test.describe("AC6: close to tray", () => {
       await expect(page.getByRole("heading", { level: 1 })).toHaveText("Inbox");
       expect(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
     } finally {
+      busy?.dispose();
       await app.close();
       await profile.dispose();
     }

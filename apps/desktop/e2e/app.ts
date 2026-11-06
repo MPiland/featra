@@ -86,7 +86,7 @@ export async function windowInForeground(app: ElectronApplication): Promise<bool
     if (buf === undefined) return undefined;
     return (buf.length >= 8 ? buf.readBigUInt64LE() : BigInt(buf.readUInt32LE())).toString();
   });
-  return handle !== undefined && foregroundWindow() === BigInt(handle);
+  return handle !== undefined && (await foregroundWindow()) === BigInt(handle);
 }
 /** Featra's main process, which owns its windows. */
 const mainPid = (app: ElectronApplication) => app.evaluate(() => process.pid);
@@ -115,7 +115,7 @@ export const trayExists = (app: ElectronApplication) =>
  * Electron emits `click` on the real Tray.
  */
 export async function clickTray(app: ElectronApplication) {
-  grantForeground(await mainPid(app));
+  await grantForeground(await mainPid(app));
   await app.evaluate(() => {
     (globalThis as MainGlobal).featraTest.tray!.emit("click");
   });
@@ -127,7 +127,7 @@ export const trayMenuLabels = (app: ElectronApplication) =>
  * which lets Featra take the foreground (faked: see foreground.ts).
  */
 export async function chooseTrayItem(app: ElectronApplication, label: string) {
-  grantForeground(await mainPid(app));
+  await grantForeground(await mainPid(app));
   await app.evaluate((_e, wanted) => {
     (globalThis as MainGlobal).featraTest.trayMenu!.items.find((i) => i.label === wanted)!.click();
   }, label);
@@ -181,7 +181,7 @@ export const exited = (app: ElectronApplication) =>
  * grant (see foreground.ts).
  */
 export async function launchAgain(userDataDir: string, running: ElectronApplication): Promise<number | null> {
-  grantForeground(await mainPid(running));
+  await grantForeground(await mainPid(running));
   const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", FEATRA_PROJECT_DIR: "" } as Record<
     string,
     string
