@@ -1,0 +1,82 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "jsx-a11y", "import", "unicorn", "oxc", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "env": { "browser": true, "node": true, "es2024": true },
+  "ignorePatterns": ["**/dist/**", "**/lint-fixtures/**", "spikes/**"],
+  "rules": {
+    "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
+    "no-console": "error",
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/react-in-jsx-scope": "off",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/no-duplicates": "error"
+  },
+  "overrides": [
+    {
+      "files": ["packages/work-format/**"],
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "react", "message": "work-format is pure domain logic: no React (ADR 0011)." },
+              { "name": "react-dom", "message": "work-format is pure domain logic: no React (ADR 0011)." },
+              { "name": "electron", "message": "work-format is pure domain logic: no Electron (ADR 0011)." }
+            ],
+            "patterns": [
+              {
+                "group": ["react/*", "react-dom/*"],
+                "message": "work-format is pure domain logic: no React (ADR 0011)."
+              },
+              {
+                "group": ["@featra/*"],
+                "message": "Dependencies point toward work-format, never out of it (ADR 0011)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/client/**"],
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "electron", "message": "client reaches the platform only through FeatraBridge (ADR 0011)." }
+            ],
+            "patterns": [
+              {
+                "group": ["electron/*"],
+                "message": "client reaches the platform only through FeatraBridge (ADR 0011)."
+              },
+              {
+                "group": ["@featra/desktop", "@featra/desktop/*"],
+                "message": "Dependencies point toward work-format (ADR 0011)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/test/**", "**/e2e/**", "**/*.test.ts", "**/*.test.tsx", "**/*.config.ts"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off"
+      }
+    }
+  ]
+}

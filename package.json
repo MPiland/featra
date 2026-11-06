@@ -1,12 +1,9 @@
 {
   "name": "featra",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "license": "MIT",
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
   "scripts": {
     "start": "pnpm --filter @featra/desktop start",
     "dev:client": "pnpm --filter @featra/client dev",
@@ -14,11 +11,21 @@
     "test:unit": "vitest run",
     "test:e2e": "pnpm --filter @featra/desktop test:e2e",
     "test:watch": "vitest",
-    "typecheck": "pnpm -r --if-present run typecheck"
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives",
+    "format": "oxfmt",
+    "format:check": "oxfmt --check",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
+    "oxfmt": "^0.76.0",
+    "oxlint": "^1.91.0",
+    "oxlint-tsgolint": "^7.0.2005",
     "typescript": "^7.0.2",
     "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }

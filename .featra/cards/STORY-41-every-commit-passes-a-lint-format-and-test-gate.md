@@ -2,7 +2,7 @@
 id: STORY-41
 type: story
 title: Every commit passes a lint, format and test gate
-status: New
+status: In Progress
 parent: FEAT-13
 order: 4
 origin: added
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-06T05:11:03Z
+    field: status
+    from: New
+    to: In Progress
+    by: claude
 ---
 
 ## Description
