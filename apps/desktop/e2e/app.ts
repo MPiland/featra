@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from "node:child_process";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,12 +15,28 @@ export async function tempUserData(): Promise<{ dir: string; dispose: () => Prom
   return { dir, dispose: () => rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }) }; // Electron helpers can hold files briefly after exit
 }
 
+/** A temporary project folder holding `.featra/config.yaml` with `config`: the project Featra opens. */
+export async function tempProject(config: string): Promise<{ dir: string; config: string; dispose: () => Promise<void> }> {
+  const dir = await mkdtemp(join(tmpdir(), "featra-project-"));
+  await mkdir(join(dir, ".featra"));
+  const file = join(dir, ".featra", "config.yaml");
+  await writeFile(file, config, "utf8");
+  return { dir, config: file, dispose: () => rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }) };
+}
+
 /** Launches the built app (run `pnpm --filter @featra/desktop build` first; `test:e2e` does). */
 export async function launch(
   userDataDir: string,
   extraEnv: Record<string, string> = {},
 ): Promise<{ app: ElectronApplication; page: Page }> {
-  const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", ...extraEnv } as Record<string, string>;
+  // No project unless a test gives one: Featra would otherwise find this repo's own .featra from the working folder.
+  const env = {
+    ...process.env,
+    FEATRA_USER_DATA_DIR: userDataDir,
+    FEATRA_E2E: "1",
+    FEATRA_PROJECT_DIR: "",
+    ...extraEnv,
+  } as Record<string, string>;
   delete env.FEATRA_CLIENT_URL;
   delete env.ELECTRON_RUN_AS_NODE;
   const app = await electron.launch({
@@ -115,7 +131,7 @@ export const exited = (app: ElectronApplication) =>
 
 /** Starts Featra a second time on the same profile, as the Start menu would; resolves when that process ends. */
 export function launchAgain(userDataDir: string): Promise<number | null> {
-  const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1" } as Record<string, string>;
+  const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", FEATRA_PROJECT_DIR: "" } as Record<string, string>;
   delete env.FEATRA_CLIENT_URL;
   delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(electronPath as unknown as string, [appDir], { env, stdio: "ignore" });

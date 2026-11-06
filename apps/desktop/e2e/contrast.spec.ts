@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { launch, tempUserData } from "./app.ts";
+import { launch, tempProject, tempUserData } from "./app.ts";
 import { contrast, luminance, parseCssColor, resolve, sampleRenderedText, tokenColours } from "./contrast.ts";
 
 /**
@@ -31,7 +31,8 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
   for (const scheme of ["dark", "light"] as const) {
     test(`${scheme}`, async () => {
       const profile = await tempUserData();
-      const { app, page } = await launch(profile.dir);
+      const project = await tempProject("version: 1\nprogress: tasks\n");
+      const { app, page } = await launch(profile.dir, { FEATRA_PROJECT_DIR: project.dir });
       try {
         await page.emulateMedia({ colorScheme: scheme });
 
@@ -48,6 +49,30 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name }).click();
           problems.push(...(await failures(page)));
         }
+        // Every Settings page (STORY-20), the project page showing an override with its mark and Reset button, and
+        // its project list open.
+        const settingsPages = [
+          ["App", "General"],
+          ["App", "Appearance"],
+          ["App", "Workflow"],
+          ["App", "Keyboard shortcuts"],
+          ["Project", "Workflow"],
+        ] as const;
+        for (const [scope, name] of settingsPages) {
+          await page
+            .getByRole("navigation", { name: "Settings pages" })
+            .getByRole("list", { name: scope })
+            .getByRole("button", { name, exact: true })
+            .click();
+          await expect(page.getByRole("heading", { name, level: 2 })).toBeVisible();
+          if (scope === "Project") await expect(page.getByText(/^Overridden/)).toBeVisible();
+          problems.push(...(await failures(page, { text: 6, icon: 4 })));
+        }
+        await page.getByRole("button", { name: /^Project: / }).click();
+        await expect(page.getByRole("listbox", { name: "Project" })).toBeVisible();
+        problems.push(...(await failures(page, { text: 6, icon: 4 })));
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("listbox")).toHaveCount(0);
         const menuItem = (name: string | RegExp) => page.getByRole("menuitem", { name, exact: typeof name === "string" });
         for (const path of [["File"], ["Edit"], ["View"], ["Go"], ["Help", "Troubleshooting"]]) {
           await page.getByRole("button", { name: "Menu" }).click();
@@ -90,6 +115,7 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
       } finally {
         await app.close();
         await profile.dispose();
+        await project.dispose();
       }
     });
   }

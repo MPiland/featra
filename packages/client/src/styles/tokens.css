@@ -1,0 +1,86 @@
+/*
+ * Colour tokens. Layout and dark palette follow docs/mockups/app.html; the light palette mirrors it.
+ * Every text and status colour must meet WCAG AA (4.5:1) on the surfaces it sits on, in both themes:
+ * apps/desktop/e2e/contrast.spec.ts measures the rendered result.
+ */
+:root {
+  color-scheme: light;
+  --bg: #fbfbfa;
+  --side: #f2f2f1;
+  --row: #e7e7e8;
+  --row2: #dcdcde;
+  --line: #e0e0e2;
+  --tx: #1c1c1e;
+  --tx2: #4a4a50;
+  --tx3: #5f5f66;
+  --acc: #2f5bd0;
+  --accbg: #3b5fcc;
+  --ok: #186f3f;
+  --warn: #8a5700;
+  --bad: #b8322a;
+  --pur: #6a4fcf;
+  --menu: #ffffff;
+  --menu-line: #dcdcde;
+  --menu-hover: #ececed;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.16);
+  --tip-bg: #1c1c1e;
+  --tip-tx: #ffffff;
+  --close-hover: #c42b1c;
+  --scrim: rgba(0, 0, 0, 0.32);
+}
+
+/*
+ * Theme: System follows prefers-color-scheme; a stored Light or Dark (Settings > Appearance, STORY-20) pins it
+ * with data-theme on <html> (src/theme.ts). The dark block appears twice because CSS cannot share it between the two selectors.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #1c1c1e;
+    --side: #161617;
+    --row: #262628;
+    --row2: #2e2e31;
+    --line: #2c2c2f;
+    --tx: #ececee;
+    --tx2: #a9a9ae;
+    --tx3: #8a8a90;
+    --acc: #7aa2ff;
+    --accbg: #3b5fcc;
+    --ok: #6fcf97;
+    --warn: #e7b65a;
+    --bad: #f0918a;
+    --pur: #b9a3ff;
+    --menu: #2a2a2d;
+    --menu-line: #38383c;
+    --menu-hover: #38383c;
+    --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    --tip-bg: #000000;
+    --tip-tx: #ffffff;
+    --scrim: rgba(0, 0, 0, 0.55);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #1c1c1e;
+  --side: #161617;
+  --row: #262628;
+  --row2: #2e2e31;
+  --line: #2c2c2f;
+  --tx: #ececee;
+  --tx2: #a9a9ae;
+  --tx3: #8a8a90;
+  --acc: #7aa2ff;
+  --accbg: #3b5fcc;
+  --ok: #6fcf97;
+  --warn: #e7b65a;
+  --bad: #f0918a;
+  --pur: #b9a3ff;
+  --menu: #2a2a2d;
+  --menu-line: #38383c;
+  --menu-hover: #38383c;
+  --shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  --tip-bg: #000000;
+  --tip-tx: #ffffff;
+  --scrim: rgba(0, 0, 0, 0.55);
+}

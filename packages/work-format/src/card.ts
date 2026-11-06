@@ -155,9 +155,18 @@ function parseBody(body: string): ParsedBody {
 
 function parseChecklist(content: string): ChecklistItem[] {
   const items: ChecklistItem[] = [];
+  let last: ChecklistItem | undefined;
   for (const line of content.split("\n")) {
     const m = /^\s*[-*] \[( |x|X)\] (.*)$/.exec(line);
-    if (m) items.push({ done: m[1] !== " ", text: m[2]!.trim() });
+    if (m) {
+      last = { done: m[1] !== " ", text: m[2]!.trim() };
+      items.push(last);
+    } else if (last && /^\s+\S/.test(line)) {
+      // An indented line continues the item above it, as in Markdown; it is written back unwrapped.
+      last.text = `${last.text} ${line.trim()}`;
+    } else {
+      last = undefined;
+    }
   }
   return items;
 }

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { ConfigError, DEFAULT_CONFIG, isKnownStatus, parseConfig, serializeConfig, stageCategory } from "../src/index.ts";
+import {
+  ConfigError,
+  configOverrides,
+  DEFAULT_CONFIG,
+  isKnownStatus,
+  parseConfig,
+  serializeConfig,
+  setConfigValue,
+  stageCategory,
+} from "../src/index.ts";
 
 describe("config", () => {
   it("fills defaults for missing keys and ignores unknown ones", () => {
@@ -29,5 +38,57 @@ describe("config", () => {
     expect(stageCategory("Cancelled", DEFAULT_CONFIG)).toBeNull();
     expect(isKnownStatus("Cancelled", DEFAULT_CONFIG)).toBe(true);
     expect(isKnownStatus("Shipped", DEFAULT_CONFIG)).toBe(false);
+  });
+});
+
+describe("STORY-20: project overrides of the app-wide defaults", () => {
+  const appDefaults = { ...DEFAULT_CONFIG, progress: "tasks" as const, requireAccept: false };
+
+  it("keys the file leaves out come from the app-wide defaults; keys it sets override them", () => {
+    expect(parseConfig("worktrees: false\n", appDefaults)).toEqual({ ...appDefaults, worktrees: false });
+    expect(parseConfig("progress: stories\n", appDefaults).progress).toBe("stories");
+  });
+
+  it("lists only the keys the file sets as overrides", () => {
+    expect(configOverrides("# Featra project settings\nversion: 1\nrequireAccept: false\nhierarchy: x\n")).toEqual({
+      version: 1,
+      requireAccept: false,
+    });
+    expect(configOverrides("")).toEqual({});
+  });
+
+  it.each([
+    ["a non-boolean switch", "requireAccept: yes-please"],
+    ["an unknown knowledge permission", "knowledge: everything"],
+    ["a list instead of settings", "- a\n- b"],
+  ])("rejects %s", (_, text) => {
+    expect(() => configOverrides(text)).toThrow(ConfigError);
+  });
+
+  it("sets a key in place, keeping comments, key order and keys Featra doesn't know (a comment keeps one space before it)", () => {
+    const text = "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: stories        # stories | tasks\nmcp: true\n";
+    expect(setConfigValue(text, "progress", "tasks")).toBe(
+      "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: tasks # stories | tasks\nmcp: true\n",
+    );
+    expect(setConfigValue(text, "requireAccept", false)).toBe(
+      "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: stories # stories | tasks\nmcp: true\nrequireAccept: false\n",
+    );
+  });
+
+  it("removing a key lets the app-wide default apply again", () => {
+    const text = setConfigValue("version: 1\nprogress: tasks\nmcp: true\n", "progress", undefined);
+    expect(text).toBe("version: 1\nmcp: true\n");
+    expect(parseConfig(text, appDefaults).progress).toBe("tasks");
+    expect(configOverrides(text)).not.toHaveProperty("progress");
+  });
+
+  it("starts a new file with the header when the project has none yet", () => {
+    expect(setConfigValue("", "worktrees", false)).toBe("# Featra project settings\nversion: 1\nworktrees: false\n");
+  });
+
+  it("refuses to edit a file that isn't valid, or to write a value that isn't", () => {
+    expect(() => setConfigValue("progress: [", "worktrees", false)).toThrow(ConfigError);
+    expect(() => setConfigValue("progress: effort\n", "worktrees", false)).toThrow(ConfigError);
+    expect(() => setConfigValue("", "knowledge", "everything" as never)).toThrow(ConfigError);
   });
 });

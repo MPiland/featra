@@ -61,16 +61,17 @@ describe("AC2: sidebar state survives a restart", () => {
   });
 });
 
-describe("AC5: zoom and theme survive a restart", () => {
-  it("a restarted app reads back the zoom factor and theme the last one saved", async () => {
-    await createUiStateStore(dir).save({ sidebarCollapsed: false, zoomFactor: 1.25, theme: "dark" });
-    expect(await createUiStateStore(dir).load()).toEqual({ sidebarCollapsed: false, zoomFactor: 1.25, theme: "dark" });
+// The theme moved to app settings in STORY-20: its restart test is in settings-store.test.ts (AC8).
+describe("AC5: zoom survives a restart", () => {
+  it("a restarted app reads back the zoom factor the last one saved", async () => {
+    await createUiStateStore(dir).save({ sidebarCollapsed: false, zoomFactor: 1.25 });
+    expect(await createUiStateStore(dir).load()).toEqual({ sidebarCollapsed: false, zoomFactor: 1.25 });
   });
 
-  it("a file from before zoom and theme existed loads with 100% zoom and the system theme", async () => {
+  it("a file from before zoom existed loads with 100% zoom", async () => {
     const store = createUiStateStore(dir);
     await writeFile(store.file, JSON.stringify({ sidebarCollapsed: true }), "utf8");
-    expect(await store.load()).toEqual({ sidebarCollapsed: true, zoomFactor: 1, theme: "system" });
+    expect(await store.load()).toEqual({ sidebarCollapsed: true, zoomFactor: 1 });
   });
 });
 

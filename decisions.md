@@ -27,8 +27,8 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     (sent back twice by the user; replaces the first flat developer menu and then a generic one). The model is
     `packages/client/src/menu.ts`. Items not built yet are hidden, not greyed; later stories add theirs (New Chat, New
     Project…, Open Folder…, pane toggles, Keyboard Shortcuts, Find, Previous/Next Chat). Only Back and Forward grey
-    out, when there is nowhere to go (user decision). There is no Keyboard Shortcuts item and no Ctrl+/ yet: shortcuts
-    live on a Settings page that STORY-20 builds.
+    out, when there is nowhere to go (user decision). STORY-20 added Help > Keyboard Shortcuts (Ctrl+/), opening the
+    shortcuts page in Settings.
   - File: Settings… Ctrl+,, Close Window Ctrl+Shift+W (hides to the tray, like the close button), Exit. Exit has no
     shortcut on Windows and Linux, as in Claude; Ctrl+Q is not bound, and Alt+F4 stays close-to-tray. macOS shows
     "Quit Featra" ⌘Q (user decision).
@@ -40,8 +40,8 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - Every shortcut the menu shows works from the keyboard too; the client handles them in one keydown listener. macOS
     uses its own keys: ⌘W, ⌃⌘F, ⌘R, ⌘[ and ⌘]. Show Logs names the platform's file manager (File Explorer, Finder,
     File Manager). Redo is Ctrl+Y on Windows, Ctrl+Shift+Z on Linux and ⇧⌘Z on macOS.
-  - No Theme submenu: theme moves to Settings > Appearance in STORY-20 (user decision). The stored theme and the
-    `setTheme` bridge stay for it; the default is System, so the app follows the OS until then.
+  - No Theme submenu: theme moves to Settings > Appearance in STORY-20 (user decision). STORY-20 built it; the
+    `setTheme` bridge is what it uses. The default is System.
   - Featra writes a minimal main-process log, `userData/logs/main.log` (start, hide/show, troubleshooting, quit), so
     Show Logs opens something real. Past 1 MB it is moved to `main.old.log` on the next start. Writes never throw.
   - Clear Cache and Restart clears Chromium's HTTP cache and keeps stored settings. Reset App Data… asks first (Cancel
@@ -65,10 +65,10 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - The title bar shows the view title only ("Work"). The mockup's "· manager" project suffix waits for STORY-19.
   - Window chrome state (sidebar collapsed, zoom, theme) is `ui-state.json` in Electron's `userData`, written by main
     (atomic, flushed before quit), not renderer `localStorage`. `FEATRA_USER_DATA_DIR` overrides the folder. STORY-20
-    may fold it into app settings.
+    moved the theme out to `settings.json`; `ui-state.json` keeps the sidebar and zoom.
   - Close goes to the system tray (sent back by the user): the close button and Alt+F4 hide the window and the app keeps
-    running, so agent sessions carry on. It sits behind one flag in main, `CLOSE_TO_TRAY` (on), for STORY-20 to wire to
-    Settings; off, closing quits as before. The logic is `apps/desktop/src/lifecycle.ts`, free of Electron imports.
+    running, so agent sessions carry on. STORY-20 made it the Settings > General > Close button
+    setting (default Minimize to tray); set to Quit, closing quits. The logic is `apps/desktop/src/lifecycle.ts`, free of Electron imports.
   - Exit exits: File > Exit, the tray's Exit and any other quit (⌘Q, OS shutdown, `before-quit`) let the window close
     for real. A second launch reveals the running window (`requestSingleInstanceLock`, per userData).
   - The tray icon is a placeholder until there is a logo: a blue rounded square with a white "F"
@@ -130,3 +130,61 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     app down on that. No app code is involved, so assertions are unchanged and there is no product fix.
   - Rule: run the WSLg e2e suite on its own, not alongside another Electron suite on the same machine. Investigate
     immediately if it recurs in a run on its own.
+- 2026-11-05 — STORY-20 Settings:
+  - Settings is a view in the main area, like Claude desktop's, not a separate window. It is reached from the sidebar,
+    File > Settings… (Ctrl+,, ⌘,) and Help > Keyboard Shortcuts (Ctrl+/, ⌘/). A view shares the shell's menu,
+    shortcuts and theme for free, and a second BrowserWindow would need its own preload, focus and close-to-tray
+    rules. The story title's "window" is met by this page.
+  - Pages, in two scopes. App: General (Close button), Appearance (Theme), Workflow, Keyboard shortcuts.
+    Project: Workflow. The work settings page has the same name at both scopes (user feedback: "Work" read as the Work
+    view; "Progress and review" repeated as its first section heading, so it became "Workflow"). In a plain browser tab General is left out: there is no close button.
+  - Layout, after user feedback that the first version's options looked sloppy, modelled on Claude desktop and Windows
+    11 Settings: content at most 720px wide and centred; titled groups, each a card of rows; a row is the label with a
+    short description under it on the left and the control right-aligned, with hairline dividers. Controls are the
+    app's own, in its tokens: a switch for on/off, a segmented control for two or three short choices, and a dropdown
+    (listbox) for longer lists, such as the project picker. The picker sits in the Project page header ("Project:
+    name ▾"), not among the settings.
+  - Overrides are quiet: a setting that follows the app default shows nothing. An override shows "Overridden · Reset"
+    by its label, Reset a text button; the app default is in their tooltip and in the control's accessible
+    description. The UI names no file paths: the Project page says "Saved in the project, shared through git.", with
+    `.featra/config.yaml` in its tooltip.
+  - No repeated or idle text (user feedback): no section heading echoes its page title; a page with one group has no
+    section heading; a description is shown only where it adds to the label; intros keep only what the user needs.
+    A component test walks every page for these rules.
+  - Short, standard wording, as in VS Code, Slack and Claude desktop (user feedback: "No need for all the extra words
+    and flavor"): Close button "Minimize to tray" or "Quit" ("Minimize to Dock" on macOS); "Feature progress",
+    "Require acceptance before Done", "Use a worktree per story", "Agent access to project knowledge" (Edit, Propose
+    edits, Read only). The only descriptions left say what a label alone can't: knowledge covers "Glossary, decisions
+    and ADRs.", and without a tray "No system tray, so closing quits." Intros: "Defaults for all projects." and
+    "Saved in the project, shared through git."
+  - App settings are `settings.json` in userData (`apps/desktop/src/settings-store.ts`): `{ theme, closeButton, work }`.
+    The theme moved there from `ui-state.json`; a profile with no settings file yet takes its theme from there once.
+    Reset App Data clears `settings.json` too; Clear Cache keeps it.
+  - Work settings exist at both scopes: progress counts, Accept to be Done (`requireAccept`), worktrees, and agents and
+    project knowledge. The app holds the defaults, equal to work-format's `DEFAULT_CONFIG`. A project overrides a
+    setting exactly when its `.featra/config.yaml` sets the key; Reset deletes the key. Other config keys (stages,
+    baseBranch, mcp…) are not app defaults and aren't shown yet.
+  - `config.yaml` is edited through work-format (`setConfigValue`, `configOverrides`) with yaml's Document API:
+    comments, key order and unknown keys are kept, but a trailing comment's alignment collapses to one space. A file
+    that isn't valid is reported in Settings and never rewritten. `parseConfig` now also rejects non-boolean flags
+    and an unknown `knowledge` value.
+  - The current project, until STORY-19's project list: `FEATRA_PROJECT_DIR` if set (empty means none), else the
+    nearest folder at or above the working folder that holds `.featra/`. The picker lists only that project, and main
+    accepts project reads and writes only for it. E2E launches set `FEATRA_PROJECT_DIR=""` unless a test gives a
+    temporary project, so no test touches this repo's own config.
+  - The Close button applies at once (`lifecycle.setCloseToTray`): the tray icon exists only while close keeps
+    Featra running, so main creates or destroys it when the setting changes. On macOS the choice reads "Minimize to
+    Dock". With no tray (Linux without a StatusNotifier host) the setting shows Quit, disabled, with the reason.
+  - The Keyboard shortcuts page is read-only and built from the menu model (`listShortcuts(menu)`), so it lists exactly
+    the shortcuts the menu shows, by menu, with `shortcuts.ts` labels. Search matches every word against name, keys
+    and area. Rebinding stays on the roadmap.
+  - A project change shows at once and is then replaced by what the file holds (bug found in e2e: the radio waited for
+    the IPC write and a click looked ignored; regression test in `ProjectPage.test.tsx`).
+  - Code layout, per `docs/coding-standards.md` (user feedback): the shared controls are one file each in
+    `packages/client/src/components/controls/` (`Switch`, `SegmentedControl`, `Dropdown`, `SettingRow`); the pages
+    are one file each in `components/settings/`, with `SettingsView` only the page list and switch. `SettingRow` hands
+    its control the label and description ids through a render prop, so the id scheme lives in one place. What
+    Settings shows (pages, groups, choice and override wording) is plain data in `src/settings-pages.ts`; work-setting
+    lookups go through `workSettingDef`. The stylesheet is `src/styles/` by area (tokens, base, shell, titlebar, menus,
+    dialog, settings, controls), joined by `styles/index.css`; the built CSS has the same rules as before. The
+    component tests are split by page under `test/components/settings/`.

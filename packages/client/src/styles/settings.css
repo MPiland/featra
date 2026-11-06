@@ -1,0 +1,149 @@
+/*
+ * Settings (STORY-20): a page in the main area, like Claude desktop's and Windows 11's. Pages on the left; on the
+ * right, groups of rows, each row a label and short description with its control right-aligned.
+ */
+.settings {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-height: 0;
+}
+
+.settings-nav {
+  padding: 20px 10px;
+  border-right: 1px solid var(--line);
+  overflow: auto;
+}
+
+.settings-scope + .settings-scope {
+  margin-top: 16px;
+}
+
+.settings-scope ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.settings-scope-title {
+  margin: 0 0 4px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--tx2);
+}
+
+.settings-page {
+  overflow: auto;
+  padding: 24px 32px 48px;
+}
+
+.settings-content {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 32px;
+  margin: 0 0 8px;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.settings-intro {
+  margin: 0 0 20px;
+  color: var(--tx2);
+}
+
+.settings-group {
+  margin: 0 0 24px;
+}
+
+.settings-group h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx2);
+}
+
+.settings-card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.setting-error {
+  margin: 0 0 20px;
+  padding: 8px 12px;
+  border: 1px solid var(--bad);
+  border-radius: 8px;
+  color: var(--bad);
+}
+
+.settings-search {
+  width: 100%;
+  height: 32px;
+  margin: 0 0 20px;
+  padding: 0 12px;
+  border: 1px solid var(--menu-line);
+  border-radius: 8px;
+  background: var(--menu);
+  color: var(--tx);
+  font: inherit;
+}
+
+.settings-search::placeholder {
+  color: var(--tx3);
+}
+
+table.shortcuts {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table.shortcuts th,
+table.shortcuts td {
+  height: 40px;
+  padding: 0 16px;
+}
+
+table.shortcuts tr + tr th,
+table.shortcuts tr + tr td {
+  border-top: 1px solid var(--line);
+}
+
+table.shortcuts th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--tx);
+}
+
+table.shortcuts td {
+  text-align: right;
+}
+
+kbd {
+  padding: 2px 7px;
+  border: 1px solid var(--menu-line);
+  border-radius: 5px;
+  background: var(--row);
+  color: var(--tx);
+  font: inherit;
+  font-size: 12px;
+}
+
+.settings-search:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}

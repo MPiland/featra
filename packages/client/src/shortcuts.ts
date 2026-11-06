@@ -5,6 +5,7 @@ export type KeyInput = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey
 /** Shortcuts the app handles itself. Edit shortcuts are left to the browser engine, which already does them. */
 export type AppShortcut =
   | "settings"
+  | "keyboardShortcuts"
   | "closeWindow"
   | "toggleSidebar"
   | "zoomReset"
@@ -57,6 +58,7 @@ export function matchShortcut(e: KeyInput, platform: string): AppShortcut | null
   if (e.key === "-" || e.code === "NumpadSubtract") return "zoomOut";
   if (e.key === "0" || e.code === "Numpad0") return "zoomReset";
   if (e.key === ",") return "settings";
+  if (e.key === "/" || e.code === "Slash") return "keyboardShortcuts";
   if (mac && (e.key === "[" || e.code === "BracketLeft")) return "back";
   if (mac && (e.key === "]" || e.code === "BracketRight")) return "forward";
   if (mac && letter(e, "r")) return "reload";
@@ -65,6 +67,7 @@ export function matchShortcut(e: KeyInput, platform: string): AppShortcut | null
 
 const LABELS: Record<Exclude<ShortcutId, "quit">, [pc: string, mac: string]> = {
   settings: ["Ctrl+,", "⌘,"],
+  keyboardShortcuts: ["Ctrl+/", "⌘/"],
   closeWindow: ["Ctrl+Shift+W", "⌘W"],
   toggleSidebar: ["Ctrl+B", "⌘B"],
   zoomReset: ["Ctrl+0", "⌘0"],

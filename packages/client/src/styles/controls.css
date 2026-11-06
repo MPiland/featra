@@ -1,0 +1,228 @@
+/* Shared controls (components/controls/): the setting row, segmented control, switch and dropdown. */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  min-height: 60px;
+  padding: 10px 16px;
+}
+
+.setting-row + .setting-row {
+  border-top: 1px solid var(--line);
+}
+
+.setting-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.setting-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  color: var(--tx);
+  font-weight: 500;
+}
+
+.setting-help {
+  margin: 2px 0 0;
+  color: var(--tx2);
+  font-size: 12px;
+}
+
+.setting-control {
+  flex: none;
+  margin-left: auto;
+}
+
+/* "Overridden · Reset": quiet, inline with the label. */
+.override {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--acc);
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--acc);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.link:hover {
+  color: var(--tx);
+}
+
+/* Segmented control: a radio group drawn as joined buttons. The radios stay real, so the arrow keys work. */
+.segmented {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--menu-line);
+  border-radius: 8px;
+  background: var(--side);
+}
+
+.segment {
+  position: relative;
+  display: inline-flex;
+}
+
+.segment input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.segment span {
+  padding: 4px 12px;
+  border-radius: 6px;
+  color: var(--tx2);
+  white-space: nowrap;
+}
+
+.segment input:hover:not(:disabled) + span {
+  color: var(--tx);
+}
+
+.segment input:checked + span {
+  background: var(--menu);
+  color: var(--tx);
+  font-weight: 500;
+  box-shadow: 0 0 0 1px var(--menu-line);
+}
+
+.segment input:disabled {
+  cursor: default;
+}
+
+.segment input:focus-visible + span {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+
+/* Switch: on is the accent colour with the thumb to the right. */
+.switch {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  padding: 0;
+  border: 1px solid var(--tx3);
+  border-radius: 999px;
+  background: var(--row);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--tx2);
+  transition: transform 0.15s;
+}
+
+/* --acc track with a --bg thumb: at least 3:1 against the page and against each other in both themes. */
+.switch[aria-checked="true"] {
+  border-color: var(--acc);
+  background: var(--acc);
+}
+
+.switch[aria-checked="true"] .switch-thumb {
+  transform: translateX(18px);
+  background: var(--bg);
+}
+
+.switch:disabled,
+.segmented[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.switch:focus-visible,
+.dropdown-button:focus-visible,
+.dropdown-list:focus-visible,
+.link:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch-thumb {
+    transition: none;
+  }
+}
+
+/* The app's dropdown: a button and a list box in the menu's style. */
+.dropdown {
+  position: relative;
+}
+
+.dropdown-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 1px solid var(--menu-line);
+  border-radius: 8px;
+  background: var(--row);
+  color: var(--tx);
+  font: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dropdown-button:hover {
+  background: var(--row2);
+}
+
+.dropdown-button svg.i {
+  color: var(--tx2);
+}
+
+.dropdown-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 10;
+  min-width: 100%;
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  background: var(--menu);
+  border: 1px solid var(--menu-line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+
+.dropdown-list [role="option"] {
+  padding: 6px 10px;
+  border-radius: 6px;
+  color: var(--tx);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.dropdown-list [role="option"].active {
+  background: var(--menu-hover);
+}
+
+.dropdown-list [role="option"][aria-selected="true"] {
+  font-weight: 600;
+}

@@ -12,7 +12,8 @@
     "test:e2e": "pnpm run build && playwright test -c e2e"
   },
   "dependencies": {
-    "@featra/client": "workspace:*"
+    "@featra/client": "workspace:*",
+    "@featra/work-format": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

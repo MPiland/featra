@@ -36,6 +36,11 @@ export const ChevronRightIcon = () => (
     <path d="M9 6l6 6-6 6" />
   </Icon>
 );
+export const ChevronDownIcon = () => (
+  <Icon size={14}>
+    <path d="M6 9l6 6 6-6" />
+  </Icon>
+);
 export const CheckIcon = () => (
   <Icon size={14}>
     <path d="M5 12l5 5 9-10" />

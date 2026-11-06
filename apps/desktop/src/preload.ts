@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
-import { IPC, normalizeUiState, normalizeWindowState, type FeatraBridge } from "@featra/client/bridge";
+import {
+  IPC,
+  normalizeAppSettings,
+  normalizeProjectSettings,
+  normalizeSettingsSnapshot,
+  normalizeUiState,
+  normalizeWindowState,
+  type FeatraBridge,
+} from "@featra/client/bridge";
 
 const bridge: FeatraBridge = {
   platform: process.platform,
@@ -22,6 +30,15 @@ const bridge: FeatraBridge = {
     },
     setZoomFactor: (factor) => ipcRenderer.send(IPC.windowSetZoom, factor),
     setTheme: (theme) => ipcRenderer.send(IPC.windowSetTheme, theme),
+  },
+  settings: {
+    load: async () => normalizeSettingsSnapshot(await ipcRenderer.invoke(IPC.settingsLoad)),
+    saveApp: async (settings) => {
+      await ipcRenderer.invoke(IPC.settingsSaveApp, normalizeAppSettings(settings));
+    },
+    loadProject: async (dir) => normalizeProjectSettings(await ipcRenderer.invoke(IPC.settingsLoadProject, dir), dir),
+    setProjectValue: async (dir, key, value) =>
+      normalizeProjectSettings(await ipcRenderer.invoke(IPC.settingsSetProjectValue, dir, key, value), dir),
   },
   edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {

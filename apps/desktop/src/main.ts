@@ -16,25 +16,34 @@ import {
 import {
   EDIT_COMMANDS,
   IPC,
+  normalizeAppSettings,
   normalizeUiState,
+  normalizeWorkOverrides,
   sizeButtonAction,
   THEME_CHOICES,
+  WORK_SETTING_KEYS,
+  type AppSettings,
   type EditCommand,
+  type ProjectRef,
+  type ProjectSettings,
+  type SettingsSnapshot,
   type ThemeChoice,
   type WindowState,
+  type WorkSettingKey,
 } from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
-import { createLifecycle, type Lifecycle } from "./lifecycle.ts";
+import { closeToTraySupport, createLifecycle, type Lifecycle } from "./lifecycle.ts";
 import { createLog, type Log } from "./log.ts";
+import {
+  createSettingsStore,
+  findProject,
+  readProjectSettings,
+  writeProjectValue,
+  type SettingsStore,
+} from "./settings-store.ts";
 import { hasTrayHost, type RunCommand } from "./tray-support.ts";
 import { clearCacheAndRestart, resetAppData, type TroubleshootDeps } from "./troubleshoot.ts";
 import { createAppStateStore, createUiStateStore, type UiStateStore } from "./ui-state-store.ts";
-
-/**
- * Close sends Featra to the system tray (the Dock on macOS) instead of quitting, so agent sessions keep running.
- * STORY-20 wires this to Settings; until then it is always on.
- */
-const CLOSE_TO_TRAY = true;
 
 /**
  * E2E runs set FEATRA_E2E=1. What differs is only where Featra meets the OS: notifications and "show in File Explorer"
@@ -118,9 +127,16 @@ interface MainDeps {
   lifecycle: Lifecycle;
   log: Log;
   troubleshoot: TroubleshootDeps;
+  settings: {
+    store: SettingsStore;
+    current(): AppSettings;
+    /** Stores new app settings and applies them: the close button at once (the page applies the theme). */
+    apply(next: AppSettings): Promise<void>;
+    project: ProjectRef | null;
+  };
 }
 
-function registerIpc({ store, lifecycle, log, troubleshoot }: MainDeps) {
+function registerIpc({ store, lifecycle, log, troubleshoot, settings }: MainDeps) {
   const fromOurWindow = (e: IpcMainEvent | IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);
 
   ipcMain.handle(IPC.uiStateLoad, () => store.load());
@@ -151,6 +167,28 @@ function registerIpc({ store, lifecycle, log, troubleshoot }: MainDeps) {
   // focused field.
   ipcMain.on(IPC.edit, (e, command: unknown) => {
     if (EDIT_COMMANDS.includes(command as EditCommand)) e.sender[command as EditCommand]();
+  });
+  ipcMain.handle(
+    IPC.settingsLoad,
+    (): SettingsSnapshot => ({
+      app: settings.current(),
+      closeToTray: closeToTraySupport(lifecycle, process.platform),
+      currentProject: settings.project,
+      projects: settings.project ? [settings.project] : [],
+    }),
+  );
+  ipcMain.handle(IPC.settingsSaveApp, (_e, next: unknown) => settings.apply(normalizeAppSettings(next)));
+  // The page may only reach projects main offers it (the current one, until STORY-19 brings the project list).
+  const knownProject = (dir: unknown): dir is string => typeof dir === "string" && dir === settings.project?.dir;
+  const notOpen = (dir: unknown): ProjectSettings => ({ dir: String(dir), overrides: {}, error: "Not an open project." });
+  ipcMain.handle(IPC.settingsLoadProject, (_e, dir: unknown) => (knownProject(dir) ? readProjectSettings(dir) : notOpen(dir)));
+  ipcMain.handle(IPC.settingsSetProjectValue, (_e, dir: unknown, key: unknown, value: unknown) => {
+    if (!knownProject(dir)) return notOpen(dir);
+    if (!WORK_SETTING_KEYS.includes(key as WorkSettingKey)) return readProjectSettings(dir);
+    const k = key as WorkSettingKey;
+    if (value === null) return writeProjectValue(dir, k, null);
+    const valid = normalizeWorkOverrides({ [k]: value });
+    return valid[k] !== undefined ? writeProjectValue(dir, k, valid[k]) : readProjectSettings(dir);
   });
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());
@@ -190,6 +228,14 @@ function createTray(win: BrowserWindow, lifecycle: Lifecycle): Tray {
   return tray;
 }
 
+function destroyTray(tray: Tray) {
+  tray.destroy();
+  if (testHooks.tray === tray) {
+    testHooks.tray = undefined;
+    testHooks.trayMenu = undefined;
+  }
+}
+
 // The window only ever shows the bundled client: no navigation away, no pop-up windows.
 app.on("web-contents-created", (_e, contents) => {
   contents.on("will-navigate", (e) => e.preventDefault());
@@ -201,6 +247,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   const store = createUiStateStore(app.getPath("userData"));
   const appState = createAppStateStore(app.getPath("userData"));
+  const settingsStore = createSettingsStore(app.getPath("userData"));
   const log = createLog(join(app.getPath("userData"), "logs"));
   log.info(`Featra ${app.getVersion()} started (${process.platform})`);
   let win: BrowserWindow | undefined;
@@ -209,24 +256,55 @@ if (!app.requestSingleInstanceLock()) {
   void app.whenReady().then(async () => {
     if (process.platform === "win32") app.setAppUserModelId("dev.featra.app"); // notifications need it on Windows
     setNativeMenu();
-    const [ui, remembered, hasTray] = await Promise.all([store.load(), appState.load(), trayAvailable()]);
+    const [remembered, hasTray, stored, project] = await Promise.all([
+      appState.load(),
+      trayAvailable(),
+      settingsStore.load(),
+      findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR),
+    ]);
+    let appSettings = stored;
     if (process.platform !== "darwin") log.info(hasTray ? "Tray available" : "No tray: close quits");
+    log.info(project ? `Project: ${project.dir}` : "No project");
     const lifecycle = createLifecycle({
       platform: process.platform,
-      closeToTray: CLOSE_TO_TRAY,
+      // Settings > General > Close button: keep running in the tray (the default) or quit.
+      closeToTray: appSettings.closeButton === "tray",
       trayAvailable: hasTray,
       noticeShown: remembered.trayNoticeShown,
       notify: showNotice,
       rememberNotice: () => void appState.save({ trayNoticeShown: true }),
       exit: () => app.quit(),
     });
+    // The tray icon is there while close keeps Featra running, and goes when the Close button is set to quit.
+    const syncTray = (w: BrowserWindow) => {
+      if (lifecycle.usesTray && !tray) tray = createTray(w, lifecycle);
+      else if (!lifecycle.usesTray && tray) {
+        destroyTray(tray);
+        tray = undefined;
+      }
+    };
     registerIpc({
       store,
       lifecycle,
       log,
+      settings: {
+        store: settingsStore,
+        current: () => appSettings,
+        project,
+        async apply(next) {
+          const closeChanged = next.closeButton !== appSettings.closeButton;
+          appSettings = next;
+          if (closeChanged) {
+            lifecycle.setCloseToTray(next.closeButton === "tray");
+            log.info(`Close button: ${next.closeButton === "tray" ? "keep running" : "quit"}`);
+            if (win && !win.isDestroyed()) syncTray(win);
+          }
+          await settingsStore.save(next);
+        },
+      },
       troubleshoot: {
         session: session.defaultSession,
-        stores: [store, appState],
+        stores: [store, appState, settingsStore],
         log,
         restart: () => {
           if (!e2e) app.relaunch(); // the test launches the next instance itself, and checks the log for the restart
@@ -252,12 +330,12 @@ if (!app.requestSingleInstanceLock()) {
     });
 
     // Apply a pinned theme before the window exists so its background matches from the first frame.
-    nativeTheme.themeSource = ui.theme;
+    nativeTheme.themeSource = appSettings.theme;
     win = createWindow();
     win.on("hide", () => log.info("Window hidden"));
     win.on("show", () => log.info("Window shown"));
     lifecycle.manage(win);
-    if (lifecycle.usesTray) tray = createTray(win, lifecycle);
+    syncTray(win);
   });
 
   nativeTheme.on("updated", () => {
@@ -272,12 +350,13 @@ if (!app.requestSingleInstanceLock()) {
     e.preventDefault();
     if (exiting) return;
     exiting = true;
-    void Promise.all([store.flush(), appState.flush(), log.flush()]).finally(() => app.exit(0));
+    void Promise.all([store.flush(), appState.flush(), settingsStore.flush(), log.flush()]).finally(() => app.exit(0));
   });
 
   // Only reached when close-to-tray is off or the app is quitting.
   app.on("window-all-closed", () => {
-    tray?.destroy();
+    if (tray) destroyTray(tray);
+    tray = undefined;
     if (process.platform !== "darwin") app.quit();
   });
 }

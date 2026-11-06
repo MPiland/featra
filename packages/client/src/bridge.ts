@@ -2,20 +2,30 @@
  * The contract between the UI and its host. Electron's preload implements it; a plain browser (Vite dev, later
  * remote control) gets the fallback below. The UI never talks to Electron any other way.
  */
+import {
+  DEFAULT_APP_SETTINGS,
+  normalizeAppSettings,
+  normalizeProjectSettings,
+  normalizeSettingsSnapshot,
+  type AppSettings,
+  type ProjectSettings,
+  type SettingsSnapshot,
+  type WorkSettingKey,
+  type WorkSettings,
+} from "./settings.ts";
+import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
 
-/** System follows the OS; Light and Dark override it. */
-export type ThemeChoice = "system" | "light" | "dark";
-export const THEME_CHOICES: readonly ThemeChoice[] = ["system", "light", "dark"];
+export { THEME_CHOICES, type ThemeChoice };
+export * from "./settings.ts";
 
-/** Window chrome state that survives a restart. */
+/** Window chrome state that survives a restart. The theme is an app setting (Settings > Appearance), not chrome. */
 export interface UiState {
   sidebarCollapsed: boolean;
   zoomFactor: number;
-  theme: ThemeChoice;
 }
 
-export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: DEFAULT_ZOOM, theme: "system" };
+export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: DEFAULT_ZOOM };
 
 /** Reads stored state defensively: unknown or malformed fields fall back to defaults. */
 export function normalizeUiState(raw: unknown): UiState {
@@ -24,7 +34,6 @@ export function normalizeUiState(raw: unknown): UiState {
     sidebarCollapsed:
       typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
     zoomFactor: normalizeZoom(r.zoomFactor),
-    theme: THEME_CHOICES.includes(r.theme as ThemeChoice) ? (r.theme as ThemeChoice) : DEFAULT_UI_STATE.theme,
   };
 }
 
@@ -84,8 +93,18 @@ export interface FeatraBridge {
     /** Calls back on every change to the window's state; returns the unsubscribe. */
     onStateChange(listener: (state: WindowState) => void): () => void;
     setZoomFactor(factor: number): void;
-    /** Applied from the stored state; Settings > Appearance (STORY-20) will change it. */
+    /** Pins native surfaces to the app setting's theme (System lets the OS decide). */
     setTheme(theme: ThemeChoice): void;
+  };
+  readonly settings: {
+    /** App settings, what the close button can do here, and the projects the Project scope can pick from. */
+    load(): Promise<SettingsSnapshot>;
+    /** Stores app settings; the host applies them at once (the close button among them, without a restart). */
+    saveApp(settings: AppSettings): Promise<void>;
+    /** A project's overrides, read from its `.featra/config.yaml`. */
+    loadProject(dir: string): Promise<ProjectSettings>;
+    /** Overrides one work setting in the project's config file, or removes the override (`null`). */
+    setProjectValue<K extends WorkSettingKey>(dir: string, key: K, value: WorkSettings[K] | null): Promise<ProjectSettings>;
   };
   edit(command: EditCommand): void;
   readonly app: {
@@ -122,6 +141,10 @@ export const IPC = {
   appClearCacheAndRestart: "app:clear-cache-and-restart",
   appResetAppData: "app:reset-app-data",
   appQuit: "app:quit",
+  settingsLoad: "settings:load",
+  settingsSaveApp: "settings:save-app",
+  settingsLoadProject: "settings:load-project",
+  settingsSetProjectValue: "settings:set-project-value",
 } as const;
 
 declare global {
@@ -131,9 +154,21 @@ declare global {
 }
 
 const STORAGE_KEY = "featra.ui-state";
+const SETTINGS_KEY = "featra.settings";
 
-/** Used when the UI runs in a plain browser: state lives in localStorage and there is no window to control. */
+/**
+ * Used when the UI runs in a plain browser: state lives in localStorage and there is no window to control, nor a
+ * project folder to read.
+ */
 export function browserBridge(storage: Storage = window.localStorage): FeatraBridge {
+  const readSettings = (): AppSettings => {
+    try {
+      return normalizeAppSettings(JSON.parse(storage.getItem(SETTINGS_KEY) ?? "null"));
+    } catch {
+      return { ...DEFAULT_APP_SETTINGS };
+    }
+  };
+  const noProject = (dir: string): ProjectSettings => normalizeProjectSettings({ error: "No project folder in a browser tab." }, dir);
   return {
     platform: "web",
     uiState: {
@@ -159,6 +194,14 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
         document.documentElement.style.zoom = String(factor);
       },
       setTheme() {},
+    },
+    settings: {
+      load: async () => normalizeSettingsSnapshot({ app: readSettings(), closeToTray: null, currentProject: null, projects: [] }),
+      async saveApp(settings) {
+        storage.setItem(SETTINGS_KEY, JSON.stringify(normalizeAppSettings(settings)));
+      },
+      loadProject: async (dir) => noProject(dir),
+      setProjectValue: async (dir) => noProject(dir),
     },
     edit: (command) => {
       document.execCommand(command);
