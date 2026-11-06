@@ -9,12 +9,13 @@ import {
   type WindowState,
 } from "./bridge.ts";
 import { Dialog } from "./components/Dialog.tsx";
-import { firstSettingsPage, SettingsView, type SettingsPage } from "./components/SettingsView.tsx";
+import { SettingsView } from "./components/settings/SettingsView.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import { canGoBack, canGoForward, currentView, goBack, goForward, initialNav, navigate } from "./navigation.ts";
+import { firstSettingsPage, type SettingsPage } from "./settings-pages.ts";
 import { matchShortcut, type AppShortcut } from "./shortcuts.ts";
 import { applyTheme } from "./theme.ts";
 import { viewDef, type ViewId } from "./views.ts";

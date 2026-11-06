@@ -1,0 +1,9 @@
+/* The app's stylesheet, by area. Order matters: tokens first, then each area. */
+@import "./tokens.css";
+@import "./base.css";
+@import "./shell.css";
+@import "./titlebar.css";
+@import "./menus.css";
+@import "./dialog.css";
+@import "./settings.css";
+@import "./controls.css";

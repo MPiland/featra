@@ -21,7 +21,7 @@ export interface LifecycleOptions {
   platform: string;
   /**
    * Close hides the window and the app keeps running (agent sessions carry on): Settings > General > Close button,
-   * "Keep running in the tray". Off: closing the last window quits. `setCloseToTray` changes it while running.
+   * "Minimize to tray". Off: closing the last window quits. `setCloseToTray` changes it while running.
    */
   closeToTray: boolean;
   /**

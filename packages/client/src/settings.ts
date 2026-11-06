@@ -37,53 +37,57 @@ export interface AppSettings {
 
 export const DEFAULT_APP_SETTINGS: AppSettings = { theme: "system", closeButton: "tray", work: DEFAULT_WORK_SETTINGS };
 
-interface ChoiceDef<V> {
+/** One option of a choice setting. */
+export interface ChoiceDef<V> {
   value: V;
   label: string;
 }
 export type WorkSettingDef =
   | { key: "progress"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<ProgressMode>[] }
-  | { key: "knowledge"; kind: "choice"; label: string; help: string; choices: readonly ChoiceDef<KnowledgePermission>[] }
-  | { key: "requireAccept" | "worktrees"; kind: "toggle"; label: string; help: string };
+  | { key: "knowledge"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<KnowledgePermission>[] }
+  | { key: "requireAccept" | "worktrees"; kind: "toggle"; label: string; help?: string };
 
 /** Work settings in the order Settings shows them, with their wording. */
 export const WORK_SETTINGS: readonly WorkSettingDef[] = [
   {
     key: "progress",
     kind: "choice",
-    label: "Feature progress counts",
+    label: "Feature progress",
     choices: [
       { value: "stories", label: "Stories" },
       { value: "tasks", label: "Tasks" },
     ],
   },
-  {
-    key: "requireAccept",
-    kind: "toggle",
-    label: "Stories need my Accept to be Done",
-    help: "Passing checks alone don't finish a story.",
-  },
-  { key: "worktrees", kind: "toggle", label: "Build each story in its own worktree", help: "When off, stories are built on the feature branch." },
+  { key: "requireAccept", kind: "toggle", label: "Require acceptance before Done" },
+  { key: "worktrees", kind: "toggle", label: "Use a worktree per story" },
   {
     key: "knowledge",
     kind: "choice",
-    label: "Agents and project knowledge",
-    help: "What agents may do with the glossary, decisions and ADRs.",
+    label: "Agent access to project knowledge",
+    // "Project knowledge" alone doesn't say what it covers.
+    help: "Glossary, decisions and ADRs.",
     choices: [
-      { value: "edit", label: "Edit it" },
-      { value: "propose", label: "Propose changes" },
-      { value: "read-only", label: "Only read it" },
+      { value: "edit", label: "Edit" },
+      { value: "propose", label: "Propose edits" },
+      { value: "read-only", label: "Read only" },
     ],
   },
 ];
 
 export const WORK_SETTING_KEYS: readonly WorkSettingKey[] = WORK_SETTINGS.map((d) => d.key);
 
+/** The definition of one work setting. Every key has one: WORK_SETTINGS lists them all. */
+export function workSettingDef(key: WorkSettingKey): WorkSettingDef {
+  const def = WORK_SETTINGS.find((d) => d.key === key);
+  if (!def) throw new Error(`No work setting "${key}"`);
+  return def;
+}
+
 const record = (raw: unknown): Record<string, unknown> =>
   raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
 
 function validWorkValue(key: WorkSettingKey, value: unknown): boolean {
-  const def = WORK_SETTINGS.find((d) => d.key === key)!;
+  const def = workSettingDef(key);
   if (def.kind === "toggle") return typeof value === "boolean";
   return (def.choices as readonly ChoiceDef<unknown>[]).some((c) => c.value === value);
 }
@@ -115,9 +119,9 @@ export function effectiveWork(defaults: WorkSettings, overrides: WorkOverrides):
 
 export const isOverridden = (overrides: WorkOverrides, key: WorkSettingKey): boolean => key in overrides;
 
-/** The label of a setting's value, for "Overrides the app default (Stories)". */
+/** The label of a setting's value, as in "App default: Stories". */
 export function workValueLabel(key: WorkSettingKey, value: WorkSettings[WorkSettingKey]): string {
-  const def = WORK_SETTINGS.find((d) => d.key === key)!;
+  const def = workSettingDef(key);
   if (def.kind === "toggle") return value ? "On" : "Off";
   return (def.choices as readonly ChoiceDef<unknown>[]).find((c) => c.value === value)?.label ?? String(value);
 }
@@ -151,7 +155,7 @@ export interface SettingsSnapshot {
   projects: ProjectRef[];
 }
 
-export const NO_TRAY_REASON = "This desktop has no system tray, so closing always quits Featra.";
+export const NO_TRAY_REASON = "No system tray, so closing quits.";
 
 function normalizeProjectRef(raw: unknown): ProjectRef | null {
   const r = record(raw);

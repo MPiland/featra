@@ -68,7 +68,7 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     moved the theme out to `settings.json`; `ui-state.json` keeps the sidebar and zoom.
   - Close goes to the system tray (sent back by the user): the close button and Alt+F4 hide the window and the app keeps
     running, so agent sessions carry on. STORY-20 made it the Settings > General > Close button
-    setting (default keep running); set to quit, closing quits. The logic is `apps/desktop/src/lifecycle.ts`, free of Electron imports.
+    setting (default Minimize to tray); set to Quit, closing quits. The logic is `apps/desktop/src/lifecycle.ts`, free of Electron imports.
   - Exit exits: File > Exit, the tray's Exit and any other quit (⌘Q, OS shutdown, `before-quit`) let the window close
     for real. A second launch reveals the running window (`requestSingleInstanceLock`, per userData).
   - The tray icon is a placeholder until there is a logo: a blue rounded square with a white "F"
@@ -146,13 +146,17 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     name ▾"), not among the settings.
   - Overrides are quiet: a setting that follows the app default shows nothing. An override shows "Overridden · Reset"
     by its label, Reset a text button; the app default is in their tooltip and in the control's accessible
-    description. The UI names no file paths: the Project page says "Saved with this project (shared through git)",
-    with `.featra/config.yaml` in its tooltip.
+    description. The UI names no file paths: the Project page says "Saved in the project, shared through git.", with
+    `.featra/config.yaml` in its tooltip.
   - No repeated or idle text (user feedback): no section heading echoes its page title; a page with one group has no
-    section heading; a description is shown only where it adds to the label (Theme has none; "Progress counts" became
-    "Feature progress counts" instead of a description saying so); intros keep only what the user needs ("Every
-    project uses these unless it overrides them."; "Saved with this project (shared through git)."). A component test
-    walks every page for these rules.
+    section heading; a description is shown only where it adds to the label; intros keep only what the user needs.
+    A component test walks every page for these rules.
+  - Short, standard wording, as in VS Code, Slack and Claude desktop (user feedback: "No need for all the extra words
+    and flavor"): Close button "Minimize to tray" or "Quit" ("Minimize to Dock" on macOS); "Feature progress",
+    "Require acceptance before Done", "Use a worktree per story", "Agent access to project knowledge" (Edit, Propose
+    edits, Read only). The only descriptions left say what a label alone can't: knowledge covers "Glossary, decisions
+    and ADRs.", and without a tray "No system tray, so closing quits." Intros: "Defaults for all projects." and
+    "Saved in the project, shared through git."
   - App settings are `settings.json` in userData (`apps/desktop/src/settings-store.ts`): `{ theme, closeButton, work }`.
     The theme moved there from `ui-state.json`; a profile with no settings file yet takes its theme from there once.
     Reset App Data clears `settings.json` too; Clear Cache keeps it.
@@ -169,10 +173,18 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     accepts project reads and writes only for it. E2E launches set `FEATRA_PROJECT_DIR=""` unless a test gives a
     temporary project, so no test touches this repo's own config.
   - The Close button applies at once (`lifecycle.setCloseToTray`): the tray icon exists only while close keeps
-    Featra running, so main creates or destroys it when the setting changes. On macOS the choice reads "Keep running
-    in the Dock". With no tray (Linux without a StatusNotifier host) the setting shows Quit, disabled, with the reason.
+    Featra running, so main creates or destroys it when the setting changes. On macOS the choice reads "Minimize to
+    Dock". With no tray (Linux without a StatusNotifier host) the setting shows Quit, disabled, with the reason.
   - The Keyboard shortcuts page is read-only and built from the menu model (`listShortcuts(menu)`), so it lists exactly
     the shortcuts the menu shows, by menu, with `shortcuts.ts` labels. Search matches every word against name, keys
     and area. Rebinding stays on the roadmap.
   - A project change shows at once and is then replaced by what the file holds (bug found in e2e: the radio waited for
-    the IPC write and a click looked ignored; regression test in `settings.test.tsx`).
+    the IPC write and a click looked ignored; regression test in `ProjectPage.test.tsx`).
+  - Code layout, per `docs/coding-standards.md` (user feedback): the shared controls are one file each in
+    `packages/client/src/components/controls/` (`Switch`, `SegmentedControl`, `Dropdown`, `SettingRow`); the pages
+    are one file each in `components/settings/`, with `SettingsView` only the page list and switch. `SettingRow` hands
+    its control the label and description ids through a render prop, so the id scheme lives in one place. What
+    Settings shows (pages, groups, choice and override wording) is plain data in `src/settings-pages.ts`; work-setting
+    lookups go through `workSettingDef`. The stylesheet is `src/styles/` by area (tokens, base, shell, titlebar, menus,
+    dialog, settings, controls), joined by `styles/index.css`; the built CSS has the same rules as before. The
+    component tests are split by page under `test/components/settings/`.

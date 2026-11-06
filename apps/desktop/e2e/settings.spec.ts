@@ -69,20 +69,20 @@ test.describe("STORY-20: Settings", () => {
       const { app, page } = await launch(profile.dir);
       await page.keyboard.press("Control+,");
       const close = page.getByRole("radiogroup", { name: "Close button" });
-      await expect(close.getByRole("radio", { name: "Keep running in the tray" })).toBeChecked();
+      await expect(close.getByRole("radio", { name: "Minimize to tray" })).toBeChecked();
       expect(await trayExists(app)).toBe(true);
 
-      await close.getByRole("radio", { name: "Quit Featra" }).check();
+      await close.getByRole("radio", { name: "Quit" }).check();
       await expect.poll(() => trayExists(app)).toBe(false);
       await expect.poll(async () => (await readSettings(profile.dir)).closeButton).toBe("quit");
 
-      await close.getByRole("radio", { name: "Keep running in the tray" }).check();
+      await close.getByRole("radio", { name: "Minimize to tray" }).check();
       await expect.poll(() => trayExists(app)).toBe(true);
       await closeFromOs(app);
       await expect.poll(() => windowVisible(app)).toBe(false);
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show());
 
-      await close.getByRole("radio", { name: "Quit Featra" }).check();
+      await close.getByRole("radio", { name: "Quit" }).check();
       await expect.poll(() => trayExists(app)).toBe(false);
       const gone = exited(app);
       await closeFromOs(app);
@@ -99,10 +99,10 @@ test.describe("STORY-20: Settings", () => {
       const { app, page } = await launch(profile.dir, { FEATRA_E2E_TRAY: "absent" });
       await page.keyboard.press("Control+,");
       const close = page.getByRole("radiogroup", { name: "Close button" });
-      await expect(close.getByRole("radio", { name: "Quit Featra" })).toBeChecked();
-      await expect(close.getByRole("radio", { name: "Quit Featra" })).toBeDisabled();
-      await expect(close.getByRole("radio", { name: "Keep running in the tray" })).toBeDisabled();
-      await expect(close).toHaveAccessibleDescription(/no system tray, so closing always quits Featra/);
+      await expect(close.getByRole("radio", { name: "Quit" })).toBeChecked();
+      await expect(close.getByRole("radio", { name: "Quit" })).toBeDisabled();
+      await expect(close.getByRole("radio", { name: "Minimize to tray" })).toBeDisabled();
+      await expect(close).toHaveAccessibleDescription(/^No system tray, so closing quits\.$/);
       await app.close();
     } finally {
       await profile.dispose();
@@ -124,7 +124,7 @@ test.describe("STORY-20: Settings", () => {
       await page.keyboard.press("Escape");
       await expect(picker).toBeFocused();
 
-      const progress = page.getByRole("radiogroup", { name: "Feature progress counts" });
+      const progress = page.getByRole("radiogroup", { name: "Feature progress" });
       const row = page.locator(".setting-row").filter({ has: progress });
       await expect(progress).not.toHaveAccessibleDescription(/App default|Overridden/);
       await progress.getByRole("radio", { name: "Tasks" }).check();
@@ -132,7 +132,7 @@ test.describe("STORY-20: Settings", () => {
       await expect(progress).toHaveAccessibleDescription(/Overridden\s*\. App default: Stories/);
       expect(await readFile(project.config, "utf8")).toBe(`${before}progress: tasks\n`);
 
-      await row.getByRole("button", { name: "Reset Feature progress counts to the app default" }).click();
+      await row.getByRole("button", { name: "Reset Feature progress to the app default" }).click();
       await expect(row.getByText(/^Overridden/)).toHaveCount(0);
       await expect(progress.getByRole("radio", { name: "Stories" })).toBeChecked();
       await expect(progress.getByRole("radio", { name: "Stories" })).toBeFocused();

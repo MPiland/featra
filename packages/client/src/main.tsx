@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
 import { getBridge } from "./bridge.ts";
 import { applyTheme } from "./theme.ts";
-import "./styles.css";
+import "./styles/index.css";
 
 const bridge = getBridge();
 // Load stored chrome state and settings before the first paint so a collapsed sidebar or a pinned theme never flashes.
