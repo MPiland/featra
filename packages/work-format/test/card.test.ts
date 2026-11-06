@@ -138,6 +138,9 @@ describe("parseCard", () => {
     ["missing id", story.replace("id: STORY-7\n", "")],
     ["unknown origin", story.replace("origin: added", "origin: magic")],
     ["history not a list", story.replace(/history:[\s\S]*?estimate/, "history: nope\nestimate")],
+    ["frontmatter not a mapping", "---\n- a list\n---\n"],
+    ["a history event not a mapping", story.replace(/history:[\s\S]*?estimate/, "history:\n  - nope\nestimate")],
+    ["an unknown history field", story.replace("field: status", "field: mood")],
   ])("rejects %s", (_, text) => {
     expect(() => parseCard(text, "x.md")).toThrow(CardParseError);
   });

@@ -23,7 +23,7 @@
   },
   "overrides": [
     {
-      "files": ["packages/work-format/**"],
+      "files": ["packages/work-format/src/**"],
       "rules": {
         "import/no-nodejs-modules": "error",
         "no-restricted-imports": [
@@ -49,7 +49,7 @@
       }
     },
     {
-      "files": ["packages/client/**"],
+      "files": ["packages/client/src/**"],
       "rules": {
         "import/no-nodejs-modules": "error",
         "no-restricted-imports": [
@@ -75,7 +75,8 @@
     {
       "files": ["**/test/**", "**/e2e/**", "**/*.test.ts", "**/*.test.tsx", "**/*.config.ts"],
       "rules": {
-        "typescript/no-non-null-assertion": "off"
+        "typescript/no-non-null-assertion": "off",
+        "typescript/no-unsafe-type-assertion": "off"
       }
     }
   ]

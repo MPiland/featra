@@ -8,3 +8,4 @@ export * from "./evidence.ts";
 export * from "./bugs.ts";
 export * from "./ids.ts";
 export * from "./validate.ts";
+export * from "./utils/guards.ts";

@@ -1,5 +1,6 @@
 import { isKnownStatus, stageCategory } from "./config.ts";
-import { CANCELLED, type Card, type ContainerStatus, type ProjectConfig } from "./types.ts";
+import { CANCELLED, CONTAINER_STATUSES, type Card, type ProjectConfig } from "./types.ts";
+import { isOneOf } from "./utils/guards.ts";
 
 /**
  * Evidence vocabulary written to `history[]` with field `evidence` (ADR 0004):
@@ -35,14 +36,15 @@ export function evidenceState(card: Card): EvidenceState {
       else if (e.to === UNVERIFIED) verified = false;
       else {
         const m = /^(proven|unproven):(\d+)$/.exec(e.to ?? "");
-        if (m) m[1] === "proven" ? proven.add(Number(m[2])) : proven.delete(Number(m[2]));
+        if (m?.[1] === "proven") proven.add(Number(m[2]));
+        else if (m?.[1] === "unproven") proven.delete(Number(m[2]));
       }
     } else if (e.field === "accepted") {
       accepted = e.to === "accepted";
     }
   }
   const lastStatus = card.history.filter((e) => e.field === "status").at(-1);
-  const provenAcs = [...proven].filter((n) => n >= 1 && n <= card.acs.length).sort((a, b) => a - b);
+  const provenAcs = [...proven].filter((n) => n >= 1 && n <= card.acs.length).toSorted((a, b) => a - b);
   return {
     reported: !!lastStatus && lastStatus.by.startsWith("session:"),
     verified,
@@ -53,8 +55,6 @@ export function evidenceState(card: Card): EvidenceState {
 }
 
 export type TransitionCheck = { ok: true } | { ok: false; reason: string };
-
-const CONTAINER_STATUSES: ContainerStatus[] = ["draft", "approved", "active", "done", "cancelled"];
 
 /**
  * Whether a card may move to `to`.
@@ -80,8 +80,7 @@ export function checkTransition(
     }
     return { ok: true };
   }
-  if (!CONTAINER_STATUSES.includes(to as ContainerStatus))
-    return { ok: false, reason: `"${to}" is not a valid ${card.type} status` };
+  if (!isOneOf(CONTAINER_STATUSES, to)) return { ok: false, reason: `"${to}" is not a valid ${card.type} status` };
   if (card.type === "feature" && to === "done") {
     const open = cards.filter(
       (c) =>

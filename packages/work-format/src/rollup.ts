@@ -95,7 +95,7 @@ export function scopeBaseline(featureId: string, cards: readonly Card[], config:
 export function joinedAt(card: Card, featureId: string): string | null {
   let joined: number | null = null;
   const parentEvents = card.history.filter((e) => e.field === "parent");
-  const initialParent = parentEvents.length ? parentEvents[0]!.from : card.parent;
+  const initialParent = parentEvents[0] ? parentEvents[0].from : card.parent;
   if (initialParent === featureId) joined = createdMs(card);
   for (const e of parentEvents) if (e.to === featureId) joined = ms(e.at);
   return joined === null ? null : Number.isFinite(joined) ? iso(joined) : null;
@@ -171,7 +171,7 @@ export function burnUp(featureId: string, cards: readonly Card[], config: Projec
     for (const e of c.history) if (e.field === "status" || e.field === "parent") times.add(ms(e.at));
   }
   const points: BurnUpPoint[] = [];
-  for (const t of [...times].sort((a, b) => a - b)) {
+  for (const t of [...times].toSorted((a, b) => a - b)) {
     let scope = 0;
     let done = 0;
     for (const c of relevant) {

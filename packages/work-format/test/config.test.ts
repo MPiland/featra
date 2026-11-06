@@ -87,6 +87,16 @@ describe("STORY-20: project overrides of the app-wide defaults", () => {
     expect(setConfigValue("", "worktrees", false)).toBe("# Featra project settings\nversion: 1\nworktrees: false\n");
   });
 
+  it.each([
+    ["a version that isn't a number", "version: one\n"],
+    ["an empty base branch", 'baseBranch: ""\n'],
+    ["a stage that isn't a mapping", "stages: [Done]\n"],
+    ["a stage in an unknown category", "stages: [{ name: Done, category: finished }]\n"],
+    ["a non-boolean switch", "mcp: maybe\n"],
+  ])("rejects %s", (_, text) => {
+    expect(() => configOverrides(text)).toThrow(ConfigError);
+  });
+
   it("refuses to edit a file that isn't valid, or to write a value that isn't", () => {
     expect(() => setConfigValue("progress: [", "worktrees", false)).toThrow(ConfigError);
     expect(() => setConfigValue("progress: effort\n", "worktrees", false)).toThrow(ConfigError);

@@ -1,4 +1,5 @@
 import type { Card } from "./types.ts";
+import { assertNever } from "./utils/guards.ts";
 
 /** Where a card's authoritative copy lives (ADR 0002). */
 export type OwnerLocation =
@@ -47,6 +48,8 @@ export function ownerOf(card: Pick<Card, "id" | "type" | "parent">, state: Branc
       if (wt && !wt.merged) return { kind: "worktree", branch: wt.branch, path: wt.path };
       return (card.parent && activeFeature(card.parent, state)) || MAIN;
     }
+    default:
+      return assertNever(card.type);
   }
 }
 
@@ -59,7 +62,7 @@ export function sameLocation(a: OwnerLocation, b: OwnerLocation): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === "main") return true;
   if (a.kind === "worktree" && b.kind === "worktree") return a.path === b.path;
-  return (a as { branch: string }).branch === (b as { branch: string }).branch;
+  return a.kind === "feature" && b.kind === "feature" && a.branch === b.branch;
 }
 
 export function locationLabel(loc: OwnerLocation): string {
@@ -70,5 +73,7 @@ export function locationLabel(loc: OwnerLocation): string {
       return `feature branch ${loc.branch}`;
     case "worktree":
       return `worktree ${loc.branch}`;
+    default:
+      return assertNever(loc);
   }
 }

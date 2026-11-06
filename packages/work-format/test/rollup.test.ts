@@ -13,11 +13,12 @@ import { at, config, feature, moves, story, reparent } from "./fixtures.ts";
 
 const tasksMode = { ...config, progress: "tasks" as const };
 
+const withTasks = (c: ReturnType<typeof story>, done: number, total: number) => ({
+  ...c,
+  tasks: Array.from({ length: total }, (_, i) => ({ text: `t${i}`, done: i < done })),
+});
+
 describe("featureProgress", () => {
-  const withTasks = (c: ReturnType<typeof story>, done: number, total: number) => ({
-    ...c,
-    tasks: Array.from({ length: total }, (_, i) => ({ text: `t${i}`, done: i < done })),
-  });
   const cards = [
     feature("FEAT-1"),
     withTasks(moves(story("STORY-1", "FEAT-1"), [5, "Done"]), 1, 3),

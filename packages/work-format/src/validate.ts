@@ -1,13 +1,13 @@
 import { isKnownStatus } from "./config.ts";
 import { ID_PREFIX, parseId } from "./ids.ts";
-import type { Card, CardType, ContainerStatus, ProjectConfig } from "./types.ts";
+import { CONTAINER_STATUSES, type Card, type CardType, type ProjectConfig } from "./types.ts";
+import { isOneOf } from "./utils/guards.ts";
 
 export interface CardIssue {
   id: string;
   message: string;
 }
 
-const CONTAINER_STATUSES: ContainerStatus[] = ["draft", "approved", "active", "done", "cancelled"];
 const ALLOWED_PARENT: Record<CardType, { types: CardType[]; required: boolean }> = {
   epic: { types: [], required: false },
   feature: { types: ["epic"], required: false },
@@ -30,7 +30,7 @@ export function validateCards(cards: readonly Card[], config: ProjectConfig): Ca
 
     if (c.type === "story" || c.type === "bug") {
       if (!isKnownStatus(c.status, config)) issues.push({ id: c.id, message: `unknown stage "${c.status}"` });
-    } else if (!CONTAINER_STATUSES.includes(c.status as ContainerStatus)) {
+    } else if (!isOneOf(CONTAINER_STATUSES, c.status)) {
       issues.push({ id: c.id, message: `status must be one of ${CONTAINER_STATUSES.join(", ")}` });
     }
 
