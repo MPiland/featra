@@ -2,7 +2,7 @@
 id: STORY-42
 type: story
 title: Init confirms what it created
-status: New
+status: In Progress
 parent: FEAT-2
 order: 4
 origin: added
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: lead
+  - at: 2026-11-06T23:44:11Z
+    field: status
+    from: New
+    to: In Progress
+    by: developer
 ---
 
 ## Description
