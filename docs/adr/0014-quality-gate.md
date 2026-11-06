@@ -3,6 +3,7 @@
 Date: 2026-11-05 · Status: accepted
 
 ## Context
+
 Until now the only automated checks were `tsc` and the tests. Agent-written code drifts in style, duplicates helpers
 and crosses package boundaries unless a tool stops it. The repo has no remote and no CI, so the gate must run locally
 and fast enough that nobody is tempted to skip it.
@@ -10,6 +11,7 @@ and fast enough that nobody is tempted to skip it.
 We considered ESLint with Prettier, Biome, and OXC.
 
 ## Decision
+
 Use OXC for both linting and formatting:
 
 - **oxlint** for linting.
@@ -25,6 +27,7 @@ STORY-41 builds the gate. Where an OXC rule we want doesn't exist yet, it record
 meanwhile, in this ADR's Consequences.
 
 ## Consequences
+
 - One tool family, written in Rust, so the gate runs in seconds.
 - OXC's rule set is younger than ESLint's, so some rules may be missing; STORY-41 lists any gaps.
 - The codebase gets one formatting commit. After that, no commit lands that fails the gate, whoever writes it.

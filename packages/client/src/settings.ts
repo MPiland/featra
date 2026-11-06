@@ -44,7 +44,13 @@ export interface ChoiceDef<V> {
 }
 export type WorkSettingDef =
   | { key: "progress"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<ProgressMode>[] }
-  | { key: "knowledge"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<KnowledgePermission>[] }
+  | {
+      key: "knowledge";
+      kind: "choice";
+      label: string;
+      help?: string;
+      choices: readonly ChoiceDef<KnowledgePermission>[];
+    }
   | { key: "requireAccept" | "worktrees"; kind: "toggle"; label: string; help?: string };
 
 /** Work settings in the order Settings shows them, with their wording. */
@@ -144,7 +150,10 @@ export interface ProjectSettings {
  * Whether the close button can keep Featra running. `null` where there is no window to close (a browser tab).
  * Unavailable on a Linux desktop without a tray: a hidden window could not be brought back, so close always quits.
  */
-export type CloseToTraySupport = null | { available: true; place: "tray" | "dock" } | { available: false; reason: string };
+export type CloseToTraySupport =
+  | null
+  | { available: true; place: "tray" | "dock" }
+  | { available: false; reason: string };
 
 export interface SettingsSnapshot {
   app: AppSettings;
@@ -174,7 +183,12 @@ export function normalizeSettingsSnapshot(raw: unknown): SettingsSnapshot {
   const currentProject = normalizeProjectRef(r.currentProject);
   const projects = (Array.isArray(r.projects) ? r.projects : []).map(normalizeProjectRef).filter((p) => p !== null);
   if (currentProject && !projects.some((p) => p.dir === currentProject.dir)) projects.unshift(currentProject);
-  return { app: normalizeAppSettings(r.app), closeToTray: normalizeCloseToTray(r.closeToTray), currentProject, projects };
+  return {
+    app: normalizeAppSettings(r.app),
+    closeToTray: normalizeCloseToTray(r.closeToTray),
+    currentProject,
+    projects,
+  };
 }
 
 export function normalizeProjectSettings(raw: unknown, dir: string): ProjectSettings {

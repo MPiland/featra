@@ -18,7 +18,10 @@ const record = (name, ok, detail) => {
 // Strip API-key env vars so the only possible auth is the user's own CLI login.
 const env = { ...process.env };
 // Like T3 Code: run the user's installed `claude`, not the SDK's bundled binary.
-const claudePath = execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], { encoding: "utf8" }).trim().split(String.fromCharCode(10))[0].trim();
+const claudePath = execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], { encoding: "utf8" })
+  .trim()
+  .split(String.fromCharCode(10))[0]
+  .trim();
 results.claudePath = claudePath;
 delete env.ANTHROPIC_API_KEY;
 delete env.ANTHROPIC_AUTH_TOKEN;
@@ -61,9 +64,15 @@ record("login", !!a.init && a.result?.subtype === "success", {
   note: "ANTHROPIC_API_KEY/AUTH_TOKEN removed from env; Featra read no credential files",
 });
 // The AC is that the user answer reaches the agent: check the tool result the agent received, not its wording.
-const askResults = a.transcript.flatMap((m) => (m.type === "user" ? (m.message?.content ?? []) : [])).filter((c) => c.type === "tool_result");
-const delivered = askResults.some((c) => JSON.stringify(c.content).includes("=\\\"Blue\\\""));
-record("ask", asked.length > 0 && delivered && /blue/i.test(a.result?.result ?? ""), { questions: asked.map((i) => i.questions?.map((q) => q.question)), toolResult: askResults.map((c) => c.content), reply: a.result?.result ?? null });
+const askResults = a.transcript
+  .flatMap((m) => (m.type === "user" ? (m.message?.content ?? []) : []))
+  .filter((c) => c.type === "tool_result");
+const delivered = askResults.some((c) => JSON.stringify(c.content).includes('=\\"Blue\\"'));
+record("ask", asked.length > 0 && delivered && /blue/i.test(a.result?.result ?? ""), {
+  questions: asked.map((i) => i.questions?.map((q) => q.question)),
+  toolResult: askResults.map((c) => c.content),
+  reply: a.result?.result ?? null,
+});
 
 // --- Session B: different model, stdio MCP attached, worktree as cwd ---
 const repo = mkdtempSync(join(tmpdir(), "featra-spike-"));
@@ -88,7 +97,12 @@ const b = await run(
     cwd: worktree,
     settingSources: [],
     mcpServers: {
-      featra: { type: "stdio", command: process.execPath, args: [join(here, "mcp-server.mjs")], env: { FEATRA_SPIKE_LOG: mcpLog } },
+      featra: {
+        type: "stdio",
+        command: process.execPath,
+        args: [join(here, "mcp-server.mjs")],
+        env: { FEATRA_SPIKE_LOG: mcpLog },
+      },
     },
     // No allowedTools: does canUseTool get asked for MCP tools too?
     canUseTool: async (toolName, input) => {
@@ -97,13 +111,22 @@ const b = await run(
     },
   },
 );
-record("model", a.init?.model !== b.init?.model && /haiku/i.test(a.init?.model ?? "") && /sonnet/i.test(b.init?.model ?? ""), {
-  sessionA: a.init?.model ?? null,
-  sessionB: b.init?.model ?? null,
-});
+record(
+  "model",
+  a.init?.model !== b.init?.model && /haiku/i.test(a.init?.model ?? "") && /sonnet/i.test(b.init?.model ?? ""),
+  {
+    sessionA: a.init?.model ?? null,
+    sessionB: b.init?.model ?? null,
+  },
+);
 const mcpStatus = b.init?.mcp_servers ?? null;
 const mcpCalled = existsSync(mcpLog) ? readFileSync(mcpLog, "utf8").trim() : null;
-record("mcp", !!mcpCalled && /FEATRA-7731/.test(b.result?.result ?? ""), { status: mcpStatus, canUseToolSaw: seenB, serverLog: mcpCalled, reply: b.result?.result ?? null });
+record("mcp", !!mcpCalled && /FEATRA-7731/.test(b.result?.result ?? ""), {
+  status: mcpStatus,
+  canUseToolSaw: seenB,
+  serverLog: mcpCalled,
+  reply: b.result?.result ?? null,
+});
 const proof = join(worktree, "proof.txt");
 record("cwd", b.init?.cwd === worktree && existsSync(proof) && !existsSync(join(repo, "proof.txt")), {
   initCwd: b.init?.cwd ?? null,

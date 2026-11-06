@@ -58,7 +58,9 @@ export type UiStateStore = JsonStore<UiState>;
 
 /** Window chrome state (sidebar collapsed, zoom, theme): `ui-state.json`. */
 export function createUiStateStore(dir: string): UiStateStore {
-  return createJsonStore(dir, "ui-state.json", (raw) => (raw === undefined ? { ...DEFAULT_UI_STATE } : normalizeUiState(raw)));
+  return createJsonStore(dir, "ui-state.json", (raw) =>
+    raw === undefined ? { ...DEFAULT_UI_STATE } : normalizeUiState(raw),
+  );
 }
 
 /** What main itself remembers between runs: `app-state.json`. */

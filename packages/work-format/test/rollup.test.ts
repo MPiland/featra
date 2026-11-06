@@ -28,11 +28,20 @@ describe("featureProgress", () => {
   ];
 
   it("counts stories, excluding cancelled and other features", () => {
-    expect(featureProgress("FEAT-1", cards, config)).toEqual({ done: 1, total: 3, unit: "stories", label: "1 of 3 stories done" });
+    expect(featureProgress("FEAT-1", cards, config)).toEqual({
+      done: 1,
+      total: 3,
+      unit: "stories",
+      label: "1 of 3 stories done",
+    });
   });
 
   it("counts tasks in tasks mode; a done story counts all its tasks", () => {
-    expect(featureProgress("FEAT-1", cards, tasksMode)).toMatchObject({ done: 5, total: 9, label: "5 of 9 tasks done" });
+    expect(featureProgress("FEAT-1", cards, tasksMode)).toMatchObject({
+      done: 5,
+      total: 9,
+      label: "5 of 9 tasks done",
+    });
   });
 
   it("labels are counts, never percentages", () => {
@@ -44,7 +53,12 @@ describe("featureProgress", () => {
 
 describe("epicProgress", () => {
   it("counts done features, excluding cancelled", () => {
-    const cards = [feature("FEAT-1", "done"), feature("FEAT-2", "active"), feature("FEAT-3", "cancelled"), feature("FEAT-4", "done", "EPIC-2")];
+    const cards = [
+      feature("FEAT-1", "done"),
+      feature("FEAT-2", "active"),
+      feature("FEAT-3", "cancelled"),
+      feature("FEAT-4", "done", "EPIC-2"),
+    ];
     expect(epicProgress("EPIC-1", cards)).toEqual({ done: 1, total: 2, label: "1 of 2 features done" });
   });
 });

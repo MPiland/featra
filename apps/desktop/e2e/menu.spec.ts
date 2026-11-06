@@ -134,7 +134,9 @@ test.describe("AC5: app menu", () => {
 
       await choose(page, "Help", "Troubleshooting", "Toggle Developer Tools");
       await expect
-        .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.isDevToolsOpened()))
+        .poll(() =>
+          app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.isDevToolsOpened()),
+        )
         .toBe(true);
     } finally {
       await app.close();
@@ -198,7 +200,9 @@ test.describe("AC5: app menu", () => {
       // "…in File Explorer" on Windows, "…in File Manager" on Linux (the label is unit-tested per platform).
       await choose(page, "Help", "Troubleshooting", "Show Logs in ");
       await expect.poll(() => shownInFolder(app)).toEqual([logFile(profile.dir)]);
-      expect(await readFile(logFile(profile.dir), "utf8")).toMatch(new RegExp(String.raw`^\S+ Featra \S+ started \(${process.platform}\)\n`));
+      expect(await readFile(logFile(profile.dir), "utf8")).toMatch(
+        new RegExp(String.raw`^\S+ Featra \S+ started \(${process.platform}\)\n`),
+      );
     } finally {
       await app.close();
       await profile.dispose();

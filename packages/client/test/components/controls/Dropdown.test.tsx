@@ -24,7 +24,8 @@ function Picker({ onEscapeBehind = () => {} }) {
 
 const button = () => screen.getByRole("button", { name: /^Letter: / });
 const options = () => within(screen.getByRole("listbox", { name: "Letter" })).getAllByRole("option");
-const active = () => document.getElementById(screen.getByRole("listbox").getAttribute("aria-activedescendant")!)!.textContent;
+const active = () =>
+  document.getElementById(screen.getByRole("listbox").getAttribute("aria-activedescendant")!)!.textContent;
 
 describe("Dropdown", () => {
   it("shows its name and the chosen label; clicking opens a list box with the choice selected and focused", async () => {

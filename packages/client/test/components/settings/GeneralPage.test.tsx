@@ -28,7 +28,10 @@ describe("AC6: Close button: keep running in the tray or quit", () => {
   });
 
   it("without a tray (Linux with no tray host) shows Quit, disabled, with the reason", async () => {
-    const { user, appSaved } = renderApp({ platform: "linux", closeToTray: { available: false, reason: NO_TRAY_REASON } });
+    const { user, appSaved } = renderApp({
+      platform: "linux",
+      closeToTray: { available: false, reason: NO_TRAY_REASON },
+    });
     await openSettings(user, "General");
     expect(checked("Close button")).toBe("Quit");
     for (const r of radios("Close button")) expect((r as HTMLInputElement).disabled).toBe(true);

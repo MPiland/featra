@@ -70,7 +70,12 @@ export function SettingsView({ bridge, snapshot, page, onPage, onAppChange, shor
 }
 
 /** An App page: the user's own settings. */
-function AppPage({ id, snapshot, onAppChange, shortcuts }: Pick<SettingsViewProps, "snapshot" | "onAppChange" | "shortcuts"> & {
+function AppPage({
+  id,
+  snapshot,
+  onAppChange,
+  shortcuts,
+}: Pick<SettingsViewProps, "snapshot" | "onAppChange" | "shortcuts"> & {
   id: Exclude<SettingsPage, "project">;
 }) {
   const app = snapshot.app;
@@ -79,7 +84,11 @@ function AppPage({ id, snapshot, onAppChange, shortcuts }: Pick<SettingsViewProp
     case "general":
       return (
         snapshot.closeToTray && (
-          <GeneralPage app={app} support={snapshot.closeToTray} onCloseButton={(closeButton) => setApp({ closeButton })} />
+          <GeneralPage
+            app={app}
+            support={snapshot.closeToTray}
+            onCloseButton={(closeButton) => setApp({ closeButton })}
+          />
         )
       );
     case "appearance":

@@ -31,8 +31,7 @@ export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: 
 export function normalizeUiState(raw: unknown): UiState {
   const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
-    sidebarCollapsed:
-      typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
+    sidebarCollapsed: typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
     zoomFactor: normalizeZoom(r.zoomFactor),
   };
 }
@@ -104,7 +103,11 @@ export interface FeatraBridge {
     /** A project's overrides, read from its `.featra/config.yaml`. */
     loadProject(dir: string): Promise<ProjectSettings>;
     /** Overrides one work setting in the project's config file, or removes the override (`null`). */
-    setProjectValue<K extends WorkSettingKey>(dir: string, key: K, value: WorkSettings[K] | null): Promise<ProjectSettings>;
+    setProjectValue<K extends WorkSettingKey>(
+      dir: string,
+      key: K,
+      value: WorkSettings[K] | null,
+    ): Promise<ProjectSettings>;
   };
   edit(command: EditCommand): void;
   readonly app: {
@@ -168,7 +171,8 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       return { ...DEFAULT_APP_SETTINGS };
     }
   };
-  const noProject = (dir: string): ProjectSettings => normalizeProjectSettings({ error: "No project folder in a browser tab." }, dir);
+  const noProject = (dir: string): ProjectSettings =>
+    normalizeProjectSettings({ error: "No project folder in a browser tab." }, dir);
   return {
     platform: "web",
     uiState: {
@@ -196,7 +200,8 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       setTheme() {},
     },
     settings: {
-      load: async () => normalizeSettingsSnapshot({ app: readSettings(), closeToTray: null, currentProject: null, projects: [] }),
+      load: async () =>
+        normalizeSettingsSnapshot({ app: readSettings(), closeToTray: null, currentProject: null, projects: [] }),
       async saveApp(settings) {
         storage.setItem(SETTINGS_KEY, JSON.stringify(normalizeAppSettings(settings)));
       },

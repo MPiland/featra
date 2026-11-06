@@ -62,7 +62,9 @@ export function SettingRow({ id, label, help, status, override, children }: Sett
           </p>
         )}
       </div>
-      <div className="setting-control">{children({ labelledBy: `${id}-label`, describedBy: describedBy || undefined })}</div>
+      <div className="setting-control">
+        {children({ labelledBy: `${id}-label`, describedBy: describedBy || undefined })}
+      </div>
     </div>
   );
 }

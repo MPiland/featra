@@ -29,7 +29,8 @@ export interface AppProps {
 
 type OpenDialog = "about" | "resetAppData" | null;
 
-const sameUiState = (a: UiState, b: UiState) => a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor;
+const sameUiState = (a: UiState, b: UiState) =>
+  a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor;
 
 export function App({ bridge, initialUiState, initialSettings }: AppProps) {
   const [nav, setNav] = useState(() => initialNav());

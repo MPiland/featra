@@ -25,7 +25,10 @@ async function chooseFromMenu(page: Page, ...path: string[]) {
   await page.getByRole("button", { name: "Menu" }).click();
   const last = path.pop()!;
   for (const name of path) await page.getByRole("menuitem", { name, exact: true }).hover();
-  await page.locator("[role=menuitem]").filter({ hasText: new RegExp(`^${last}`) }).click();
+  await page
+    .locator("[role=menuitem]")
+    .filter({ hasText: new RegExp(`^${last}`) })
+    .click();
 }
 
 test.describe("STORY-20: Settings", () => {
@@ -138,7 +141,9 @@ test.describe("STORY-20: Settings", () => {
       await expect(progress.getByRole("radio", { name: "Stories" })).toBeFocused();
       expect(await readFile(project.config, "utf8")).toBe(before);
       // App settings stayed in the user's config folder; the project's file never held them.
-      await expect.poll(() => readFile(settingsFile(profile.dir), "utf8").catch(() => "")).not.toMatch(/progress.*tasks/);
+      await expect
+        .poll(() => readFile(settingsFile(profile.dir), "utf8").catch(() => ""))
+        .not.toMatch(/progress.*tasks/);
       await app.close();
     } finally {
       await profile.dispose();

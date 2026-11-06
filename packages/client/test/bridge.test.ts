@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { browserBridge, DEFAULT_APP_SETTINGS, DEFAULT_UI_STATE, normalizeAppSettings, normalizeUiState } from "../src/bridge.ts";
+import {
+  browserBridge,
+  DEFAULT_APP_SETTINGS,
+  DEFAULT_UI_STATE,
+  normalizeAppSettings,
+  normalizeUiState,
+} from "../src/bridge.ts";
 
 describe("stored UI state", () => {
   it("falls back to defaults for missing or malformed values", () => {
     expect(normalizeUiState(null)).toEqual(DEFAULT_UI_STATE);
     expect(normalizeUiState("nope")).toEqual(DEFAULT_UI_STATE);
     expect(normalizeUiState({ sidebarCollapsed: "yes" })).toEqual(DEFAULT_UI_STATE);
-    expect(normalizeUiState({ sidebarCollapsed: true, extra: 1 })).toEqual({ ...DEFAULT_UI_STATE, sidebarCollapsed: true });
+    expect(normalizeUiState({ sidebarCollapsed: true, extra: 1 })).toEqual({
+      ...DEFAULT_UI_STATE,
+      sidebarCollapsed: true,
+    });
     expect(normalizeUiState({ theme: "sepia", zoomFactor: "big" })).toEqual(DEFAULT_UI_STATE);
     expect(normalizeUiState({ zoomFactor: -1 })).toEqual(DEFAULT_UI_STATE);
     expect(normalizeUiState({ zoomFactor: Number.POSITIVE_INFINITY })).toEqual(DEFAULT_UI_STATE);

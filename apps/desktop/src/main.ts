@@ -168,20 +168,23 @@ function registerIpc({ store, lifecycle, log, troubleshoot, settings }: MainDeps
   ipcMain.on(IPC.edit, (e, command: unknown) => {
     if (EDIT_COMMANDS.includes(command as EditCommand)) e.sender[command as EditCommand]();
   });
-  ipcMain.handle(
-    IPC.settingsLoad,
-    (): SettingsSnapshot => ({
-      app: settings.current(),
-      closeToTray: closeToTraySupport(lifecycle, process.platform),
-      currentProject: settings.project,
-      projects: settings.project ? [settings.project] : [],
-    }),
-  );
+  ipcMain.handle(IPC.settingsLoad, (): SettingsSnapshot => ({
+    app: settings.current(),
+    closeToTray: closeToTraySupport(lifecycle, process.platform),
+    currentProject: settings.project,
+    projects: settings.project ? [settings.project] : [],
+  }));
   ipcMain.handle(IPC.settingsSaveApp, (_e, next: unknown) => settings.apply(normalizeAppSettings(next)));
   // The page may only reach projects main offers it (the current one, until STORY-19 brings the project list).
   const knownProject = (dir: unknown): dir is string => typeof dir === "string" && dir === settings.project?.dir;
-  const notOpen = (dir: unknown): ProjectSettings => ({ dir: String(dir), overrides: {}, error: "Not an open project." });
-  ipcMain.handle(IPC.settingsLoadProject, (_e, dir: unknown) => (knownProject(dir) ? readProjectSettings(dir) : notOpen(dir)));
+  const notOpen = (dir: unknown): ProjectSettings => ({
+    dir: String(dir),
+    overrides: {},
+    error: "Not an open project.",
+  });
+  ipcMain.handle(IPC.settingsLoadProject, (_e, dir: unknown) =>
+    knownProject(dir) ? readProjectSettings(dir) : notOpen(dir),
+  );
   ipcMain.handle(IPC.settingsSetProjectValue, (_e, dir: unknown, key: unknown, value: unknown) => {
     if (!knownProject(dir)) return notOpen(dir);
     if (!WORK_SETTING_KEYS.includes(key as WorkSettingKey)) return readProjectSettings(dir);

@@ -53,7 +53,8 @@ export function configOverrides(text: string): Partial<ProjectConfig> {
     throw new ConfigError(`progress must be "stories" or "tasks", got ${String(out.progress)}`);
   }
   for (const key of BOOLEAN_KEYS) {
-    if (key in out && typeof out[key] !== "boolean") throw new ConfigError(`${key} must be true or false, got ${String(out[key])}`);
+    if (key in out && typeof out[key] !== "boolean")
+      throw new ConfigError(`${key} must be true or false, got ${String(out[key])}`);
   }
   if ("knowledge" in out && !KNOWLEDGE.includes(out.knowledge as string)) {
     throw new ConfigError(`knowledge must be one of ${KNOWLEDGE.join(", ")}, got ${String(out.knowledge)}`);
@@ -66,7 +67,11 @@ export function configOverrides(text: string): Partial<ProjectConfig> {
  * the YAML document in place, so comments, layout and keys Featra doesn't know survive. Throws a ConfigError, and
  * changes nothing, if the file can't be read or the result would not be a valid config.
  */
-export function setConfigValue<K extends keyof ProjectConfig>(text: string, key: K, value: ProjectConfig[K] | undefined): string {
+export function setConfigValue<K extends keyof ProjectConfig>(
+  text: string,
+  key: K,
+  value: ProjectConfig[K] | undefined,
+): string {
   const doc = parseDocument(text.trim() ? text : NEW_CONFIG);
   if (doc.errors.length > 0) throw new ConfigError(doc.errors[0]!.message);
   if (doc.contents !== null && !isMap(doc.contents)) throw new ConfigError("config must be a mapping of settings");
@@ -102,12 +107,14 @@ function validateStages(stages: unknown): asserts stages is Stage[] {
   const names = new Set<string>();
   for (const s of stages as Stage[]) {
     if (!s || typeof s.name !== "string" || !s.name) throw new ConfigError("every stage needs a name");
-    if (!CATEGORIES.includes(s.category)) throw new ConfigError(`stage "${s.name}" has unknown category "${s.category}"`);
+    if (!CATEGORIES.includes(s.category))
+      throw new ConfigError(`stage "${s.name}" has unknown category "${s.category}"`);
     if (s.name === CANCELLED) throw new ConfigError(`"${CANCELLED}" is reserved`);
     if (names.has(s.name)) throw new ConfigError(`duplicate stage "${s.name}"`);
     names.add(s.name);
   }
-  if (!(stages as Stage[]).some((s) => s.category === "done")) throw new ConfigError("at least one stage must be in the done category");
+  if (!(stages as Stage[]).some((s) => s.category === "done"))
+    throw new ConfigError("at least one stage must be in the done category");
 }
 
 /** Category of a story/bug status. Cancelled and unknown statuses return null (they count toward nothing). */

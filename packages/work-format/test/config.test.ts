@@ -66,7 +66,8 @@ describe("STORY-20: project overrides of the app-wide defaults", () => {
   });
 
   it("sets a key in place, keeping comments, key order and keys Featra doesn't know (a comment keeps one space before it)", () => {
-    const text = "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: stories        # stories | tasks\nmcp: true\n";
+    const text =
+      "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: stories        # stories | tasks\nmcp: true\n";
     expect(setConfigValue(text, "progress", "tasks")).toBe(
       "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: tasks # stories | tasks\nmcp: true\n",
     );

@@ -25,7 +25,8 @@ export function validateCards(cards: readonly Card[], config: ProjectConfig): Ca
   }
   for (const c of cards) {
     const p = parseId(c.id);
-    if (!p || p.prefix !== ID_PREFIX[c.type]) issues.push({ id: c.id, message: `id should look like ${ID_PREFIX[c.type]}-<n>` });
+    if (!p || p.prefix !== ID_PREFIX[c.type])
+      issues.push({ id: c.id, message: `id should look like ${ID_PREFIX[c.type]}-<n>` });
 
     if (c.type === "story" || c.type === "bug") {
       if (!isKnownStatus(c.status, config)) issues.push({ id: c.id, message: `unknown stage "${c.status}"` });
@@ -39,7 +40,8 @@ export function validateCards(cards: readonly Card[], config: ProjectConfig): Ca
     } else {
       const parent = byId.get(c.parent);
       if (!parent) issues.push({ id: c.id, message: `parent ${c.parent} not found` });
-      else if (!rule.types.includes(parent.type)) issues.push({ id: c.id, message: `a ${c.type} cannot sit under a ${parent.type}` });
+      else if (!rule.types.includes(parent.type))
+        issues.push({ id: c.id, message: `a ${c.type} cannot sit under a ${parent.type}` });
     }
   }
   return issues;

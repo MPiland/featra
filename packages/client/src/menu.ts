@@ -82,7 +82,14 @@ export function buildAppMenu({
   }
 
   const view: MenuNode[] = [
-    { kind: "check", id: "view.sidebar", label: "Sidebar", shortcut: key("toggleSidebar"), checked: sidebarShown, onSelect: a.toggleSidebar },
+    {
+      kind: "check",
+      id: "view.sidebar",
+      label: "Sidebar",
+      shortcut: key("toggleSidebar"),
+      checked: sidebarShown,
+      onSelect: a.toggleSidebar,
+    },
     sep("view.sep1"),
     item("view.actualSize", "Actual Size", a.zoomReset, "zoomReset"),
     item("view.zoomIn", "Zoom In", a.zoomIn, "zoomIn"),
@@ -108,7 +115,9 @@ export function buildAppMenu({
     ...GO_VIEWS.map((id) => item(`go.${id}`, VIEWS.find((v) => v.id === id)!.title, () => a.open(id))),
   ];
 
-  const help: MenuNode[] = [item("help.keyboardShortcuts", "Keyboard Shortcuts", a.showKeyboardShortcuts, "keyboardShortcuts")];
+  const help: MenuNode[] = [
+    item("help.keyboardShortcuts", "Keyboard Shortcuts", a.showKeyboardShortcuts, "keyboardShortcuts"),
+  ];
   if (inWindow) {
     help.push(
       sep("help.sep0"),
@@ -169,7 +178,8 @@ export function listShortcuts(menu: readonly MenuNode[]): ShortcutEntry[] {
   const walk = (area: string, nodes: readonly MenuNode[]) => {
     for (const n of nodes) {
       if (n.kind === "submenu") walk(area, n.items);
-      else if (n.kind !== "separator" && n.shortcut) out.push({ area, name: n.label.replace(/…$/, ""), keys: n.shortcut });
+      else if (n.kind !== "separator" && n.shortcut)
+        out.push({ area, name: n.label.replace(/…$/, ""), keys: n.shortcut });
     }
   };
   for (const top of menu) if (top.kind === "submenu") walk(top.label, top.items);

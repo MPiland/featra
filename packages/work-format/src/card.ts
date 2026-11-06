@@ -2,8 +2,22 @@ import { parse, stringify } from "yaml";
 import type { AcceptanceCriterion, BodySection, Card, CardType, ChecklistItem, HistoryEvent, Origin } from "./types.ts";
 
 const KNOWN_KEYS = [
-  "id", "type", "title", "status", "parent", "order", "origin", "role", "agent", "model", "reasoning",
-  "sessions", "branch", "pr", "created", "history",
+  "id",
+  "type",
+  "title",
+  "status",
+  "parent",
+  "order",
+  "origin",
+  "role",
+  "agent",
+  "model",
+  "reasoning",
+  "sessions",
+  "branch",
+  "pr",
+  "created",
+  "history",
 ] as const;
 const STORY_ONLY_KEYS = new Set(["role", "agent", "model", "reasoning", "sessions", "branch", "pr"]);
 const CARD_TYPES: CardType[] = ["epic", "feature", "story", "bug"];
@@ -91,8 +105,13 @@ export function serializeCard(card: Card): string {
   };
   if (isWorkItem(card.type)) {
     Object.assign(fm, {
-      role: card.role, agent: card.agent, model: card.model, reasoning: card.reasoning,
-      sessions: card.sessions, branch: card.branch, pr: card.pr,
+      role: card.role,
+      agent: card.agent,
+      model: card.model,
+      reasoning: card.reasoning,
+      sessions: card.sessions,
+      branch: card.branch,
+      pr: card.pr,
     });
   }
   fm.created = card.created;
@@ -110,7 +129,8 @@ export function serializeCard(card: Card): string {
   } else if (card.notes.trim()) {
     parts.push(`## ${H_NOTES}`, "", card.notes.trim(), "");
   }
-  for (const s of card.extraSections) parts.push(`## ${s.heading}`, "", ...(s.content.trim() ? [s.content.trim(), ""] : []));
+  for (const s of card.extraSections)
+    parts.push(`## ${s.heading}`, "", ...(s.content.trim() ? [s.content.trim(), ""] : []));
   return collapseBlankRuns(parts.join("\n")).replace(/\n*$/, "\n");
 }
 
@@ -149,7 +169,9 @@ function parseBody(body: string): ParsedBody {
     acs: parseChecklist(get(H_ACS)).map(splitTestRef),
     tasks: parseChecklist(get(H_TASKS)),
     notes: get(H_NOTES).trim(),
-    extra: sections.filter((s) => !KNOWN_HEADINGS.has(s.heading)).map((s) => ({ heading: s.heading, content: s.content.trim() })),
+    extra: sections
+      .filter((s) => !KNOWN_HEADINGS.has(s.heading))
+      .map((s) => ({ heading: s.heading, content: s.content.trim() })),
   };
 }
 

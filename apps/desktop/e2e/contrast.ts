@@ -6,7 +6,10 @@ export type Rgba = [number, number, number, number];
 export function parseCssColor(css: string): Rgba {
   const m = css.match(/rgba?\(([^)]+)\)/);
   if (!m?.[1]) throw new Error(`Unparsed colour: ${css}`);
-  const [r = 0, g = 0, b = 0, a = 1] = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+  const [r = 0, g = 0, b = 0, a = 1] = m[1]
+    .split(/[\s,/]+/)
+    .filter(Boolean)
+    .map(Number);
   return [r, g, b, a];
 }
 
@@ -81,14 +84,22 @@ export function sampleRenderedText(page: Page): Promise<(Sample & { kind: "text"
     const describe = (el: Element) =>
       `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? `.${el.className.split(" ").join(".")}` : ""} "${(el.textContent ?? el.getAttribute("aria-label") ?? "").trim().slice(0, 40)}"`;
 
-    const samples: { kind: "text" | "icon"; what: string; fg: string; bgs: string[]; opacity: number; large: boolean }[] = [];
+    const samples: {
+      kind: "text" | "icon";
+      what: string;
+      fg: string;
+      bgs: string[];
+      opacity: number;
+      large: boolean;
+    }[] = [];
     for (const el of Array.from(document.body.querySelectorAll("*"))) {
       if (!visible(el) || disabled(el)) continue;
       const cs = getComputedStyle(el);
       const ownText = Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
       const size = parseFloat(cs.fontSize);
       const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
-      if (ownText) samples.push({ kind: "text", what: describe(el), fg: cs.color, bgs: bgChain(el), opacity: opacity(el), large });
+      if (ownText)
+        samples.push({ kind: "text", what: describe(el), fg: cs.color, bgs: bgChain(el), opacity: opacity(el), large });
       else if (el.tagName === "BUTTON" && el.querySelector("svg")) {
         samples.push({ kind: "icon", what: describe(el), fg: cs.color, bgs: bgChain(el), opacity: opacity(el), large });
       }

@@ -20,7 +20,10 @@ export function createLog(dir: string, now: () => Date = () => new Date()): Log 
   const file = join(dir, "main.log");
   let queue: Promise<void> = (async () => {
     await mkdir(dir, { recursive: true });
-    const size = await stat(file).then((s) => s.size, () => 0);
+    const size = await stat(file).then(
+      (s) => s.size,
+      () => 0,
+    );
     if (size > MAX_LOG_BYTES) await rename(file, join(dir, "main.old.log"));
   })().catch(() => {});
 

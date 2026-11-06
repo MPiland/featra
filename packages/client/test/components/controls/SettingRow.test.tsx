@@ -38,10 +38,13 @@ describe("SettingRow", () => {
     const { aria, control, row } = renderRow({ help: "In the gutter.", status: "Turned off by policy." });
     expect(aria.describedBy).toBe("x-help x-status");
     expect(description(control)).toBe("In the gutter. Turned off by policy.");
-    expect([...row.querySelectorAll(".setting-help")].map((p) => p.textContent)).toEqual(["In the gutter.", "Turned off by policy."]);
+    expect([...row.querySelectorAll(".setting-help")].map((p) => p.textContent)).toEqual([
+      "In the gutter.",
+      "Turned off by policy.",
+    ]);
   });
 
-  it("an override shows \"Overridden · Reset\" by the label, says the app default, and Reset calls back", async () => {
+  it('an override shows "Overridden · Reset" by the label, says the app default, and Reset calls back', async () => {
     const user = userEvent.setup();
     let resets = 0;
     const { control, row } = renderRow({

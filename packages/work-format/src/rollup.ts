@@ -26,7 +26,8 @@ export interface Progress {
 }
 
 export function progressLabel(done: number, total: number, unit: ProgressMode | "features"): string {
-  const [one, many] = unit === "stories" ? ["story", "stories"] : unit === "tasks" ? ["task", "tasks"] : ["feature", "features"];
+  const [one, many] =
+    unit === "stories" ? ["story", "stories"] : unit === "tasks" ? ["task", "tasks"] : ["feature", "features"];
   return `${done} of ${total} ${total === 1 ? one : many} done`;
 }
 
@@ -62,7 +63,8 @@ function everUnder(featureId: string, cards: readonly Card[]): Card[] {
   return cards.filter(
     (c) =>
       isItem(c) &&
-      (c.parent === featureId || c.history.some((e) => e.field === "parent" && (e.to === featureId || e.from === featureId))),
+      (c.parent === featureId ||
+        c.history.some((e) => e.field === "parent" && (e.to === featureId || e.from === featureId))),
   );
 }
 
@@ -124,7 +126,8 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
   if (baseline !== null) {
     for (const c of items) {
       const at = joinedAt(c, featureId);
-      if (at !== null && ms(at) > ms(baseline)) added.push({ id: c.id, title: c.title, type: c.type, origin: c.origin, at });
+      if (at !== null && ms(at) > ms(baseline))
+        added.push({ id: c.id, title: c.title, type: c.type, origin: c.origin, at });
     }
   }
   const bugs = items.filter((c) => c.type === "bug");
@@ -137,7 +140,12 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
 }
 
 /** Origin for a new item under a feature: bugs are `bug`; anything after the baseline is `added`. */
-export function originForNewItem(featureId: string | null, type: "story" | "bug", cards: readonly Card[], config: ProjectConfig): Origin {
+export function originForNewItem(
+  featureId: string | null,
+  type: "story" | "bug",
+  cards: readonly Card[],
+  config: ProjectConfig,
+): Origin {
   if (type === "bug") return "bug";
   if (featureId === null) return "planned";
   return scopeBaseline(featureId, cards, config) === null ? "planned" : "added";

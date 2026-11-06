@@ -178,7 +178,13 @@ interface MenuListProps {
 
 function MenuList(p: MenuListProps) {
   return (
-    <div id={p.id} className={p.depth === 0 ? "menu top" : "menu sub"} role="menu" aria-label={p.label} data-depth={p.depth}>
+    <div
+      id={p.id}
+      className={p.depth === 0 ? "menu top" : "menu sub"}
+      role="menu"
+      aria-label={p.label}
+      data-depth={p.depth}
+    >
       {p.nodes.map((node) => {
         if (node.kind === "separator") return <div key={node.id} className="msep" role="separator" />;
         const hover = (e: MouseEvent<HTMLButtonElement>) => {

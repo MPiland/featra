@@ -11,8 +11,8 @@ delegates them to sub-sessions in their own git worktrees, and Featra shows you 
 
 - **A view of the work, not just the sessions.** The home screen is a feature list: which stories are moving, how many
   are done, what was added after work started, and which bugs the feature caused.
-- **Evidence, not reports.** An agent ticking a box is *reported*; green CI is *verified*; a passing acceptance test
-  is *proven*; your sign-off is *accepted*. Featra shows which one you actually have.
+- **Evidence, not reports.** An agent ticking a box is _reported_; green CI is _verified_; a passing acceptance test
+  is _proven_; your sign-off is _accepted_. Featra shows which one you actually have.
 - **Markdown cards in your repo.** Every epic, feature, story and bug is a markdown file in `.featra/`, committed with
   your code and cheap for agents to read and update.
 - **No forced flow, no ceremony.** No sprints, no estimates, no forecasts. Automations are settings.

@@ -12,9 +12,19 @@ export interface ViewDef {
 
 export const VIEWS: readonly ViewDef[] = [
   { id: "work", title: "Work", placement: "top", placeholder: "Your features and stories will show here." },
-  { id: "inbox", title: "Inbox", placement: "top", placeholder: "Questions and approvals from your agents will show here." },
+  {
+    id: "inbox",
+    title: "Inbox",
+    placement: "top",
+    placeholder: "Questions and approvals from your agents will show here.",
+  },
   { id: "artifacts", title: "Artifacts", placement: "top", placeholder: "Files your agents produce will show here." },
-  { id: "plugins", title: "Plugins", placement: "bottom", placeholder: "Plugins you can turn on for chats will show here." },
+  {
+    id: "plugins",
+    title: "Plugins",
+    placement: "bottom",
+    placeholder: "Plugins you can turn on for chats will show here.",
+  },
   { id: "settings", title: "Settings", placement: "bottom", placeholder: "App and project settings will show here." },
 ];
 

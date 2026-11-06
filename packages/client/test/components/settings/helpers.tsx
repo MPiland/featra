@@ -9,7 +9,9 @@ export const pageNav = () => within(main()).getByRole("navigation", { name: "Set
 export const pageTitle = () => within(main()).getByRole("heading", { level: 2 }).textContent;
 export const radios = (group: string) => within(screen.getByRole("radiogroup", { name: group })).getAllByRole("radio");
 export const checked = (group: string) =>
-  (radios(group).find((r) => (r as HTMLInputElement).checked)?.closest("label")?.textContent ?? null);
+  radios(group)
+    .find((r) => (r as HTMLInputElement).checked)
+    ?.closest("label")?.textContent ?? null;
 export const row = (control: HTMLElement) => control.closest(".setting-row") as HTMLElement;
 export const WORK = "Workflow";
 /** App and Project both have a "Workflow" page: a page is found within its scope's list. */

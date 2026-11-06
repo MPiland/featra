@@ -103,14 +103,27 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       windowState = { ...windowState, ...s };
       for (const l of listeners) l(windowState);
     });
-  return { bridge, saves, appSaves, projectFiles, calls, setWindowState, releaseWrites: () => act(async () => releaseWrites()) };
+  return {
+    bridge,
+    saves,
+    appSaves,
+    projectFiles,
+    calls,
+    setWindowState,
+    releaseWrites: () => act(async () => releaseWrites()),
+  };
 }
 
 /** Window calls the app makes on its own at startup (apply the stored zoom and theme); `actions()` skips them. */
 const startupCalls = (s: UiState, app: AppSettings) => [`zoom:${s.zoomFactor}`, `theme:${app.theme}`];
 
 export function renderApp(
-  opts: { collapsed?: boolean; platform?: string; state?: Partial<UiState>; settings?: Partial<AppSettings> } & HostOptions = {},
+  opts: {
+    collapsed?: boolean;
+    platform?: string;
+    state?: Partial<UiState>;
+    settings?: Partial<AppSettings>;
+  } & HostOptions = {},
 ) {
   const fake = fakeBridge(opts.platform, opts);
   if (opts.settings) fake.appSaves.push({ ...DEFAULT_APP_SETTINGS, ...opts.settings });
@@ -120,9 +133,14 @@ export function renderApp(
   const app = fake.appSaves.at(-1) ?? DEFAULT_APP_SETTINGS;
   const snapshot: SettingsSnapshot = {
     app,
-    closeToTray: opts.closeToTray === undefined ? (opts.platform === "web" ? null : { available: true, place: opts.platform === "darwin" ? "dock" : "tray" }) : opts.closeToTray,
+    closeToTray:
+      opts.closeToTray === undefined
+        ? opts.platform === "web"
+          ? null
+          : { available: true, place: opts.platform === "darwin" ? "dock" : "tray" }
+        : opts.closeToTray,
     currentProject: opts.project === undefined ? PROJECT : opts.project,
-    projects: (opts.project === undefined ? [PROJECT] : opts.project ? [opts.project] : []),
+    projects: opts.project === undefined ? [PROJECT] : opts.project ? [opts.project] : [],
   };
   const startupSaves = fake.appSaves.length;
   render(<App bridge={fake.bridge} initialUiState={initial} initialSettings={snapshot} />);

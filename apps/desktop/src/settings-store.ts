@@ -112,7 +112,8 @@ export function writeProjectValue<K extends WorkSettingKey>(
     try {
       text = await readFile(file, "utf8");
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT") return { dir: projectDir, overrides: {}, error: message(err) };
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT")
+        return { dir: projectDir, overrides: {}, error: message(err) };
     }
     let next: string;
     try {

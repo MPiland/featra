@@ -34,7 +34,12 @@ const fromOs = (app: ElectronApplication, change: "maximize" | "unmaximize" | "e
 
 const RESTORE = process.platform === "win32" ? "Restore Down" : "Restore";
 /** The second of the three window controls: Maximize, Restore (Down) or Exit Full Screen. */
-const sizeButton = (page: Page) => page.getByRole("banner").getByRole("button").filter({ hasNot: page.locator(".close") }).nth(-2);
+const sizeButton = (page: Page) =>
+  page
+    .getByRole("banner")
+    .getByRole("button")
+    .filter({ hasNot: page.locator(".close") })
+    .nth(-2);
 
 async function expectSizeButton(page: Page, label: string, icon: "maximize" | "restore") {
   const b = sizeButton(page);

@@ -91,7 +91,14 @@ describe("AC5: app menu", () => {
     await user.hover(item("Edit"));
     expect(labels(menuAt(1))).toEqual(["Undo⌘Z", "Redo⇧⌘Z", "Cut⌘X", "Copy⌘C", "Paste⌘V", "Delete", "Select All⌘A"]);
     await user.hover(item("View"));
-    expect(labels(menuAt(1))).toEqual(["Sidebar⌘B", "Actual Size⌘0", "Zoom In⌘=", "Zoom Out⌘-", "Full Screen⌃⌘F", "Reload⌘R"]);
+    expect(labels(menuAt(1))).toEqual([
+      "Sidebar⌘B",
+      "Actual Size⌘0",
+      "Zoom In⌘=",
+      "Zoom Out⌘-",
+      "Full Screen⌃⌘F",
+      "Reload⌘R",
+    ]);
     await user.hover(item("Go"));
     expect(labels(menuAt(1)).slice(0, 2)).toEqual(["Back⌘[", "Forward⌘]"]);
     await openPath(user, "Help", "Troubleshooting");
@@ -360,7 +367,9 @@ describe("AC5: app menu", () => {
 
     await openPath(user, "Help");
     await user.click(item("About Featra"));
-    await user.click(within(screen.getByRole("dialog", { name: "About Featra" })).getByRole("button", { name: "Close" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "About Featra" })).getByRole("button", { name: "Close" }),
+    );
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
@@ -402,7 +411,13 @@ describe("AC5: app menu", () => {
     await openPath(user, "File");
     expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,"]);
     await user.hover(item("View"));
-    expect(labels(menuAt(1))).toEqual(["SidebarCtrl+B", "Actual SizeCtrl+0", "Zoom InCtrl+=", "Zoom OutCtrl+-", "ReloadF5"]);
+    expect(labels(menuAt(1))).toEqual([
+      "SidebarCtrl+B",
+      "Actual SizeCtrl+0",
+      "Zoom InCtrl+=",
+      "Zoom OutCtrl+-",
+      "ReloadF5",
+    ]);
     await user.hover(item("Help"));
     expect(labels(menuAt(1))).toEqual(["Keyboard ShortcutsCtrl+/", "About Featra"]);
     await user.keyboard("{Escape}{Escape}{F11}{Control>}{Shift>}W{/Shift}{/Control}");
