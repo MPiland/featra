@@ -1,7 +1,10 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vitest/config";
 
-/** The built app runs from file:// inside Electron, so it gets a strict CSP. Dev keeps Vite's inline HMR preamble. */
+/**
+ * The built app runs from file:// inside Electron, so it gets a strict CSP. Dev keeps Vite's inline HMR preamble.
+ * `connect-src` lets the preload reach the local server on loopback only (ADR 0015); its port changes every start.
+ */
 const productionCsp = (): Plugin => ({
   name: "featra-csp",
   apply: "build",
@@ -10,7 +13,8 @@ const productionCsp = (): Plugin => ({
       tag: "meta",
       attrs: {
         "http-equiv": "Content-Security-Policy",
-        content: "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
+        content:
+          "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' ws://127.0.0.1:*",
       },
       injectTo: "head-prepend",
     },

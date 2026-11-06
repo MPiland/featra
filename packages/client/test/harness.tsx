@@ -11,6 +11,7 @@ import {
   type CloseToTraySupport,
   type FeatraBridge,
   type ProjectRef,
+  type ProjectSetup,
   type ProjectsResult,
   type ProjectsSnapshot,
   type SettingsSnapshot,
@@ -39,6 +40,10 @@ export interface HostOptions {
   brokenProjects?: Record<string, string>;
   /** Config-file writes wait until `releaseWrites()`: a slow disk or IPC round trip. */
   slowProjectWrites?: boolean;
+  /** Each folder's setup as the server would find it on disk. Default: set up ("ready"). */
+  setup?: Record<string, ProjectSetup>;
+  /** Folders where the server's Featra init fails: its error. */
+  initFailures?: Record<string, string>;
 }
 
 const noop = () => {};
@@ -72,6 +77,9 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   const listeners = new Set<(s: WindowState) => void>();
   let releaseWrites: () => void = noop;
   const writesReleased = new Promise<void>((r) => (releaseWrites = r));
+  // The project folders on disk, as the server sees them: git init and Featra init move a folder to the next state.
+  const setupOnDisk = new Map(Object.entries(host.setup ?? {}));
+  const setupOf = (dir: string): ProjectSetup => setupOnDisk.get(dir) ?? { state: "ready" };
   const bridge: FeatraBridge = {
     platform,
     uiState: {
@@ -126,6 +134,21 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       create: async (location, name) => {
         calls.push(`create:${location}:${name}`);
         return makeCurrent(`${location}/${name.trim()}`);
+      },
+    },
+    setup: {
+      status: async (dir) => setupOf(dir),
+      initGit: async (dir) => {
+        calls.push(`initGit:${dir}`);
+        if (setupOf(dir).state === "no-git") setupOnDisk.set(dir, { state: "no-featra" });
+        return setupOf(dir);
+      },
+      initFeatra: async (dir) => {
+        calls.push(`initFeatra:${dir}`);
+        const failure = host.initFailures?.[dir];
+        if (failure) return { ok: false, error: failure };
+        setupOnDisk.set(dir, { state: "ready" });
+        return { ok: true, created: [".featra/config.yaml"], kept: [] };
       },
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.

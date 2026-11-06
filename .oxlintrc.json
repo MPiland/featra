@@ -87,6 +87,39 @@
               {
                 "group": ["@featra/desktop", "@featra/desktop/**"],
                 "message": "Dependencies point toward work-format (ADR 0011)."
+              },
+              {
+                "group": ["@featra/server", "@featra/server/**"],
+                "message": "client reaches the server only through FeatraBridge (ADR 0015)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/server/src/**", "packages/server/lint-fixtures/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "react", "message": "server is headless Node services: no React (ADR 0015)." },
+              { "name": "react-dom", "message": "server is headless Node services: no React (ADR 0015)." },
+              { "name": "electron", "message": "server runs as plain Node, not Electron (ADR 0015)." }
+            ],
+            "patterns": [
+              {
+                "group": ["react/**", "react-dom/**"],
+                "message": "server is headless Node services: no React (ADR 0015)."
+              },
+              {
+                "group": ["electron/**"],
+                "message": "server runs as plain Node, not Electron (ADR 0015)."
+              },
+              {
+                "group": ["@featra/client", "@featra/client/**", "@featra/desktop", "@featra/desktop/**"],
+                "message": "Dependencies point toward work-format (ADR 0011)."
               }
             ]
           }

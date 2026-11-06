@@ -1,10 +1,11 @@
 import { join } from "node:path";
 import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
-import { registerIpc } from "./ipc.ts";
+import { allowedDirs, registerIpc } from "./ipc.ts";
 import { createLifecycle } from "./lifecycle.ts";
 import { createLog } from "./log.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
+import { createServerProcess } from "./server-process.ts";
 import { createSettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 import { createTray, destroyTray, trayAvailable } from "./tray.ts";
@@ -45,6 +46,12 @@ if (!app.requestSingleInstanceLock()) {
     fallbackLocation: app.getPath("documents"),
   });
   log.info(`Featra ${app.getVersion()} started (${process.platform})`);
+  // The local server makes every project write (ADR 0012, ADR 0015). It runs on Electron's own Node.
+  const server = createServerProcess({
+    script: join(app.getAppPath(), "dist", "server.cjs"),
+    execPath: process.execPath,
+    log: (message) => log.info(message),
+  });
   let win: BrowserWindow | undefined;
   let tray: Tray | undefined;
 
@@ -58,6 +65,7 @@ if (!app.requestSingleInstanceLock()) {
       findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR).then(projects.start),
     ]);
     const project = projects.current();
+    void projects.snapshot().then((s) => server.setProjects(allowedDirs(s)));
     let appSettings = stored;
     if (process.platform !== "darwin") log.info(hasTray ? "Tray available" : "No tray: close quits");
     log.info(project ? `Project: ${project.dir}` : "No project");
@@ -84,6 +92,7 @@ if (!app.requestSingleInstanceLock()) {
       lifecycle,
       log,
       projects,
+      server,
       settings: {
         store: settingsStore,
         current: () => appSettings,
@@ -111,6 +120,8 @@ if (!app.requestSingleInstanceLock()) {
     let loggedQuit = false;
     app.on("before-quit", () => {
       lifecycle.onBeforeQuit();
+      // A server main stops logs nothing, so "Quitting" stays the log's last line.
+      void server.stop();
       if (!loggedQuit) log.info("Quitting");
       loggedQuit = true;
     });

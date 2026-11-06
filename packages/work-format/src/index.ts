@@ -9,3 +9,5 @@ export * from "./bugs.ts";
 export * from "./ids.ts";
 export * from "./validate.ts";
 export * from "./utils/guards.ts";
+export * from "./scaffold.ts";
+export * from "./protocol.ts";

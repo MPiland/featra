@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from "electron";
 import {
+  createServerClient,
   IPC,
+  normalizeEndpoint,
   normalizeAppSettings,
   normalizeProjectSettings,
   normalizeProjects,
@@ -8,8 +10,12 @@ import {
   normalizeSettingsSnapshot,
   normalizeUiState,
   normalizeWindowState,
+  serverSetup,
   type FeatraBridge,
 } from "@featra/client/bridge";
+
+// The local server's WebSocket (ADR 0015). Main hands out its address and token; the page never sees either.
+const server = createServerClient(async () => normalizeEndpoint(await ipcRenderer.invoke(IPC.serverEndpoint)));
 
 const bridge: FeatraBridge = {
   platform: process.platform,
@@ -56,6 +62,7 @@ const bridge: FeatraBridge = {
     create: async (location, name) =>
       normalizeProjectsResult(await ipcRenderer.invoke(IPC.projectsCreate, location, name)),
   },
+  setup: serverSetup(server),
   edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {
     info: () => ipcRenderer.invoke(IPC.appInfo),

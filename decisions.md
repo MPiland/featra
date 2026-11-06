@@ -238,3 +238,19 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   (`e2e/user32-helper.ps1`, about 8 ms a call) instead of one PowerShell per call. The two focus tests start a
   busy-user window (`e2e/busy-user.ps1`) that keeps getting input, so the lock is on in every run instead of only when
   someone happens to be at the desktop.
+- 2026-11-06 — STORY-2 (open a folder and initialise Featra): the server's process model and protocol are ADR 0015.
+  Smaller choices:
+  - The offer is a non-modal banner at the top of Work ("Project setup"), not a dialog. Opening a folder never blocks
+    on it, and "Not now" hides it for that project until Featra restarts. The full guided setup is STORY-33.
+  - Featra init needs a git repository. A plain folder is offered Initialize Git first, then Initialize Featra, so
+    cards always live in git.
+  - Init writes each file with create-only (`wx`), so it never overwrites, even in a race. `docs/adr/README.md` is
+    seeded only when init creates `docs/adr/` itself; a user's own ADR folder is left as it is.
+  - The new `config.yaml` holds only `version: 1`, so every work setting follows the app-wide defaults until the user
+    overrides it.
+  - Git runs with `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and the other repo overrides removed from its env, so a
+    caller's env (a git hook, for one) can't point it at another repository. A git error other than "not a git
+    repository" (dubious ownership, for one) is shown as an error, not as an offer to run `git init`.
+  - A server main stops (on quit) logs nothing: not the stop, nor the child's exit, stderr or messages after it. The
+    stop is part of quitting, so "Quitting" stays the log's last line, right after the line that caused it (e2e checks
+    both). A server that exits on its own is still logged with its exit code.
