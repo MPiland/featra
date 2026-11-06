@@ -2,7 +2,7 @@
 id: STORY-20
 type: story
 title: Settings window with app and project scopes
-status: In Progress
+status: In Review
 parent: FEAT-13
 order: 3
 origin: planned
@@ -45,6 +45,11 @@ history:
     from: In Review
     to: In Progress
     by: user
+  - at: 2026-11-06T00:21:06Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-20
 ---
 
 ## Description
@@ -67,8 +72,7 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - [x] work-format: project overrides (`configOverrides`) and in-place edits (`setConfigValue`) of config.yaml
 - [x] Settings model and bridge (`packages/client/src/settings.ts`, `bridge.ts`, preload)
 - [x] Settings view: pages, scopes, picker, override mark and Reset, shortcuts page with search
-- [x] Layout rework after review: rows in titled cards, switch, segmented control and dropdown, quiet "Overridden ·
-  Reset", picker in the Project page header, no file paths in the UI, the work page renamed (now "Workflow")
+- [x] Layout rework after review: rows in titled cards, switch, segmented control and dropdown, quiet "Overridden · Reset", picker in the Project page header, no file paths in the UI, the work page renamed (now "Workflow")
 - [x] Text pass after review: no repeated headings or descriptions that restate labels
 - [x] Help > Keyboard Shortcuts and Ctrl+/; shortcuts listed from the menu model
 - [x] Main: settings store, current project, IPC, Close button at runtime with the tray following it
@@ -78,8 +82,8 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 ## Notes
 
 - Settings is an in-app view, not a separate window: see decisions.md (STORY-20).
-- E2E after the layout rework: Windows 29 passed; WSL Ubuntu WSLg and xvfb-run: see the commit report. Unit: 233
-  passed (settings.test.tsx 26).
+- E2E after the text pass: Windows 29 passed; WSL Ubuntu WSLg 29 passed; xvfb-run 28 passed, 1 skipped (BUG-1's
+  maximize test: xvfb has no window manager). Unit: 235 passed.
 - Bug found and fixed: a project change waited for the write before showing; regression test in settings.test.tsx.
 - Sent back by the user (2026-11-05): "Any repetitive text, unnecessary text, etc" and "Duplicate heading" (the
   Project page title repeated as its first section heading). Fixed: the page is "Workflow", single-group pages have
