@@ -2,7 +2,7 @@
 id: BUG-2
 type: bug
 title: Tray restore test fails in the full Windows e2e suite
-status: In Review
+status: Done
 parent: FEAT-13
 order: 6
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-2
+  - at: 2026-11-06T17:19:15Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-06T17:19:15Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
