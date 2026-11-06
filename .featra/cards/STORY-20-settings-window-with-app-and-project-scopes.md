@@ -2,7 +2,7 @@
 id: STORY-20
 type: story
 title: Settings window with app and project scopes
-status: In Review
+status: In Progress
 parent: FEAT-13
 order: 3
 origin: planned
@@ -50,6 +50,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-20
+  - at: 2026-11-06T00:23:32Z
+    field: status
+    from: In Review
+    to: In Progress
+    by: user
 ---
 
 ## Description
@@ -90,6 +95,9 @@ As a builder, I change app-wide and per-project settings in one Settings window.
   no section heading, descriptions that restated labels are gone; regression test "no page repeats itself".
 - Bug found and fixed: work-format dropped the wrapped lines of a checklist item when it rewrote a card (a status
   change lost half of a task here); regression test in `packages/work-format/test/card.test.ts`.
+- Sent back by the user (2026-11-06) for the coding standards (`docs/coding-standards.md`: one concern per file,
+  shared controls in `components/controls/`, no file over about 300 lines) and for shorter, standard setting wording
+  ("Minimize to tray" or "Quit", no flavour text).
 
 ## Tests
 
