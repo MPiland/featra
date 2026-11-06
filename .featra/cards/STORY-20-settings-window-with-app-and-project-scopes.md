@@ -2,7 +2,7 @@
 id: STORY-20
 type: story
 title: Settings window with app and project scopes
-status: In Progress
+status: In Review
 parent: FEAT-13
 order: 3
 origin: planned
@@ -55,6 +55,11 @@ history:
     from: In Review
     to: In Progress
     by: user
+  - at: 2026-11-06T00:36:50Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-20
 ---
 
 ## Description
@@ -83,14 +88,14 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - [x] Main: settings store, current project, IPC, Close button at runtime with the tray following it
 - [x] Styles meeting WCAG AA in both themes (contrast e2e walks every Settings page)
 - [x] E2E journey; runs on Windows, WSLg and xvfb-run
-- [ ] Coding standards: controls in `components/controls/`, one page per file, page model in `settings-pages.ts`, styles split by area, tests split by page
-- [ ] Shorter, standard setting wording ("Minimize to tray" / "Quit"; no flavour text)
+- [x] Coding standards: controls in `components/controls/`, one page per file, page model in `settings-pages.ts`, styles split by area, tests split by page
+- [x] Shorter, standard setting wording ("Minimize to tray" / "Quit"; no flavour text)
 
 ## Notes
 
 - Settings is an in-app view, not a separate window: see decisions.md (STORY-20).
-- E2E after the text pass: Windows 29 passed; WSL Ubuntu WSLg 29 passed; xvfb-run 28 passed, 1 skipped (BUG-1's
-  maximize test: xvfb has no window manager). Unit: 235 passed.
+- E2E after the coding-standards split and wording pass (c28a3e8): Windows 29 passed; WSL Ubuntu WSLg 29 passed;
+  xvfb-run 28 passed (BUG-1's maximize test needs a window manager). Unit: 253 passed.
 - Bug found and fixed: a project change waited for the write before showing; regression test in `ProjectPage.test.tsx`.
 - Sent back by the user (2026-11-05): "Any repetitive text, unnecessary text, etc" and "Duplicate heading" (the
   Project page title repeated as its first section heading). Fixed: the page is "Workflow", single-group pages have
