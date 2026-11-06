@@ -2,6 +2,7 @@
  * The contract between the UI and its host. Electron's preload implements it; a plain browser (Vite dev, later
  * remote control) gets the fallback below. The UI never talks to Electron any other way.
  */
+import { isRecord } from "@featra/work-format";
 import {
   DEFAULT_APP_SETTINGS,
   normalizeAppSettings,
@@ -29,7 +30,7 @@ export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: 
 
 /** Reads stored state defensively: unknown or malformed fields fall back to defaults. */
 export function normalizeUiState(raw: unknown): UiState {
-  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const r = isRecord(raw) ? raw : {};
   return {
     sidebarCollapsed: typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
     zoomFactor: normalizeZoom(r.zoomFactor),
@@ -49,7 +50,7 @@ export interface WindowState {
 export const DEFAULT_WINDOW_STATE: WindowState = { maximized: false, fullScreen: false };
 
 export function normalizeWindowState(raw: unknown): WindowState {
-  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const r = isRecord(raw) ? raw : {};
   return { maximized: r.maximized === true, fullScreen: r.fullScreen === true };
 }
 
@@ -159,6 +160,9 @@ declare global {
 const STORAGE_KEY = "featra.ui-state";
 const SETTINGS_KEY = "featra.settings";
 
+const noProject = (dir: string): ProjectSettings =>
+  normalizeProjectSettings({ error: "No project folder in a browser tab." }, dir);
+
 /**
  * Used when the UI runs in a plain browser: state lives in localStorage and there is no window to control, nor a
  * project folder to read.
@@ -171,8 +175,6 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       return { ...DEFAULT_APP_SETTINGS };
     }
   };
-  const noProject = (dir: string): ProjectSettings =>
-    normalizeProjectSettings({ error: "No project folder in a browser tab." }, dir);
   return {
     platform: "web",
     uiState: {

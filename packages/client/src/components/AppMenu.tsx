@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from "react";
 import type { MenuNode } from "../menu.ts";
+import { focusedElement, isInside } from "../utils/dom.ts";
 import { CheckIcon, ChevronRightIcon, MenuIcon } from "./icons.tsx";
 
 /**
@@ -29,10 +30,11 @@ export function AppMenu({ nodes }: { nodes: readonly MenuNode[] }) {
   });
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     const onPointer = (e: PointerEvent) => {
-      const t = e.target as Node;
-      if (!root.current?.contains(t) && !button.current?.contains(t)) closeAll(false);
+      if (isInside(e.target, root.current, button.current)) return;
+      setOpen(false);
+      setPath([]);
     };
     document.addEventListener("pointerdown", onPointer);
     return () => document.removeEventListener("pointerdown", onPointer);
@@ -77,11 +79,12 @@ export function AppMenu({ nodes }: { nodes: readonly MenuNode[] }) {
   };
 
   const onKey = (e: KeyboardEvent) => {
-    const item = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>("[data-id]");
+    const item = focusedElement()?.closest<HTMLElement>("[data-id]");
     const list = item?.closest<HTMLElement>("[role=menu]");
-    if (!item || !list) return;
+    const itemId = item?.dataset.id;
+    if (!item || !list || !itemId) return;
     const depth = Number(list.dataset.depth);
-    const node = findNode(nodes, item.dataset.id!);
+    const node = findNode(nodes, itemId);
     const items = Array.from(list.querySelectorAll<HTMLElement>("[data-id]")).filter(
       (el) => el.closest("[role=menu]") === list,
     );
@@ -135,7 +138,7 @@ export function AppMenu({ nodes }: { nodes: readonly MenuNode[] }) {
         aria-expanded={open}
         aria-controls={open ? "app-menu" : undefined}
         onPointerDown={() => {
-          if (!open) pointerOpener.current = document.activeElement as HTMLElement | null;
+          if (!open) pointerOpener.current = focusedElement();
         }}
         onClick={() => (open ? closeAll(false) : openMenu())}
         onKeyDown={(e) => {
@@ -148,7 +151,8 @@ export function AppMenu({ nodes }: { nodes: readonly MenuNode[] }) {
         <MenuIcon />
       </button>
       {open && (
-        <div ref={root} onKeyDown={onKey}>
+        // Catches keys bubbling up from the menus below; the menus carry the roles.
+        <div ref={root} role="presentation" onKeyDown={onKey}>
           <MenuList
             id="app-menu"
             label="Menu"
@@ -186,7 +190,7 @@ function MenuList(p: MenuListProps) {
       data-depth={p.depth}
     >
       {p.nodes.map((node) => {
-        if (node.kind === "separator") return <div key={node.id} className="msep" role="separator" />;
+        if (node.kind === "separator") return <hr key={node.id} className="msep" />;
         const hover = (e: MouseEvent<HTMLButtonElement>) => {
           e.currentTarget.focus();
           if (node.kind === "submenu") p.onOpenSub(p.depth, node.id, false);

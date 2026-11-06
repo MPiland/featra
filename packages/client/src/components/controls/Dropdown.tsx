@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import type { ChoiceDef } from "../../settings.ts";
+import { isInside } from "../../utils/dom.ts";
 import { ChevronDownIcon } from "../icons.tsx";
 
 export interface DropdownProps {
@@ -27,10 +28,10 @@ export function Dropdown({ name, value, options, onChange }: DropdownProps) {
   );
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
     list.current?.focus();
     const outside = (e: MouseEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+      if (!isInside(e.target, wrap.current)) setOpen(false);
     };
     document.addEventListener("mousedown", outside);
     return () => document.removeEventListener("mousedown", outside);
@@ -101,6 +102,8 @@ export function Dropdown({ name, value, options, onChange }: DropdownProps) {
           onKeyDown={onListKey}
         >
           {options.map((o, i) => (
+            // The list box owns the keyboard (aria-activedescendant), so an option needs only the click.
+            // oxlint-disable-next-line jsx-a11y/click-events-have-key-events
             <li
               key={o.value}
               id={`${id}-opt-${i}`}

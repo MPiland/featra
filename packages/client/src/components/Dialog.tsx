@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { focusedElement } from "../utils/dom.ts";
 
 interface DialogProps {
   title: string;
@@ -20,7 +21,7 @@ export function Dialog({ title, onClose, children, closeLabel = "Close", actions
   const closeButton = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const before = document.activeElement as HTMLElement | null;
+    const before = focusedElement();
     closeButton.current?.focus();
     return () => {
       if (before?.isConnected) before.focus();
@@ -28,27 +29,26 @@ export function Dialog({ title, onClose, children, closeLabel = "Close", actions
   }, []);
 
   return (
-    <div className="overlay">
-      <div
-        ref={box}
-        className="dialog"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") {
-            e.preventDefault();
-            e.stopPropagation();
-            onClose();
-          } else if (e.key === "Tab") {
-            const els = Array.from(box.current?.querySelectorAll<HTMLElement>("button, [href], [tabindex='0']") ?? []);
-            const at = els.indexOf(document.activeElement as HTMLElement);
-            const next = els[(at + (e.shiftKey ? -1 : 1) + els.length) % els.length];
-            e.preventDefault();
-            next?.focus();
-          }
-        }}
-      >
+    // The overlay only catches keys bubbling up from inside the dialog, so it has no role of its own.
+    <div
+      className="overlay"
+      role="presentation"
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          e.stopPropagation();
+          onClose();
+        } else if (e.key === "Tab") {
+          const els = Array.from(box.current?.querySelectorAll<HTMLElement>("button, [href], [tabindex='0']") ?? []);
+          const focused = focusedElement();
+          const at = focused ? els.indexOf(focused) : -1;
+          const next = els[(at + (e.shiftKey ? -1 : 1) + els.length) % els.length];
+          e.preventDefault();
+          next?.focus();
+        }
+      }}
+    >
+      <div ref={box} className="dialog" role="dialog" aria-modal="true" aria-labelledby={titleId}>
         <h2 id={titleId}>{title}</h2>
         {children}
         <div className="dialog-actions">

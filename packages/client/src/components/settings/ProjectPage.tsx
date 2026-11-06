@@ -24,14 +24,18 @@ export interface ProjectPageProps {
 /** The Project scope's Workflow page: one project's work settings, each either the app default or an override. */
 export function ProjectPage({ bridge, snapshot, title }: ProjectPageProps) {
   const [dir, setDir] = useState(snapshot.currentProject?.dir ?? snapshot.projects[0]?.dir ?? null);
-  const [project, setProject] = useState<ProjectSettings | null>(null);
+  // Settings are kept with the folder they were read from, so switching folders shows nothing until the new one loads.
+  const [loaded, setLoaded] = useState<{ dir: string; settings: ProjectSettings } | null>(null);
+  const project = loaded && loaded.dir === dir ? loaded.settings : null;
   const page = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!dir) return;
     let live = true;
-    setProject(null);
-    void bridge.settings.loadProject(dir).then((p) => live && setProject(p));
+    if (dir) {
+      void bridge.settings.loadProject(dir).then((settings) => {
+        if (live) setLoaded({ dir, settings });
+      });
+    }
     return () => {
       live = false;
     };
@@ -49,12 +53,13 @@ export function ProjectPage({ bridge, snapshot, title }: ProjectPageProps) {
   const overrides = project?.overrides ?? {};
   const set = async (key: WorkSettingKey, value: WorkSettings[WorkSettingKey] | null) => {
     // Show the change at once; what the file then holds replaces it.
-    setProject((p) => {
-      if (!p) return p;
-      const { [key]: _old, ...rest } = p.overrides;
-      return { ...p, overrides: value === null ? rest : { ...rest, [key]: value } };
+    setLoaded((l) => {
+      if (l?.dir !== dir) return l;
+      const { [key]: _old, ...rest } = l.settings.overrides;
+      return { dir, settings: { ...l.settings, overrides: value === null ? rest : { ...rest, [key]: value } } };
     });
-    setProject(await bridge.settings.setProjectValue(dir, key, value as never));
+    const settings = await bridge.settings.setProjectValue(dir, key, value);
+    setLoaded({ dir, settings });
   };
   const reset = async (key: WorkSettingKey) => {
     await set(key, null);

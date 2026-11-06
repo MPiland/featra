@@ -1,4 +1,10 @@
-import { workSettingDef, type WorkSettingDef, type WorkSettingKey, type WorkSettings } from "../../settings.ts";
+import {
+  workSettingDef,
+  type ChoiceDef,
+  type WorkSettingDef,
+  type WorkSettingKey,
+  type WorkSettings,
+} from "../../settings.ts";
 import { WORK_GROUPS, type SettingsScope } from "../../settings-pages.ts";
 import { SegmentedControl } from "../controls/SegmentedControl.tsx";
 import { SettingRow, type OverrideMark } from "../controls/SettingRow.tsx";
@@ -55,7 +61,11 @@ function WorkSettingRow(props: {
             name={id}
             value={String(value)}
             options={def.choices}
-            onChange={(v) => onChange(v as WorkValue)}
+            onChange={(v) => {
+              const choices: readonly ChoiceDef<WorkValue>[] = def.choices;
+              const choice = choices.find((c) => String(c.value) === v);
+              if (choice) onChange(choice.value);
+            }}
             disabled={disabled}
             {...aria}
           />

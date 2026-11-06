@@ -1,6 +1,6 @@
 import type { EditCommand } from "./bridge.ts";
 import { shortcutLabel, type ShortcutId } from "./shortcuts.ts";
-import { VIEWS, type ViewId } from "./views.ts";
+import { viewDef, VIEWS, type ViewId } from "./views.ts";
 
 export type MenuNode =
   | { kind: "item"; id: string; label: string; shortcut?: string; disabled?: boolean; onSelect: () => void }
@@ -45,6 +45,8 @@ export interface MenuContext {
 /** The views the Go menu opens: the sidebar's, except Settings, which is in File. */
 const GO_VIEWS: readonly ViewId[] = VIEWS.map((v) => v.id).filter((id) => id !== "settings");
 
+const sep = (id: string): MenuNode => ({ kind: "separator", id });
+
 const fileManager = (platform: string) =>
   platform === "darwin" ? "Finder" : platform === "win32" ? "File Explorer" : "File Manager";
 
@@ -63,7 +65,6 @@ export function buildAppMenu({
 }: MenuContext): MenuNode[] {
   const key = (id: ShortcutId) => shortcutLabel(id, platform);
   const inWindow = platform !== "web"; // a plain browser tab can't close, quit, go full screen or troubleshoot itself
-  const sep = (id: string): MenuNode => ({ kind: "separator", id });
   const item = (id: string, label: string, onSelect: () => void, shortcut?: ShortcutId, disabled = false): MenuNode => {
     const k = shortcut && key(shortcut);
     return { kind: "item", id, label, onSelect, ...(k ? { shortcut: k } : {}), ...(disabled ? { disabled } : {}) };
@@ -112,7 +113,7 @@ export function buildAppMenu({
     item("go.back", "Back", a.back, "back", !canGoBack),
     item("go.forward", "Forward", a.forward, "forward", !canGoForward),
     sep("go.sep"),
-    ...GO_VIEWS.map((id) => item(`go.${id}`, VIEWS.find((v) => v.id === id)!.title, () => a.open(id))),
+    ...GO_VIEWS.map((id) => item(`go.${id}`, viewDef(id).title, () => a.open(id))),
   ];
 
   const help: MenuNode[] = [

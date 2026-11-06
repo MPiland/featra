@@ -4,7 +4,7 @@
  * project's `.featra/config.yaml` can override any of them. A project overrides a setting exactly when its file sets
  * the key; resetting removes the key so the app default applies again.
  */
-import type { KnowledgePermission, ProgressMode } from "@featra/work-format";
+import { isOneOf, isRecord, type KnowledgePermission, type ProgressMode } from "@featra/work-format";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 
 /** What the window's close button (and Alt+F4) does. */
@@ -89,8 +89,7 @@ export function workSettingDef(key: WorkSettingKey): WorkSettingDef {
   return def;
 }
 
-const record = (raw: unknown): Record<string, unknown> =>
-  raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+const record = (raw: unknown): Record<string, unknown> => (isRecord(raw) ? raw : {});
 
 function validWorkValue(key: WorkSettingKey, value: unknown): boolean {
   const def = workSettingDef(key);
@@ -103,17 +102,15 @@ export function normalizeWorkOverrides(raw: unknown): WorkOverrides {
   const r = record(raw);
   const out: Record<string, unknown> = {};
   for (const key of WORK_SETTING_KEYS) if (key in r && validWorkValue(key, r[key])) out[key] = r[key];
-  return out as WorkOverrides;
+  return out;
 }
 
 /** Reads stored app settings defensively: unknown or malformed fields fall back to defaults. */
 export function normalizeAppSettings(raw: unknown): AppSettings {
   const r = record(raw);
   return {
-    theme: THEME_CHOICES.includes(r.theme as ThemeChoice) ? (r.theme as ThemeChoice) : DEFAULT_APP_SETTINGS.theme,
-    closeButton: CLOSE_BUTTON_CHOICES.includes(r.closeButton as CloseButton)
-      ? (r.closeButton as CloseButton)
-      : DEFAULT_APP_SETTINGS.closeButton,
+    theme: isOneOf(THEME_CHOICES, r.theme) ? r.theme : DEFAULT_APP_SETTINGS.theme,
+    closeButton: isOneOf(CLOSE_BUTTON_CHOICES, r.closeButton) ? r.closeButton : DEFAULT_APP_SETTINGS.closeButton,
     work: { ...DEFAULT_WORK_SETTINGS, ...normalizeWorkOverrides(r.work) },
   };
 }
