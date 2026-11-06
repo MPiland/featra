@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseConfig } from "@featra/work-format";
 import { DEFAULT_APP_SETTINGS, DEFAULT_WORK_SETTINGS } from "@featra/client/bridge";
-import { createSettingsStore, findProject, readProjectSettings, writeProjectValue } from "../src/settings-store.ts";
+import { createSettingsStore, readProjectSettings, writeProjectValue } from "../src/settings-store.ts";
 import { createUiStateStore } from "../src/ui-state-store.ts";
 
 /** Real stores against temporary folders: a userData folder and a project folder. */
@@ -111,23 +111,5 @@ describe("AC2: project settings are stored in the project's .featra/config.yaml"
     const result = await writeProjectValue(project, "worktrees", false);
     expect(result.error).toMatch(/progress must be/);
     expect(await configText()).toBe(broken);
-  });
-});
-
-describe("AC1: the current project", () => {
-  it("is the nearest folder at or above the start folder that holds .featra", async () => {
-    const nested = join(project, "apps", "desktop");
-    await mkdir(nested, { recursive: true });
-    expect(await findProject(nested)).toEqual({ dir: project, name: project.split(/[\\/]/).at(-1) });
-    expect(await findProject(project)).toEqual({ dir: project, name: project.split(/[\\/]/).at(-1) });
-  });
-
-  it("is none when no folder above holds .featra", async () => {
-    expect(await findProject(userData)).toBeNull();
-  });
-
-  it("FEATRA_PROJECT_DIR picks it, and an empty value means none", async () => {
-    expect((await findProject(userData, project))?.dir).toBe(project);
-    expect(await findProject(project, "")).toBeNull();
   });
 });

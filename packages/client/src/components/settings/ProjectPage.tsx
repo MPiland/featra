@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { FeatraBridge } from "../../bridge.ts";
+import type { ProjectsSnapshot } from "../../projects.ts";
 import {
   effectiveWork,
   isOverridden,
@@ -18,12 +19,14 @@ import { WorkSettingGroups } from "./WorkSettingGroups.tsx";
 export interface ProjectPageProps {
   bridge: FeatraBridge;
   snapshot: SettingsSnapshot;
+  /** The picker lists every known project and starts on the current one. */
+  projects: ProjectsSnapshot;
   title: string;
 }
 
 /** The Project scope's Workflow page: one project's work settings, each either the app default or an override. */
-export function ProjectPage({ bridge, snapshot, title }: ProjectPageProps) {
-  const [dir, setDir] = useState(snapshot.currentProject?.dir ?? snapshot.projects[0]?.dir ?? null);
+export function ProjectPage({ bridge, snapshot, projects, title }: ProjectPageProps) {
+  const [dir, setDir] = useState(projects.current?.dir ?? projects.projects[0]?.dir ?? null);
   // Settings are kept with the folder they were read from, so switching folders shows nothing until the new one loads.
   const [loaded, setLoaded] = useState<{ dir: string; settings: ProjectSettings } | null>(null);
   const project = loaded && loaded.dir === dir ? loaded.settings : null;
@@ -73,7 +76,7 @@ export function ProjectPage({ bridge, snapshot, title }: ProjectPageProps) {
         <Dropdown
           name="Project"
           value={dir}
-          options={snapshot.projects.map((p) => ({ value: p.dir, label: p.name }))}
+          options={projects.projects.map((p) => ({ value: p.dir, label: p.name }))}
           onChange={setDir}
         />
       </PageHeader>

@@ -125,12 +125,6 @@ export function workValueLabel(key: WorkSettingKey, value: WorkSettings[WorkSett
   return (def.choices as readonly ChoiceDef<unknown>[]).find((c) => c.value === value)?.label ?? String(value);
 }
 
-export interface ProjectRef {
-  /** Absolute path of the project folder (the one holding `.featra/`). */
-  dir: string;
-  name: string;
-}
-
 /** A project's work settings as its config file has them. */
 export interface ProjectSettings {
   dir: string;
@@ -151,18 +145,9 @@ export type CloseToTraySupport =
 export interface SettingsSnapshot {
   app: AppSettings;
   closeToTray: CloseToTraySupport;
-  /** The project Featra is working in, or null; the Project scope's picker starts on it. */
-  currentProject: ProjectRef | null;
-  /** Projects the picker offers. Only the current one until STORY-19 brings the project list. */
-  projects: ProjectRef[];
 }
 
 export const NO_TRAY_REASON = "No system tray, so closing quits.";
-
-function normalizeProjectRef(raw: unknown): ProjectRef | null {
-  const r = record(raw);
-  return typeof r.dir === "string" && r.dir && typeof r.name === "string" ? { dir: r.dir, name: r.name } : null;
-}
 
 function normalizeCloseToTray(raw: unknown): CloseToTraySupport {
   if (raw === null || raw === undefined) return null;
@@ -173,14 +158,9 @@ function normalizeCloseToTray(raw: unknown): CloseToTraySupport {
 
 export function normalizeSettingsSnapshot(raw: unknown): SettingsSnapshot {
   const r = record(raw);
-  const currentProject = normalizeProjectRef(r.currentProject);
-  const projects = (Array.isArray(r.projects) ? r.projects : []).map(normalizeProjectRef).filter((p) => p !== null);
-  if (currentProject && !projects.some((p) => p.dir === currentProject.dir)) projects.unshift(currentProject);
   return {
     app: normalizeAppSettings(r.app),
     closeToTray: normalizeCloseToTray(r.closeToTray),
-    currentProject,
-    projects,
   };
 }
 

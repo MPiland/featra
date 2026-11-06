@@ -1,11 +1,10 @@
-import { access, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { configOverrides, ConfigError, errorMessage, isRecord, setConfigValue } from "@featra/work-format";
 import {
   normalizeAppSettings,
   normalizeWorkOverrides,
   type AppSettings,
-  type ProjectRef,
   type ProjectSettings,
   type WorkSettingKey,
   type WorkSettings,
@@ -49,31 +48,6 @@ const exists = (file: string) =>
 
 export const CONFIG_PATH = [".featra", "config.yaml"] as const;
 const configFile = (projectDir: string) => join(projectDir, ...CONFIG_PATH);
-
-const isDir = (path: string) =>
-  stat(path).then(
-    (s) => s.isDirectory(),
-    () => false,
-  );
-
-/**
- * The project Featra works in until STORY-19 brings a project list: `FEATRA_PROJECT_DIR` if set (an empty value
- * means none), else the nearest folder at or above `start` that holds a `.featra` folder.
- */
-export async function findProject(start: string, override?: string): Promise<ProjectRef | null> {
-  if (override !== undefined) {
-    if (!override) return null;
-    const dir = resolve(override);
-    return { dir, name: basename(dir) };
-  }
-  let dir = resolve(start);
-  for (;;) {
-    if (await isDir(join(dir, ".featra"))) return { dir, name: basename(dir) };
-    const parent = dirname(dir);
-    if (parent === dir) return null;
-    dir = parent;
-  }
-}
 
 const message = errorMessage;
 

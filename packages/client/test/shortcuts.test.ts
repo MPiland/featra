@@ -116,3 +116,41 @@ describe("app shortcuts", () => {
     expect(shortcutLabel("redo", "darwin")).toBe("⇧⌘Z");
   });
 });
+
+describe("STORY-19 AC4: project shortcuts", () => {
+  it("New Project… is Ctrl+Shift+N, Open Folder… Ctrl+O and Project Settings… Ctrl+Shift+, on Windows and Linux", () => {
+    for (const platform of ["win32", "linux"]) {
+      expect(matchShortcut(ctrl("N", "KeyN", { shiftKey: true }), platform)).toBe("newProject");
+      expect(matchShortcut(ctrl("o", "KeyO"), platform)).toBe("openFolder");
+      expect(matchShortcut(ctrl("<", "Comma", { shiftKey: true }), platform)).toBe("projectSettings");
+      // Shift turns "," into "<" on most layouts: the physical key or either character will do.
+      expect(matchShortcut(ctrl("<", "", { shiftKey: true }), platform)).toBe("projectSettings");
+      expect(matchShortcut(ctrl(",", "", { shiftKey: true }), platform)).toBe("projectSettings");
+      expect(matchShortcut(ctrl(",", "Comma"), platform)).toBe("settings");
+    }
+  });
+
+  it("keeps Ctrl+N for New chat and leaves Ctrl+Shift+O and Ctrl+Alt+O alone", () => {
+    expect(matchShortcut(ctrl("n", "KeyN"), "win32")).toBeNull();
+    expect(matchShortcut(ctrl("O", "KeyO", { shiftKey: true }), "win32")).toBeNull();
+    expect(matchShortcut(ctrl("o", "KeyO", { altKey: true }), "win32")).toBeNull();
+  });
+
+  it("works on non-Latin layouts by the physical key", () => {
+    expect(matchShortcut(ctrl("щ", "KeyO"), "win32")).toBe("openFolder");
+    expect(matchShortcut(ctrl("Т", "KeyN", { shiftKey: true }), "win32")).toBe("newProject");
+  });
+
+  it("uses Cmd on macOS: ⇧⌘N, ⌘O and ⇧⌘,", () => {
+    expect(matchShortcut(cmd("n", "KeyN", { shiftKey: true }), "darwin")).toBe("newProject");
+    expect(matchShortcut(cmd("o", "KeyO"), "darwin")).toBe("openFolder");
+    expect(matchShortcut(cmd("<", "Comma", { shiftKey: true }), "darwin")).toBe("projectSettings");
+    expect(matchShortcut(ctrl("o", "KeyO"), "darwin")).toBeNull();
+    expect(shortcutLabel("newProject", "darwin")).toBe("⇧⌘N");
+    expect(shortcutLabel("openFolder", "darwin")).toBe("⌘O");
+    expect(shortcutLabel("projectSettings", "darwin")).toBe("⇧⌘,");
+    expect(shortcutLabel("newProject", "linux")).toBe("Ctrl+Shift+N");
+    expect(shortcutLabel("openFolder", "win32")).toBe("Ctrl+O");
+    expect(shortcutLabel("projectSettings", "win32")).toBe("Ctrl+Shift+,");
+  });
+});

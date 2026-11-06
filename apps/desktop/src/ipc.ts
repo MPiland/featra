@@ -9,14 +9,16 @@ import {
   THEME_CHOICES,
   WORK_SETTING_KEYS,
   type AppSettings,
-  type ProjectRef,
   type ProjectSettings,
+  type ProjectsResult,
   type SettingsSnapshot,
 } from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
 import { isOneOf, toText } from "@featra/work-format";
+import { pickFolder } from "./folder-dialog.ts";
 import { closeToTraySupport, type Lifecycle } from "./lifecycle.ts";
 import type { Log } from "./log.ts";
+import type { ProjectRegistry } from "./project-registry.ts";
 import { readProjectSettings, writeProjectValue, type SettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 import { clearCacheAndRestart, resetAppData, type TroubleshootDeps } from "./troubleshoot.ts";
@@ -28,12 +30,12 @@ export interface MainDeps {
   lifecycle: Lifecycle;
   log: Log;
   troubleshoot: TroubleshootDeps;
+  projects: ProjectRegistry;
   settings: {
     store: SettingsStore;
     current: () => AppSettings;
     /** Stores new app settings and applies them: the close button at once (the page applies the theme). */
     apply: (next: AppSettings) => Promise<void>;
-    project: ProjectRef | null;
   };
 }
 
@@ -46,7 +48,7 @@ const notOpen = (dir: unknown): ProjectSettings => ({
 });
 
 /** Answers the page's calls (see `IPC` in the client's bridge). Every payload is checked: the page is not trusted. */
-export function registerIpc({ store, lifecycle, log, troubleshoot, settings }: MainDeps) {
+export function registerIpc({ store, lifecycle, log, troubleshoot, projects, settings }: MainDeps) {
   ipcMain.handle(IPC.uiStateLoad, () => store.load());
   ipcMain.handle(IPC.uiStateSave, (_e, state: unknown) => store.save(normalizeUiState(state)));
   ipcMain.on(IPC.windowMinimize, (e) => fromOurWindow(e)?.minimize());
@@ -79,12 +81,10 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, settings }: M
   ipcMain.handle(IPC.settingsLoad, (): SettingsSnapshot => ({
     app: settings.current(),
     closeToTray: closeToTraySupport(lifecycle, process.platform),
-    currentProject: settings.project,
-    projects: settings.project ? [settings.project] : [],
   }));
   ipcMain.handle(IPC.settingsSaveApp, (_e, next: unknown) => settings.apply(normalizeAppSettings(next)));
-  // The page may only reach projects main offers it (the current one, until STORY-19 brings the project list).
-  const knownProject = (dir: unknown): dir is string => typeof dir === "string" && dir === settings.project?.dir;
+  // The page may only reach projects on the list: the folders the user opened or created.
+  const knownProject = projects.has;
   ipcMain.handle(IPC.settingsLoadProject, (_e, dir: unknown) =>
     knownProject(dir) ? readProjectSettings(dir) : notOpen(dir),
   );
@@ -95,6 +95,23 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, settings }: M
     const valid = normalizeWorkOverrides({ [key]: value })[key];
     return valid !== undefined ? writeProjectValue(dir, key, valid) : readProjectSettings(dir);
   });
+  ipcMain.handle(IPC.projectsList, () => projects.snapshot());
+  const logged = (action: string) => (result: ProjectsResult) => {
+    const current = projects.current();
+    log.info(result.ok && current ? `${action}: ${current.dir}` : `${action} failed`);
+    return result;
+  };
+  ipcMain.handle(IPC.projectsSwitch, (_e, dir: unknown) => projects.switchTo(dir).then(logged("Project")));
+  ipcMain.handle(IPC.projectsOpenFolder, async (e) => {
+    const dir = await pickFolder(fromOurWindow(e), { title: "Open Folder", button: "Open" });
+    return dir === null ? null : projects.open(dir).then(logged("Opened folder"));
+  });
+  ipcMain.handle(IPC.projectsChooseLocation, (e, from: unknown) =>
+    pickFolder(fromOurWindow(e), { title: "Choose Location", button: "Choose", from: toText(from) || undefined }),
+  );
+  ipcMain.handle(IPC.projectsCreate, (_e, location: unknown, name: unknown) =>
+    projects.create(location, name).then(logged("New project")),
+  );
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());
   ipcMain.on(IPC.appToggleDevTools, (e) => e.sender.toggleDevTools());

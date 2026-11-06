@@ -49,6 +49,12 @@ export const ChevronDownIcon = () => (
     <path d="M6 9l6 6 6-6" />
   </Icon>
 );
+/** Up and down chevrons: the button opens a list to choose from. */
+export const ChevronsIcon = () => (
+  <Icon size={14}>
+    <path d="M8 9l4-4 4 4M16 15l-4 4-4-4" />
+  </Icon>
+);
 export const CheckIcon = () => (
   <Icon size={14}>
     <path d="M5 12l5 5 9-10" />

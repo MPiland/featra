@@ -27,6 +27,8 @@
   --tip-tx: #ffffff;
   --close-hover: #c42b1c;
   --scrim: rgba(0, 0, 0, 0.32);
+  --av-bg: #dbe4fb;
+  --av-tx: #2a3f86;
 }
 
 /*
@@ -57,6 +59,8 @@
     --tip-bg: #000000;
     --tip-tx: #ffffff;
     --scrim: rgba(0, 0, 0, 0.55);
+    --av-bg: #33415f;
+    --av-tx: #d3defc;
   }
 }
 
@@ -83,4 +87,6 @@
   --tip-bg: #000000;
   --tip-tx: #ffffff;
   --scrim: rgba(0, 0, 0, 0.55);
+  --av-bg: #33415f;
+  --av-tx: #d3defc;
 }

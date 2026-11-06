@@ -4,6 +4,9 @@ export type KeyInput = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey
 
 /** Shortcuts the app handles itself. Edit shortcuts are left to the browser engine, which already does them. */
 export type AppShortcut =
+  | "newProject"
+  | "openFolder"
+  | "projectSettings"
   | "settings"
   | "keyboardShortcuts"
   | "closeWindow"
@@ -54,7 +57,11 @@ export function matchShortcut(e: KeyInput, platform: string): AppShortcut | null
   if (e.key === "=" || e.key === "+" || e.code === "NumpadAdd") return "zoomIn";
   // Ctrl+Shift+W on Windows and Linux (Ctrl+W alone is too easy to hit); Cmd+W on macOS.
   if (letter(e, "w") && e.shiftKey !== mac) return "closeWindow";
+  // By the physical key too: Shift turns "," into "<" on most layouts.
+  if (e.shiftKey && (e.code === "Comma" || e.key === "," || e.key === "<")) return "projectSettings";
+  if (e.shiftKey && letter(e, "n")) return "newProject";
   if (e.shiftKey) return null;
+  if (letter(e, "o")) return "openFolder";
   if (e.key === "-" || e.code === "NumpadSubtract") return "zoomOut";
   if (e.key === "0" || e.code === "Numpad0") return "zoomReset";
   if (e.key === ",") return "settings";
@@ -66,6 +73,9 @@ export function matchShortcut(e: KeyInput, platform: string): AppShortcut | null
 }
 
 const LABELS: Record<Exclude<ShortcutId, "quit">, [pc: string, mac: string]> = {
+  newProject: ["Ctrl+Shift+N", "⇧⌘N"],
+  openFolder: ["Ctrl+O", "⌘O"],
+  projectSettings: ["Ctrl+Shift+,", "⇧⌘,"],
   settings: ["Ctrl+,", "⌘,"],
   keyboardShortcuts: ["Ctrl+/", "⌘/"],
   closeWindow: ["Ctrl+Shift+W", "⌘W"],

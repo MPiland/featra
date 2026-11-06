@@ -100,3 +100,64 @@ main {
   margin: 0;
   color: var(--tx2);
 }
+
+/* The project switcher, at the top of the sidebar. */
+.side > .menuwrap {
+  margin-bottom: 8px;
+}
+
+.proj {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--tx);
+  text-align: left;
+  cursor: pointer;
+}
+
+.proj:hover,
+.proj.on {
+  background: var(--row);
+}
+
+.proj:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: -2px;
+}
+
+.proj svg {
+  color: var(--tx3);
+}
+
+.av {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--av-bg);
+  color: var(--av-tx);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.proj-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.placeholder-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}

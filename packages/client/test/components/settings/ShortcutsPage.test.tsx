@@ -25,6 +25,9 @@ describe("AC7: Keyboard shortcuts page, by area and searchable; Help > Keyboard 
     for (const platform of ["win32", "darwin", "linux"]) {
       const listed = listShortcuts(menuFor(platform));
       const ids: ShortcutId[] = [
+        "newProject",
+        "openFolder",
+        "projectSettings",
         "settings",
         "keyboardShortcuts",
         "closeWindow",

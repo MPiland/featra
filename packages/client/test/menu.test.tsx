@@ -13,7 +13,14 @@ describe("AC5: app menu", () => {
     expect(labels(menuAt(0))).toEqual(["File", "Edit", "View", "Go", "Help"]);
 
     await user.hover(item("File"));
-    expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,", "Close WindowCtrl+Shift+W", "Exit"]);
+    expect(labels(menuAt(1))).toEqual([
+      "New Project…Ctrl+Shift+N",
+      "Open Folder…Ctrl+O",
+      "Project Settings…Ctrl+Shift+,",
+      "Settings…Ctrl+,",
+      "Close WindowCtrl+Shift+W",
+      "Exit",
+    ]);
     await user.hover(item("Edit"));
     expect(labels(menuAt(1))).toEqual([
       "UndoCtrl+Z",
@@ -71,7 +78,14 @@ describe("AC5: app menu", () => {
   it("uses Cmd on macOS, Quit Featra ⌘Q, and Finder for the logs", async () => {
     const { user } = renderApp({ platform: "darwin" });
     await openPath(user, "File");
-    expect(labels(menuAt(1))).toEqual(["Settings…⌘,", "Close Window⌘W", "Quit Featra⌘Q"]);
+    expect(labels(menuAt(1))).toEqual([
+      "New Project…⇧⌘N",
+      "Open Folder…⌘O",
+      "Project Settings…⇧⌘,",
+      "Settings…⌘,",
+      "Close Window⌘W",
+      "Quit Featra⌘Q",
+    ]);
     await user.hover(item("Edit"));
     expect(labels(menuAt(1))).toEqual(["Undo⌘Z", "Redo⇧⌘Z", "Cut⌘X", "Copy⌘C", "Paste⌘V", "Delete", "Select All⌘A"]);
     await user.hover(item("View"));
@@ -92,7 +106,14 @@ describe("AC5: app menu", () => {
   it("Linux: Exit has no shortcut, Redo is Ctrl+Shift+Z and the logs open in the file manager", async () => {
     const { user } = renderApp({ platform: "linux" });
     await openPath(user, "File");
-    expect(labels(menuAt(1))).toEqual(["Settings…Ctrl+,", "Close WindowCtrl+Shift+W", "Exit"]);
+    expect(labels(menuAt(1))).toEqual([
+      "New Project…Ctrl+Shift+N",
+      "Open Folder…Ctrl+O",
+      "Project Settings…Ctrl+Shift+,",
+      "Settings…Ctrl+,",
+      "Close WindowCtrl+Shift+W",
+      "Exit",
+    ]);
     await user.hover(item("Edit"));
     expect(labels(menuAt(1))[1]).toBe("RedoCtrl+Shift+Z");
     await openPath(user, "Help", "Troubleshooting");
@@ -159,7 +180,8 @@ describe("AC5: app menu", () => {
   it("runs an item with Enter and with Space", async () => {
     const { user } = renderApp();
     menuButton().focus();
-    await user.keyboard("{ArrowDown}{ArrowRight}{Enter}"); // File > Settings…
+    // File > Settings…, after New Project…, Open Folder… and Project Settings… (the separator is skipped).
+    await user.keyboard("{ArrowDown}{ArrowRight}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}");
     expect(viewTitle().textContent).toBe("Settings");
     expect(menus()).toHaveLength(0);
     expect(document.activeElement).toBe(menuButton());

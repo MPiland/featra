@@ -7,6 +7,8 @@ import { BackIcon, CloseIcon, ForwardIcon, MaximizeIcon, MinimizeIcon, RestoreIc
 export interface TitleBarProps {
   bridge: FeatraBridge;
   title: string;
+  /** The current project's name, after the title. */
+  project?: string | undefined;
   sidebarCollapsed: boolean;
   onToggleSidebar: () => void;
   canGoBack: boolean;
@@ -55,6 +57,7 @@ export function TitleBar(p: TitleBarProps) {
       <h1 className="ttl" id="view-title">
         {p.title}
       </h1>
+      {p.project && <span className="ttl-proj">· {p.project}</span>}
       <span className="grow" />
       {/* STORY-26..28: pane toggles (changes, terminal, environment) go here. */}
       {ownWindowControls && (

@@ -51,6 +51,17 @@ describe("browser bridge", () => {
     expect((await browserBridge(fake).settings.load()).app).toEqual(app);
   });
 
+  it("has no project folders: an empty list, and every folder action says so (STORY-19)", async () => {
+    const fake = { getItem: () => null, setItem() {} } as unknown as Storage;
+    const { projects } = browserBridge(fake);
+    expect(await projects.list()).toEqual({ current: null, projects: [], location: "" });
+    const refused = { ok: false, error: "No project folder in a browser tab." };
+    expect(await projects.switchTo("/p")).toEqual(refused);
+    expect(await projects.openFolder()).toEqual(refused);
+    expect(await projects.create("/p", "x")).toEqual(refused);
+    expect(await projects.chooseLocation("/p")).toBeNull();
+  });
+
   it("recovers from corrupt storage", async () => {
     const fake = { getItem: () => "{not json", setItem() {} } as unknown as Storage;
     expect(await browserBridge(fake).uiState.load()).toEqual(DEFAULT_UI_STATE);

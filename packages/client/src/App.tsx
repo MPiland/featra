@@ -4,15 +4,19 @@ import {
   type AppInfo,
   type AppSettings,
   type FeatraBridge,
+  type ProjectsSnapshot,
   type SettingsSnapshot,
   type UiState,
   type WindowState,
 } from "./bridge.ts";
 import { Dialog } from "./components/Dialog.tsx";
+import { ProjectSwitcher } from "./components/ProjectSwitcher.tsx";
 import { SettingsView } from "./components/settings/SettingsView.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
+import { useProjects } from "./components/useProjects.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
+import { WorkView } from "./components/WorkView.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import { canGoBack, canGoForward, currentView, goBack, goForward, initialNav, navigate } from "./navigation.ts";
 import { firstSettingsPage, type SettingsPage } from "./settings-pages.ts";
@@ -25,14 +29,18 @@ export interface AppProps {
   bridge: FeatraBridge;
   initialUiState: UiState;
   initialSettings: SettingsSnapshot;
+  initialProjects: ProjectsSnapshot;
 }
 
 type OpenDialog = "about" | "resetAppData" | null;
 
+/** Shortcuts a plain browser tab keeps for itself: it has no window to close and no folders to open. */
+const WEB_KEEPS: ReadonlySet<AppShortcut> = new Set(["fullScreen", "closeWindow", "newProject", "openFolder"]);
+
 const sameUiState = (a: UiState, b: UiState) =>
   a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor;
 
-export function App({ bridge, initialUiState, initialSettings }: AppProps) {
+export function App({ bridge, initialUiState, initialSettings, initialProjects }: AppProps) {
   const [nav, setNav] = useState(() => initialNav());
   const [ui, setUi] = useState(initialUiState);
   const [dialog, setDialog] = useState<OpenDialog>(null);
@@ -59,6 +67,18 @@ export function App({ bridge, initialUiState, initialSettings }: AppProps) {
     setSettingsPage("shortcuts");
     open("settings");
   }, [open]);
+  // Each Project Settings… opens the page afresh on the current project, even when Settings already shows another.
+  const [projectSettingsOpened, setProjectSettingsOpened] = useState(0);
+  const projectSettings = useCallback(() => {
+    setSettingsPage("project");
+    setProjectSettingsOpened((n) => n + 1);
+    open("settings");
+  }, [open]);
+  const {
+    projects,
+    actions: projectActions,
+    dialog: projectDialog,
+  } = useProjects(bridge, initialProjects, projectSettings);
   // The host stores app settings and applies them at once (the close button too); the UI applies the theme.
   const changeAppSettings = useCallback(
     (app: AppSettings) => {
@@ -70,6 +90,7 @@ export function App({ bridge, initialUiState, initialSettings }: AppProps) {
 
   const actions: MenuActions = useMemo(
     () => ({
+      ...projectActions,
       openSettings: () => open("settings"),
       showKeyboardShortcuts,
       closeWindow: () => bridge.window.close(),
@@ -90,7 +111,7 @@ export function App({ bridge, initialUiState, initialSettings }: AppProps) {
       resetAppData: () => setDialog("resetAppData"),
       showAbout: () => setDialog("about"),
     }),
-    [bridge, open, showKeyboardShortcuts, toggleSidebar, setZoom, back, forward],
+    [bridge, projectActions, open, showKeyboardShortcuts, toggleSidebar, setZoom, back, forward],
   );
   const menu = useMemo(
     () =>
@@ -138,6 +159,9 @@ export function App({ bridge, initialUiState, initialSettings }: AppProps) {
     const run: Record<AppShortcut, () => void> = {
       settings: actions.openSettings,
       keyboardShortcuts: actions.showKeyboardShortcuts,
+      newProject: actions.newProject,
+      openFolder: actions.openFolder,
+      projectSettings: actions.projectSettings,
       closeWindow: actions.closeWindow,
       toggleSidebar: actions.toggleSidebar,
       zoomReset: actions.zoomReset,
@@ -151,8 +175,7 @@ export function App({ bridge, initialUiState, initialSettings }: AppProps) {
     const onKey = (e: KeyboardEvent) => {
       const shortcut = matchShortcut(e, bridge.platform);
       if (!shortcut) return;
-      // A plain browser tab keeps its own F11 and has no window to close.
-      if (bridge.platform === "web" && (shortcut === "fullScreen" || shortcut === "closeWindow")) return;
+      if (bridge.platform === "web" && WEB_KEEPS.has(shortcut)) return;
       e.preventDefault();
       run[shortcut]();
     };
@@ -166,10 +189,11 @@ export function App({ bridge, initialUiState, initialSettings }: AppProps) {
 
   return (
     <>
-      <div className="shell" inert={dialog !== null}>
+      <div className="shell" inert={dialog !== null || projectDialog !== null}>
         <TitleBar
           bridge={bridge}
           title={view.title}
+          project={projects.current?.name}
           sidebarCollapsed={collapsed}
           onToggleSidebar={toggleSidebar}
           canGoBack={canGoBack(nav)}
@@ -180,23 +204,34 @@ export function App({ bridge, initialUiState, initialSettings }: AppProps) {
           windowState={windowState}
         />
         <div className={collapsed ? "app collapsed" : "app"}>
-          <Sidebar collapsed={collapsed} current={view.id} onOpen={open} />
+          <Sidebar
+            collapsed={collapsed}
+            current={view.id}
+            onOpen={open}
+            project={projects.current}
+            switcher={<ProjectSwitcher projects={projects} platform={bridge.platform} actions={projectActions} />}
+          />
           <main aria-labelledby="view-title">
             {view.id === "settings" ? (
               <SettingsView
                 bridge={bridge}
                 snapshot={settings}
+                projects={projects}
+                projectKey={`${projects.current?.dir ?? ""}:${projectSettingsOpened}`}
                 page={settingsPage}
                 onPage={setSettingsPage}
                 onAppChange={changeAppSettings}
                 shortcuts={shortcuts}
               />
+            ) : view.id === "work" ? (
+              <WorkView projects={projects} platform={bridge.platform} actions={projectActions} />
             ) : (
               <ViewPlaceholder view={view} />
             )}
           </main>
         </div>
       </div>
+      {projectDialog}
       {dialog === "about" && (
         <Dialog title="About Featra" onClose={() => setDialog(null)}>
           <p className="about-name">{info?.name ?? "Featra"}</p>
