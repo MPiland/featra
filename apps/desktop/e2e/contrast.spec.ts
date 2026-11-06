@@ -49,13 +49,30 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name }).click();
           problems.push(...(await failures(page)));
         }
-        // Every Settings page (STORY-20), the project page showing an override with its badge and Reset button.
-        for (const name of ["General", "Appearance", "Work defaults", "Keyboard shortcuts", "Work"]) {
-          await page.getByRole("navigation", { name: "Settings pages" }).getByRole("button", { name, exact: true }).click();
+        // Every Settings page (STORY-20), the project page showing an override with its mark and Reset button, and
+        // its project list open.
+        const settingsPages = [
+          ["App", "General"],
+          ["App", "Appearance"],
+          ["App", "Progress and review"],
+          ["App", "Keyboard shortcuts"],
+          ["Project", "Progress and review"],
+        ] as const;
+        for (const [scope, name] of settingsPages) {
+          await page
+            .getByRole("navigation", { name: "Settings pages" })
+            .getByRole("list", { name: scope })
+            .getByRole("button", { name, exact: true })
+            .click();
           await expect(page.getByRole("heading", { name, level: 2 })).toBeVisible();
-          if (name === "Work") await expect(page.getByText("Override", { exact: true })).toBeVisible();
+          if (scope === "Project") await expect(page.getByText(/^Overridden/)).toBeVisible();
           problems.push(...(await failures(page, { text: 6, icon: 4 })));
         }
+        await page.getByRole("button", { name: /^Project: / }).click();
+        await expect(page.getByRole("listbox", { name: "Project" })).toBeVisible();
+        problems.push(...(await failures(page, { text: 6, icon: 4 })));
+        await page.keyboard.press("Escape");
+        await expect(page.getByRole("listbox")).toHaveCount(0);
         const menuItem = (name: string | RegExp) => page.getByRole("menuitem", { name, exact: typeof name === "string" });
         for (const path of [["File"], ["Edit"], ["View"], ["Go"], ["Help", "Troubleshooting"]]) {
           await page.getByRole("button", { name: "Menu" }).click();

@@ -116,20 +116,24 @@ test.describe("STORY-20: Settings", () => {
     try {
       const { app, page } = await launch(profile.dir, { FEATRA_PROJECT_DIR: project.dir });
       await page.keyboard.press("Control+,");
-      await pages(page).getByRole("button", { name: "Work", exact: true }).click();
-      const picker = page.getByRole("combobox", { name: "Project" });
-      await expect(picker.locator("option")).toHaveText([project.dir.split(/[\\/]/).at(-1)!]);
-      await expect(picker).toHaveValue(project.dir);
+      await pages(page).getByRole("list", { name: "Project" }).getByRole("button", { name: "Progress and review" }).click();
+      const name = project.dir.split(/[\\/]/).at(-1)!;
+      const picker = page.getByRole("button", { name: `Project: ${name}` });
+      await picker.click();
+      await expect(page.getByRole("listbox", { name: "Project" }).getByRole("option")).toHaveText([name]);
+      await page.keyboard.press("Escape");
+      await expect(picker).toBeFocused();
 
       const progress = page.getByRole("radiogroup", { name: "Progress counts" });
-      await expect(progress).toHaveAccessibleDescription(/App default/);
+      const row = page.locator(".setting-row").filter({ has: progress });
+      await expect(progress).not.toHaveAccessibleDescription(/App default|Overridden/);
       await progress.getByRole("radio", { name: "Tasks" }).check();
-      await expect(progress.getByText("Override", { exact: true })).toBeVisible();
-      await expect(progress.getByText("App default: Stories")).toBeVisible();
+      await expect(row.getByText(/^Overridden/)).toBeVisible();
+      await expect(progress).toHaveAccessibleDescription(/Overridden\s*\. App default: Stories/);
       expect(await readFile(project.config, "utf8")).toBe(`${before}progress: tasks\n`);
 
-      await page.getByRole("button", { name: "Reset Progress counts to the app default" }).click();
-      await expect(progress.getByText("Override", { exact: true })).toHaveCount(0);
+      await row.getByRole("button", { name: "Reset Progress counts to the app default" }).click();
+      await expect(row.getByText(/^Overridden/)).toHaveCount(0);
       await expect(progress.getByRole("radio", { name: "Stories" })).toBeChecked();
       await expect(progress.getByRole("radio", { name: "Stories" })).toBeFocused();
       expect(await readFile(project.config, "utf8")).toBe(before);

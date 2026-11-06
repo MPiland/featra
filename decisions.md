@@ -135,8 +135,19 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     File > Settings… (Ctrl+,, ⌘,) and Help > Keyboard Shortcuts (Ctrl+/, ⌘/). A view shares the shell's menu,
     shortcuts and theme for free, and a second BrowserWindow would need its own preload, focus and close-to-tray
     rules. The story title's "window" is met by this page.
-  - Pages, in two scopes. App: General (Close button), Appearance (Theme), Work defaults, Keyboard shortcuts.
-    Project: Work, with a project picker. In a plain browser tab General is left out: there is no close button.
+  - Pages, in two scopes. App: General (Close button), Appearance (Theme), Progress and review, Keyboard shortcuts.
+    Project: Progress and review. The work settings page has the same name at both scopes (user feedback: "Work" read
+    as the Work view). In a plain browser tab General is left out: there is no close button.
+  - Layout, after user feedback that the first version's options looked sloppy, modelled on Claude desktop and Windows
+    11 Settings: content at most 720px wide and centred; titled groups, each a card of rows; a row is the label with a
+    short description under it on the left and the control right-aligned, with hairline dividers. Controls are the
+    app's own, in its tokens: a switch for on/off, a segmented control for two or three short choices, and a dropdown
+    (listbox) for longer lists, such as the project picker. The picker sits in the Project page header ("Project:
+    name ▾"), not among the settings.
+  - Overrides are quiet: a setting that follows the app default shows nothing. An override shows "Overridden · Reset"
+    by its label, Reset a text button; the app default is in their tooltip and in the control's accessible
+    description. The UI names no file paths: the Project page says "Saved with this project (shared through git)",
+    with `.featra/config.yaml` in its tooltip.
   - App settings are `settings.json` in userData (`apps/desktop/src/settings-store.ts`): `{ theme, closeButton, work }`.
     The theme moved there from `ui-state.json`; a profile with no settings file yet takes its theme from there once.
     Reset App Data clears `settings.json` too; Clear Cache keeps it.

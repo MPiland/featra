@@ -1,4 +1,4 @@
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import type { UserEvent } from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@featra/work-format";
@@ -15,11 +15,28 @@ const pageTitle = () => within(main()).getByRole("heading", { level: 2 }).textCo
 const radios = (group: string) => within(screen.getByRole("radiogroup", { name: group })).getAllByRole("radio");
 const checked = (group: string) =>
   (radios(group).find((r) => (r as HTMLInputElement).checked)?.closest("label")?.textContent ?? null);
-const row = (control: HTMLElement) => control.closest(".setting") as HTMLElement;
+const row = (control: HTMLElement) => control.closest(".setting-row") as HTMLElement;
+const WORK = "Progress and review";
+/** App and Project both have a "Progress and review" page: a page is found within its scope's list. */
+const navButton = (name: string, scope: "App" | "Project" = name === WORK ? "Project" : "App") =>
+  within(within(pageNav()).getByRole("list", { name: scope })).getByRole("button", { name });
+/** The text a screen reader reads as the control's description. */
+const description = (el: HTMLElement) =>
+  (el.getAttribute("aria-describedby") ?? "")
+    .split(" ")
+    .filter(Boolean)
+    .map((id) => document.getElementById(id)!.textContent)
+    .join(" ");
+const switchFor = (name: string) => screen.getByRole("switch", { name });
+const isOn = (el: HTMLElement) => el.getAttribute("aria-checked") === "true";
+/** The Project page has read the project's config file. */
+const projectLoaded = () => waitFor(() => expect(main().querySelector('[aria-busy="true"]')).toBeNull());
+const picker = () => within(main()).getByRole("button", { name: /^Project: / });
 
-async function openSettings(user: UserEvent, page?: string) {
+async function openSettings(user: UserEvent, page?: string, scope?: "App" | "Project") {
   await user.click(within(sidebar()).getByRole("button", { name: "Settings" }));
-  if (page) await user.click(within(pageNav()).getByRole("button", { name: page }));
+  if (page) await user.click(navButton(page, scope));
+  if (page === WORK && scope !== "App") await projectLoaded();
 }
 
 describe("AC1: App and Project scopes; the project picker starts on the current project", () => {
@@ -34,68 +51,111 @@ describe("AC1: App and Project scopes; the project picker starts on the current 
     expect(within(scopes[0]!).getAllByRole("button").map((b) => b.textContent)).toEqual([
       "General",
       "Appearance",
-      "Work defaults",
+      WORK,
       "Keyboard shortcuts",
     ]);
-    expect(within(scopes[1]!).getAllByRole("button").map((b) => b.textContent)).toEqual(["Work"]);
+    // The same name at both scopes: the same settings, as your defaults and as this project's.
+    expect(within(scopes[1]!).getAllByRole("button").map((b) => b.textContent)).toEqual([WORK]);
     expect(pageTitle()).toBe("General");
   });
 
-  it("the Project scope's picker defaults to the current project and lists only it (the project list is STORY-19)", async () => {
+  it("the Project scope's picker, in the page header, defaults to the current project and lists only it (the project list is STORY-19)", async () => {
     const { user } = renderApp();
-    await openSettings(user, "Work");
-    const picker = screen.getByRole("combobox", { name: "Project" }) as HTMLSelectElement;
-    expect(picker.value).toBe(PROJECT.dir);
-    expect(within(picker).getAllByRole("option").map((o) => o.textContent)).toEqual([PROJECT.name]);
+    await openSettings(user, WORK);
+    expect(picker().textContent).toBe(`Project: ${PROJECT.name}`);
+    expect(picker().closest(".settings-header")!.querySelector("h2")!.textContent).toBe(WORK);
+    expect(picker().getAttribute("aria-haspopup")).toBe("listbox");
+    await user.click(picker());
+    const list = screen.getByRole("listbox", { name: "Project" });
+    expect(within(list).getAllByRole("option").map((o) => [o.textContent, o.getAttribute("aria-selected")])).toEqual([
+      [PROJECT.name, "true"],
+    ]);
+  });
+
+  it("the picker works from the keyboard: Enter opens it, Escape closes only it and focus returns", async () => {
+    const { user } = renderApp();
+    await openSettings(user, WORK);
+    picker().focus();
+    await user.keyboard("{Enter}");
+    const list = screen.getByRole("listbox", { name: "Project" });
+    expect(document.activeElement).toBe(list);
+    expect(picker().getAttribute("aria-expanded")).toBe("true");
+    expect(list.getAttribute("aria-activedescendant")).toBe(within(list).getByRole("option").id);
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(picker());
+    expect(viewTitle().textContent).toBe("Settings");
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("listbox", { name: "Project" })).toBeTruthy();
+    await user.keyboard("{Enter}");
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(picker());
+    expect(picker().textContent).toBe(`Project: ${PROJECT.name}`);
+  });
+
+  it("says where project settings are saved in plain words; the file path is only a tooltip", async () => {
+    const { user } = renderApp();
+    await openSettings(user, WORK);
+    const saved = within(main()).getByText("Saved with this project (shared through git).");
+    expect(saved.getAttribute("title")).toMatch(/\.featra\/config\.yaml/);
+    expect(main().textContent).not.toMatch(/config\.yaml|\.featra/);
   });
 
   it("says so when no project is open, instead of showing settings that can't be saved anywhere", async () => {
     const { user } = renderApp({ project: null });
-    await openSettings(user, "Work");
-    expect(screen.queryByRole("combobox", { name: "Project" })).toBeNull();
+    await user.click(within(sidebar()).getByRole("button", { name: "Settings" }));
+    await user.click(navButton(WORK));
+    expect(within(main()).queryByRole("button", { name: /^Project: / })).toBeNull();
     expect(within(main()).getByText(/No project is open/)).toBeTruthy();
   });
 });
 
 describe("AC3: a project value that overrides an app default is labelled and can be reset", () => {
-  it("shows the app default where the project sets nothing, and Override with the default where it does", async () => {
+  it("marks an override \"Overridden · Reset\" by its label, the app default in tooltip and description; shows nothing where the project follows the default", async () => {
     const { user } = renderApp({ projectFiles: { [PROJECT.dir]: { progress: "tasks" } } });
-    await openSettings(user, "Work");
+    await openSettings(user, WORK);
     const progress = screen.getByRole("radiogroup", { name: "Progress counts" });
-    await within(progress).findByText("Override");
     expect(checked("Progress counts")).toBe("Tasks");
-    expect(within(progress).getByText("App default: Stories")).toBeTruthy();
-    const accept = screen.getByRole("checkbox", { name: "Stories need my Accept to be Done" });
-    expect(within(row(accept)).queryByText("Override")).toBeNull();
-    expect(within(row(accept)).getByText("App default")).toBeTruthy();
-    expect(accept.getAttribute("aria-describedby")).toContain("project-requireAccept-status");
+    const mark = within(row(progress)).getByText("Overridden");
+    expect(mark.getAttribute("title")).toBe("App default: Stories");
+    expect(description(progress)).toContain("Overridden. App default: Stories");
+    expect(progress.getAttribute("aria-describedby")).toContain("project-progress-status");
+    const reset = within(row(progress)).getByRole("button", { name: "Reset Progress counts to the app default" });
+    expect(reset.textContent).toBe("Reset");
+    expect(reset.getAttribute("title")).toBe("App default: Stories");
+    expect(mark.closest(".setting-label")!.textContent).toMatch(/^Progress countsOverridden/);
+
+    const accept = switchFor("Stories need my Accept to be Done");
+    expect(within(row(accept)).queryByText(/Overridden|App default/)).toBeNull();
+    expect(within(row(accept)).queryByRole("button", { name: /^Reset/ })).toBeNull();
+    expect(description(accept)).not.toMatch(/Overridden|App default/);
+    expect(within(main()).queryByText(/^App default/)).toBeNull();
   });
 
   it("changing a project value makes it an override; Reset removes it and the app default applies again", async () => {
     const { user, projectFiles } = renderApp();
-    await openSettings(user, "Work");
-    const accept = await screen.findByRole("checkbox", { name: "Stories need my Accept to be Done" });
+    await openSettings(user, WORK);
+    const accept = switchFor("Stories need my Accept to be Done");
     await user.click(accept);
-    await within(row(accept)).findByText("Override");
+    await within(row(accept)).findByText("Overridden");
     expect(projectFiles.get(PROJECT.dir)).toEqual({ requireAccept: false });
-    expect((accept as HTMLInputElement).checked).toBe(false);
-    expect(within(row(accept)).getByText("App default: On")).toBeTruthy();
+    expect(isOn(accept)).toBe(false);
+    expect(description(accept)).toContain("App default: On");
 
     await user.click(screen.getByRole("button", { name: "Reset Stories need my Accept to be Done to the app default" }));
-    await within(row(accept)).findByText("App default");
+    await waitFor(() => expect(within(row(accept)).queryByText("Overridden")).toBeNull());
     expect(projectFiles.get(PROJECT.dir)).toEqual({});
-    expect((accept as HTMLInputElement).checked).toBe(true);
+    expect(isOn(accept)).toBe(true);
     expect(document.activeElement).toBe(accept); // focus stays on the setting when its Reset button goes
   });
 
   it("a change shows at once, before the config file is written (regression: the choice looked ignored)", async () => {
     const { user, projectFiles, releaseWrites } = renderApp({ slowProjectWrites: true });
-    await openSettings(user, "Work");
+    await openSettings(user, WORK);
     const progress = await screen.findByRole("radiogroup", { name: "Progress counts" });
-    await within(progress).findAllByText("App default");
     await user.click(within(progress).getByRole("radio", { name: "Tasks" }));
     expect(checked("Progress counts")).toBe("Tasks");
-    expect(within(progress).getByText("Override")).toBeTruthy();
+    expect(within(row(progress)).getByText("Overridden")).toBeTruthy();
     expect(projectFiles.get(PROJECT.dir)).toBeUndefined();
     await releaseWrites();
     expect(projectFiles.get(PROJECT.dir)).toEqual({ progress: "tasks" });
@@ -104,29 +164,31 @@ describe("AC3: a project value that overrides an app default is labelled and can
 
   it("a project that doesn't override a setting follows the app default as it changes", async () => {
     const { user } = renderApp({ settings: { work: { ...DEFAULT_WORK_SETTINGS, knowledge: "read-only" } } });
-    await openSettings(user, "Work");
-    await within(screen.getByRole("radiogroup", { name: "Agents and project knowledge" })).findAllByText("App default");
+    await openSettings(user, WORK);
     expect(checked("Agents and project knowledge")).toBe("Only read it");
+    expect(within(row(screen.getByRole("radiogroup", { name: "Agents and project knowledge" }))).queryByText("Overridden")).toBeNull();
   });
 
   it("changing an app default saves it in the app settings, not the project", async () => {
     const { user, appSaved, projectFiles } = renderApp();
-    await openSettings(user, "Work defaults");
-    expect(within(main()).getByText(/Every project uses these unless its own settings override them/)).toBeTruthy();
+    await openSettings(user, WORK, "App");
+    expect(within(main()).getByText(/Every project uses these unless it overrides them/)).toBeTruthy();
     await user.click(screen.getByRole("radio", { name: "Tasks" }));
     expect(appSaved().at(-1)!.work).toEqual({ ...DEFAULT_WORK_SETTINGS, progress: "tasks" });
     expect(projectFiles.size).toBe(0);
-    await user.click(within(pageNav()).getByRole("button", { name: "Work" }));
-    await within(screen.getByRole("radiogroup", { name: "Progress counts" })).findByText("App default");
+    await user.click(navButton(WORK, "Project"));
+    await projectLoaded();
     expect(checked("Progress counts")).toBe("Tasks");
+    expect(within(main()).queryByText("Overridden")).toBeNull();
   });
 
   it("a project whose config file can't be read shows why and offers nothing to change", async () => {
     const { user } = renderApp({ brokenProjects: { [PROJECT.dir]: "progress must be \"stories\" or \"tasks\"" } });
-    await openSettings(user, "Work");
+    await user.click(within(sidebar()).getByRole("button", { name: "Settings" }));
+    await user.click(navButton(WORK));
     expect((await screen.findByRole("alert")).textContent).toMatch(/can't change this project's settings: progress must be/);
     for (const r of radios("Progress counts")) expect((r as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByRole("checkbox", { name: "Stories need my Accept to be Done" }) as HTMLInputElement).disabled).toBe(true);
+    expect((switchFor("Stories need my Accept to be Done") as HTMLButtonElement).disabled).toBe(true);
   });
 
   it("Featra's own work defaults are work-format's project defaults", () => {
@@ -151,16 +213,20 @@ describe("AC4: every setting is reachable and changeable by keyboard", () => {
   it("Tab reaches every setting on every page, a radio group being one stop, as browsers have it", async () => {
     const { user } = renderApp({ projectFiles: { [PROJECT.dir]: { worktrees: false } } });
     await openSettings(user);
-    const pages = within(pageNav()).getAllByRole("button").map((b) => b.textContent!);
-    for (const name of pages) {
-      const button = within(pageNav()).getByRole("button", { name });
+    const buttons = within(pageNav()).getAllByRole("button");
+    expect(buttons.length).toBe(5);
+    for (const [i, button] of buttons.entries()) {
+      const name = `${i + 1}. ${button.textContent}`;
       await user.click(button);
-      await screen.findAllByRole("heading", { level: 2, name });
-      if (name === "Work") await within(main()).findAllByText(/^App default/);
+      await screen.findAllByRole("heading", { level: 2, name: button.textContent! });
+      if (i === buttons.length - 1) {
+        await projectLoaded();
+        expect(within(main()).getByText("Overridden")).toBeTruthy(); // its Reset button is a stop too
+      }
       const page = main().querySelector<HTMLElement>(".settings-page")!;
       within(pageNav()).getAllByRole("button").at(-1)!.focus(); // the page follows the page list in tab order
       const stops = await tabStops(user, page);
-      // Every enabled control: inputs (one per radio group), selects, buttons.
+      // Every enabled control: inputs (one per radio group), selects, buttons (switches, Reset, the picker).
       const controls = Array.from(page.querySelectorAll<HTMLElement>("input, select, button")).filter(
         (c) => !(c as HTMLInputElement).disabled,
       );
@@ -171,11 +237,11 @@ describe("AC4: every setting is reachable and changeable by keyboard", () => {
     }
   });
 
-  it("changes each kind of setting from the keyboard: arrows in a choice, Space on a switch, Enter on Reset", async () => {
+  it("changes each kind of setting from the keyboard: arrows in a segmented control, Space and Enter on a switch, Enter on Reset", async () => {
     const { user, appSaved, projectFiles } = renderApp();
     await openSettings(user);
     // Pages: focus the nav and pick Appearance with Tab and Enter.
-    within(pageNav()).getByRole("button", { name: "General" }).focus();
+    navButton("General").focus();
     await user.tab();
     expect(document.activeElement?.textContent).toBe("Appearance");
     await user.keyboard("{Enter}");
@@ -183,22 +249,41 @@ describe("AC4: every setting is reachable and changeable by keyboard", () => {
     screen.getByRole("radio", { name: "System" }).focus();
     await user.keyboard("{ArrowDown}");
     expect(appSaved().at(-1)!.theme).toBe("light");
+    await user.keyboard("{ArrowRight}");
+    expect(appSaved().at(-1)!.theme).toBe("dark");
+    expect(checked("Theme")).toBe("Dark");
+    expect(document.activeElement).toBe(screen.getByRole("radio", { name: "Dark" }));
+    await user.keyboard("{ArrowLeft}");
+    expect(checked("Theme")).toBe("Light");
 
-    await user.click(within(pageNav()).getByRole("button", { name: "General" }));
+    await user.click(navButton("General"));
     screen.getByRole("radio", { name: "Keep running in the tray" }).focus();
     await user.keyboard("{ArrowDown}");
     expect(appSaved().at(-1)!.closeButton).toBe("quit");
 
-    await user.click(within(pageNav()).getByRole("button", { name: "Work" }));
-    const worktrees = await screen.findByRole("checkbox", { name: "Build each story in its own worktree" });
+    await user.click(navButton(WORK, "App"));
+    const appAccept = switchFor("Stories need my Accept to be Done");
+    appAccept.focus();
+    await user.keyboard("{Enter}");
+    expect(isOn(appAccept)).toBe(false);
+    expect(appSaved().at(-1)!.work.requireAccept).toBe(false);
+    await user.keyboard(" ");
+    expect(isOn(appAccept)).toBe(true);
+    expect(appSaved().at(-1)!.work.requireAccept).toBe(true);
+
+    await user.click(navButton(WORK, "Project"));
+    await projectLoaded();
+    const worktrees = switchFor("Build each story in its own worktree");
     worktrees.focus();
     await user.keyboard(" ");
-    await within(row(worktrees)).findByText("Override");
+    await within(row(worktrees)).findByText("Overridden");
+    expect(isOn(worktrees)).toBe(false);
     expect(projectFiles.get(PROJECT.dir)).toEqual({ worktrees: false });
-    await user.tab();
+    // Reset sits by the label, before the switch: Shift+Tab reaches it.
+    await user.tab({ shift: true });
     expect(document.activeElement).toBe(screen.getByRole("button", { name: /^Reset Build each story/ }));
     await user.keyboard("{Enter}");
-    await within(row(worktrees)).findByText("App default");
+    await waitFor(() => expect(within(row(worktrees)).queryByText("Overridden")).toBeNull());
     expect(projectFiles.get(PROJECT.dir)).toEqual({});
     expect(document.activeElement).toBe(worktrees);
   });
@@ -242,8 +327,9 @@ describe("AC6: Close button: keep running in the tray or quit", () => {
     expect(checked("Close button")).toBe("Quit Featra");
     for (const r of radios("Close button")) expect((r as HTMLInputElement).disabled).toBe(true);
     const group = screen.getByRole("radiogroup", { name: "Close button" });
-    expect(within(group).getByText(NO_TRAY_REASON)).toBeTruthy();
+    expect(within(row(group)).getByText(NO_TRAY_REASON)).toBeTruthy();
     expect(group.getAttribute("aria-describedby")).toContain("app-closeButton-status");
+    expect(description(group)).toContain(NO_TRAY_REASON);
     await user.click(screen.getByRole("radio", { name: "Keep running in the tray" }));
     expect(appSaved()).toEqual([]);
   });

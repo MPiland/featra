@@ -64,12 +64,12 @@ export const WORK_SETTINGS: readonly WorkSettingDef[] = [
     label: "Stories need my Accept to be Done",
     help: "Passing checks alone don't finish a story.",
   },
-  { key: "worktrees", kind: "toggle", label: "Build each story in its own worktree", help: "Off: stories run on the feature branch." },
+  { key: "worktrees", kind: "toggle", label: "Build each story in its own worktree", help: "When off, stories are built on the feature branch." },
   {
     key: "knowledge",
     kind: "choice",
     label: "Agents and project knowledge",
-    help: "What agents may do with CONTEXT.md, ADRs and decisions.",
+    help: "What agents may do with the glossary, decisions and ADRs.",
     choices: [
       { value: "edit", label: "Edit it" },
       { value: "propose", label: "Propose changes" },

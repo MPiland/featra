@@ -2,7 +2,7 @@
 id: STORY-20
 type: story
 title: Settings window with app and project scopes
-status: In Progress
+status: In Review
 parent: FEAT-13
 order: 3
 origin: planned
@@ -35,6 +35,11 @@ history:
     from: In Review
     to: In Progress
     by: session:story-20
+  - at: 2026-11-06T00:05:07Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-20
 ---
 
 ## Description
@@ -56,7 +61,8 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 
 - [x] work-format: project overrides (`configOverrides`) and in-place edits (`setConfigValue`) of config.yaml
 - [x] Settings model and bridge (`packages/client/src/settings.ts`, `bridge.ts`, preload)
-- [x] Settings view: pages, scopes, picker, override badge and Reset, shortcuts page with search
+- [x] Settings view: pages, scopes, picker, override mark and Reset, shortcuts page with search
+- [x] Layout rework after review: rows in titled cards, switch, segmented control and dropdown, quiet "Overridden ·
 - [x] Help > Keyboard Shortcuts and Ctrl+/; shortcuts listed from the menu model
 - [x] Main: settings store, current project, IPC, Close button at runtime with the tray following it
 - [x] Styles meeting WCAG AA in both themes (contrast e2e walks every Settings page)
@@ -65,6 +71,24 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 ## Notes
 
 - Settings is an in-app view, not a separate window: see decisions.md (STORY-20).
-- E2E: Windows 29 passed; WSL Ubuntu WSLg 29 passed; xvfb-run 28 passed, 1 skipped (BUG-1's maximize test: xvfb has
-  no window manager). Unit: 231 passed.
+- E2E after the layout rework: Windows 29 passed; WSL Ubuntu WSLg and xvfb-run: see the commit report. Unit: 233
+  passed (settings.test.tsx 26).
 - Bug found and fixed: a project change waited for the write before showing; regression test in settings.test.tsx.
+
+## Tests
+
+- AC1: `packages/client/test/settings.test.tsx` (AC1 block: scopes, picker in the header, picker keyboard);
+  `apps/desktop/e2e/settings.spec.ts` "a project override is written…"
+- AC2: `apps/desktop/e2e/settings.spec.ts` "a project override is written…" and "keyboard only…" (settings.json);
+  `apps/desktop/test/settings-store.test.ts`; `packages/work-format/test/config.test.ts` (`setConfigValue`, `configOverrides`)
+- AC3: `packages/client/test/settings.test.tsx` (AC3 block: "Overridden · Reset", hidden when following the default,
+  Reset, optimistic change regression); `apps/desktop/e2e/settings.spec.ts` "a project override is written…"
+- AC4: `packages/client/test/settings.test.tsx` (AC4 block: Tab reaches every setting; arrows on the segmented
+  control, Space and Enter on a switch, Enter on Reset); `apps/desktop/e2e/settings.spec.ts` "keyboard only…";
+  `apps/desktop/e2e/contrast.spec.ts` (every Settings page and the open picker, both themes)
+- AC5: `packages/client/test/settings.test.tsx` (AC5); `apps/desktop/e2e/settings.spec.ts` "keyboard only…"
+- AC6: `packages/client/test/settings.test.tsx` (AC6); `apps/desktop/e2e/settings.spec.ts` "the Close button setting
+  applies at once…" and "with no tray…"
+- AC7: `packages/client/test/settings.test.tsx` (AC7); `apps/desktop/e2e/settings.spec.ts` "Ctrl+/ and Help >
+  Keyboard Shortcuts…"
+- AC8: `packages/client/test/settings.test.tsx` (AC8); `apps/desktop/e2e/settings.spec.ts` "keyboard only…"
