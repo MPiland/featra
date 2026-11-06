@@ -37,3 +37,7 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   STORY-41, after STORY-20 and before STORY-19.
 - 2026-11-05 — Settings copy is short and standard, the way established desktop apps word it (for example "Minimize to
   tray" or "Quit"). There's no flavour text, and a description appears only where the label alone would mislead.
+- 2026-11-05 — Remote control MVP (M2) goes over Tailscale, with an SSH tunnel to the local server as an alternative.
+  We don't build on Claude's or Codex's own Remote Control: it belongs to the vendor's running process, not the
+  session. Imported sessions are resumed in place (as `claude --resume` does), so their turns carry over to the
+  vendor's own apps the way they do natively.
