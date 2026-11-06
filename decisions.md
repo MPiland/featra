@@ -62,7 +62,7 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     there, and F11 and Ctrl+Shift+W are left to the browser.
   - About is a modal dialog: the app behind is inert, Tab stays inside, Escape closes, and focus
     returns to where it was. About reads the version from the desktop package (`app.getVersion()`).
-  - The title bar shows the view title only ("Work"). The mockup's "· manager" project suffix waits for STORY-19.
+  - The title bar shows the view title only ("Work"). STORY-19 added the "· manager" project suffix after it.
   - Window chrome state (sidebar collapsed, zoom, theme) is `ui-state.json` in Electron's `userData`, written by main
     (atomic, flushed before quit), not renderer `localStorage`. `FEATRA_USER_DATA_DIR` overrides the folder. STORY-20
     moved the theme out to `settings.json`; `ui-state.json` keeps the sidebar and zoom.
@@ -168,7 +168,7 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     comments, key order and unknown keys are kept, but a trailing comment's alignment collapses to one space. A file
     that isn't valid is reported in Settings and never rewritten. `parseConfig` now also rejects non-boolean flags
     and an unknown `knowledge` value.
-  - The current project, until STORY-19's project list: `FEATRA_PROJECT_DIR` if set (empty means none), else the
+  - The current project, until STORY-19's project list (now superseded, see STORY-19 below): `FEATRA_PROJECT_DIR` if set (empty means none), else the
     nearest folder at or above the working folder that holds `.featra/`. The picker lists only that project, and main
     accepts project reads and writes only for it. E2E launches set `FEATRA_PROJECT_DIR=""` unless a test gives a
     temporary project, so no test touches this repo's own config.
@@ -202,3 +202,22 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   STORY-41, after STORY-20 and before STORY-19.
 - 2026-11-05 — Settings copy is short and standard, the way established desktop apps word it (for example "Minimize to
   tray" or "Quit"). There's no flavour text, and a description appears only where the label alone would mislead.
+- 2026-11-06 — STORY-19 (switch, create and open projects):
+  - The known projects are `projects.json` in `userData`, owned by main (`project-registry.ts`), with the current
+    project and the last New Project location. Reset App Data keeps it. A folder that is gone is left out of the list
+    but kept in the file, so it comes back with the folder. Folders compare without case on Windows and macOS.
+  - The current project at startup: `FEATRA_PROJECT_DIR` if set (pinned for that run), else the stored current one if
+    its folder is there, else the nearest folder holding `.featra/`. Main accepts project settings reads and writes
+    only for known projects.
+  - New Project… creates an empty folder and opens it. Setting up git and `.featra/` in it belongs to STORY-2 and
+    STORY-33. The dialog checks the name as you type with the shared `projectNameError` (Windows' forbidden characters
+    and reserved names on every platform, so a project moves between machines); main checks again. Location defaults
+    to the last one used, else the folder the current project is in.
+  - Shortcuts: New Project Ctrl+Shift+N (Ctrl+N stays New Chat), Open Folder Ctrl+O, Project Settings Ctrl+Shift+,.
+    In a browser tab New Project and Open Folder are left out and their shortcuts ignored.
+  - The switcher is the sidebar's first control, a `MenuButton`: known projects as a checked list, then New Project…,
+    Open Folder…, Project Settings…. Project Settings… always opens Settings' Project page on the current project.
+  - Switching re-keys Work and the chat list on the project folder, so their state starts fresh. The title bar shows
+    "· name" after the view title; the window title stays "Featra · View". With no project, Work offers New Project…
+    and Open Folder…. A switch or open that main refuses shows a "Can't Open Project" dialog with the reason.
+  - E2E fakes only the OS folder dialog: tests queue the folders it returns (`queueFolderPicks`).
