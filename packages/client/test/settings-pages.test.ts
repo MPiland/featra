@@ -33,7 +33,7 @@ describe("settings pages", () => {
   });
 
   it("groups every work setting exactly once", () => {
-    expect(WORK_GROUPS.flatMap((g) => g.keys).sort()).toEqual([...WORK_SETTING_KEYS].sort());
+    expect(WORK_GROUPS.flatMap((g) => g.keys).toSorted()).toEqual(WORK_SETTING_KEYS.toSorted());
   });
 
   it("names the choices in short, standard words", () => {

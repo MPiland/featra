@@ -31,6 +31,8 @@ export interface HostOptions {
   slowProjectWrites?: boolean;
 }
 
+const noop = () => {};
+
 /** Fakes only the host platform: in-memory stores (userData, the projects' config files) and recorded window calls. */
 export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   const saves: UiState[] = [];
@@ -39,13 +41,13 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   const project = host.project === undefined ? PROJECT : host.project;
   const projectSettings = (dir: string) => ({
     dir,
-    overrides: { ...(projectFiles.get(dir) ?? {}) },
+    overrides: { ...projectFiles.get(dir) },
     error: host.brokenProjects?.[dir] ?? null,
   });
   const calls: string[] = [];
   let windowState: WindowState = { ...DEFAULT_WINDOW_STATE };
   const listeners = new Set<(s: WindowState) => void>();
-  let releaseWrites = () => {};
+  let releaseWrites: () => void = noop;
   const writesReleased = new Promise<void>((r) => (releaseWrites = r));
   const bridge: FeatraBridge = {
     platform,
@@ -78,7 +80,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       setProjectValue: async (dir, key, value) => {
         if (host.slowProjectWrites) await writesReleased;
         if (host.brokenProjects?.[dir]) return projectSettings(dir);
-        const next: Record<string, unknown> = { ...(projectFiles.get(dir) ?? {}) };
+        const next: Record<string, unknown> = { ...projectFiles.get(dir) };
         if (value === null) delete next[key];
         else next[key] = value;
         projectFiles.set(dir, normalizeWorkOverrides(next));

@@ -55,6 +55,6 @@ describe("Switch", () => {
     render(<Labelled disabled changes={changes} />);
     await user.click(screen.getByRole("switch"));
     expect(changes).toEqual([]);
-    expect((screen.getByRole("switch") as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByRole<HTMLButtonElement>("switch").disabled).toBe(true);
   });
 });

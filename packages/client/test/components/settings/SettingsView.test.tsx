@@ -10,7 +10,6 @@ import {
   row,
   WORK,
   navButton,
-  description,
   switchFor,
   isOn,
   projectLoaded,
@@ -92,20 +91,21 @@ describe("AC1: App and Project scopes; the project picker starts on the current 
     await openSettings(user);
     for (const [i, button] of within(pageNav()).getAllByRole("button").entries()) {
       await user.click(button);
-      await screen.findAllByRole("heading", { level: 2, name: button.textContent! });
+      await screen.findAllByRole("heading", { level: 2, name: button.textContent });
       if (i === 4) await projectLoaded();
       const page = main().querySelector<HTMLElement>(".settings-page")!;
       const sections = within(page)
         .queryAllByRole("heading", { level: 3 })
         .map((h) => h.textContent);
-      expect(sections, button.textContent!).not.toContain(pageTitle());
-      expect(new Set(sections).size, button.textContent!).toBe(sections.length);
-      if (page.querySelectorAll(".settings-card").length === 1 && !page.querySelector("table"))
-        expect(sections, `${button.textContent}: one group`).toEqual([]);
+      expect(sections, button.textContent).not.toContain(pageTitle());
+      expect(new Set(sections).size, button.textContent).toBe(sections.length);
+      // A page with one group needs no group heading.
+      const oneGroup = page.querySelectorAll(".settings-card").length === 1 && !page.querySelector("table");
+      expect(oneGroup ? sections : [], `${button.textContent}: one group`).toEqual([]);
       // Every description says something its label doesn't.
       for (const help of page.querySelectorAll(".setting-help")) {
-        const label = help.closest(".setting-row")!.querySelector(".setting-label > span")!.textContent!.toLowerCase();
-        expect(help.textContent!.toLowerCase(), label).not.toContain(label);
+        const label = help.closest(".setting-row")!.querySelector(".setting-label > span")!.textContent.toLowerCase();
+        expect(help.textContent.toLowerCase(), label).not.toContain(label);
       }
     }
   });
@@ -128,11 +128,10 @@ describe("AC4: every setting is reachable and changeable by keyboard", () => {
     for (const [i, button] of buttons.entries()) {
       const name = `${i + 1}. ${button.textContent}`;
       await user.click(button);
-      await screen.findAllByRole("heading", { level: 2, name: button.textContent! });
-      if (i === buttons.length - 1) {
-        await projectLoaded();
-        expect(within(main()).getByText("Overridden")).toBeTruthy(); // its Reset button is a stop too
-      }
+      await screen.findAllByRole("heading", { level: 2, name: button.textContent });
+      if (i === buttons.length - 1) await projectLoaded();
+      // Only the project page has an override, and its Reset button is a stop too.
+      expect(within(main()).queryAllByText("Overridden"), name).toHaveLength(i === buttons.length - 1 ? 1 : 0);
       const page = main().querySelector<HTMLElement>(".settings-page")!;
       within(pageNav()).getAllByRole("button").at(-1)!.focus(); // the page follows the page list in tab order
       const stops = await tabStops(user, page);

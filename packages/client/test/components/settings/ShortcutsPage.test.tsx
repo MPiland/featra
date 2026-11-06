@@ -45,7 +45,7 @@ describe("AC7: Keyboard shortcuts page, by area and searchable; Help > Keyboard 
         "forward",
       ];
       const labels = ids.map((id) => shortcutLabel(id, platform)).filter((l) => l !== undefined);
-      expect(listed.map((e) => e.keys).sort(), platform).toEqual(labels.sort());
+      expect(listed.map((e) => e.keys).toSorted(), platform).toEqual(labels.toSorted());
       expect([...new Set(listed.map((e) => e.area))], platform).toEqual(["File", "Edit", "View", "Go", "Help"]);
     }
     expect(listShortcuts(menuFor("win32")).find((e) => e.keys === "Ctrl+B")).toEqual({

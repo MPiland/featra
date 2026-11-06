@@ -15,7 +15,7 @@ const OPTIONS = [
 function Picker({ onEscapeBehind = () => {} }) {
   const [value, setValue] = useState("b");
   return (
-    <div onKeyDown={(e) => e.key === "Escape" && onEscapeBehind()}>
+    <div role="presentation" onKeyDown={(e) => e.key === "Escape" && onEscapeBehind()}>
       <Dropdown name="Letter" value={value} options={OPTIONS} onChange={setValue} />
       <button type="button">outside</button>
     </div>

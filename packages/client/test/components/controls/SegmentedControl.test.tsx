@@ -35,7 +35,10 @@ function Sizes({ disabled = false, changes = [] as Size[] }) {
 }
 
 const checked = () =>
-  (screen.getAllByRole("radio") as HTMLInputElement[]).find((r) => r.checked)?.closest("label")?.textContent;
+  screen
+    .getAllByRole<HTMLInputElement>("radio")
+    .find((r) => r.checked)
+    ?.closest("label")?.textContent;
 
 describe("SegmentedControl", () => {
   it("is a named radio group with one radio per option, in order, the value checked", () => {
@@ -44,7 +47,7 @@ describe("SegmentedControl", () => {
     expect(group.getAttribute("aria-describedby")).toBe("d");
     expect(
       within(group)
-        .getAllByRole("radio")
+        .getAllByRole<HTMLInputElement>("radio")
         .map((r) => [r.closest("label")!.textContent, r.id]),
     ).toEqual([
       ["Small", "size-s"],

@@ -10,6 +10,7 @@
   "rules": {
     "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
     "no-console": "error",
+    "vitest/valid-expect": ["error", { "maxArgs": 2 }],
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",
     "react/react-in-jsx-scope": "off",
