@@ -26,7 +26,8 @@ export interface Progress {
 }
 
 export function progressLabel(done: number, total: number, unit: ProgressMode | "features"): string {
-  const [one, many] = unit === "stories" ? ["story", "stories"] : unit === "tasks" ? ["task", "tasks"] : ["feature", "features"];
+  const [one, many] =
+    unit === "stories" ? ["story", "stories"] : unit === "tasks" ? ["task", "tasks"] : ["feature", "features"];
   return `${done} of ${total} ${total === 1 ? one : many} done`;
 }
 
@@ -62,7 +63,8 @@ function everUnder(featureId: string, cards: readonly Card[]): Card[] {
   return cards.filter(
     (c) =>
       isItem(c) &&
-      (c.parent === featureId || c.history.some((e) => e.field === "parent" && (e.to === featureId || e.from === featureId))),
+      (c.parent === featureId ||
+        c.history.some((e) => e.field === "parent" && (e.to === featureId || e.from === featureId))),
   );
 }
 
@@ -93,7 +95,7 @@ export function scopeBaseline(featureId: string, cards: readonly Card[], config:
 export function joinedAt(card: Card, featureId: string): string | null {
   let joined: number | null = null;
   const parentEvents = card.history.filter((e) => e.field === "parent");
-  const initialParent = parentEvents.length ? parentEvents[0]!.from : card.parent;
+  const initialParent = parentEvents[0] ? parentEvents[0].from : card.parent;
   if (initialParent === featureId) joined = createdMs(card);
   for (const e of parentEvents) if (e.to === featureId) joined = ms(e.at);
   return joined === null ? null : Number.isFinite(joined) ? iso(joined) : null;
@@ -124,7 +126,8 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
   if (baseline !== null) {
     for (const c of items) {
       const at = joinedAt(c, featureId);
-      if (at !== null && ms(at) > ms(baseline)) added.push({ id: c.id, title: c.title, type: c.type, origin: c.origin, at });
+      if (at !== null && ms(at) > ms(baseline))
+        added.push({ id: c.id, title: c.title, type: c.type, origin: c.origin, at });
     }
   }
   const bugs = items.filter((c) => c.type === "bug");
@@ -137,7 +140,12 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
 }
 
 /** Origin for a new item under a feature: bugs are `bug`; anything after the baseline is `added`. */
-export function originForNewItem(featureId: string | null, type: "story" | "bug", cards: readonly Card[], config: ProjectConfig): Origin {
+export function originForNewItem(
+  featureId: string | null,
+  type: "story" | "bug",
+  cards: readonly Card[],
+  config: ProjectConfig,
+): Origin {
   if (type === "bug") return "bug";
   if (featureId === null) return "planned";
   return scopeBaseline(featureId, cards, config) === null ? "planned" : "added";
@@ -163,7 +171,7 @@ export function burnUp(featureId: string, cards: readonly Card[], config: Projec
     for (const e of c.history) if (e.field === "status" || e.field === "parent") times.add(ms(e.at));
   }
   const points: BurnUpPoint[] = [];
-  for (const t of [...times].sort((a, b) => a - b)) {
+  for (const t of [...times].toSorted((a, b) => a - b)) {
     let scope = 0;
     let done = 0;
     for (const c of relevant) {

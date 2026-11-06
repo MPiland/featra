@@ -1,0 +1,111 @@
+/* App menu */
+.menuwrap {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  top: 36px;
+  left: 0;
+  background: var(--menu);
+  color: var(--tx);
+  border: 1px solid var(--menu-line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 5px;
+  min-width: 230px;
+  z-index: 20;
+}
+
+.mi {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mi:hover,
+.mi:focus {
+  background: var(--menu-hover);
+}
+
+.mi .k {
+  margin-left: auto;
+  /* --tx2, not the mockup's --tx3: --tx3 on the focused item's background is only 3.4:1 in dark. */
+  color: var(--tx2);
+  font-size: 11px;
+}
+
+.msep {
+  border: 0;
+  height: 1px;
+  background: var(--menu-line);
+  margin: 4px 2px;
+}
+
+.menu.top {
+  min-width: 180px;
+}
+
+/* Submenus open to the right of the item that owns them. */
+.mwrap {
+  position: relative;
+}
+
+.menu.sub {
+  top: -6px;
+  left: calc(100% + 4px);
+  min-width: 220px;
+}
+
+.mi.open {
+  background: var(--menu-hover);
+}
+
+.mi svg.i {
+  width: 14px;
+  height: 14px;
+}
+
+.mi .chev {
+  display: grid;
+  color: var(--tx2);
+}
+
+.mcheck {
+  display: grid;
+  place-items: center;
+  width: 14px;
+  margin-left: -2px;
+}
+
+/* In a menu with a checkmark item, every label lines up after the checkmark's column. */
+.menu:has(> [role="none"] > :is([role="menuitemcheckbox"], [role="menuitemradio"]))
+  > [role="none"]
+  > .mi:not([role="menuitemcheckbox"], [role="menuitemradio"]) {
+  padding-left: 32px;
+}
+
+/* Back and Forward when there's nowhere to go. Still focusable, so arrowing through the menu finds them. */
+.mi[aria-disabled="true"] {
+  color: var(--tx3);
+  cursor: default;
+}
+
+.mi[aria-disabled="true"] .k {
+  color: var(--tx3);
+}
+
+/* The project switcher's menu: under the switcher, as wide as the sidebar allows. */
+.menu.proj-menu {
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  min-width: 0;
+}

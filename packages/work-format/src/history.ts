@@ -51,8 +51,9 @@ export function existsAt(card: Card, t: number): boolean {
 /** Value of a tracked field at time `t`, replayed from history. Falls back to the current value when untracked. */
 function valueAt(card: Card, field: "status" | "parent", t: number): string | null {
   const events = card.history.filter((e) => e.field === field);
-  if (events.length === 0) return card[field];
-  let value: string | null = events[0]!.from;
+  const [first] = events;
+  if (!first) return card[field];
+  let value: string | null = first.from;
   for (const e of events) {
     if (ms(e.at) <= t) value = e.to;
   }

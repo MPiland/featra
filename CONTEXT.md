@@ -15,7 +15,7 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **AC** (acceptance criterion) — a checklist item on a story that links the test proving it.
 - **Bug** — a card for something that broke in already-merged work. A regression caused by the in-progress feature
   lives under that feature; a bug with no in-progress cause lives in the project bug list. A problem inside a story that
-  is still being worked is a *task*, not a bug.
+  is still being worked is a _task_, not a bug.
 
 ## Ownership and history
 
@@ -38,6 +38,13 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   - **Verified** — the PR's CI checks passed.
   - **Proven** — the AC's linked test passed.
   - **Accepted** — the user signed off.
+
+## Projects
+
+- **Project** — a folder Featra works in, normally holding `.featra/`. Featra keeps a list of known projects; one is
+  current, and Work, the chat list and Project settings follow it.
+- **Project switcher** — the control at the top of the sidebar that lists known projects and offers New Project…, Open
+  Folder… and Project Settings….
 
 ## Agents
 

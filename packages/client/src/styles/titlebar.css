@@ -1,0 +1,118 @@
+/* Title bar. The bar drags the window; its controls opt out. */
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 6px 0 10px;
+  background: var(--side);
+  border-bottom: 1px solid var(--line);
+  user-select: none;
+  -webkit-app-region: drag;
+  position: relative;
+}
+
+.titlebar.mac {
+  padding-left: 80px; /* room for the native traffic lights */
+}
+
+.titlebar button,
+.titlebar .menu {
+  -webkit-app-region: no-drag;
+}
+
+.tb {
+  width: 32px;
+  height: 30px;
+  border-radius: 7px;
+  display: grid;
+  place-items: center;
+  color: var(--tx2);
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+}
+
+.tb:hover:not(:disabled) {
+  background: var(--row);
+  color: var(--tx);
+}
+
+.tb.on {
+  background: var(--row2);
+  color: var(--tx);
+}
+
+.tb:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.tb.close:hover {
+  background: var(--close-hover);
+  color: #ffffff;
+}
+
+.tb:focus-visible,
+.nav:focus-visible,
+.mi:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: -2px;
+}
+
+.tb[data-tip]:hover::after,
+.tb[data-tip]:focus-visible::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--tip-bg);
+  color: var(--tip-tx);
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  white-space: pre;
+  z-index: 9;
+  pointer-events: none;
+}
+/* The window controls sit at the window's right edge: keep their tooltips inside it. */
+.tb.close[data-tip]:hover::after,
+.tb.close[data-tip]:focus-visible::after {
+  left: auto;
+  right: 2px;
+  transform: none;
+}
+
+.ttl {
+  margin: 0 0 0 10px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tx);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grow {
+  flex: 1;
+}
+
+.sep {
+  width: 1px;
+  height: 18px;
+  background: var(--line);
+  margin: 0 6px;
+}
+
+/* The current project after the view title: "Work · manager". */
+.ttl-proj {
+  margin-left: -6px;
+  font-size: 13px;
+  color: var(--tx2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

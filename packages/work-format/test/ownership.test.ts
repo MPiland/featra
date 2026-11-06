@@ -44,7 +44,10 @@ describe("ownerOf (ADR 0002 table)", () => {
   });
 
   it("a project bug being fixed in its own worktree is owned by that worktree", () => {
-    const state: BranchState = { features: {}, worktrees: { "BUG-2": { branch: "bug-2", path: "/wt/bug-2", merged: false } } };
+    const state: BranchState = {
+      features: {},
+      worktrees: { "BUG-2": { branch: "bug-2", path: "/wt/bug-2", merged: false } },
+    };
     expect(ownerOf(projectBug, state)).toEqual({ kind: "worktree", branch: "bug-2", path: "/wt/bug-2" });
   });
 });

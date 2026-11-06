@@ -23,6 +23,7 @@ epics in `.featra/cards/`.
   Settings.
 - **Command palette** (View > Command Palette, Ctrl+K): every menu action and view, searchable.
 - **Search** (Go > Search…, Ctrl+Shift+K) across chats and cards.
+- **Remove a project from the list**, and reorder or pin projects in the switcher.
 - **Desktop computer use** for agents: screenshots plus mouse and keyboard control of other apps, offered as MCP tools
   so any agent can use them. Off by default (tool definitions cost tokens), with per-app approval, browsers and
   terminals restricted, and macOS screen-recording and accessibility permissions. Linux under Wayland limits it. M1
@@ -33,4 +34,3 @@ epics in `.featra/cards/`.
 - A trademark and registrar check on the name "Featra".
 - **Help menu links** that need a public repo and a release channel: Featra Docs (F1), View Changelog, Get Support,
   Send Feedback, and Check for Updates.
-

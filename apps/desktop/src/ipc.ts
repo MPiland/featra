@@ -1,0 +1,128 @@
+import { app, BrowserWindow, ipcMain, nativeTheme, shell, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import {
+  EDIT_COMMANDS,
+  IPC,
+  normalizeAppSettings,
+  normalizeUiState,
+  normalizeWorkOverrides,
+  sizeButtonAction,
+  THEME_CHOICES,
+  WORK_SETTING_KEYS,
+  type AppSettings,
+  type ProjectSettings,
+  type ProjectsResult,
+  type SettingsSnapshot,
+} from "@featra/client/bridge";
+import { normalizeZoom } from "@featra/client/zoom";
+import { isOneOf, toText } from "@featra/work-format";
+import { pickFolder } from "./folder-dialog.ts";
+import { closeToTraySupport, type Lifecycle } from "./lifecycle.ts";
+import type { Log } from "./log.ts";
+import type { ProjectRegistry } from "./project-registry.ts";
+import { readProjectSettings, writeProjectValue, type SettingsStore } from "./settings-store.ts";
+import { e2e, testHooks } from "./test-hooks.ts";
+import { clearCacheAndRestart, resetAppData, type TroubleshootDeps } from "./troubleshoot.ts";
+import type { UiStateStore } from "./ui-state-store.ts";
+import { windowState } from "./window.ts";
+
+export interface MainDeps {
+  store: UiStateStore;
+  lifecycle: Lifecycle;
+  log: Log;
+  troubleshoot: TroubleshootDeps;
+  projects: ProjectRegistry;
+  settings: {
+    store: SettingsStore;
+    current: () => AppSettings;
+    /** Stores new app settings and applies them: the close button at once (the page applies the theme). */
+    apply: (next: AppSettings) => Promise<void>;
+  };
+}
+
+const fromOurWindow = (e: IpcMainEvent | IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);
+
+const notOpen = (dir: unknown): ProjectSettings => ({
+  dir: toText(dir),
+  overrides: {},
+  error: "Not an open project.",
+});
+
+/** Answers the page's calls (see `IPC` in the client's bridge). Every payload is checked: the page is not trusted. */
+export function registerIpc({ store, lifecycle, log, troubleshoot, projects, settings }: MainDeps) {
+  ipcMain.handle(IPC.uiStateLoad, () => store.load());
+  ipcMain.handle(IPC.uiStateSave, (_e, state: unknown) => store.save(normalizeUiState(state)));
+  ipcMain.on(IPC.windowMinimize, (e) => fromOurWindow(e)?.minimize());
+  ipcMain.handle(IPC.windowGetState, (e) => {
+    const win = fromOurWindow(e);
+    return win ? windowState(win) : undefined;
+  });
+  ipcMain.on(IPC.windowToggleMaximize, (e) => {
+    const win = fromOurWindow(e);
+    if (!win) return;
+    const action = sizeButtonAction(windowState(win));
+    if (action === "leaveFullScreen") win.setFullScreen(false);
+    else if (action === "unmaximize") win.unmaximize();
+    else win.maximize();
+  });
+  ipcMain.on(IPC.windowClose, (e) => fromOurWindow(e)?.close());
+  ipcMain.on(IPC.windowToggleFullScreen, (e) => {
+    const win = fromOurWindow(e);
+    win?.setFullScreen(!win.isFullScreen());
+  });
+  ipcMain.on(IPC.windowSetZoom, (e, factor: unknown) => e.sender.setZoomFactor(normalizeZoom(factor)));
+  ipcMain.on(IPC.windowSetTheme, (_e, theme: unknown) => {
+    if (isOneOf(THEME_CHOICES, theme)) nativeTheme.themeSource = theme;
+  });
+  // The same webContents calls Electron's undo/redo/cut/copy/paste/selectAll menu roles make: they act on the
+  // focused field.
+  ipcMain.on(IPC.edit, (e, command: unknown) => {
+    if (isOneOf(EDIT_COMMANDS, command)) e.sender[command]();
+  });
+  ipcMain.handle(IPC.settingsLoad, (): SettingsSnapshot => ({
+    app: settings.current(),
+    closeToTray: closeToTraySupport(lifecycle, process.platform),
+  }));
+  ipcMain.handle(IPC.settingsSaveApp, (_e, next: unknown) => settings.apply(normalizeAppSettings(next)));
+  // The page may only reach projects on the list: the folders the user opened or created.
+  const knownProject = projects.has;
+  ipcMain.handle(IPC.settingsLoadProject, (_e, dir: unknown) =>
+    knownProject(dir) ? readProjectSettings(dir) : notOpen(dir),
+  );
+  ipcMain.handle(IPC.settingsSetProjectValue, (_e, dir: unknown, key: unknown, value: unknown) => {
+    if (!knownProject(dir)) return notOpen(dir);
+    if (!isOneOf(WORK_SETTING_KEYS, key)) return readProjectSettings(dir);
+    if (value === null) return writeProjectValue(dir, key, null);
+    const valid = normalizeWorkOverrides({ [key]: value })[key];
+    return valid !== undefined ? writeProjectValue(dir, key, valid) : readProjectSettings(dir);
+  });
+  ipcMain.handle(IPC.projectsList, () => projects.snapshot());
+  const logged = (action: string) => (result: ProjectsResult) => {
+    const current = projects.current();
+    log.info(result.ok && current ? `${action}: ${current.dir}` : `${action} failed`);
+    return result;
+  };
+  ipcMain.handle(IPC.projectsSwitch, (_e, dir: unknown) => projects.switchTo(dir).then(logged("Project")));
+  ipcMain.handle(IPC.projectsOpenFolder, async (e) => {
+    const dir = await pickFolder(fromOurWindow(e), { title: "Open Folder", button: "Open" });
+    return dir === null ? null : projects.open(dir).then(logged("Opened folder"));
+  });
+  ipcMain.handle(IPC.projectsChooseLocation, (e, from: unknown) =>
+    pickFolder(fromOurWindow(e), { title: "Choose Location", button: "Choose", from: toText(from) || undefined }),
+  );
+  ipcMain.handle(IPC.projectsCreate, (_e, location: unknown, name: unknown) =>
+    projects.create(location, name).then(logged("New project")),
+  );
+  ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
+  ipcMain.on(IPC.appReload, (e) => e.sender.reload());
+  ipcMain.on(IPC.appToggleDevTools, (e) => e.sender.toggleDevTools());
+  ipcMain.on(IPC.appShowLogs, () => {
+    // Flush first, so the file exists and holds everything logged so far.
+    void log.flush().then(() => {
+      if (e2e) testHooks.shownInFolder.push(log.file);
+      else shell.showItemInFolder(log.file);
+    });
+  });
+  ipcMain.on(IPC.appClearCacheAndRestart, () => void clearCacheAndRestart(troubleshoot));
+  ipcMain.on(IPC.appResetAppData, () => void resetAppData(troubleshoot));
+  ipcMain.on(IPC.appQuit, () => lifecycle.quit());
+}
