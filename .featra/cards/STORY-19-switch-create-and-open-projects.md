@@ -36,6 +36,6 @@ As a builder, I switch between my projects from the top of the sidebar, and add 
 ## Tasks
 
 - [ ] Break down when picked up
-- [ ] Split `apps/desktop/src/main.ts` by job (windows, tray, menus, IPC) per `docs/coding-standards.md` before adding the project menu items
+- [x] Split `apps/desktop/src/main.ts` by job (windows, tray, menus, IPC) per `docs/coding-standards.md` before adding the project menu items
 
 ## Notes

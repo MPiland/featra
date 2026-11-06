@@ -37,9 +37,7 @@ export function ShortcutsPage({ shortcuts }: { shortcuts: readonly ShortcutEntry
           </div>
         </section>
       ))}
-      <p role="status" className="settings-intro">
-        {shown.length === 0 ? `No shortcuts match “${query.trim()}”.` : ""}
-      </p>
+      <output className="settings-intro">{shown.length === 0 ? `No shortcuts match “${query.trim()}”.` : ""}</output>
     </>
   );
 }

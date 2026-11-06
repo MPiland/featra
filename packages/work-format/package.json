@@ -5,12 +5,13 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
-  },
-  "dependencies": {
-    "yaml": "^2.8.1"
+    ".": "./src/index.ts",
+    "./guards": "./src/utils/guards.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
   }
 }

@@ -13,7 +13,8 @@ function bus(answers: Record<string, string | Error>) {
   return { run, ran };
 }
 
-const DBUS_SEND_TRUE = 'method return time=1.0 sender=org.freedesktop.DBus -> destination=:1.9 serial=3 reply_serial=2\n   boolean true\n';
+const DBUS_SEND_TRUE =
+  "method return time=1.0 sender=org.freedesktop.DBus -> destination=:1.9 serial=3 reply_serial=2\n   boolean true\n";
 const DBUS_SEND_FALSE = DBUS_SEND_TRUE.replace("true", "false");
 
 describe("AC7: Linux has a tray only when a StatusNotifier host is on the session bus", () => {

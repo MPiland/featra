@@ -1,13 +1,37 @@
 import { parse, stringify } from "yaml";
-import type { AcceptanceCriterion, BodySection, Card, CardType, ChecklistItem, HistoryEvent, Origin } from "./types.ts";
+import {
+  HISTORY_FIELDS,
+  type AcceptanceCriterion,
+  type BodySection,
+  type Card,
+  type CardType,
+  type ChecklistItem,
+  type HistoryEvent,
+  type Origin,
+} from "./types.ts";
+import { errorMessage, isOneOf, isRecord, toText } from "./utils/guards.ts";
 
 const KNOWN_KEYS = [
-  "id", "type", "title", "status", "parent", "order", "origin", "role", "agent", "model", "reasoning",
-  "sessions", "branch", "pr", "created", "history",
+  "id",
+  "type",
+  "title",
+  "status",
+  "parent",
+  "order",
+  "origin",
+  "role",
+  "agent",
+  "model",
+  "reasoning",
+  "sessions",
+  "branch",
+  "pr",
+  "created",
+  "history",
 ] as const;
 const STORY_ONLY_KEYS = new Set(["role", "agent", "model", "reasoning", "sessions", "branch", "pr"]);
-const CARD_TYPES: CardType[] = ["epic", "feature", "story", "bug"];
-const ORIGINS: Origin[] = ["planned", "added", "bug"];
+const CARD_TYPES: readonly CardType[] = ["epic", "feature", "story", "bug"];
+const ORIGINS: readonly Origin[] = ["planned", "added", "bug"];
 
 const H_DESCRIPTION = "Description";
 const H_ACS = "Acceptance criteria";
@@ -32,21 +56,23 @@ export function parseCard(text: string, source?: string): Card {
   const normalized = text.replace(/\r\n/g, "\n");
   const match = /^---\n([\s\S]*?)\n---\n?([\s\S]*)$/.exec(normalized);
   if (!match) throw new CardParseError("missing frontmatter", source);
-  let fm: Record<string, unknown>;
+  let parsed: unknown;
   try {
-    fm = (parse(match[1]!) ?? {}) as Record<string, unknown>;
+    parsed = parse(match[1] ?? "") ?? {};
   } catch (e) {
-    throw new CardParseError(`invalid frontmatter: ${(e as Error).message}`, source);
+    throw new CardParseError(`invalid frontmatter: ${errorMessage(e)}`, source);
   }
+  if (!isRecord(parsed)) throw new CardParseError("frontmatter must be a mapping", source);
+  const fm = parsed;
   const body = parseBody(match[2] ?? "");
 
-  const type = fm.type as CardType;
-  if (!CARD_TYPES.includes(type)) throw new CardParseError(`unknown type "${String(fm.type)}"`, source);
+  const type = fm.type;
+  if (!isOneOf(CARD_TYPES, type)) throw new CardParseError(`unknown type "${toText(type)}"`, source);
   if (typeof fm.id !== "string" || !fm.id) throw new CardParseError("missing id", source);
   if (typeof fm.title !== "string") throw new CardParseError("missing title", source);
   if (typeof fm.status !== "string") throw new CardParseError("missing status", source);
-  const origin = (fm.origin ?? "planned") as Origin;
-  if (!ORIGINS.includes(origin)) throw new CardParseError(`unknown origin "${String(fm.origin)}"`, source);
+  const origin = fm.origin ?? "planned";
+  if (!isOneOf(ORIGINS, origin)) throw new CardParseError(`unknown origin "${toText(origin)}"`, source);
 
   const extra: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(fm)) {
@@ -91,8 +117,13 @@ export function serializeCard(card: Card): string {
   };
   if (isWorkItem(card.type)) {
     Object.assign(fm, {
-      role: card.role, agent: card.agent, model: card.model, reasoning: card.reasoning,
-      sessions: card.sessions, branch: card.branch, pr: card.pr,
+      role: card.role,
+      agent: card.agent,
+      model: card.model,
+      reasoning: card.reasoning,
+      sessions: card.sessions,
+      branch: card.branch,
+      pr: card.pr,
     });
   }
   fm.created = card.created;
@@ -110,7 +141,8 @@ export function serializeCard(card: Card): string {
   } else if (card.notes.trim()) {
     parts.push(`## ${H_NOTES}`, "", card.notes.trim(), "");
   }
-  for (const s of card.extraSections) parts.push(`## ${s.heading}`, "", ...(s.content.trim() ? [s.content.trim(), ""] : []));
+  for (const s of card.extraSections)
+    parts.push(`## ${s.heading}`, "", ...(s.content.trim() ? [s.content.trim(), ""] : []));
   return collapseBlankRuns(parts.join("\n")).replace(/\n*$/, "\n");
 }
 
@@ -133,7 +165,7 @@ function parseBody(body: string): ParsedBody {
   for (const line of body.split("\n")) {
     const h = /^## (.+?)\s*$/.exec(line);
     if (h) {
-      current = { heading: h[1]!, content: "" };
+      current = { heading: h[1] ?? "", content: "" };
       sections.push(current);
     } else if (current) {
       current.content += line + "\n";
@@ -149,7 +181,9 @@ function parseBody(body: string): ParsedBody {
     acs: parseChecklist(get(H_ACS)).map(splitTestRef),
     tasks: parseChecklist(get(H_TASKS)),
     notes: get(H_NOTES).trim(),
-    extra: sections.filter((s) => !KNOWN_HEADINGS.has(s.heading)).map((s) => ({ heading: s.heading, content: s.content.trim() })),
+    extra: sections
+      .filter((s) => !KNOWN_HEADINGS.has(s.heading))
+      .map((s) => ({ heading: s.heading, content: s.content.trim() })),
   };
 }
 
@@ -159,7 +193,7 @@ function parseChecklist(content: string): ChecklistItem[] {
   for (const line of content.split("\n")) {
     const m = /^\s*[-*] \[( |x|X)\] (.*)$/.exec(line);
     if (m) {
-      last = { done: m[1] !== " ", text: m[2]!.trim() };
+      last = { done: m[1] !== " ", text: (m[2] ?? "").trim() };
       items.push(last);
     } else if (last && /^\s+\S/.test(line)) {
       // An indented line continues the item above it, as in Markdown; it is written back unwrapped.
@@ -173,19 +207,20 @@ function parseChecklist(content: string): ChecklistItem[] {
 
 function splitTestRef(item: ChecklistItem): AcceptanceCriterion {
   const m = /^(.*?)\s*\(test: ([^)]+)\)\s*$/.exec(item.text);
-  return m ? { ...item, text: m[1]!, test: m[2]!.trim() } : { ...item, test: null };
+  const [, text, test] = m ?? [];
+  return text !== undefined && test ? { ...item, text, test: test.trim() } : { ...item, test: null };
 }
 
 function parseHistory(raw: unknown, source?: string): HistoryEvent[] {
   if (raw == null) return [];
   if (!Array.isArray(raw)) throw new CardParseError("history must be a list", source);
-  return raw.map((e, i) => {
-    const ev = e as Record<string, unknown>;
+  return (raw as unknown[]).map((ev, i) => {
+    if (!isRecord(ev)) throw new CardParseError(`history[${i}] must be a mapping`, source);
     const at = dateStr(ev.at);
     if (!at) throw new CardParseError(`history[${i}] missing "at"`, source);
     return {
       at,
-      field: (ev.field ?? "status") as HistoryEvent["field"],
+      field: historyField(ev.field ?? "status", i, source),
       from: str(ev.from),
       to: str(ev.to),
       by: typeof ev.by === "string" ? ev.by : "unknown",
@@ -193,13 +228,19 @@ function parseHistory(raw: unknown, source?: string): HistoryEvent[] {
   });
 }
 
+function historyField(field: unknown, i: number, source?: string): HistoryEvent["field"] {
+  if (!isOneOf(HISTORY_FIELDS, field))
+    throw new CardParseError(`history[${i}] has unknown field "${toText(field)}"`, source);
+  return field;
+}
+
 function str(v: unknown): string | null {
-  return v === null || v === undefined ? null : String(v);
+  return v === null || v === undefined ? null : toText(v);
 }
 
 function dateStr(v: unknown): string | null {
   if (v instanceof Date) return v.toISOString().replace(".000Z", "Z");
-  return v === null || v === undefined ? null : String(v);
+  return v === null || v === undefined ? null : toText(v);
 }
 
 function collapseBlankRuns(s: string): string {

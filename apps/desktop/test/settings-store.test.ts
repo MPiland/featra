@@ -4,12 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseConfig } from "@featra/work-format";
 import { DEFAULT_APP_SETTINGS, DEFAULT_WORK_SETTINGS } from "@featra/client/bridge";
-import {
-  createSettingsStore,
-  findProject,
-  readProjectSettings,
-  writeProjectValue,
-} from "../src/settings-store.ts";
+import { createSettingsStore, findProject, readProjectSettings, writeProjectValue } from "../src/settings-store.ts";
 import { createUiStateStore } from "../src/ui-state-store.ts";
 
 /** Real stores against temporary folders: a userData folder and a project folder. */
@@ -29,7 +24,11 @@ const configText = () => readFile(join(project, ".featra", "config.yaml"), "utf8
 
 describe("AC2: app settings are stored in the user's config folder", () => {
   it("as settings.json in userData; a restarted app reads them back", async () => {
-    const settings = { ...DEFAULT_APP_SETTINGS, closeButton: "quit" as const, work: { ...DEFAULT_WORK_SETTINGS, progress: "tasks" as const } };
+    const settings = {
+      ...DEFAULT_APP_SETTINGS,
+      closeButton: "quit" as const,
+      work: { ...DEFAULT_WORK_SETTINGS, progress: "tasks" as const },
+    };
     const store = createSettingsStore(userData);
     expect(store.file).toBe(join(userData, "settings.json"));
     await store.save(settings);
@@ -55,9 +54,12 @@ describe("AC8: the theme survives a restart", () => {
   });
 
   it("a theme pinned before STORY-20 (in ui-state.json) carries over once; the settings file wins after that", async () => {
-    await writeFile(join(userData, "ui-state.json"), JSON.stringify({ sidebarCollapsed: true, zoomFactor: 1, theme: "light" }));
+    await writeFile(
+      join(userData, "ui-state.json"),
+      JSON.stringify({ sidebarCollapsed: true, zoomFactor: 1, theme: "light" }),
+    );
     expect((await createSettingsStore(userData).load()).theme).toBe("light");
-    expect((await createUiStateStore(userData).load())).toEqual({ sidebarCollapsed: true, zoomFactor: 1 });
+    expect(await createUiStateStore(userData).load()).toEqual({ sidebarCollapsed: true, zoomFactor: 1 });
     await createSettingsStore(userData).save({ ...DEFAULT_APP_SETTINGS, theme: "system" });
     expect((await createSettingsStore(userData).load()).theme).toBe("system");
   });
@@ -65,7 +67,8 @@ describe("AC8: the theme survives a restart", () => {
 
 describe("AC2: project settings are stored in the project's .featra/config.yaml", () => {
   it("an override is written to config.yaml, keeping the file's other keys and comments", async () => {
-    const before = "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nbaseBranch: main\nmcp: true # tools for agents\n";
+    const before =
+      "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nbaseBranch: main\nmcp: true # tools for agents\n";
     await writeFile(join(project, ".featra", "config.yaml"), before);
     const result = await writeProjectValue(project, "progress", "tasks");
     expect(result).toEqual({ dir: project, overrides: { progress: "tasks" }, error: null });

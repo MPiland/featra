@@ -37,10 +37,10 @@ describe("toggle sidebar shortcut", () => {
   });
 });
 
-describe("app shortcuts", () => {
-  const ctrl = (k: string, code = "", over: Partial<KeyInput> = {}) => key({ key: k, code, ctrlKey: true, ...over });
-  const cmd = (k: string, code = "", over: Partial<KeyInput> = {}) => key({ key: k, code, metaKey: true, ...over });
+const ctrl = (k: string, code = "", over: Partial<KeyInput> = {}) => key({ key: k, code, ctrlKey: true, ...over });
+const cmd = (k: string, code = "", over: Partial<KeyInput> = {}) => key({ key: k, code, metaKey: true, ...over });
 
+describe("app shortcuts", () => {
   it("matches zoom, settings and sidebar with Ctrl on Windows and Linux", () => {
     for (const platform of ["win32", "linux"]) {
       expect(matchShortcut(ctrl("b", "KeyB"), platform)).toBe("toggleSidebar");

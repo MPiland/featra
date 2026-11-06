@@ -1,6 +1,6 @@
 import type { EditCommand } from "./bridge.ts";
 import { shortcutLabel, type ShortcutId } from "./shortcuts.ts";
-import { VIEWS, type ViewId } from "./views.ts";
+import { viewDef, VIEWS, type ViewId } from "./views.ts";
 
 export type MenuNode =
   | { kind: "item"; id: string; label: string; shortcut?: string; disabled?: boolean; onSelect: () => void }
@@ -9,27 +9,27 @@ export type MenuNode =
   | { kind: "separator"; id: string };
 
 export interface MenuActions {
-  openSettings(): void;
+  openSettings: () => void;
   /** Opens Settings on its Keyboard shortcuts page. */
-  showKeyboardShortcuts(): void;
-  closeWindow(): void;
-  quit(): void;
-  edit(command: EditCommand): void;
-  toggleSidebar(): void;
-  zoomReset(): void;
-  zoomIn(): void;
-  zoomOut(): void;
-  toggleFullScreen(): void;
-  reload(): void;
-  back(): void;
-  forward(): void;
-  open(view: ViewId): void;
-  showLogs(): void;
-  toggleDevTools(): void;
-  clearCacheAndRestart(): void;
+  showKeyboardShortcuts: () => void;
+  closeWindow: () => void;
+  quit: () => void;
+  edit: (command: EditCommand) => void;
+  toggleSidebar: () => void;
+  zoomReset: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  toggleFullScreen: () => void;
+  reload: () => void;
+  back: () => void;
+  forward: () => void;
+  open: (view: ViewId) => void;
+  showLogs: () => void;
+  toggleDevTools: () => void;
+  clearCacheAndRestart: () => void;
   /** Asks first: the confirm dialog runs the reset. */
-  resetAppData(): void;
-  showAbout(): void;
+  resetAppData: () => void;
+  showAbout: () => void;
 }
 
 export interface MenuContext {
@@ -44,6 +44,8 @@ export interface MenuContext {
 
 /** The views the Go menu opens: the sidebar's, except Settings, which is in File. */
 const GO_VIEWS: readonly ViewId[] = VIEWS.map((v) => v.id).filter((id) => id !== "settings");
+
+const sep = (id: string): MenuNode => ({ kind: "separator", id });
 
 const fileManager = (platform: string) =>
   platform === "darwin" ? "Finder" : platform === "win32" ? "File Explorer" : "File Manager";
@@ -63,7 +65,6 @@ export function buildAppMenu({
 }: MenuContext): MenuNode[] {
   const key = (id: ShortcutId) => shortcutLabel(id, platform);
   const inWindow = platform !== "web"; // a plain browser tab can't close, quit, go full screen or troubleshoot itself
-  const sep = (id: string): MenuNode => ({ kind: "separator", id });
   const item = (id: string, label: string, onSelect: () => void, shortcut?: ShortcutId, disabled = false): MenuNode => {
     const k = shortcut && key(shortcut);
     return { kind: "item", id, label, onSelect, ...(k ? { shortcut: k } : {}), ...(disabled ? { disabled } : {}) };
@@ -82,7 +83,14 @@ export function buildAppMenu({
   }
 
   const view: MenuNode[] = [
-    { kind: "check", id: "view.sidebar", label: "Sidebar", shortcut: key("toggleSidebar"), checked: sidebarShown, onSelect: a.toggleSidebar },
+    {
+      kind: "check",
+      id: "view.sidebar",
+      label: "Sidebar",
+      shortcut: key("toggleSidebar"),
+      checked: sidebarShown,
+      onSelect: a.toggleSidebar,
+    },
     sep("view.sep1"),
     item("view.actualSize", "Actual Size", a.zoomReset, "zoomReset"),
     item("view.zoomIn", "Zoom In", a.zoomIn, "zoomIn"),
@@ -105,10 +113,12 @@ export function buildAppMenu({
     item("go.back", "Back", a.back, "back", !canGoBack),
     item("go.forward", "Forward", a.forward, "forward", !canGoForward),
     sep("go.sep"),
-    ...GO_VIEWS.map((id) => item(`go.${id}`, VIEWS.find((v) => v.id === id)!.title, () => a.open(id))),
+    ...GO_VIEWS.map((id) => item(`go.${id}`, viewDef(id).title, () => a.open(id))),
   ];
 
-  const help: MenuNode[] = [item("help.keyboardShortcuts", "Keyboard Shortcuts", a.showKeyboardShortcuts, "keyboardShortcuts")];
+  const help: MenuNode[] = [
+    item("help.keyboardShortcuts", "Keyboard Shortcuts", a.showKeyboardShortcuts, "keyboardShortcuts"),
+  ];
   if (inWindow) {
     help.push(
       sep("help.sep0"),
@@ -169,7 +179,8 @@ export function listShortcuts(menu: readonly MenuNode[]): ShortcutEntry[] {
   const walk = (area: string, nodes: readonly MenuNode[]) => {
     for (const n of nodes) {
       if (n.kind === "submenu") walk(area, n.items);
-      else if (n.kind !== "separator" && n.shortcut) out.push({ area, name: n.label.replace(/…$/, ""), keys: n.shortcut });
+      else if (n.kind !== "separator" && n.shortcut)
+        out.push({ area, name: n.label.replace(/…$/, ""), keys: n.shortcut });
     }
   };
   for (const top of menu) if (top.kind === "submenu") walk(top.label, top.items);

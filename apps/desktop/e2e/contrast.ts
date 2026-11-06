@@ -6,7 +6,10 @@ export type Rgba = [number, number, number, number];
 export function parseCssColor(css: string): Rgba {
   const m = css.match(/rgba?\(([^)]+)\)/);
   if (!m?.[1]) throw new Error(`Unparsed colour: ${css}`);
-  const [r = 0, g = 0, b = 0, a = 1] = m[1].split(/[\s,/]+/).filter(Boolean).map(Number);
+  const [r = 0, g = 0, b = 0, a = 1] = m[1]
+    .split(/[\s,/]+/)
+    .filter(Boolean)
+    .map(Number);
   return [r, g, b, a];
 }
 
@@ -16,16 +19,18 @@ export function over(top: Rgba, bottom: Rgba): Rgba {
   return [0, 1, 2].map((i) => top[i]! * a + bottom[i]! * (1 - a)).concat(1) as Rgba;
 }
 
+/** An sRGB channel (0–255) as linear light. */
+const lin = (c: number) => {
+  const s = c / 255;
+  return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+};
+
 export function luminance([r, g, b]: Rgba): number {
-  const lin = (c: number) => {
-    const s = c / 255;
-    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
-  };
   return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
 }
 
 export function contrast(a: Rgba, b: Rgba): number {
-  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x) as [number, number];
+  const [hi, lo] = [luminance(a), luminance(b)].toSorted((x, y) => y - x) as [number, number];
   return (hi + 0.05) / (lo + 0.05);
 }
 
@@ -44,7 +49,7 @@ export function resolve(s: Sample): { fg: Rgba; bg: Rgba } {
   const layers = s.bgs.map(parseCssColor);
   let bg = layers.at(-1) ?? ([255, 255, 255, 1] as Rgba);
   if (bg[3] < 1) bg = over(bg, [255, 255, 255, 1]);
-  for (const layer of layers.slice(0, -1).reverse()) bg = over(layer, bg);
+  for (const layer of layers.slice(0, -1).toReversed()) bg = over(layer, bg);
   const raw = parseCssColor(s.fg);
   const fg = over([raw[0], raw[1], raw[2], raw[3] * s.opacity], bg);
   return { fg, bg };
@@ -55,6 +60,8 @@ export function resolve(s: Sample): { fg: Rgba; bg: Rgba } {
  * (`kind: "icon"`, a non-text UI component that needs 3:1).
  */
 export function sampleRenderedText(page: Page): Promise<(Sample & { kind: "text" | "icon" })[]> {
+  // The function runs in the page, so its helpers must be inside it rather than at module scope.
+  /* oxlint-disable unicorn/consistent-function-scoping */
   return page.evaluate(() => {
     const bgChain = (el: Element | null): string[] => {
       const out: string[] = [];
@@ -81,20 +88,29 @@ export function sampleRenderedText(page: Page): Promise<(Sample & { kind: "text"
     const describe = (el: Element) =>
       `${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? `.${el.className.split(" ").join(".")}` : ""} "${(el.textContent ?? el.getAttribute("aria-label") ?? "").trim().slice(0, 40)}"`;
 
-    const samples: { kind: "text" | "icon"; what: string; fg: string; bgs: string[]; opacity: number; large: boolean }[] = [];
+    const samples: {
+      kind: "text" | "icon";
+      what: string;
+      fg: string;
+      bgs: string[];
+      opacity: number;
+      large: boolean;
+    }[] = [];
     for (const el of Array.from(document.body.querySelectorAll("*"))) {
       if (!visible(el) || disabled(el)) continue;
       const cs = getComputedStyle(el);
       const ownText = Array.from(el.childNodes).some((n) => n.nodeType === Node.TEXT_NODE && n.textContent?.trim());
       const size = parseFloat(cs.fontSize);
       const large = size >= 24 || (size >= 18.66 && Number(cs.fontWeight) >= 700);
-      if (ownText) samples.push({ kind: "text", what: describe(el), fg: cs.color, bgs: bgChain(el), opacity: opacity(el), large });
+      if (ownText)
+        samples.push({ kind: "text", what: describe(el), fg: cs.color, bgs: bgChain(el), opacity: opacity(el), large });
       else if (el.tagName === "BUTTON" && el.querySelector("svg")) {
         samples.push({ kind: "icon", what: describe(el), fg: cs.color, bgs: bgChain(el), opacity: opacity(el), large });
       }
     }
     return samples;
   });
+  /* oxlint-enable unicorn/consistent-function-scoping */
 }
 
 /** Computed values of colour tokens, read through a probe element so the browser normalises them to rgb(). */

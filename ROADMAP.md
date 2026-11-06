@@ -29,4 +29,3 @@ epics in `.featra/cards/`.
 - A trademark and registrar check on the name "Featra".
 - **Help menu links** that need a public repo and a release channel: Featra Docs (F1), View Changelog, Get Support,
   Send Feedback, and Check for Updates.
-

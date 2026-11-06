@@ -2,6 +2,7 @@ packages:
   - "packages/*"
   - "apps/*"
   - "spikes/*"
+  - "tooling"
 # Hold back releases younger than pnpm's minimumReleaseAge instead of excluding them from the check.
 overrides:
   vite: 8.3.5

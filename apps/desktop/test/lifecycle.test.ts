@@ -1,7 +1,13 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it } from "vitest";
 import { NO_TRAY_REASON } from "@featra/client/bridge";
-import { closeToTraySupport, createLifecycle, TRAY_NOTICE, type LifecycleOptions, type ManagedWindow } from "../src/lifecycle.ts";
+import {
+  closeToTraySupport,
+  createLifecycle,
+  TRAY_NOTICE,
+  type LifecycleOptions,
+  type ManagedWindow,
+} from "../src/lifecycle.ts";
 
 /** Fakes only the OS window: records what the lifecycle asks of it. */
 class FakeWindow extends EventEmitter implements ManagedWindow {

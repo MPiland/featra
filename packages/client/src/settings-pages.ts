@@ -44,7 +44,10 @@ export const WORK_GROUPS: readonly { title: string; keys: readonly WorkSettingKe
 ];
 
 const THEME_LABELS: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };
-export const THEME_OPTIONS: readonly ChoiceDef<ThemeChoice>[] = THEME_CHOICES.map((t) => ({ value: t, label: THEME_LABELS[t] }));
+export const THEME_OPTIONS: readonly ChoiceDef<ThemeChoice>[] = THEME_CHOICES.map((t) => ({
+  value: t,
+  label: THEME_LABELS[t],
+}));
 
 /** The close button's choices: macOS keeps a closed app in the Dock, other desktops in the tray. */
 export function closeButtonOptions(support: NonNullable<CloseToTraySupport>): readonly ChoiceDef<CloseButton>[] {

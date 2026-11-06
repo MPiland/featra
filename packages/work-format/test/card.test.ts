@@ -95,7 +95,13 @@ describe("parseCard", () => {
       { text: "Save", done: false },
     ]);
     expect(c.history).toHaveLength(2);
-    expect(c.history[1]).toEqual({ at: "2026-11-05T10:00:00Z", field: "status", from: "New", to: "In Progress", by: "session:s-1" });
+    expect(c.history[1]).toEqual({
+      at: "2026-11-05T10:00:00Z",
+      field: "status",
+      from: "New",
+      to: "In Progress",
+      by: "session:s-1",
+    });
     expect(c.extra).toEqual({ estimate: 3 });
     expect(c.extraSections).toEqual([{ heading: "Links", content: "See ADR 0002." }]);
   });
@@ -110,9 +116,16 @@ describe("parseCard", () => {
       { done: true, text: "Layout rework: rows in titled cards, a switch and a segmented control" },
       { done: false, text: "Next" },
     ]);
-    const acs = parseCard(story.replace("## Acceptance criteria\n\n", "## Acceptance criteria\n\n- [ ] Long\n  criterion (test: a.test.ts)\n")).acs;
+    const acs = parseCard(
+      story.replace(
+        "## Acceptance criteria\n\n",
+        "## Acceptance criteria\n\n- [ ] Long\n  criterion (test: a.test.ts)\n",
+      ),
+    ).acs;
     expect(acs[0]).toEqual({ done: false, text: "Long criterion", test: "a.test.ts" });
-    expect(serializeCard(c)).toMatch(/^- \[x\] Layout rework: rows in titled cards, a switch and a segmented control$/m);
+    expect(serializeCard(c)).toMatch(
+      /^- \[x\] Layout rework: rows in titled cards, a switch and a segmented control$/m,
+    );
   });
 
   it("accepts CRLF line endings", () => {
@@ -125,6 +138,9 @@ describe("parseCard", () => {
     ["missing id", story.replace("id: STORY-7\n", "")],
     ["unknown origin", story.replace("origin: added", "origin: magic")],
     ["history not a list", story.replace(/history:[\s\S]*?estimate/, "history: nope\nestimate")],
+    ["frontmatter not a mapping", "---\n- a list\n---\n"],
+    ["a history event not a mapping", story.replace(/history:[\s\S]*?estimate/, "history:\n  - nope\nestimate")],
+    ["an unknown history field", story.replace("field: status", "field: mood")],
   ])("rejects %s", (_, text) => {
     expect(() => parseCard(text, "x.md")).toThrow(CardParseError);
   });
@@ -142,22 +158,40 @@ describe("serializeCard", () => {
   });
 
   it("omits story-only fields and sections for epics and features", () => {
-    const text = serializeCard(newCard({ id: "FEAT-1", type: "feature", title: "Login", status: "draft", parent: "EPIC-1" }, "user", "2026-11-04T23:00:00Z"));
+    const text = serializeCard(
+      newCard(
+        { id: "FEAT-1", type: "feature", title: "Login", status: "draft", parent: "EPIC-1" },
+        "user",
+        "2026-11-04T23:00:00Z",
+      ),
+    );
     expect(text).not.toMatch(/^role:/m);
     expect(text).not.toMatch(/^## Acceptance criteria/m);
     expect(text).toMatch(/^## Description/m);
   });
 
   it("writes story sections even when empty", () => {
-    const text = serializeCard(newCard({ id: "STORY-1", type: "story", title: "X", status: "New", parent: "FEAT-1" }, "user", "2026-11-04T23:00:00Z"));
+    const text = serializeCard(
+      newCard(
+        { id: "STORY-1", type: "story", title: "X", status: "New", parent: "FEAT-1" },
+        "user",
+        "2026-11-04T23:00:00Z",
+      ),
+    );
     expect(text).toMatch(/^## Acceptance criteria\n\n## Tasks\n\n## Notes\n$/m);
   });
 });
 
 describe("newCard", () => {
   it("records creation as the first history event", () => {
-    const c = newCard({ id: "STORY-9", type: "story", title: "X", status: "New", parent: "FEAT-1" }, "session:a", "2026-11-04T23:00:00Z");
-    expect(c.history).toEqual([{ at: "2026-11-04T23:00:00Z", field: "status", from: null, to: "New", by: "session:a" }]);
+    const c = newCard(
+      { id: "STORY-9", type: "story", title: "X", status: "New", parent: "FEAT-1" },
+      "session:a",
+      "2026-11-04T23:00:00Z",
+    );
+    expect(c.history).toEqual([
+      { at: "2026-11-04T23:00:00Z", field: "status", from: null, to: "New", by: "session:a" },
+    ]);
   });
 });
 

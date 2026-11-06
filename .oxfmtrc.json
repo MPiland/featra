@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "ignorePatterns": [
+    ".featra/**",
+    ".impeccable/**",
+    "**/CLAUDE.md",
+    "**/AGENTS.md",
+    "pnpm-lock.yaml",
+    "spikes/**/results.json"
+  ]
+}

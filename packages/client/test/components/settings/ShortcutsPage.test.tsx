@@ -11,21 +11,48 @@ afterEach(cleanup);
 const noop = () => {};
 const actionsStub = new Proxy({}, { get: () => noop }) as MenuActions;
 const menuFor = (platform: string) =>
-  buildAppMenu({ platform, sidebarShown: true, fullScreen: false, canGoBack: true, canGoForward: true, actions: actionsStub });
+  buildAppMenu({
+    platform,
+    sidebarShown: true,
+    fullScreen: false,
+    canGoBack: true,
+    canGoForward: true,
+    actions: actionsStub,
+  });
 
 describe("AC7: Keyboard shortcuts page, by area and searchable; Help > Keyboard Shortcuts and Ctrl+/ open it", () => {
   it("lists every shortcut Featra has, each under its menu", () => {
     for (const platform of ["win32", "darwin", "linux"]) {
       const listed = listShortcuts(menuFor(platform));
       const ids: ShortcutId[] = [
-        "settings", "keyboardShortcuts", "closeWindow", "quit", "undo", "redo", "cut", "copy", "paste", "selectAll",
-        "toggleSidebar", "zoomReset", "zoomIn", "zoomOut", "fullScreen", "reload", "back", "forward",
+        "settings",
+        "keyboardShortcuts",
+        "closeWindow",
+        "quit",
+        "undo",
+        "redo",
+        "cut",
+        "copy",
+        "paste",
+        "selectAll",
+        "toggleSidebar",
+        "zoomReset",
+        "zoomIn",
+        "zoomOut",
+        "fullScreen",
+        "reload",
+        "back",
+        "forward",
       ];
       const labels = ids.map((id) => shortcutLabel(id, platform)).filter((l) => l !== undefined);
-      expect(listed.map((e) => e.keys).sort(), platform).toEqual(labels.sort());
+      expect(listed.map((e) => e.keys).toSorted(), platform).toEqual(labels.toSorted());
       expect([...new Set(listed.map((e) => e.area))], platform).toEqual(["File", "Edit", "View", "Go", "Help"]);
     }
-    expect(listShortcuts(menuFor("win32")).find((e) => e.keys === "Ctrl+B")).toEqual({ area: "View", name: "Sidebar", keys: "Ctrl+B" });
+    expect(listShortcuts(menuFor("win32")).find((e) => e.keys === "Ctrl+B")).toEqual({
+      area: "View",
+      name: "Sidebar",
+      keys: "Ctrl+B",
+    });
   });
 
   it("search matches names, keys and areas, every word", () => {
@@ -40,14 +67,24 @@ describe("AC7: Keyboard shortcuts page, by area and searchable; Help > Keyboard 
   it("shows each area as a table of names and keys, and filters as you type", async () => {
     const { user } = renderApp();
     await openSettings(user, "Keyboard shortcuts");
-    const areas = within(main()).getAllByRole("table").map((t) => t.getAttribute("aria-label"));
+    const areas = within(main())
+      .getAllByRole("table")
+      .map((t) => t.getAttribute("aria-label"));
     expect(areas).toEqual(["File", "Edit", "View", "Go", "Help"]);
     const view = within(main()).getByRole("table", { name: "View" });
     expect(within(view).getByRole("rowheader", { name: "Zoom In" }).closest("tr")!.textContent).toBe("Zoom InCtrl+=");
 
     await user.type(within(main()).getByRole("searchbox", { name: "Search shortcuts" }), "zoom");
-    expect(within(main()).getAllByRole("table").map((t) => t.getAttribute("aria-label"))).toEqual(["View"]);
-    expect(within(main()).getAllByRole("rowheader").map((r) => r.textContent)).toEqual(["Zoom In", "Zoom Out"]);
+    expect(
+      within(main())
+        .getAllByRole("table")
+        .map((t) => t.getAttribute("aria-label")),
+    ).toEqual(["View"]);
+    expect(
+      within(main())
+        .getAllByRole("rowheader")
+        .map((r) => r.textContent),
+    ).toEqual(["Zoom In", "Zoom Out"]);
 
     await user.type(within(main()).getByRole("searchbox"), "zzz");
     expect(within(main()).queryAllByRole("table")).toEqual([]);
@@ -65,7 +102,10 @@ describe("AC7: Keyboard shortcuts page, by area and searchable; Help > Keyboard 
   });
 
   it("Ctrl+/ opens it from anywhere, and ⌘/ on macOS", async () => {
-    for (const [platform, keys] of [["win32", "{Control>}/{/Control}"], ["darwin", "{Meta>}/{/Meta}"]] as const) {
+    for (const [platform, keys] of [
+      ["win32", "{Control>}/{/Control}"],
+      ["darwin", "{Meta>}/{/Meta}"],
+    ] as const) {
       const { user } = renderApp({ platform });
       await openSettings(user, "Appearance");
       await user.click(within(sidebar()).getByRole("button", { name: "Inbox" }));

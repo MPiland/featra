@@ -31,6 +31,8 @@ export interface HostOptions {
   slowProjectWrites?: boolean;
 }
 
+const noop = () => {};
+
 /** Fakes only the host platform: in-memory stores (userData, the projects' config files) and recorded window calls. */
 export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   const saves: UiState[] = [];
@@ -39,13 +41,13 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   const project = host.project === undefined ? PROJECT : host.project;
   const projectSettings = (dir: string) => ({
     dir,
-    overrides: { ...(projectFiles.get(dir) ?? {}) },
+    overrides: { ...projectFiles.get(dir) },
     error: host.brokenProjects?.[dir] ?? null,
   });
   const calls: string[] = [];
   let windowState: WindowState = { ...DEFAULT_WINDOW_STATE };
   const listeners = new Set<(s: WindowState) => void>();
-  let releaseWrites = () => {};
+  let releaseWrites: () => void = noop;
   const writesReleased = new Promise<void>((r) => (releaseWrites = r));
   const bridge: FeatraBridge = {
     platform,
@@ -78,7 +80,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       setProjectValue: async (dir, key, value) => {
         if (host.slowProjectWrites) await writesReleased;
         if (host.brokenProjects?.[dir]) return projectSettings(dir);
-        const next: Record<string, unknown> = { ...(projectFiles.get(dir) ?? {}) };
+        const next: Record<string, unknown> = { ...projectFiles.get(dir) };
         if (value === null) delete next[key];
         else next[key] = value;
         projectFiles.set(dir, normalizeWorkOverrides(next));
@@ -103,14 +105,27 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       windowState = { ...windowState, ...s };
       for (const l of listeners) l(windowState);
     });
-  return { bridge, saves, appSaves, projectFiles, calls, setWindowState, releaseWrites: () => act(async () => releaseWrites()) };
+  return {
+    bridge,
+    saves,
+    appSaves,
+    projectFiles,
+    calls,
+    setWindowState,
+    releaseWrites: () => act(async () => releaseWrites()),
+  };
 }
 
 /** Window calls the app makes on its own at startup (apply the stored zoom and theme); `actions()` skips them. */
 const startupCalls = (s: UiState, app: AppSettings) => [`zoom:${s.zoomFactor}`, `theme:${app.theme}`];
 
 export function renderApp(
-  opts: { collapsed?: boolean; platform?: string; state?: Partial<UiState>; settings?: Partial<AppSettings> } & HostOptions = {},
+  opts: {
+    collapsed?: boolean;
+    platform?: string;
+    state?: Partial<UiState>;
+    settings?: Partial<AppSettings>;
+  } & HostOptions = {},
 ) {
   const fake = fakeBridge(opts.platform, opts);
   if (opts.settings) fake.appSaves.push({ ...DEFAULT_APP_SETTINGS, ...opts.settings });
@@ -120,9 +135,14 @@ export function renderApp(
   const app = fake.appSaves.at(-1) ?? DEFAULT_APP_SETTINGS;
   const snapshot: SettingsSnapshot = {
     app,
-    closeToTray: opts.closeToTray === undefined ? (opts.platform === "web" ? null : { available: true, place: opts.platform === "darwin" ? "dock" : "tray" }) : opts.closeToTray,
+    closeToTray:
+      opts.closeToTray === undefined
+        ? opts.platform === "web"
+          ? null
+          : { available: true, place: opts.platform === "darwin" ? "dock" : "tray" }
+        : opts.closeToTray,
     currentProject: opts.project === undefined ? PROJECT : opts.project,
-    projects: (opts.project === undefined ? [PROJECT] : opts.project ? [opts.project] : []),
+    projects: opts.project === undefined ? [PROJECT] : opts.project ? [opts.project] : [],
   };
   const startupSaves = fake.appSaves.length;
   render(<App bridge={fake.bridge} initialUiState={initial} initialSettings={snapshot} />);

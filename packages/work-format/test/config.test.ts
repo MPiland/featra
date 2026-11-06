@@ -66,7 +66,8 @@ describe("STORY-20: project overrides of the app-wide defaults", () => {
   });
 
   it("sets a key in place, keeping comments, key order and keys Featra doesn't know (a comment keeps one space before it)", () => {
-    const text = "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: stories        # stories | tasks\nmcp: true\n";
+    const text =
+      "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: stories        # stories | tasks\nmcp: true\n";
     expect(setConfigValue(text, "progress", "tasks")).toBe(
       "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nprogress: tasks # stories | tasks\nmcp: true\n",
     );
@@ -84,6 +85,16 @@ describe("STORY-20: project overrides of the app-wide defaults", () => {
 
   it("starts a new file with the header when the project has none yet", () => {
     expect(setConfigValue("", "worktrees", false)).toBe("# Featra project settings\nversion: 1\nworktrees: false\n");
+  });
+
+  it.each([
+    ["a version that isn't a number", "version: one\n"],
+    ["an empty base branch", 'baseBranch: ""\n'],
+    ["a stage that isn't a mapping", "stages: [Done]\n"],
+    ["a stage in an unknown category", "stages: [{ name: Done, category: finished }]\n"],
+    ["a non-boolean switch", "mcp: maybe\n"],
+  ])("rejects %s", (_, text) => {
+    expect(() => configOverrides(text)).toThrow(ConfigError);
   });
 
   it("refuses to edit a file that isn't valid, or to write a value that isn't", () => {

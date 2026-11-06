@@ -2,6 +2,7 @@
  * The contract between the UI and its host. Electron's preload implements it; a plain browser (Vite dev, later
  * remote control) gets the fallback below. The UI never talks to Electron any other way.
  */
+import { isRecord } from "@featra/work-format/guards";
 import {
   DEFAULT_APP_SETTINGS,
   normalizeAppSettings,
@@ -29,10 +30,9 @@ export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: 
 
 /** Reads stored state defensively: unknown or malformed fields fall back to defaults. */
 export function normalizeUiState(raw: unknown): UiState {
-  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const r = isRecord(raw) ? raw : {};
   return {
-    sidebarCollapsed:
-      typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
+    sidebarCollapsed: typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
     zoomFactor: normalizeZoom(r.zoomFactor),
   };
 }
@@ -50,7 +50,7 @@ export interface WindowState {
 export const DEFAULT_WINDOW_STATE: WindowState = { maximized: false, fullScreen: false };
 
 export function normalizeWindowState(raw: unknown): WindowState {
-  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const r = isRecord(raw) ? raw : {};
   return { maximized: r.maximized === true, fullScreen: r.fullScreen === true };
 }
 
@@ -80,44 +80,48 @@ export interface FeatraBridge {
   /** `process.platform` of the host: "win32", "darwin", "linux", or "web" outside Electron. */
   readonly platform: string;
   readonly uiState: {
-    load(): Promise<UiState>;
-    save(state: UiState): Promise<void>;
+    load: () => Promise<UiState>;
+    save: (state: UiState) => Promise<void>;
   };
   readonly window: {
-    minimize(): void;
+    minimize: () => void;
     /** Maximize, restore, or leave full screen: see `sizeButtonAction`. */
-    toggleMaximize(): void;
-    close(): void;
-    toggleFullScreen(): void;
-    state(): Promise<WindowState>;
+    toggleMaximize: () => void;
+    close: () => void;
+    toggleFullScreen: () => void;
+    state: () => Promise<WindowState>;
     /** Calls back on every change to the window's state; returns the unsubscribe. */
-    onStateChange(listener: (state: WindowState) => void): () => void;
-    setZoomFactor(factor: number): void;
+    onStateChange: (listener: (state: WindowState) => void) => () => void;
+    setZoomFactor: (factor: number) => void;
     /** Pins native surfaces to the app setting's theme (System lets the OS decide). */
-    setTheme(theme: ThemeChoice): void;
+    setTheme: (theme: ThemeChoice) => void;
   };
   readonly settings: {
     /** App settings, what the close button can do here, and the projects the Project scope can pick from. */
-    load(): Promise<SettingsSnapshot>;
+    load: () => Promise<SettingsSnapshot>;
     /** Stores app settings; the host applies them at once (the close button among them, without a restart). */
-    saveApp(settings: AppSettings): Promise<void>;
+    saveApp: (settings: AppSettings) => Promise<void>;
     /** A project's overrides, read from its `.featra/config.yaml`. */
-    loadProject(dir: string): Promise<ProjectSettings>;
+    loadProject: (dir: string) => Promise<ProjectSettings>;
     /** Overrides one work setting in the project's config file, or removes the override (`null`). */
-    setProjectValue<K extends WorkSettingKey>(dir: string, key: K, value: WorkSettings[K] | null): Promise<ProjectSettings>;
+    setProjectValue: <K extends WorkSettingKey>(
+      dir: string,
+      key: K,
+      value: WorkSettings[K] | null,
+    ) => Promise<ProjectSettings>;
   };
-  edit(command: EditCommand): void;
+  edit: (command: EditCommand) => void;
   readonly app: {
-    info(): Promise<AppInfo>;
-    reload(): void;
-    toggleDevTools(): void;
+    info: () => Promise<AppInfo>;
+    reload: () => void;
+    toggleDevTools: () => void;
     /** Shows the main process's log file in the OS file manager. */
-    showLogs(): void;
+    showLogs: () => void;
     /** Clears Chromium's HTTP cache, then restarts the app. */
-    clearCacheAndRestart(): void;
+    clearCacheAndRestart: () => void;
     /** Deletes stored state (window chrome, app state, web storage, cache), then restarts. Logs are kept. */
-    resetAppData(): void;
-    quit(): void;
+    resetAppData: () => void;
+    quit: () => void;
   };
 }
 
@@ -156,6 +160,9 @@ declare global {
 const STORAGE_KEY = "featra.ui-state";
 const SETTINGS_KEY = "featra.settings";
 
+const noProject = (dir: string): ProjectSettings =>
+  normalizeProjectSettings({ error: "No project folder in a browser tab." }, dir);
+
 /**
  * Used when the UI runs in a plain browser: state lives in localStorage and there is no window to control, nor a
  * project folder to read.
@@ -168,7 +175,6 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       return { ...DEFAULT_APP_SETTINGS };
     }
   };
-  const noProject = (dir: string): ProjectSettings => normalizeProjectSettings({ error: "No project folder in a browser tab." }, dir);
   return {
     platform: "web",
     uiState: {
@@ -196,7 +202,8 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       setTheme() {},
     },
     settings: {
-      load: async () => normalizeSettingsSnapshot({ app: readSettings(), closeToTray: null, currentProject: null, projects: [] }),
+      load: async () =>
+        normalizeSettingsSnapshot({ app: readSettings(), closeToTray: null, currentProject: null, projects: [] }),
       async saveApp(settings) {
         storage.setItem(SETTINGS_KEY, JSON.stringify(normalizeAppSettings(settings)));
       },

@@ -5,7 +5,7 @@ export interface SegmentedControlProps<V extends string> {
   name: string;
   value: V;
   options: readonly ChoiceDef<V>[];
-  onChange(value: V): void;
+  onChange: (value: V) => void;
   labelledBy?: string | undefined;
   describedBy?: string | undefined;
   disabled?: boolean | undefined;

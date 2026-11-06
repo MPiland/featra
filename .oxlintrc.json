@@ -1,0 +1,104 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "jsx-a11y", "import", "unicorn", "oxc", "vitest"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error"
+  },
+  "env": { "browser": true, "node": true, "es2024": true },
+  "ignorePatterns": ["**/dist/**", "spikes/**"],
+  "rules": {
+    "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
+    "no-console": "error",
+    "no-await-in-loop": "off",
+    "vitest/valid-expect": ["error", { "maxArgs": 2 }],
+    "react/rules-of-hooks": "error",
+    "react/exhaustive-deps": "error",
+    "react/react-in-jsx-scope": "off",
+    "import/no-unassigned-import": ["error", { "allow": ["**/*.css"] }],
+    "jsx-a11y/prefer-tag-over-role": "off",
+    "jsx-a11y/no-noninteractive-element-to-interactive-role": [
+      "error",
+      {
+        "ul": ["listbox", "menu", "menubar", "radiogroup", "tablist", "tree", "treegrid"],
+        "ol": ["listbox", "menu", "menubar", "radiogroup", "tablist", "tree", "treegrid"],
+        "li": ["menuitem", "menuitemradio", "menuitemcheckbox", "option", "row", "tab", "treeitem"],
+        "table": ["grid"],
+        "td": ["gridcell"],
+        "fieldset": ["radiogroup", "presentation"]
+      }
+    ],
+    "typescript/no-explicit-any": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/consistent-type-imports": "error",
+    "typescript/method-signature-style": ["error", "property"],
+    "typescript/switch-exhaustiveness-check": "error",
+    "import/no-cycle": "error",
+    "import/no-self-import": "error",
+    "import/no-duplicates": "error"
+  },
+  "overrides": [
+    {
+      "files": ["packages/work-format/src/**", "packages/work-format/lint-fixtures/**"],
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "react", "message": "work-format is pure domain logic: no React (ADR 0011)." },
+              { "name": "react-dom", "message": "work-format is pure domain logic: no React (ADR 0011)." },
+              { "name": "electron", "message": "work-format is pure domain logic: no Electron (ADR 0011)." }
+            ],
+            "patterns": [
+              {
+                "group": ["react/**", "react-dom/**"],
+                "message": "work-format is pure domain logic: no React (ADR 0011)."
+              },
+              {
+                "group": ["electron/**"],
+                "message": "work-format is pure domain logic: no Electron (ADR 0011)."
+              },
+              {
+                "group": ["@featra/*", "@featra/**"],
+                "message": "Dependencies point toward work-format, never out of it (ADR 0011)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["packages/client/src/**", "packages/client/lint-fixtures/**"],
+      "rules": {
+        "import/no-nodejs-modules": "error",
+        "no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              { "name": "electron", "message": "client reaches the platform only through FeatraBridge (ADR 0011)." }
+            ],
+            "patterns": [
+              {
+                "group": ["electron/**"],
+                "message": "client reaches the platform only through FeatraBridge (ADR 0011)."
+              },
+              {
+                "group": ["@featra/desktop", "@featra/desktop/**"],
+                "message": "Dependencies point toward work-format (ADR 0011)."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/test/**", "**/e2e/**", "**/*.test.ts", "**/*.test.tsx", "**/*.config.ts"],
+      "rules": {
+        "typescript/no-non-null-assertion": "off",
+        "typescript/no-unsafe-type-assertion": "off"
+      }
+    }
+  ]
+}

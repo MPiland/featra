@@ -1,15 +1,16 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DEFAULT_UI_STATE, normalizeUiState, type UiState } from "@featra/client/bridge";
+import { isRecord } from "@featra/work-format";
 
 export interface JsonStore<T> {
   readonly file: string;
-  load(): Promise<T>;
-  save(state: T): Promise<void>;
+  load: () => Promise<T>;
+  save: (state: T) => Promise<void>;
   /** Deletes the file (Reset App Data), after any save already queued. */
-  remove(): Promise<void>;
+  remove: () => Promise<void>;
   /** Resolves once every save issued so far is on disk. */
-  flush(): Promise<void>;
+  flush: () => Promise<void>;
   readonly pending: boolean;
 }
 
@@ -58,7 +59,9 @@ export type UiStateStore = JsonStore<UiState>;
 
 /** Window chrome state (sidebar collapsed, zoom, theme): `ui-state.json`. */
 export function createUiStateStore(dir: string): UiStateStore {
-  return createJsonStore(dir, "ui-state.json", (raw) => (raw === undefined ? { ...DEFAULT_UI_STATE } : normalizeUiState(raw)));
+  return createJsonStore(dir, "ui-state.json", (raw) =>
+    raw === undefined ? { ...DEFAULT_UI_STATE } : normalizeUiState(raw),
+  );
 }
 
 /** What main itself remembers between runs: `app-state.json`. */
@@ -68,8 +71,7 @@ export interface AppState {
 }
 
 export function normalizeAppState(raw: unknown): AppState {
-  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  return { trayNoticeShown: r.trayNoticeShown === true };
+  return { trayNoticeShown: isRecord(raw) && raw.trayNoticeShown === true };
 }
 
 export function createAppStateStore(dir: string): JsonStore<AppState> {

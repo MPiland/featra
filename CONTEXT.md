@@ -15,7 +15,7 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **AC** (acceptance criterion) — a checklist item on a story that links the test proving it.
 - **Bug** — a card for something that broke in already-merged work. A regression caused by the in-progress feature
   lives under that feature; a bug with no in-progress cause lives in the project bug list. A problem inside a story that
-  is still being worked is a *task*, not a bug.
+  is still being worked is a _task_, not a bug.
 
 ## Ownership and history
 

@@ -4,7 +4,8 @@
  * project's `.featra/config.yaml` can override any of them. A project overrides a setting exactly when its file sets
  * the key; resetting removes the key so the app default applies again.
  */
-import type { KnowledgePermission, ProgressMode } from "@featra/work-format";
+import type { KnowledgePermission, ProgressMode, ProjectConfig } from "@featra/work-format";
+import { isOneOf, isRecord } from "@featra/work-format/guards";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 
 /** What the window's close button (and Alt+F4) does. */
@@ -12,12 +13,7 @@ export type CloseButton = "tray" | "quit";
 export const CLOSE_BUTTON_CHOICES: readonly CloseButton[] = ["tray", "quit"];
 
 /** Project settings that also have an app-wide default. Featra's own defaults match work-format's DEFAULT_CONFIG. */
-export interface WorkSettings {
-  progress: ProgressMode;
-  requireAccept: boolean;
-  worktrees: boolean;
-  knowledge: KnowledgePermission;
-}
+export type WorkSettings = Pick<ProjectConfig, "progress" | "requireAccept" | "worktrees" | "knowledge">;
 export type WorkSettingKey = keyof WorkSettings;
 export type WorkOverrides = Partial<WorkSettings>;
 
@@ -44,7 +40,13 @@ export interface ChoiceDef<V> {
 }
 export type WorkSettingDef =
   | { key: "progress"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<ProgressMode>[] }
-  | { key: "knowledge"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<KnowledgePermission>[] }
+  | {
+      key: "knowledge";
+      kind: "choice";
+      label: string;
+      help?: string;
+      choices: readonly ChoiceDef<KnowledgePermission>[];
+    }
   | { key: "requireAccept" | "worktrees"; kind: "toggle"; label: string; help?: string };
 
 /** Work settings in the order Settings shows them, with their wording. */
@@ -83,8 +85,7 @@ export function workSettingDef(key: WorkSettingKey): WorkSettingDef {
   return def;
 }
 
-const record = (raw: unknown): Record<string, unknown> =>
-  raw !== null && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+const record = (raw: unknown): Record<string, unknown> => (isRecord(raw) ? raw : {});
 
 function validWorkValue(key: WorkSettingKey, value: unknown): boolean {
   const def = workSettingDef(key);
@@ -97,17 +98,15 @@ export function normalizeWorkOverrides(raw: unknown): WorkOverrides {
   const r = record(raw);
   const out: Record<string, unknown> = {};
   for (const key of WORK_SETTING_KEYS) if (key in r && validWorkValue(key, r[key])) out[key] = r[key];
-  return out as WorkOverrides;
+  return out;
 }
 
 /** Reads stored app settings defensively: unknown or malformed fields fall back to defaults. */
 export function normalizeAppSettings(raw: unknown): AppSettings {
   const r = record(raw);
   return {
-    theme: THEME_CHOICES.includes(r.theme as ThemeChoice) ? (r.theme as ThemeChoice) : DEFAULT_APP_SETTINGS.theme,
-    closeButton: CLOSE_BUTTON_CHOICES.includes(r.closeButton as CloseButton)
-      ? (r.closeButton as CloseButton)
-      : DEFAULT_APP_SETTINGS.closeButton,
+    theme: isOneOf(THEME_CHOICES, r.theme) ? r.theme : DEFAULT_APP_SETTINGS.theme,
+    closeButton: isOneOf(CLOSE_BUTTON_CHOICES, r.closeButton) ? r.closeButton : DEFAULT_APP_SETTINGS.closeButton,
     work: { ...DEFAULT_WORK_SETTINGS, ...normalizeWorkOverrides(r.work) },
   };
 }
@@ -144,7 +143,10 @@ export interface ProjectSettings {
  * Whether the close button can keep Featra running. `null` where there is no window to close (a browser tab).
  * Unavailable on a Linux desktop without a tray: a hidden window could not be brought back, so close always quits.
  */
-export type CloseToTraySupport = null | { available: true; place: "tray" | "dock" } | { available: false; reason: string };
+export type CloseToTraySupport =
+  | null
+  | { available: true; place: "tray" | "dock" }
+  | { available: false; reason: string };
 
 export interface SettingsSnapshot {
   app: AppSettings;
@@ -174,7 +176,12 @@ export function normalizeSettingsSnapshot(raw: unknown): SettingsSnapshot {
   const currentProject = normalizeProjectRef(r.currentProject);
   const projects = (Array.isArray(r.projects) ? r.projects : []).map(normalizeProjectRef).filter((p) => p !== null);
   if (currentProject && !projects.some((p) => p.dir === currentProject.dir)) projects.unshift(currentProject);
-  return { app: normalizeAppSettings(r.app), closeToTray: normalizeCloseToTray(r.closeToTray), currentProject, projects };
+  return {
+    app: normalizeAppSettings(r.app),
+    closeToTray: normalizeCloseToTray(r.closeToTray),
+    currentProject,
+    projects,
+  };
 }
 
 export function normalizeProjectSettings(raw: unknown, dir: string): ProjectSettings {

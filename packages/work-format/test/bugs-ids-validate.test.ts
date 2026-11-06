@@ -14,7 +14,11 @@ describe("routeProblem", () => {
 
   it.each([
     ["a story still being worked → task on it", "STORY-1", { kind: "task", card: "STORY-1" }],
-    ["a finished story of the in-progress feature → bug under that feature", "STORY-2", { kind: "feature-bug", feature: "FEAT-1" }],
+    [
+      "a finished story of the in-progress feature → bug under that feature",
+      "STORY-2",
+      { kind: "feature-bug", feature: "FEAT-1" },
+    ],
     ["the in-progress feature itself → bug under it", "FEAT-1", { kind: "feature-bug", feature: "FEAT-1" }],
     ["a story of a Done feature → project bug (Done stays Done)", "STORY-3", { kind: "project-bug" }],
     ["a Done feature → project bug", "FEAT-0", { kind: "project-bug" }],

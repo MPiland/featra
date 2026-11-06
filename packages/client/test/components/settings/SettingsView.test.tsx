@@ -2,7 +2,21 @@
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { PROJECT, renderApp, sidebar, titleBar, viewTitle } from "../../harness.tsx";
-import { main, pageNav, pageTitle, checked, row, WORK, navButton, description, switchFor, isOn, projectLoaded, picker, openSettings, tabStops } from "./helpers.tsx";
+import {
+  main,
+  pageNav,
+  pageTitle,
+  checked,
+  row,
+  WORK,
+  navButton,
+  switchFor,
+  isOn,
+  projectLoaded,
+  picker,
+  openSettings,
+  tabStops,
+} from "./helpers.tsx";
 
 afterEach(cleanup);
 
@@ -11,18 +25,20 @@ describe("AC1: App and Project scopes; the project picker starts on the current 
     const { user } = renderApp();
     await openSettings(user);
     const scopes = within(pageNav()).getAllByRole("list");
-    expect(scopes.map((l) => l.getAttribute("aria-labelledby")).map((id) => document.getElementById(id!)!.textContent)).toEqual([
-      "App",
-      "Project",
-    ]);
-    expect(within(scopes[0]!).getAllByRole("button").map((b) => b.textContent)).toEqual([
-      "General",
-      "Appearance",
-      WORK,
-      "Keyboard shortcuts",
-    ]);
+    expect(
+      scopes.map((l) => l.getAttribute("aria-labelledby")).map((id) => document.getElementById(id!)!.textContent),
+    ).toEqual(["App", "Project"]);
+    expect(
+      within(scopes[0]!)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["General", "Appearance", WORK, "Keyboard shortcuts"]);
     // The same name at both scopes: the same settings, as your defaults and as this project's.
-    expect(within(scopes[1]!).getAllByRole("button").map((b) => b.textContent)).toEqual([WORK]);
+    expect(
+      within(scopes[1]!)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual([WORK]);
     expect(pageTitle()).toBe("General");
   });
 
@@ -34,9 +50,11 @@ describe("AC1: App and Project scopes; the project picker starts on the current 
     expect(picker().getAttribute("aria-haspopup")).toBe("listbox");
     await user.click(picker());
     const list = screen.getByRole("listbox", { name: "Project" });
-    expect(within(list).getAllByRole("option").map((o) => [o.textContent, o.getAttribute("aria-selected")])).toEqual([
-      [PROJECT.name, "true"],
-    ]);
+    expect(
+      within(list)
+        .getAllByRole("option")
+        .map((o) => [o.textContent, o.getAttribute("aria-selected")]),
+    ).toEqual([[PROJECT.name, "true"]]);
   });
 
   it("the picker works from the keyboard: Enter opens it, Escape closes only it and focus returns", async () => {
@@ -73,18 +91,21 @@ describe("AC1: App and Project scopes; the project picker starts on the current 
     await openSettings(user);
     for (const [i, button] of within(pageNav()).getAllByRole("button").entries()) {
       await user.click(button);
-      await screen.findAllByRole("heading", { level: 2, name: button.textContent! });
+      await screen.findAllByRole("heading", { level: 2, name: button.textContent });
       if (i === 4) await projectLoaded();
       const page = main().querySelector<HTMLElement>(".settings-page")!;
-      const sections = within(page).queryAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-      expect(sections, button.textContent!).not.toContain(pageTitle());
-      expect(new Set(sections).size, button.textContent!).toBe(sections.length);
-      if (page.querySelectorAll(".settings-card").length === 1 && !page.querySelector("table"))
-        expect(sections, `${button.textContent}: one group`).toEqual([]);
+      const sections = within(page)
+        .queryAllByRole("heading", { level: 3 })
+        .map((h) => h.textContent);
+      expect(sections, button.textContent).not.toContain(pageTitle());
+      expect(new Set(sections).size, button.textContent).toBe(sections.length);
+      // A page with one group needs no group heading.
+      const oneGroup = page.querySelectorAll(".settings-card").length === 1 && !page.querySelector("table");
+      expect(oneGroup ? sections : [], `${button.textContent}: one group`).toEqual([]);
       // Every description says something its label doesn't.
       for (const help of page.querySelectorAll(".setting-help")) {
-        const label = help.closest(".setting-row")!.querySelector(".setting-label > span")!.textContent!.toLowerCase();
-        expect(help.textContent!.toLowerCase(), label).not.toContain(label);
+        const label = help.closest(".setting-row")!.querySelector(".setting-label > span")!.textContent.toLowerCase();
+        expect(help.textContent.toLowerCase(), label).not.toContain(label);
       }
     }
   });
@@ -107,11 +128,10 @@ describe("AC4: every setting is reachable and changeable by keyboard", () => {
     for (const [i, button] of buttons.entries()) {
       const name = `${i + 1}. ${button.textContent}`;
       await user.click(button);
-      await screen.findAllByRole("heading", { level: 2, name: button.textContent! });
-      if (i === buttons.length - 1) {
-        await projectLoaded();
-        expect(within(main()).getByText("Overridden")).toBeTruthy(); // its Reset button is a stop too
-      }
+      await screen.findAllByRole("heading", { level: 2, name: button.textContent });
+      if (i === buttons.length - 1) await projectLoaded();
+      // Only the project page has an override, and its Reset button is a stop too.
+      expect(within(main()).queryAllByText("Overridden"), name).toHaveLength(i === buttons.length - 1 ? 1 : 0);
       const page = main().querySelector<HTMLElement>(".settings-page")!;
       within(pageNav()).getAllByRole("button").at(-1)!.focus(); // the page follows the page list in tab order
       const stops = await tabStops(user, page);
@@ -119,10 +139,17 @@ describe("AC4: every setting is reachable and changeable by keyboard", () => {
       const controls = Array.from(page.querySelectorAll<HTMLElement>("input, select, button")).filter(
         (c) => !(c as HTMLInputElement).disabled,
       );
-      const groups = new Set(controls.map((c) => (c instanceof HTMLInputElement && c.type === "radio" ? `radio:${c.name}` : c)));
-      const reached = new Set(stops.map((c) => (c instanceof HTMLInputElement && c.type === "radio" ? `radio:${c.name}` : c)));
+      const groups = new Set(
+        controls.map((c) => (c instanceof HTMLInputElement && c.type === "radio" ? `radio:${c.name}` : c)),
+      );
+      const reached = new Set(
+        stops.map((c) => (c instanceof HTMLInputElement && c.type === "radio" ? `radio:${c.name}` : c)),
+      );
       expect(controls.length, name).toBeGreaterThan(0);
-      expect([...groups].filter((g) => !reached.has(g)), name).toEqual([]);
+      expect(
+        [...groups].filter((g) => !reached.has(g)),
+        name,
+      ).toEqual([]);
     }
   });
 

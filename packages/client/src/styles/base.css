@@ -13,7 +13,13 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--tx);
-  font: 13px/1.45 Inter, "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font:
+    13px/1.45 Inter,
+    "Segoe UI Variable Text",
+    "Segoe UI",
+    system-ui,
+    -apple-system,
+    sans-serif;
   font-variant-numeric: tabular-nums;
   overflow: hidden;
 }

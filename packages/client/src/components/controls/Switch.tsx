@@ -1,7 +1,7 @@
 export interface SwitchProps {
   id?: string | undefined;
   checked: boolean;
-  onChange(checked: boolean): void;
+  onChange: (checked: boolean) => void;
   labelledBy?: string | undefined;
   describedBy?: string | undefined;
   disabled?: boolean | undefined;

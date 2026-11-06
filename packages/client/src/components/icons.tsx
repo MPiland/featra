@@ -4,7 +4,15 @@ import type { ViewId } from "../views.ts";
 /** Stroke icons from the approved mockup (docs/mockups/app.html). Decorative: the control carries the label. */
 function Icon({ children, size = 16, name }: { children: ReactNode; size?: number; name?: string }) {
   return (
-    <svg className="i" viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" focusable="false" data-icon={name}>
+    <svg
+      className="i"
+      viewBox="0 0 24 24"
+      width={size}
+      height={size}
+      aria-hidden="true"
+      focusable="false"
+      data-icon={name}
+    >
       {children}
     </svg>
   );

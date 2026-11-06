@@ -7,7 +7,7 @@ import { SettingsGroup } from "./SettingsGroup.tsx";
 export interface GeneralPageProps {
   app: AppSettings;
   support: NonNullable<CloseToTraySupport>;
-  onCloseButton(value: CloseButton): void;
+  onCloseButton: (value: CloseButton) => void;
 }
 
 /** General: what the window's close button does. */

@@ -96,5 +96,5 @@ export function shortcutLabel(id: ShortcutId, platform: string): string | undefi
 }
 
 export function toggleSidebarShortcutLabel(platform: string): string {
-  return shortcutLabel("toggleSidebar", platform)!;
+  return shortcutLabel("toggleSidebar", platform) ?? "";
 }

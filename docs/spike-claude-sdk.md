@@ -9,6 +9,7 @@ Run 2026-11-04 on Windows 11 with `@anthropic-ai/claude-agent-sdk` 0.3.318 and t
 ## Login {#login}
 
 **Pass.**
+
 - Like T3 Code, Featra passes `pathToClaudeCodeExecutable` set to the user's installed `claude`, so the CLI's own
   login is used.
 - The spike removes `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` from the session environment.
@@ -17,6 +18,7 @@ Run 2026-11-04 on Windows 11 with `@anthropic-ai/claude-agent-sdk` 0.3.318 and t
 
 **Policy note.** The SDK overview says third-party developers may not "offer claude.ai login … including agents built
 on the Claude Agent SDK" unless approved.
+
 - Featra never offers a login: the user signs in with Anthropic's own CLI, which Featra launches. T3 Code ships the same
   pattern.
 - This is still a grey area, and Anthropic could tighten enforcement later.
@@ -25,6 +27,7 @@ on the Claude Agent SDK" unless approved.
 ## AskUserQuestion interception {#ask}
 
 **Pass.**
+
 - `canUseTool("AskUserQuestion", input)` fired with `input.questions[]`.
 - Returning `{ behavior: "allow", updatedInput: { ...input, answers: { [questionText]: "Blue" } } }` delivered the
   answer. The agent received the tool result `"Which colour do you prefer?"="Blue"` and replied "Blue".
@@ -37,6 +40,7 @@ on the Claude Agent SDK" unless approved.
 ## Model and effort per session {#model}
 
 **Pass.**
+
 - Session A ran with `model: "haiku", effort: "low"` and reported `claude-haiku-5-5`.
 - Session B ran with `model: "sonnet", effort: "high"` and reported `claude-sonnet-5-5`.
 - `effort` is accepted per query (`low | medium | high | xhigh | max`). The init message doesn't echo it back, so
@@ -45,6 +49,7 @@ on the Claude Agent SDK" unless approved.
 ## Local stdio MCP {#mcp}
 
 **Pass.**
+
 - The setting `mcpServers.featra = { type: "stdio", command: node, args: [mcp-server.mjs] }` worked: the server was
   `connected` at init.
 - The agent called `mcp__featra__ping` and got the server's token back.
@@ -56,6 +61,7 @@ on the Claude Agent SDK" unless approved.
 ## Worktree as working directory {#cwd}
 
 **Pass.**
+
 - The setting `cwd` was a real `git worktree` (branch `feat/1-pbi-1`), and the init message's `cwd` matched it.
 - The agent's `Write` created `proof.txt` in the worktree and not in the main checkout.
 - The MCP server process also started with the worktree as its cwd.

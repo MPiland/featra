@@ -30,7 +30,10 @@ async function chooseFromMenu(page: Page, ...path: string[]) {
   await page.getByRole("button", { name: "Menu" }).click();
   const last = path.pop()!;
   for (const name of path) await page.getByRole("menuitem", { name, exact: true }).hover();
-  await page.getByRole("menuitem").filter({ hasText: new RegExp(`^${last}`) }).click();
+  await page
+    .getByRole("menuitem")
+    .filter({ hasText: new RegExp(`^${last}`) })
+    .click();
 }
 
 test.describe("AC6: close to tray", () => {
@@ -122,7 +125,9 @@ test.describe("AC6: close to tray", () => {
       const { app, page } = await launch(profile.dir);
       await chooseFromMenu(page, "Help", "Troubleshooting", "Toggle Developer Tools");
       await expect
-        .poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.isDevToolsOpened()))
+        .poll(() =>
+          app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.isDevToolsOpened()),
+        )
         .toBe(true);
       const exit = exited(app);
       await chooseFromMenu(page, "File", "Exit").catch((e: Error) => {
@@ -190,11 +195,16 @@ test.describe("AC6: close to tray", () => {
       const { app, page } = await launch(profile.dir, { FEATRA_E2E_TRAY: "absent" });
       expect(await trayExists(app)).toBe(false);
       const exit = exited(app);
-      await page.getByRole("button", { name: "Close window" }).click().catch((e: Error) => {
-        if (!/has been closed/.test(e.message)) throw e;
-      });
+      await page
+        .getByRole("button", { name: "Close window" })
+        .click()
+        .catch((e: Error) => {
+          if (!/has been closed/.test(e.message)) throw e;
+        });
       expect(await exit).toBe(0); // quit, with no tray notice first
-      expect(await readFile(join(profile.dir, "logs", "main.log"), "utf8")).toMatch(/No tray: close quits\n[^]*Quitting\n/);
+      expect(await readFile(join(profile.dir, "logs", "main.log"), "utf8")).toMatch(
+        /No tray: close quits\n[^]*Quitting\n/,
+      );
     } finally {
       await profile.dispose();
     }

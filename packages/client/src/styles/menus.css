@@ -43,6 +43,7 @@
 }
 
 .msep {
+  border: 0;
   height: 1px;
   background: var(--menu-line);
   margin: 4px 2px;

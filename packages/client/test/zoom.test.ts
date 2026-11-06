@@ -21,7 +21,7 @@ describe("zoom steps", () => {
     expect(up).toEqual(ZOOM_FACTORS);
     const down = [ZOOM_FACTORS.at(-1)!];
     while (down.at(-1)! > ZOOM_FACTORS[0]!) down.push(zoomOut(down.at(-1)!));
-    expect(down).toEqual([...ZOOM_FACTORS].reverse());
+    expect(down).toEqual(ZOOM_FACTORS.toReversed());
   });
 
   it("moves to the next step from a value between steps", () => {

@@ -5,7 +5,7 @@ import { SettingRow } from "../controls/SettingRow.tsx";
 import { SettingsGroup } from "./SettingsGroup.tsx";
 
 /** Appearance: the theme. */
-export function AppearancePage({ theme, onTheme }: { theme: ThemeChoice; onTheme(theme: ThemeChoice): void }) {
+export function AppearancePage({ theme, onTheme }: { theme: ThemeChoice; onTheme: (theme: ThemeChoice) => void }) {
   const id = "app-theme";
   return (
     <SettingsGroup>

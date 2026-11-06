@@ -5,11 +5,13 @@ export type Origin = "planned" | "added" | "bug";
 
 /** Lifecycle of epics and features (stories and bugs use the project's stages instead). */
 export type ContainerStatus = "draft" | "approved" | "active" | "done" | "cancelled";
+export const CONTAINER_STATUSES: readonly ContainerStatus[] = ["draft", "approved", "active", "done", "cancelled"];
 
 /** stories and bugs use project stage names; `Cancelled` is always available. */
 export const CANCELLED = "Cancelled";
 
 export type HistoryField = "status" | "parent" | "evidence" | "accepted";
+export const HISTORY_FIELDS: readonly HistoryField[] = ["status", "parent", "evidence", "accepted"];
 
 /** Append-only record of a change, written at the card's owner (ADR 0002). */
 export interface HistoryEvent {

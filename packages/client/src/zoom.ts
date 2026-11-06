@@ -11,9 +11,9 @@ export function normalizeZoom(raw: unknown): number {
 }
 
 export function zoomIn(factor: number): number {
-  return ZOOM_FACTORS.find((f) => f > factor + EPS) ?? ZOOM_FACTORS[ZOOM_FACTORS.length - 1]!;
+  return ZOOM_FACTORS.find((f) => f > factor + EPS) ?? ZOOM_FACTORS.at(-1) ?? factor;
 }
 
 export function zoomOut(factor: number): number {
-  return [...ZOOM_FACTORS].reverse().find((f) => f < factor - EPS) ?? ZOOM_FACTORS[0]!;
+  return ZOOM_FACTORS.findLast((f) => f < factor - EPS) ?? ZOOM_FACTORS[0] ?? factor;
 }

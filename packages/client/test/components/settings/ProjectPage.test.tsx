@@ -4,12 +4,24 @@ import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_CONFIG } from "@featra/work-format";
 import { DEFAULT_APP_SETTINGS, DEFAULT_WORK_SETTINGS, WORK_SETTINGS } from "../../../src/bridge.ts";
 import { PROJECT, renderApp, sidebar } from "../../harness.tsx";
-import { main, radios, checked, row, WORK, navButton, description, switchFor, isOn, projectLoaded, openSettings } from "./helpers.tsx";
+import {
+  main,
+  radios,
+  checked,
+  row,
+  WORK,
+  navButton,
+  description,
+  switchFor,
+  isOn,
+  projectLoaded,
+  openSettings,
+} from "./helpers.tsx";
 
 afterEach(cleanup);
 
 describe("AC3: a project value that overrides an app default is labelled and can be reset", () => {
-  it("marks an override \"Overridden · Reset\" by its label, the app default in tooltip and description; shows nothing where the project follows the default", async () => {
+  it('marks an override "Overridden · Reset" by its label, the app default in tooltip and description; shows nothing where the project follows the default', async () => {
     const { user } = renderApp({ projectFiles: { [PROJECT.dir]: { progress: "tasks" } } });
     await openSettings(user, WORK);
     const progress = screen.getByRole("radiogroup", { name: "Feature progress" });
@@ -64,7 +76,11 @@ describe("AC3: a project value that overrides an app default is labelled and can
     const { user } = renderApp({ settings: { work: { ...DEFAULT_WORK_SETTINGS, knowledge: "read-only" } } });
     await openSettings(user, WORK);
     expect(checked("Agent access to project knowledge")).toBe("Read only");
-    expect(within(row(screen.getByRole("radiogroup", { name: "Agent access to project knowledge" }))).queryByText("Overridden")).toBeNull();
+    expect(
+      within(row(screen.getByRole("radiogroup", { name: "Agent access to project knowledge" }))).queryByText(
+        "Overridden",
+      ),
+    ).toBeNull();
   });
 
   it("changing an app default saves it in the app settings, not the project", async () => {
@@ -81,7 +97,7 @@ describe("AC3: a project value that overrides an app default is labelled and can
   });
 
   it("a project whose config file can't be read shows why and offers nothing to change", async () => {
-    const { user } = renderApp({ brokenProjects: { [PROJECT.dir]: "progress must be \"stories\" or \"tasks\"" } });
+    const { user } = renderApp({ brokenProjects: { [PROJECT.dir]: 'progress must be "stories" or "tasks"' } });
     await user.click(within(sidebar()).getByRole("button", { name: "Settings" }));
     await user.click(navButton(WORK));
     expect((await screen.findByRole("alert")).textContent).toMatch(/^Can't read project settings: progress must be/);

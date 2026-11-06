@@ -12,9 +12,20 @@ export function feature(id: string, status = "active", parent: string | null = "
   return newCard({ id, type: "feature", title: id, status, parent }, "user", at(0));
 }
 
-export function story(id: string, parent: string | null, opts: { created?: number; status?: string; type?: "story" | "bug" } = {}): Card {
+export function story(
+  id: string,
+  parent: string | null,
+  opts: { created?: number; status?: string; type?: "story" | "bug" } = {},
+): Card {
   return newCard(
-    { id, type: opts.type ?? "story", title: id, status: opts.status ?? "New", parent, origin: opts.type === "bug" ? "bug" : "planned" },
+    {
+      id,
+      type: opts.type ?? "story",
+      title: id,
+      status: opts.status ?? "New",
+      parent,
+      origin: opts.type === "bug" ? "bug" : "planned",
+    },
     "user",
     at(opts.created ?? 0),
   );

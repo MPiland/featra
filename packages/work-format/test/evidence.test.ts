@@ -19,12 +19,20 @@ const withAcs = (n: number): Card => ({
 
 describe("evidenceState", () => {
   it("starts with nothing", () => {
-    expect(evidenceState(withAcs(2))).toEqual({ reported: false, verified: false, provenAcs: [], proven: false, accepted: false });
+    expect(evidenceState(withAcs(2))).toEqual({
+      reported: false,
+      verified: false,
+      provenAcs: [],
+      proven: false,
+      accepted: false,
+    });
   });
 
   it("an agent's stage move is Reported; a user's is not", () => {
     expect(evidenceState(moves(withAcs(1), [1, "In Review", "session:abc"])).reported).toBe(true);
-    expect(evidenceState(moves(withAcs(1), [1, "In Review", "session:abc"], [2, "Acceptance", "user"])).reported).toBe(false);
+    expect(evidenceState(moves(withAcs(1), [1, "In Review", "session:abc"], [2, "Acceptance", "user"])).reported).toBe(
+      false,
+    );
   });
 
   it("tracks CI verification, per-AC proof and acceptance, latest event winning", () => {
@@ -47,7 +55,10 @@ describe("evidenceState", () => {
   });
 
   it("a card without ACs is never Proven, and proof for removed ACs is ignored", () => {
-    expect(evidenceState(recordEvidence(withAcs(0), provenEvent(1), "system", at(1)))).toMatchObject({ provenAcs: [], proven: false });
+    expect(evidenceState(recordEvidence(withAcs(0), provenEvent(1), "system", at(1)))).toMatchObject({
+      provenAcs: [],
+      proven: false,
+    });
   });
 });
 
@@ -55,19 +66,28 @@ describe("checkTransition", () => {
   const verified = recordEvidence(withAcs(1), VERIFIED, "system", at(1));
 
   it("Done needs Verified", () => {
-    expect(checkTransition(withAcs(1), "Done", { ...config, requireAccept: false })).toMatchObject({ ok: false, reason: expect.stringMatching(/Verified/) });
+    expect(checkTransition(withAcs(1), "Done", { ...config, requireAccept: false })).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/Verified/),
+    });
     expect(checkTransition(verified, "Done", { ...config, requireAccept: false })).toEqual({ ok: true });
   });
 
   it("Done also needs Accepted when the project requires it", () => {
-    expect(checkTransition(verified, "Done", config)).toMatchObject({ ok: false, reason: expect.stringMatching(/Accept/) });
+    expect(checkTransition(verified, "Done", config)).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/Accept/),
+    });
     expect(checkTransition(recordAcceptance(verified, true, "user", at(2)), "Done", config)).toEqual({ ok: true });
   });
 
   it("a researcher story (no code, no CI) reaches Done on Accepted alone, even when the project doesn't require Accept", () => {
     const research: Card = { ...withAcs(1), role: "researcher" };
     for (const cfg of [config, { ...config, requireAccept: false }]) {
-      expect(checkTransition(research, "Done", cfg)).toMatchObject({ ok: false, reason: expect.stringMatching(/Accept/) });
+      expect(checkTransition(research, "Done", cfg)).toMatchObject({
+        ok: false,
+        reason: expect.stringMatching(/Accept/),
+      });
       expect(checkTransition(recordAcceptance(research, true, "user", at(2)), "Done", cfg)).toEqual({ ok: true });
     }
   });
@@ -80,10 +100,20 @@ describe("checkTransition", () => {
 
   it("a feature is done only when its items are done and it is Accepted", () => {
     const f = feature("FEAT-1");
-    const open = [moves(story("STORY-1", "FEAT-1"), [1, "Done"]), story("STORY-2", "FEAT-1"), moves(story("STORY-3", "FEAT-1"), [1, "Cancelled"])];
-    expect(checkTransition(f, "done", config, open)).toMatchObject({ ok: false, reason: expect.stringMatching(/STORY-2/) });
+    const open = [
+      moves(story("STORY-1", "FEAT-1"), [1, "Done"]),
+      story("STORY-2", "FEAT-1"),
+      moves(story("STORY-3", "FEAT-1"), [1, "Cancelled"]),
+    ];
+    expect(checkTransition(f, "done", config, open)).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/STORY-2/),
+    });
     const allDone = open.map((c) => (c.id === "STORY-2" ? moves(c, [2, "Done"]) : c));
-    expect(checkTransition(f, "done", config, allDone)).toMatchObject({ ok: false, reason: expect.stringMatching(/Accept/) });
+    expect(checkTransition(f, "done", config, allDone)).toMatchObject({
+      ok: false,
+      reason: expect.stringMatching(/Accept/),
+    });
     expect(checkTransition(recordAcceptance(f, true, "user", at(3)), "done", config, allDone)).toEqual({ ok: true });
     expect(checkTransition(f, "In Progress", config).ok).toBe(false);
   });
