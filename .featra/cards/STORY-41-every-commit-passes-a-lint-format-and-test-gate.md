@@ -2,7 +2,7 @@
 id: STORY-41
 type: story
 title: Every commit passes a lint, format and test gate
-status: In Progress
+status: In Review
 parent: FEAT-13
 order: 4
 origin: added
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: claude
+  - at: 2026-11-06T14:56:50Z
+    field: status
+    from: In Progress
+    to: In Review
     by: claude
 ---
 
@@ -50,10 +55,15 @@ As a builder, I can trust that every commit an agent makes is formatted, linted,
 - [x] Pre-commit hook in `.githooks`, turned on by `pnpm install` for every worktree
 - [x] `tooling` package: lint fixtures through the real config, `pnpm check` failing on a format violation, the hook blocking a commit in a temp repo and its worktree (the end-to-end journey)
 - [x] ADR 0014 rule gaps; architecture map gains `tooling` and where lint rules go
-- [ ] Unit, e2e on Windows, WSLg and xvfb-run
+- [x] Unit, e2e on Windows, WSLg and xvfb-run
+- [x] Fix the preload regression the e2e run caught: client imports work-format's guards from `@featra/work-format/guards`, so the sandboxed preload doesn't bundle `yaml` (test: apps/desktop/test/preload-bundle.test.ts)
 
 ## Notes
 
 - The first run of the hook test from inside the real hook inherited GIT_DIR and wrote to the shared `.git/config`
   (`core.bare = true` and a test `[user]`). Repaired by hand; the test now drops GIT_* variables and refuses to run
   unless git resolves to its temp repository.
+- Windows e2e: 28 of 29 pass. `tray.spec.ts` "the tray's Show Featra and a tray click restore and focus the window"
+  fails at the focus check in the full suite only; alone it passes 3 of 3. The base commit before STORY-41 (eb82985)
+  fails the same way, so it predates this story. Linux: WSLg 29 passed; xvfb-run 28 passed, 1 skipped (BUG-1
+  maximize needs a window manager).
