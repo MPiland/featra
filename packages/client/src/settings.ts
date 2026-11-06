@@ -42,7 +42,7 @@ interface ChoiceDef<V> {
   label: string;
 }
 export type WorkSettingDef =
-  | { key: "progress"; kind: "choice"; label: string; help: string; choices: readonly ChoiceDef<ProgressMode>[] }
+  | { key: "progress"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<ProgressMode>[] }
   | { key: "knowledge"; kind: "choice"; label: string; help: string; choices: readonly ChoiceDef<KnowledgePermission>[] }
   | { key: "requireAccept" | "worktrees"; kind: "toggle"; label: string; help: string };
 
@@ -51,8 +51,7 @@ export const WORK_SETTINGS: readonly WorkSettingDef[] = [
   {
     key: "progress",
     kind: "choice",
-    label: "Progress counts",
-    help: "What a feature's progress bar counts.",
+    label: "Feature progress counts",
     choices: [
       { value: "stories", label: "Stories" },
       { value: "tasks", label: "Tasks" },

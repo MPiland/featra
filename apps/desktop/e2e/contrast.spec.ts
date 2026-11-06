@@ -54,9 +54,9 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
         const settingsPages = [
           ["App", "General"],
           ["App", "Appearance"],
-          ["App", "Progress and review"],
+          ["App", "Workflow"],
           ["App", "Keyboard shortcuts"],
-          ["Project", "Progress and review"],
+          ["Project", "Workflow"],
         ] as const;
         for (const [scope, name] of settingsPages) {
           await page

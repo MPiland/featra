@@ -116,7 +116,7 @@ test.describe("STORY-20: Settings", () => {
     try {
       const { app, page } = await launch(profile.dir, { FEATRA_PROJECT_DIR: project.dir });
       await page.keyboard.press("Control+,");
-      await pages(page).getByRole("list", { name: "Project" }).getByRole("button", { name: "Progress and review" }).click();
+      await pages(page).getByRole("list", { name: "Project" }).getByRole("button", { name: "Workflow" }).click();
       const name = project.dir.split(/[\\/]/).at(-1)!;
       const picker = page.getByRole("button", { name: `Project: ${name}` });
       await picker.click();
@@ -124,7 +124,7 @@ test.describe("STORY-20: Settings", () => {
       await page.keyboard.press("Escape");
       await expect(picker).toBeFocused();
 
-      const progress = page.getByRole("radiogroup", { name: "Progress counts" });
+      const progress = page.getByRole("radiogroup", { name: "Feature progress counts" });
       const row = page.locator(".setting-row").filter({ has: progress });
       await expect(progress).not.toHaveAccessibleDescription(/App default|Overridden/);
       await progress.getByRole("radio", { name: "Tasks" }).check();
@@ -132,7 +132,7 @@ test.describe("STORY-20: Settings", () => {
       await expect(progress).toHaveAccessibleDescription(/Overridden\s*\. App default: Stories/);
       expect(await readFile(project.config, "utf8")).toBe(`${before}progress: tasks\n`);
 
-      await row.getByRole("button", { name: "Reset Progress counts to the app default" }).click();
+      await row.getByRole("button", { name: "Reset Feature progress counts to the app default" }).click();
       await expect(row.getByText(/^Overridden/)).toHaveCount(0);
       await expect(progress.getByRole("radio", { name: "Stories" })).toBeChecked();
       await expect(progress.getByRole("radio", { name: "Stories" })).toBeFocused();

@@ -28,7 +28,8 @@ interface PageDef {
 }
 
 /** App and Project name their work-settings page alike: the same settings, at two scopes. */
-const WORK_PAGE_TITLE = "Progress and review";
+/** The work settings page: the same name at both scopes, and not a section heading inside it. */
+const WORK_PAGE_TITLE = "Workflow";
 
 const PAGES: readonly PageDef[] = [
   { id: "general", title: "General", scope: "app" },
@@ -105,16 +106,15 @@ export function SettingsView({ bridge, snapshot, page, onPage, onAppChange, shor
             <>
               <PageHeader title={current.title} />
               {current.id === "general" && snapshot.closeToTray && (
-                <Group title="Window">
+                <Group>
                   <CloseButtonSetting app={app} support={snapshot.closeToTray} onChange={(closeButton) => setApp({ closeButton })} />
                 </Group>
               )}
               {current.id === "appearance" && (
-                <Group title="Display">
+                <Group>
                   <ChoiceRow
                     id="app-theme"
                     label="Theme"
-                    help="System follows your computer's light or dark mode."
                     value={app.theme}
                     choices={THEME_CHOICES.map((t) => ({ value: t, label: THEME_LABELS[t] }))}
                     onChange={(theme) => setApp({ theme })}
@@ -123,7 +123,7 @@ export function SettingsView({ bridge, snapshot, page, onPage, onAppChange, shor
               )}
               {current.id === "workDefaults" && (
                 <>
-                  <p className="settings-intro">Saved for you on this computer. Every project uses these unless it overrides them.</p>
+                  <p className="settings-intro">Every project uses these unless it overrides them.</p>
                   {WORK_GROUPS.map((g) => (
                     <Group key={g.title} title={g.title}>
                       {g.keys.map((key) => {
@@ -161,8 +161,10 @@ function PageHeader({ title, children }: { title: string; children?: ReactNode }
 }
 
 /** A titled group of setting rows, drawn as one card. */
-function Group({ title, children }: { title: string; children: ReactNode }) {
+/** A card of rows; a title only where the page has more than one group. */
+function Group({ title, children }: { title?: string; children: ReactNode }) {
   const id = useId();
+  if (!title) return <div className="settings-group settings-card">{children}</div>;
   return (
     <section className="settings-group" aria-labelledby={id}>
       <h3 id={id}>{title}</h3>
@@ -584,8 +586,7 @@ function ProjectPage({ bridge, snapshot, title }: { bridge: FeatraBridge; snapsh
         <ProjectPicker projects={snapshot.projects} dir={dir} onChange={setDir} />
       </PageHeader>
       <p className="settings-intro">
-        <span title="Stored in the project's .featra/config.yaml">Saved with this project (shared through git).</span> Anything
-        not set here follows your app defaults.
+        <span title="Stored in the project's .featra/config.yaml">Saved with this project (shared through git).</span>
       </p>
       {project?.error && (
         <p role="alert" className="setting-error">

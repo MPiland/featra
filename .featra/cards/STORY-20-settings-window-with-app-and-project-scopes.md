@@ -53,14 +53,14 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 
 ## Acceptance criteria
 
-- [x] Settings has an App scope and a Project scope with a project picker that defaults to the current project
-- [x] App settings are stored in the user's config folder; project settings in .featra/config.yaml
-- [x] A project value that overrides an app default is labelled as an override and can be reset
-- [x] Every setting is reachable and changeable by keyboard
-- [x] Settings… in the File menu (Ctrl+,) opens the Settings window
-- [x] App settings include "Close button: keep running in the tray / quit", default keep running; it applies without a restart
-- [x] Settings has a Keyboard shortcuts page listing every shortcut by area, searchable; Help > Keyboard shortcuts and Ctrl+/ open it
-- [x] Settings > Appearance has a Theme choice (System, Light, Dark), default System; the choice survives a restart (moved here from the View menu)
+- [x] Settings has an App scope and a Project scope with a project picker that defaults to the current project (test: packages/client/test/settings.test.tsx AC1, apps/desktop/e2e/settings.spec.ts)
+- [x] App settings are stored in the user's config folder; project settings in .featra/config.yaml (test: apps/desktop/e2e/settings.spec.ts, apps/desktop/test/settings-store.test.ts, packages/work-format/test/config.test.ts)
+- [x] A project value that overrides an app default is labelled as an override and can be reset (test: packages/client/test/settings.test.tsx AC3, apps/desktop/e2e/settings.spec.ts)
+- [x] Every setting is reachable and changeable by keyboard (test: packages/client/test/settings.test.tsx AC4, apps/desktop/e2e/settings.spec.ts)
+- [x] Settings… in the File menu (Ctrl+,) opens the Settings window (test: packages/client/test/settings.test.tsx AC5, apps/desktop/e2e/settings.spec.ts)
+- [x] App settings include "Close button: keep running in the tray / quit", default keep running; it applies without a restart (test: packages/client/test/settings.test.tsx AC6, apps/desktop/e2e/settings.spec.ts)
+- [x] Settings has a Keyboard shortcuts page listing every shortcut by area, searchable; Help > Keyboard shortcuts and Ctrl+/ open it (test: packages/client/test/settings.test.tsx AC7, apps/desktop/e2e/settings.spec.ts)
+- [x] Settings > Appearance has a Theme choice (System, Light, Dark), default System; the choice survives a restart (moved here from the View menu) (test: packages/client/test/settings.test.tsx AC8, apps/desktop/e2e/settings.spec.ts)
 
 ## Tasks
 
@@ -68,6 +68,8 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - [x] Settings model and bridge (`packages/client/src/settings.ts`, `bridge.ts`, preload)
 - [x] Settings view: pages, scopes, picker, override mark and Reset, shortcuts page with search
 - [x] Layout rework after review: rows in titled cards, switch, segmented control and dropdown, quiet "Overridden ·
+  Reset", picker in the Project page header, no file paths in the UI, the work page renamed (now "Workflow")
+- [x] Text pass after review: no repeated headings or descriptions that restate labels
 - [x] Help > Keyboard Shortcuts and Ctrl+/; shortcuts listed from the menu model
 - [x] Main: settings store, current project, IPC, Close button at runtime with the tray following it
 - [x] Styles meeting WCAG AA in both themes (contrast e2e walks every Settings page)
@@ -79,6 +81,11 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - E2E after the layout rework: Windows 29 passed; WSL Ubuntu WSLg and xvfb-run: see the commit report. Unit: 233
   passed (settings.test.tsx 26).
 - Bug found and fixed: a project change waited for the write before showing; regression test in settings.test.tsx.
+- Sent back by the user (2026-11-05): "Any repetitive text, unnecessary text, etc" and "Duplicate heading" (the
+  Project page title repeated as its first section heading). Fixed: the page is "Workflow", single-group pages have
+  no section heading, descriptions that restated labels are gone; regression test "no page repeats itself".
+- Bug found and fixed: work-format dropped the wrapped lines of a checklist item when it rewrote a card (a status
+  change lost half of a task here); regression test in `packages/work-format/test/card.test.ts`.
 
 ## Tests
 
@@ -97,5 +104,3 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - AC7: `packages/client/test/settings.test.tsx` (AC7); `apps/desktop/e2e/settings.spec.ts` "Ctrl+/ and Help >
   Keyboard Shortcuts…"
 - AC8: `packages/client/test/settings.test.tsx` (AC8); `apps/desktop/e2e/settings.spec.ts` "keyboard only…"
-- Sent back by the user (2026-11-05): "Any repetitive text, unnecessary text, etc" and "Duplicate heading" (the
-  Project page title repeated as its first section heading).

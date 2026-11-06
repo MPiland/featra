@@ -100,6 +100,21 @@ describe("parseCard", () => {
     expect(c.extraSections).toEqual([{ heading: "Links", content: "See ADR 0002." }]);
   });
 
+  it("keeps the wrapped lines of a checklist item (regression: a status change dropped them from the file)", () => {
+    const wrapped = story.replace(
+      /## Tasks\n\n/,
+      "## Tasks\n\n- [x] Layout rework: rows in titled cards, a switch and\n  a segmented control\n- [ ] Next\n",
+    );
+    const c = parseCard(wrapped);
+    expect(c.tasks.slice(0, 2)).toEqual([
+      { done: true, text: "Layout rework: rows in titled cards, a switch and a segmented control" },
+      { done: false, text: "Next" },
+    ]);
+    const acs = parseCard(story.replace("## Acceptance criteria\n\n", "## Acceptance criteria\n\n- [ ] Long\n  criterion (test: a.test.ts)\n")).acs;
+    expect(acs[0]).toEqual({ done: false, text: "Long criterion", test: "a.test.ts" });
+    expect(serializeCard(c)).toMatch(/^- \[x\] Layout rework: rows in titled cards, a switch and a segmented control$/m);
+  });
+
   it("accepts CRLF line endings", () => {
     expect(parseCard(story.replace(/\n/g, "\r\n")).acs).toHaveLength(2);
   });

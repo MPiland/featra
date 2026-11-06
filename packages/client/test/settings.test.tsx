@@ -16,8 +16,8 @@ const radios = (group: string) => within(screen.getByRole("radiogroup", { name: 
 const checked = (group: string) =>
   (radios(group).find((r) => (r as HTMLInputElement).checked)?.closest("label")?.textContent ?? null);
 const row = (control: HTMLElement) => control.closest(".setting-row") as HTMLElement;
-const WORK = "Progress and review";
-/** App and Project both have a "Progress and review" page: a page is found within its scope's list. */
+const WORK = "Workflow";
+/** App and Project both have a "Workflow" page: a page is found within its scope's list. */
 const navButton = (name: string, scope: "App" | "Project" = name === WORK ? "Project" : "App") =>
   within(within(pageNav()).getByRole("list", { name: scope })).getByRole("button", { name });
 /** The text a screen reader reads as the control's description. */
@@ -101,6 +101,27 @@ describe("AC1: App and Project scopes; the project picker starts on the current 
     expect(main().textContent).not.toMatch(/config\.yaml|\.featra/);
   });
 
+  it("no page repeats itself: no section heading echoes the page title, and a page with one group has no section heading (regression: the Project page repeated its title)", async () => {
+    const { user } = renderApp();
+    await openSettings(user);
+    for (const [i, button] of within(pageNav()).getAllByRole("button").entries()) {
+      await user.click(button);
+      await screen.findAllByRole("heading", { level: 2, name: button.textContent! });
+      if (i === 4) await projectLoaded();
+      const page = main().querySelector<HTMLElement>(".settings-page")!;
+      const sections = within(page).queryAllByRole("heading", { level: 3 }).map((h) => h.textContent);
+      expect(sections, button.textContent!).not.toContain(pageTitle());
+      expect(new Set(sections).size, button.textContent!).toBe(sections.length);
+      if (page.querySelectorAll(".settings-card").length === 1 && !page.querySelector("table"))
+        expect(sections, `${button.textContent}: one group`).toEqual([]);
+      // Every description says something its label doesn't.
+      for (const help of page.querySelectorAll(".setting-help")) {
+        const label = help.closest(".setting-row")!.querySelector(".setting-label > span")!.textContent!.toLowerCase();
+        expect(help.textContent!.toLowerCase(), label).not.toContain(label);
+      }
+    }
+  });
+
   it("says so when no project is open, instead of showing settings that can't be saved anywhere", async () => {
     const { user } = renderApp({ project: null });
     await user.click(within(sidebar()).getByRole("button", { name: "Settings" }));
@@ -114,16 +135,16 @@ describe("AC3: a project value that overrides an app default is labelled and can
   it("marks an override \"Overridden · Reset\" by its label, the app default in tooltip and description; shows nothing where the project follows the default", async () => {
     const { user } = renderApp({ projectFiles: { [PROJECT.dir]: { progress: "tasks" } } });
     await openSettings(user, WORK);
-    const progress = screen.getByRole("radiogroup", { name: "Progress counts" });
-    expect(checked("Progress counts")).toBe("Tasks");
+    const progress = screen.getByRole("radiogroup", { name: "Feature progress counts" });
+    expect(checked("Feature progress counts")).toBe("Tasks");
     const mark = within(row(progress)).getByText("Overridden");
     expect(mark.getAttribute("title")).toBe("App default: Stories");
     expect(description(progress)).toContain("Overridden. App default: Stories");
     expect(progress.getAttribute("aria-describedby")).toContain("project-progress-status");
-    const reset = within(row(progress)).getByRole("button", { name: "Reset Progress counts to the app default" });
+    const reset = within(row(progress)).getByRole("button", { name: "Reset Feature progress counts to the app default" });
     expect(reset.textContent).toBe("Reset");
     expect(reset.getAttribute("title")).toBe("App default: Stories");
-    expect(mark.closest(".setting-label")!.textContent).toMatch(/^Progress countsOverridden/);
+    expect(mark.closest(".setting-label")!.textContent).toMatch(/^Feature progress countsOverridden/);
 
     const accept = switchFor("Stories need my Accept to be Done");
     expect(within(row(accept)).queryByText(/Overridden|App default/)).toBeNull();
@@ -152,14 +173,14 @@ describe("AC3: a project value that overrides an app default is labelled and can
   it("a change shows at once, before the config file is written (regression: the choice looked ignored)", async () => {
     const { user, projectFiles, releaseWrites } = renderApp({ slowProjectWrites: true });
     await openSettings(user, WORK);
-    const progress = await screen.findByRole("radiogroup", { name: "Progress counts" });
+    const progress = await screen.findByRole("radiogroup", { name: "Feature progress counts" });
     await user.click(within(progress).getByRole("radio", { name: "Tasks" }));
-    expect(checked("Progress counts")).toBe("Tasks");
+    expect(checked("Feature progress counts")).toBe("Tasks");
     expect(within(row(progress)).getByText("Overridden")).toBeTruthy();
     expect(projectFiles.get(PROJECT.dir)).toBeUndefined();
     await releaseWrites();
     expect(projectFiles.get(PROJECT.dir)).toEqual({ progress: "tasks" });
-    expect(checked("Progress counts")).toBe("Tasks");
+    expect(checked("Feature progress counts")).toBe("Tasks");
   });
 
   it("a project that doesn't override a setting follows the app default as it changes", async () => {
@@ -178,7 +199,7 @@ describe("AC3: a project value that overrides an app default is labelled and can
     expect(projectFiles.size).toBe(0);
     await user.click(navButton(WORK, "Project"));
     await projectLoaded();
-    expect(checked("Progress counts")).toBe("Tasks");
+    expect(checked("Feature progress counts")).toBe("Tasks");
     expect(within(main()).queryByText("Overridden")).toBeNull();
   });
 
@@ -187,7 +208,7 @@ describe("AC3: a project value that overrides an app default is labelled and can
     await user.click(within(sidebar()).getByRole("button", { name: "Settings" }));
     await user.click(navButton(WORK));
     expect((await screen.findByRole("alert")).textContent).toMatch(/can't change this project's settings: progress must be/);
-    for (const r of radios("Progress counts")) expect((r as HTMLInputElement).disabled).toBe(true);
+    for (const r of radios("Feature progress counts")) expect((r as HTMLInputElement).disabled).toBe(true);
     expect((switchFor("Stories need my Accept to be Done") as HTMLButtonElement).disabled).toBe(true);
   });
 
