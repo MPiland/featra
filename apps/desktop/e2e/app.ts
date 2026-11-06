@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import electronPath from "electron";
-import { foregroundWindow } from "./foreground.ts";
+import { foregroundWindow, grantForeground } from "./foreground.ts";
 
 // No trailing separator: on Windows a trailing backslash escapes the closing quote of the argument.
 const appDir = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
@@ -88,6 +88,8 @@ export async function windowInForeground(app: ElectronApplication): Promise<bool
   });
   return handle !== undefined && foregroundWindow() === BigInt(handle);
 }
+/** Featra's main process, which owns its windows. */
+const mainPid = (app: ElectronApplication) => app.evaluate(() => process.pid);
 /** What the OS close button and Alt+F4 do to a frameless window: Electron's `BrowserWindow.close()`. */
 export const closeFromOs = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
@@ -108,18 +110,28 @@ export const trayExists = (app: ElectronApplication) =>
     const tray = (globalThis as MainGlobal).featraTest.tray;
     return tray !== undefined && !tray.isDestroyed();
   });
-/** What a left-click on the tray icon does: Electron emits `click` on the real Tray. */
-export const clickTray = (app: ElectronApplication) =>
-  app.evaluate(() => {
+/**
+ * What a left-click on the tray icon does: the OS lets Featra take the foreground (faked: see foreground.ts), then
+ * Electron emits `click` on the real Tray.
+ */
+export async function clickTray(app: ElectronApplication) {
+  grantForeground(await mainPid(app));
+  await app.evaluate(() => {
     (globalThis as MainGlobal).featraTest.tray!.emit("click");
   });
+}
 export const trayMenuLabels = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.trayMenu!.items.map((i) => i.label));
-/** Chooses an item from the real tray context menu (the right-click menu). */
-export const chooseTrayItem = (app: ElectronApplication, label: string) =>
-  app.evaluate((_e, wanted) => {
+/**
+ * Chooses an item from the real tray context menu (the right-click menu). The user's click lands in Featra's own menu,
+ * which lets Featra take the foreground (faked: see foreground.ts).
+ */
+export async function chooseTrayItem(app: ElectronApplication, label: string) {
+  grantForeground(await mainPid(app));
+  await app.evaluate((_e, wanted) => {
     (globalThis as MainGlobal).featraTest.trayMenu!.items.find((i) => i.label === wanted)!.click();
   }, label);
+}
 /**
  * Whether the desktop's window manager can minimise windows. Windows always can. On X11, minimising is a request to
  * the window manager, and one that doesn't list `_NET_WM_STATE_HIDDEN` in `_NET_SUPPORTED` ignores it: WSLg's
@@ -162,8 +174,14 @@ export const exited = (app: ElectronApplication) =>
     proc.once("exit", (code) => resolve(code));
   });
 
-/** Starts Featra a second time on the same profile, as the Start menu would; resolves when that process ends. */
-export function launchAgain(userDataDir: string): Promise<number | null> {
+/**
+ * Starts Featra a second time on the same profile, as the Start menu would; resolves when that process ends. A Start
+ * menu launch is the foreground process, and hands `running` the right to take the foreground along with the
+ * command line (Chromium's single-instance lock does that); the harness launches from the background, so it fakes the
+ * grant (see foreground.ts).
+ */
+export async function launchAgain(userDataDir: string, running: ElectronApplication): Promise<number | null> {
+  grantForeground(await mainPid(running));
   const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", FEATRA_PROJECT_DIR: "" } as Record<
     string,
     string
@@ -171,7 +189,7 @@ export function launchAgain(userDataDir: string): Promise<number | null> {
   delete env.FEATRA_CLIENT_URL;
   delete env.ELECTRON_RUN_AS_NODE;
   const child = spawn(electronPath as unknown as string, [appDir], { env, stdio: "ignore" });
-  return new Promise((resolve, reject) => {
+  return new Promise<number | null>((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (code) => resolve(code));
   });

@@ -221,3 +221,9 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     "· name" after the view title; the window title stays "Featra · View". With no project, Work offers New Project…
     and Open Folder…. A switch or open that main refuses shows a "Can't Open Project" dialog with the reason.
   - E2E fakes only the OS folder dialog: tests queue the folders it returns (`queueFolderPicks`).
+- 2026-11-06 — BUG-2 (tray restore focus in e2e): Windows' foreground lock refuses `focus()` to a process that didn't
+  get the user's last input. A real tray click, tray-menu choice or Start-menu relaunch gives Featra that right; the
+  e2e harness fakes those events, so it also fakes the grant (`e2e/foreground.ts`, user32's AllowSetForegroundWindow
+  through PowerShell, test-only, no npm dependency). Product code is unchanged: it still has to call `show()` and
+  `focus()` itself, and the tests prove it. Focus tests assert both Chromium's `isFocused()` and the OS foreground window
+  (`windowInForeground`), because `isFocused()` can say true while another app is in front (user decision).
