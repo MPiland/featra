@@ -2,7 +2,7 @@
 id: BUG-3
 type: bug
 title: Tray e2e foreground helper fails in the full Windows suite
-status: In Review
+status: Done
 parent: FEAT-13
 order: 7
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-2
+  - at: 2026-11-06T19:11:14Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-06T19:11:14Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
