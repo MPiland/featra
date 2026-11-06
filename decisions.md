@@ -30,3 +30,10 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   signal to split), shared controls in `components/controls/`, shared helpers in topic `utils/` modules, no one-off
   helper files. A story isn't ready for review until its changes follow it. Existing code is brought in line as it's
   touched (SettingsView and the stylesheet in STORY-20); `main.ts` is split by job in a FEAT-13 refactor.
+- 2026-11-05 — Professional engineering standards apply to all code: `docs/coding-standards.md` (quality gate, structure,
+  TypeScript, errors, security, review checklist), `docs/architecture.md` as the code map, and ADRs for every
+  architecturally significant decision (`docs/adr/README.md`). Missing ADRs 0007–0013 were backfilled from this log.
+- 2026-11-05 — Lint and format use OXC (oxlint and oxfmt), with a `pnpm check` pre-commit gate (ADR 0014). Built in
+  STORY-41, after STORY-20 and before STORY-19.
+- 2026-11-05 — Settings copy is short and standard, the way established desktop apps word it (for example "Minimize to
+  tray" or "Quit"). There's no flavour text, and a description appears only where the label alone would mislead.
