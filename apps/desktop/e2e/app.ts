@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import electronPath from "electron";
+import { foregroundWindow } from "./foreground.ts";
 
 // No trailing separator: on Windows a trailing backslash escapes the closing quote of the argument.
 const appDir = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
@@ -73,6 +74,20 @@ export const windowVisible = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isVisible() ?? false);
 export const windowFocused = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isFocused() ?? false);
+/**
+ * Whether the window is the OS foreground window, the one the user sees in front and types into. `windowFocused` is
+ * Chromium's own view, which can say true while another app is in front (BUG-2), so tests about focus check both.
+ * Where the window manager doesn't track an active window (xvfb), there is no OS answer and Chromium's is used.
+ */
+export async function windowInForeground(app: ElectronApplication): Promise<boolean> {
+  if (!windowManagerSupports("_NET_ACTIVE_WINDOW")) return windowFocused(app);
+  const handle = await app.evaluate(({ BrowserWindow }) => {
+    const buf = BrowserWindow.getAllWindows()[0]?.getNativeWindowHandle();
+    if (buf === undefined) return undefined;
+    return (buf.length >= 8 ? buf.readBigUInt64LE() : BigInt(buf.readUInt32LE())).toString();
+  });
+  return handle !== undefined && foregroundWindow() === BigInt(handle);
+}
 /** What the OS close button and Alt+F4 do to a frameless window: Electron's `BrowserWindow.close()`. */
 export const closeFromOs = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.close());
