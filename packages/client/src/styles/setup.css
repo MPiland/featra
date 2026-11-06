@@ -32,3 +32,38 @@
 .setup-offer .placeholder-actions {
   margin-top: 0;
 }
+
+/* The confirmation after Featra init: a title and two compact, wrapping path lists. */
+.setup-done-body {
+  flex: 1;
+  min-width: 200px;
+}
+
+.setup-done h2 {
+  margin: 0 0 4px;
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.setup-done dl {
+  margin: 0;
+  font-size: 12px;
+  color: var(--tx2);
+}
+
+.setup-done dl > div {
+  display: flex;
+  gap: 8px;
+}
+
+.setup-done dt {
+  flex: none;
+  min-width: 56px;
+}
+
+.setup-done dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  margin: 0;
+}

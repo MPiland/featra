@@ -44,6 +44,8 @@ export interface HostOptions {
   setup?: Record<string, ProjectSetup>;
   /** Folders where the server's Featra init fails: its error. */
   initFailures?: Record<string, string>;
+  /** What the server's Featra init reports it created and kept, by folder. Default: it created config.yaml only. */
+  initResults?: Record<string, { created: string[]; kept: string[] }>;
 }
 
 const noop = () => {};
@@ -148,7 +150,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
         const failure = host.initFailures?.[dir];
         if (failure) return { ok: false, error: failure };
         setupOnDisk.set(dir, { state: "ready" });
-        return { ok: true, created: [".featra/config.yaml"], kept: [] };
+        return { ok: true, ...(host.initResults?.[dir] ?? { created: [".featra/config.yaml"], kept: [] }) };
       },
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.

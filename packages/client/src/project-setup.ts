@@ -29,7 +29,12 @@ export const SETUP_COPY = {
   "no-featra": { message: "Featra isn't set up in this project.", action: "Initialize Featra" },
   notNow: "Not now",
   region: "Project setup",
+  /** The confirmation after Featra init: its title (also the region's name) and the two lists. */
+  done: { title: "Featra is set up", created: "Created", kept: "Kept", dismiss: "Dismiss" },
 } as const;
+
+/** What a successful Featra init created and what it found already there, as relative paths. */
+export type InitDone = Extract<InitResult, { ok: true }>;
 
 const setupError = (err: unknown): ProjectSetup => ({ state: "error", error: errorMessage(err) });
 

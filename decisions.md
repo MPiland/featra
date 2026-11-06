@@ -254,3 +254,9 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - A server main stops (on quit) logs nothing: not the stop, nor the child's exit, stderr or messages after it. The
     stop is part of quitting, so "Quitting" stays the log's last line, right after the line that caused it (e2e checks
     both). A server that exits on its own is still logged with its exit code.
+- 2026-11-06 — STORY-42 (init confirms what it created): after Featra init succeeds, Work shows a "Featra is set up"
+  banner in place of the offer, listing what the server's `project.init` reported as Created and Kept (each list one
+  wrapping line of paths; an empty list isn't shown). It is client state in memory only, kept per project until
+  Dismiss. Nothing is stored to make "does not come back" hold across restarts: the confirmation exists only as the
+  answer to an init in this run, and a project that is set up (`ready`) is never offered init again, so after Dismiss
+  or a restart there is nothing that could bring it back. The e2e proves this with a relaunch.

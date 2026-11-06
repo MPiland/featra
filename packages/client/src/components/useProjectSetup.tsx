@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { FeatraBridge } from "../bridge.ts";
-import type { ProjectSetup } from "../project-setup.ts";
+import type { InitDone, ProjectSetup } from "../project-setup.ts";
+import { SetupDone } from "./SetupDone.tsx";
 import { SetupOffer } from "./SetupOffer.tsx";
 
 /** Each result is kept with the project it belongs to, so switching projects never shows another one's. */
@@ -12,12 +13,15 @@ interface ForDir<T> {
 /**
  * The current project's setup, checked with the server whenever the project changes (opened, created or switched
  * to), and the offer to take the next step. "Not now" hides the offer for that project until Featra restarts.
+ * After Featra init, a confirmation lists what it created and kept until it is dismissed. It lives in memory only: a
+ * project that is set up is never offered init again, so a dismissed confirmation has no way back (decisions.md).
  */
 export function useProjectSetup(bridge: FeatraBridge, dir: string | null): ReactNode {
   const [checked, setChecked] = useState<ForDir<ProjectSetup> | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ForDir<string> | null>(null);
   const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
+  const [done, setDone] = useState<ForDir<InitDone> | null>(null);
   const folders = bridge.platform !== "web";
 
   useEffect(() => {
@@ -54,14 +58,18 @@ export function useProjectSetup(bridge: FeatraBridge, dir: string | null): React
     () =>
       void step(async (project) => {
         const result = await bridge.setup.initFeatra(project);
-        return result.ok ? bridge.setup.status(project) : { error: result.error };
+        if (!result.ok) return { error: result.error };
+        setDone({ dir: project, value: result });
+        return bridge.setup.status(project);
       }),
     [bridge, step],
   );
   const dismiss = useCallback(() => {
     if (dir) setDismissed((d) => new Set(d).add(dir));
   }, [dir]);
+  const dismissDone = useCallback(() => setDone(null), []);
 
+  if (dir && done?.dir === dir) return <SetupDone done={done.value} onDismiss={dismissDone} />;
   if (!dir || checked?.dir !== dir || dismissed.has(dir)) return null;
   return (
     <SetupOffer

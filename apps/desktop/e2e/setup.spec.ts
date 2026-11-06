@@ -11,6 +11,14 @@ import { launch, queueFolderPicks, tempUserData } from "./app.ts";
  * the test queued.
  */
 const offer = (page: Page) => page.getByRole("region", { name: "Project setup" });
+/** STORY-42: the confirmation after Featra init. */
+const confirmation = (page: Page) => page.getByRole("region", { name: "Featra is set up" });
+/** The paths a confirmation list shows, by its label ("Created", "Kept"). */
+const listed = (page: Page, label: string) =>
+  confirmation(page)
+    .locator("dl > div")
+    .filter({ has: page.locator("dt", { hasText: label }) })
+    .locator("dd code");
 
 async function tempFolder(prefix: string) {
   const dir = await mkdtemp(join(tmpdir(), prefix));
@@ -35,7 +43,10 @@ test.describe("STORY-2: open a folder and initialise Featra", () => {
   test("open a plain folder, init git, then Featra; the files exist and CLAUDE.md is untouched (AC1-AC3)", async () => {
     const profile = await tempUserData();
     const project = await tempFolder("featra-plain-");
+    const other = await tempFolder("featra-other-");
     await writeFile(join(project.dir, "CLAUDE.md"), "# My own agent rules\n");
+    // STORY-42: a knowledge file the user already has, so the confirmation has something it kept.
+    await writeFile(join(project.dir, "CONTEXT.md"), "# My own context\n");
     try {
       const { app, page } = await launch(profile.dir);
       await expect(offer(page)).toHaveCount(0);
@@ -46,12 +57,24 @@ test.describe("STORY-2: open a folder and initialise Featra", () => {
       await expect(offer(page)).toContainText("This folder isn't a git repository.");
       await offer(page).getByRole("button", { name: "Initialize Git" }).click();
 
-      // AC1: a repository without .featra/ offers Featra init.
+      // AC1 (and STORY-42 AC2): a repository without .featra/ offers Featra init, with no reload.
       await expect(offer(page)).toContainText("Featra isn't set up in this project.");
       expect(isRepo(project.dir)).toBe(true);
       expect(await exists(join(project.dir, ".featra"))).toBe(false);
       await offer(page).getByRole("button", { name: "Initialize Featra" }).click();
       await expect(offer(page)).toHaveCount(0);
+
+      // STORY-42 AC1: Work confirms what init created and what it kept, as the real server reported it.
+      await expect(confirmation(page).getByRole("heading", { name: "Featra is set up" })).toBeVisible();
+      await expect(listed(page, "Created")).toHaveText([
+        ".featra/config.yaml",
+        "docs/adr/",
+        "docs/adr/README.md",
+        "decisions.md",
+        "open-questions.md",
+      ]);
+      await expect(listed(page, "Kept")).toHaveText(["CONTEXT.md"]);
+      expect(await readFile(join(project.dir, "CONTEXT.md"), "utf8")).toBe("# My own context\n");
 
       // AC2: the scaffold is on disk.
       expect(await readFile(join(project.dir, ".featra", "config.yaml"), "utf8")).toContain("version: 1");
@@ -63,10 +86,27 @@ test.describe("STORY-2: open a folder and initialise Featra", () => {
       // AC3: the user's CLAUDE.md is as it was, and no AGENTS.md appeared.
       expect(await readFile(join(project.dir, "CLAUDE.md"), "utf8")).toBe("# My own agent rules\n");
       expect((await readdir(project.dir)).filter((f) => /^agents\.md$/i.test(f))).toEqual([]);
+
+      // STORY-42 AC3: Dismiss hides the confirmation, and nothing comes back for the project after a restart.
+      await confirmation(page).getByRole("button", { name: "Dismiss" }).click();
+      await expect(confirmation(page)).toHaveCount(0);
       await app.close();
+      const again = await launch(profile.dir);
+      // A plain folder first, to see the real status check answer, then back to the project that is set up.
+      await queueFolderPicks(again.app, other.dir, project.dir);
+      await again.page.keyboard.press("Control+O");
+      await expect(offer(again.page)).toContainText("This folder isn't a git repository.");
+      await again.page.keyboard.press("Control+O");
+      await expect(offer(again.page)).toHaveCount(0);
+      // Nothing is waiting to appear: give the status check time to answer before the final look.
+      await again.page.waitForTimeout(1000);
+      await expect(offer(again.page)).toHaveCount(0);
+      await expect(confirmation(again.page)).toHaveCount(0);
+      await again.app.close();
     } finally {
       await profile.dispose();
       await project.dispose();
+      await other.dispose();
     }
   });
 
