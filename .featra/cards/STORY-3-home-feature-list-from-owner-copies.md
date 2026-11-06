@@ -2,7 +2,7 @@
 id: STORY-3
 type: story
 title: Home feature list from owner copies
-status: New
+status: In Progress
 parent: FEAT-2
 order: 2
 origin: planned
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-06T23:42:11.022Z
+    field: status
+    from: New
+    to: In Progress
+    by: lead
 ---
 
 ## Description
