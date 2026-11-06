@@ -2,7 +2,7 @@
 id: STORY-20
 type: story
 title: Settings window with app and project scopes
-status: In Review
+status: Done
 parent: FEAT-13
 order: 3
 origin: planned
@@ -60,6 +60,16 @@ history:
     from: In Progress
     to: In Review
     by: session:story-20
+  - at: 2026-11-06T00:48:08Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-06T00:48:08Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
