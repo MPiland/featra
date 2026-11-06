@@ -11,6 +11,7 @@ import {
   type AppSettings,
   type ProjectSettings,
   type ProjectsResult,
+  type ProjectsSnapshot,
   type SettingsSnapshot,
 } from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
@@ -19,6 +20,7 @@ import { pickFolder } from "./folder-dialog.ts";
 import { closeToTraySupport, type Lifecycle } from "./lifecycle.ts";
 import type { Log } from "./log.ts";
 import type { ProjectRegistry } from "./project-registry.ts";
+import type { ServerProcess } from "./server-process.ts";
 import { readProjectSettings, writeProjectValue, type SettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 import { clearCacheAndRestart, resetAppData, type TroubleshootDeps } from "./troubleshoot.ts";
@@ -31,6 +33,7 @@ export interface MainDeps {
   log: Log;
   troubleshoot: TroubleshootDeps;
   projects: ProjectRegistry;
+  server: ServerProcess;
   settings: {
     store: SettingsStore;
     current: () => AppSettings;
@@ -38,6 +41,9 @@ export interface MainDeps {
     apply: (next: AppSettings) => Promise<void>;
   };
 }
+
+/** The folders the server may act on for the page: every project on the list. */
+export const allowedDirs = (snapshot: ProjectsSnapshot): string[] => snapshot.projects.map((p) => p.dir);
 
 const fromOurWindow = (e: IpcMainEvent | IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);
 
@@ -48,7 +54,7 @@ const notOpen = (dir: unknown): ProjectSettings => ({
 });
 
 /** Answers the page's calls (see `IPC` in the client's bridge). Every payload is checked: the page is not trusted. */
-export function registerIpc({ store, lifecycle, log, troubleshoot, projects, settings }: MainDeps) {
+export function registerIpc({ store, lifecycle, log, troubleshoot, projects, server, settings }: MainDeps) {
   ipcMain.handle(IPC.uiStateLoad, () => store.load());
   ipcMain.handle(IPC.uiStateSave, (_e, state: unknown) => store.save(normalizeUiState(state)));
   ipcMain.on(IPC.windowMinimize, (e) => fromOurWindow(e)?.minimize());
@@ -96,9 +102,12 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, set
     return valid !== undefined ? writeProjectValue(dir, key, valid) : readProjectSettings(dir);
   });
   ipcMain.handle(IPC.projectsList, () => projects.snapshot());
-  const logged = (action: string) => (result: ProjectsResult) => {
+  // After a change to the list, the server learns it before the page does: the page's next call may be about the
+  // folder just opened.
+  const logged = (action: string) => async (result: ProjectsResult) => {
     const current = projects.current();
     log.info(result.ok && current ? `${action}: ${current.dir}` : `${action} failed`);
+    if (result.ok) await server.setProjects(allowedDirs(result.projects));
     return result;
   };
   ipcMain.handle(IPC.projectsSwitch, (_e, dir: unknown) => projects.switchTo(dir).then(logged("Project")));
@@ -112,6 +121,7 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, set
   ipcMain.handle(IPC.projectsCreate, (_e, location: unknown, name: unknown) =>
     projects.create(location, name).then(logged("New project")),
   );
+  ipcMain.handle(IPC.serverEndpoint, () => server.endpoint());
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());
   ipcMain.on(IPC.appToggleDevTools, (e) => e.sender.toggleDevTools());

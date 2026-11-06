@@ -15,6 +15,7 @@ import { SettingsView } from "./components/settings/SettingsView.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { useProjects } from "./components/useProjects.tsx";
+import { useProjectSetup } from "./components/useProjectSetup.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
@@ -79,6 +80,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     actions: projectActions,
     dialog: projectDialog,
   } = useProjects(bridge, initialProjects, projectSettings);
+  const setupOffer = useProjectSetup(bridge, projects.current?.dir ?? null);
   // The host stores app settings and applies them at once (the close button too); the UI applies the theme.
   const changeAppSettings = useCallback(
     (app: AppSettings) => {
@@ -224,7 +226,12 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 shortcuts={shortcuts}
               />
             ) : view.id === "work" ? (
-              <WorkView projects={projects} platform={bridge.platform} actions={projectActions} />
+              <WorkView
+                projects={projects}
+                platform={bridge.platform}
+                actions={projectActions}
+                setupOffer={setupOffer}
+              />
             ) : (
               <ViewPlaceholder view={view} />
             )}

@@ -62,6 +62,15 @@ describe("browser bridge", () => {
     expect(await projects.chooseLocation("/p")).toBeNull();
   });
 
+  it("has no local server: every setup step says there is no folder (STORY-2)", async () => {
+    const fake = { getItem: () => null, setItem() {} } as unknown as Storage;
+    const { setup } = browserBridge(fake);
+    const error = "No project folder in a browser tab.";
+    expect(await setup.status("/p")).toEqual({ state: "error", error });
+    expect(await setup.initGit("/p")).toEqual({ state: "error", error });
+    expect(await setup.initFeatra("/p")).toEqual({ ok: false, error });
+  });
+
   it("recovers from corrupt storage", async () => {
     const fake = { getItem: () => "{not json", setItem() {} } as unknown as Storage;
     expect(await browserBridge(fake).uiState.load()).toEqual(DEFAULT_UI_STATE);

@@ -116,7 +116,8 @@ export function setConfigValue<K extends keyof ProjectConfig>(
   return out;
 }
 
-const NEW_CONFIG = "# Featra project settings\nversion: 1\n";
+/** A new project's config file: only the version, so every work setting follows the app-wide defaults. */
+export const NEW_CONFIG = "# Featra project settings\nversion: 1\n";
 
 export function serializeConfig(config: ProjectConfig): string {
   return "# Featra project settings\n" + stringify(config, { flowCollectionPadding: true });

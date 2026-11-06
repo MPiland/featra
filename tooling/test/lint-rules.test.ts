@@ -26,6 +26,7 @@ const RESTRICTED = "eslint(no-restricted-imports)";
 const NODE_MODULE = "import(no-nodejs-modules)";
 const WORK_FORMAT = "packages/work-format/lint-fixtures";
 const CLIENT = "packages/client/lint-fixtures";
+const SERVER = "packages/server/lint-fixtures";
 
 const BOUNDARY_CASES: [file: string, code: string][] = [
   [`${WORK_FORMAT}/imports-react.ts`, RESTRICTED],
@@ -39,6 +40,11 @@ const BOUNDARY_CASES: [file: string, code: string][] = [
   [`${CLIENT}/imports-electron-renderer.ts`, RESTRICTED],
   [`${CLIENT}/imports-desktop.ts`, RESTRICTED],
   [`${CLIENT}/imports-node-fs.ts`, NODE_MODULE],
+  [`${CLIENT}/imports-server.ts`, RESTRICTED],
+  [`${SERVER}/imports-react.ts`, RESTRICTED],
+  [`${SERVER}/imports-electron.ts`, RESTRICTED],
+  [`${SERVER}/imports-client.ts`, RESTRICTED],
+  [`${SERVER}/imports-desktop.ts`, RESTRICTED],
 ];
 
 const PLUGIN_CASES: [file: string, code: string][] = [
@@ -49,12 +55,12 @@ const PLUGIN_CASES: [file: string, code: string][] = [
   [`${CLIENT}/floating-promise.ts`, "typescript(no-floating-promises)"], // type-aware
 ];
 
-const ALLOWED = [`${WORK_FORMAT}/allowed.ts`, `${CLIENT}/allowed.tsx`];
+const ALLOWED = [`${WORK_FORMAT}/allowed.ts`, `${CLIENT}/allowed.tsx`, `${SERVER}/allowed.ts`];
 
 /** Every fixture, linted once with the type-aware rules on, as `pnpm lint` runs them. */
 let codes: (file: string) => string[];
 beforeAll(() => {
-  codes = lint([WORK_FORMAT, CLIENT], { typeAware: true });
+  codes = lint([WORK_FORMAT, CLIENT, SERVER], { typeAware: true });
 });
 
 describe("AC3: imports that break the package boundaries (ADR 0011) fail lint", () => {
@@ -68,7 +74,9 @@ describe("AC3: imports that break the package boundaries (ADR 0011) fail lint", 
 
   it("every fixture is checked here", () => {
     const listed = new Set([...BOUNDARY_CASES.map(([f]) => f), ...PLUGIN_CASES.map(([f]) => f), ...ALLOWED]);
-    const onDisk = [WORK_FORMAT, CLIENT].flatMap((dir) => readdirSync(join(REPO, dir)).map((f) => `${dir}/${f}`));
+    const onDisk = [WORK_FORMAT, CLIENT, SERVER].flatMap((dir) =>
+      readdirSync(join(REPO, dir)).map((f) => `${dir}/${f}`),
+    );
     expect(onDisk.toSorted()).toEqual([...listed].toSorted());
   });
 });

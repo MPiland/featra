@@ -14,12 +14,15 @@ import {
   type WorkSettingKey,
   type WorkSettings,
 } from "./settings.ts";
+import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
 import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./projects.ts";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
+export * from "./project-setup.ts";
 export * from "./projects.ts";
+export * from "./server-client.ts";
 export * from "./settings.ts";
 
 /** Window chrome state that survives a restart. The theme is an app setting (Settings > Appearance), not chrome. */
@@ -124,6 +127,8 @@ export interface FeatraBridge {
     /** Creates the folder `name` in `location`, adds it and switches to it. */
     create: (location: string, name: string) => Promise<ProjectsResult>;
   };
+  /** Git and Featra init for a project folder, done by the local server (ADR 0015). */
+  readonly setup: ProjectSetupBridge;
   edit: (command: EditCommand) => void;
   readonly app: {
     info: () => Promise<AppInfo>;
@@ -168,6 +173,7 @@ export const IPC = {
   projectsOpenFolder: "projects:open-folder",
   projectsChooseLocation: "projects:choose-location",
   projectsCreate: "projects:create",
+  serverEndpoint: "server:endpoint",
 } as const;
 
 declare global {
@@ -236,6 +242,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       chooseLocation: async () => null,
       create: async () => noFolders,
     },
+    setup: noSetup(NO_FOLDERS),
     edit: (command) => {
       document.execCommand(command);
     },

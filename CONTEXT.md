@@ -45,6 +45,11 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   current, and Work, the chat list and Project settings follow it.
 - **Project switcher** — the control at the top of the sidebar that lists known projects and offers New Project…, Open
   Folder… and Project Settings….
+- **Featra init** — setting a git repository up for Featra: creating `.featra/config.yaml`, `CONTEXT.md`, `docs/adr/`,
+  `decisions.md` and `open-questions.md` where they are missing. It never overwrites a file and never creates or edits
+  agent instructions.
+- **Local server** — the Node process the app starts beside itself, on 127.0.0.1 only, that does the project work
+  (git, files, later the index). The UI reaches it through `FeatraBridge` (ADRs 0012, 0015).
 
 ## Agents
 

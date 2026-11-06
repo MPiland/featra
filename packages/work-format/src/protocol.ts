@@ -1,0 +1,90 @@
+/**
+ * The local server's WebSocket API (ADR 0015): the shapes both ends check. One JSON text frame per message. The
+ * client sends `{ id, method, params }`; the server answers each with `{ id, ok: true, result }` or
+ * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
+ */
+import { isOneOf, isRecord } from "./utils/guards.ts";
+
+/** Only loopback, always: the server must not be reachable from another machine (docs/architecture.md). */
+export const SERVER_HOST = "127.0.0.1";
+
+/** The URL path the server answers on: the protocol version. A breaking change gets a new path. */
+export const SERVER_PATH = "/v1";
+
+/** Where a project stands: not a git repository, a repository without `.featra/`, or set up. */
+export type ProjectSetup =
+  | { state: "no-git" }
+  | { state: "no-featra" }
+  | { state: "ready" }
+  | { state: "error"; error: string };
+
+/** What Featra init did: the paths it created and the ones it found and kept, relative to the project. */
+export type InitResult = { ok: true; created: string[]; kept: string[] } | { ok: false; error: string };
+
+/** Every method, its params and its result. A new method is added here first. */
+export interface ServerMethods {
+  /** Whether the project folder is a git repository and holds `.featra/`. */
+  "project.setupStatus": { params: { dir: string }; result: ProjectSetup };
+  /** Runs `git init` in a folder that is not yet in a repository; answers with the new status. */
+  "project.gitInit": { params: { dir: string }; result: ProjectSetup };
+  /** Scaffolds `.featra/` and the knowledge files that are missing, in a git repository. */
+  "project.init": { params: { dir: string }; result: InitResult };
+}
+
+export type ServerMethod = keyof ServerMethods;
+export const SERVER_METHODS: readonly ServerMethod[] = ["project.setupStatus", "project.gitInit", "project.init"];
+
+export interface ServerRequest {
+  id: number;
+  method: ServerMethod;
+  params: unknown;
+}
+
+export type ServerResponse = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
+
+const json = (text: string): unknown => {
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+};
+
+const isId = (id: unknown): id is number => typeof id === "number" && Number.isSafeInteger(id);
+
+/** A request frame, or why it can't be answered (`id` is null when even that can't be read). */
+export function parseRequest(text: string): ServerRequest | { id: number | null; error: string } {
+  const raw = json(text);
+  if (!isRecord(raw) || !isId(raw.id)) return { id: null, error: "Malformed request." };
+  if (!isOneOf(SERVER_METHODS, raw.method)) return { id: raw.id, error: "Unknown method." };
+  return { id: raw.id, method: raw.method, params: raw.params };
+}
+
+export function parseResponse(text: string): ServerResponse | null {
+  const raw = json(text);
+  if (!isRecord(raw) || !isId(raw.id)) return null;
+  if (raw.ok === true) return { id: raw.id, ok: true, result: raw.result };
+  return { id: raw.id, ok: false, error: typeof raw.error === "string" && raw.error ? raw.error : "Request failed." };
+}
+
+/** The `{ dir }` params every project method takes, or null. */
+export function dirParams(params: unknown): { dir: string } | null {
+  return isRecord(params) && typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
+}
+
+const SETUP_STATES = ["no-git", "no-featra", "ready"] as const;
+
+export function normalizeProjectSetup(raw: unknown): ProjectSetup {
+  const r = isRecord(raw) ? raw : {};
+  if (isOneOf(SETUP_STATES, r.state)) return { state: r.state };
+  return { state: "error", error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
+}
+
+const strings = (raw: unknown): string[] =>
+  Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string") : [];
+
+export function normalizeInitResult(raw: unknown): InitResult {
+  const r = isRecord(raw) ? raw : {};
+  if (r.ok === true) return { ok: true, created: strings(r.created), kept: strings(r.kept) };
+  return { ok: false, error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
+}
