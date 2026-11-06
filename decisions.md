@@ -26,3 +26,7 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
 - 2026-11-05 — Agents get tools through MCP, so they work with any MCP-capable agent, not only Claude or Codex. Agents
   driving the in-app browser is STORY-40 in M1b (FEAT-10). Desktop computer use goes on the roadmap. Both are off by
   default, because tool definitions cost context tokens on every turn.
+- 2026-11-05 — Code follows `docs/coding-standards.md`: one concern per file, no monolith files (about 300 lines is the
+  signal to split), shared controls in `components/controls/`, shared helpers in topic `utils/` modules, no one-off
+  helper files. A story isn't ready for review until its changes follow it. Existing code is brought in line as it's
+  touched (SettingsView and the stylesheet in STORY-20); `main.ts` is split by job in a FEAT-13 refactor.
