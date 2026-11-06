@@ -85,7 +85,9 @@ export const trayExists = (app: ElectronApplication) =>
   });
 /** What a left-click on the tray icon does: Electron emits `click` on the real Tray. */
 export const clickTray = (app: ElectronApplication) =>
-  app.evaluate(() => void (globalThis as MainGlobal).featraTest.tray!.emit("click"));
+  app.evaluate(() => {
+    (globalThis as MainGlobal).featraTest.tray!.emit("click");
+  });
 export const trayMenuLabels = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.trayMenu!.items.map((i) => i.label));
 /** Chooses an item from the real tray context menu (the right-click menu). */

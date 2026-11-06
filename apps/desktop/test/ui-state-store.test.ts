@@ -55,7 +55,7 @@ describe("AC2: sidebar state survives a restart", () => {
     const blocker = join(dir, "not-a-dir");
     await writeFile(blocker, "", "utf8");
     const bad = createUiStateStore(join(blocker, "child"));
-    await expect(bad.save(sidebar(true))).rejects.toThrow();
+    await expect(bad.save(sidebar(true))).rejects.toThrow(/ENOTDIR|EEXIST|ENOENT/);
     expect(bad.pending).toBe(false);
     await expect(bad.flush()).resolves.toBeUndefined();
   });
@@ -95,7 +95,7 @@ describe("AC5: Reset App Data deletes the stored state", () => {
     void store.save(sidebar(true));
     await store.remove();
     expect(await createUiStateStore(dir).load()).toEqual(DEFAULT_UI_STATE);
-    await expect(readFile(store.file, "utf8")).rejects.toThrow();
+    await expect(readFile(store.file, "utf8")).rejects.toThrow(/ENOENT/);
     await store.remove(); // nothing left to delete is fine
   });
 });

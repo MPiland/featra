@@ -18,7 +18,7 @@ async function tabTo(page: Page, target: Locator, max = 40) {
     if (await target.evaluate((el) => el === document.activeElement)) return;
     await page.keyboard.press("Tab");
   }
-  throw new Error(`Tab never reached ${target}`);
+  throw new Error(`Tab never reached ${target.toString()}`);
 }
 
 async function chooseFromMenu(page: Page, ...path: string[]) {

@@ -4,7 +4,13 @@
  * project's `.featra/config.yaml` can override any of them. A project overrides a setting exactly when its file sets
  * the key; resetting removes the key so the app default applies again.
  */
-import { isOneOf, isRecord, type KnowledgePermission, type ProgressMode } from "@featra/work-format";
+import {
+  isOneOf,
+  isRecord,
+  type KnowledgePermission,
+  type ProgressMode,
+  type ProjectConfig,
+} from "@featra/work-format";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 
 /** What the window's close button (and Alt+F4) does. */
@@ -12,12 +18,7 @@ export type CloseButton = "tray" | "quit";
 export const CLOSE_BUTTON_CHOICES: readonly CloseButton[] = ["tray", "quit"];
 
 /** Project settings that also have an app-wide default. Featra's own defaults match work-format's DEFAULT_CONFIG. */
-export interface WorkSettings {
-  progress: ProgressMode;
-  requireAccept: boolean;
-  worktrees: boolean;
-  knowledge: KnowledgePermission;
-}
+export type WorkSettings = Pick<ProjectConfig, "progress" | "requireAccept" | "worktrees" | "knowledge">;
 export type WorkSettingKey = keyof WorkSettings;
 export type WorkOverrides = Partial<WorkSettings>;
 

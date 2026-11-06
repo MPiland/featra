@@ -1,6 +1,7 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { DEFAULT_UI_STATE, normalizeUiState, type UiState } from "@featra/client/bridge";
+import { isRecord } from "@featra/work-format";
 
 export interface JsonStore<T> {
   readonly file: string;
@@ -70,8 +71,7 @@ export interface AppState {
 }
 
 export function normalizeAppState(raw: unknown): AppState {
-  const r = raw !== null && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
-  return { trayNoticeShown: r.trayNoticeShown === true };
+  return { trayNoticeShown: isRecord(raw) && raw.trayNoticeShown === true };
 }
 
 export function createAppStateStore(dir: string): JsonStore<AppState> {

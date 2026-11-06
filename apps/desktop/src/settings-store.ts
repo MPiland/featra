@@ -1,6 +1,6 @@
 import { access, mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
-import { configOverrides, ConfigError, setConfigValue } from "@featra/work-format";
+import { configOverrides, ConfigError, errorMessage, isRecord, setConfigValue } from "@featra/work-format";
 import {
   normalizeAppSettings,
   normalizeWorkOverrides,
@@ -32,8 +32,8 @@ export function createSettingsStore(dir: string): SettingsStore {
     async load() {
       if (await exists(store.file)) return store.load();
       try {
-        const legacy = JSON.parse(await readFile(join(dir, "ui-state.json"), "utf8")) as { theme?: unknown };
-        return normalizeAppSettings({ theme: legacy?.theme });
+        const legacy: unknown = JSON.parse(await readFile(join(dir, "ui-state.json"), "utf8"));
+        return normalizeAppSettings({ theme: isRecord(legacy) ? legacy.theme : undefined });
       } catch {
         return normalizeAppSettings(undefined);
       }
@@ -75,7 +75,10 @@ export async function findProject(start: string, override?: string): Promise<Pro
   }
 }
 
-const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+const message = errorMessage;
+
+/** A file that isn't there: Node's ENOENT. */
+const isMissing = (err: unknown) => isRecord(err) && err.code === "ENOENT";
 
 /** Reads the project's work-setting overrides from `.featra/config.yaml`. No file means no overrides. */
 export async function readProjectSettings(projectDir: string): Promise<ProjectSettings> {
@@ -83,7 +86,7 @@ export async function readProjectSettings(projectDir: string): Promise<ProjectSe
   try {
     text = await readFile(configFile(projectDir), "utf8");
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { dir: projectDir, overrides: {}, error: null };
+    if (isMissing(err)) return { dir: projectDir, overrides: {}, error: null };
     return { dir: projectDir, overrides: {}, error: message(err) };
   }
   try {
@@ -112,13 +115,11 @@ export function writeProjectValue<K extends WorkSettingKey>(
     try {
       text = await readFile(file, "utf8");
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code !== "ENOENT")
-        return { dir: projectDir, overrides: {}, error: message(err) };
+      if (!isMissing(err)) return { dir: projectDir, overrides: {}, error: message(err) };
     }
     let next: string;
     try {
-      // WorkSettings are a subset of ProjectConfig with the same value types.
-      next = setConfigValue(text, key as WorkSettingKey, (value ?? undefined) as never);
+      next = setConfigValue(text, key, value ?? undefined);
     } catch (err) {
       if (err instanceof ConfigError) return { ...(await readProjectSettings(projectDir)), error: err.message };
       throw err;

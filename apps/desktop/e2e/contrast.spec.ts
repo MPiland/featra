@@ -29,7 +29,7 @@ async function failures(page: Page, min = { text: 2, icon: 4 }): Promise<string[
 
 test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
   for (const scheme of ["dark", "light"] as const) {
-    test(`${scheme}`, async () => {
+    test(scheme, async () => {
       const profile = await tempUserData();
       const project = await tempProject("version: 1\nprogress: tasks\n");
       const { app, page } = await launch(profile.dir, { FEATRA_PROJECT_DIR: project.dir });

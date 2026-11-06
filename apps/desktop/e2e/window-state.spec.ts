@@ -25,11 +25,11 @@ async function settled(app: ElectronApplication): Promise<Win> {
 }
 /** What the OS does on a title-bar double-click, Win+Up or a snap: change the window without asking the page. */
 const fromOs = (app: ElectronApplication, change: "maximize" | "unmaximize" | "enterFullScreen" | "leaveFullScreen") =>
-  app.evaluate(({ BrowserWindow }, change) => {
+  app.evaluate(({ BrowserWindow }, how) => {
     const w = BrowserWindow.getAllWindows()[0]!;
-    if (change === "maximize") w.maximize();
-    else if (change === "unmaximize") w.unmaximize();
-    else w.setFullScreen(change === "enterFullScreen");
+    if (how === "maximize") w.maximize();
+    else if (how === "unmaximize") w.unmaximize();
+    else w.setFullScreen(how === "enterFullScreen");
   }, change);
 
 const RESTORE = process.platform === "win32" ? "Restore Down" : "Restore";

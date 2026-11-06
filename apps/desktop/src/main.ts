@@ -1,242 +1,27 @@
-import { execFile } from "node:child_process";
 import { join } from "node:path";
-import {
-  app,
-  BrowserWindow,
-  ipcMain,
-  Menu,
-  nativeTheme,
-  Notification,
-  session,
-  shell,
-  Tray,
-  type IpcMainEvent,
-  type IpcMainInvokeEvent,
-} from "electron";
-import {
-  EDIT_COMMANDS,
-  IPC,
-  normalizeAppSettings,
-  normalizeUiState,
-  normalizeWorkOverrides,
-  sizeButtonAction,
-  THEME_CHOICES,
-  WORK_SETTING_KEYS,
-  type AppSettings,
-  type EditCommand,
-  type ProjectRef,
-  type ProjectSettings,
-  type SettingsSnapshot,
-  type ThemeChoice,
-  type WindowState,
-  type WorkSettingKey,
-} from "@featra/client/bridge";
-import { normalizeZoom } from "@featra/client/zoom";
-import { closeToTraySupport, createLifecycle, type Lifecycle } from "./lifecycle.ts";
-import { createLog, type Log } from "./log.ts";
-import {
-  createSettingsStore,
-  findProject,
-  readProjectSettings,
-  writeProjectValue,
-  type SettingsStore,
-} from "./settings-store.ts";
-import { hasTrayHost, type RunCommand } from "./tray-support.ts";
-import { clearCacheAndRestart, resetAppData, type TroubleshootDeps } from "./troubleshoot.ts";
-import { createAppStateStore, createUiStateStore, type UiStateStore } from "./ui-state-store.ts";
+import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
+import { registerIpc } from "./ipc.ts";
+import { createLifecycle } from "./lifecycle.ts";
+import { createLog } from "./log.ts";
+import { setNativeMenu } from "./native-menu.ts";
+import { createSettingsStore, findProject } from "./settings-store.ts";
+import { e2e, testHooks } from "./test-hooks.ts";
+import { createTray, destroyTray, trayAvailable } from "./tray.ts";
+import { createAppStateStore, createUiStateStore } from "./ui-state-store.ts";
+import { createWindow, windowBackground } from "./window.ts";
 
 /**
- * E2E runs set FEATRA_E2E=1. What differs is only where Featra meets the OS: notifications and "show in File Explorer"
- * are recorded, a restart only quits (a relaunched app would escape the test), and the tray is reachable
- * from the test (Playwright can't click the real notification area).
+ * The app's lifecycle: one instance, its stores and log, the window, the tray and quitting. The window, the IPC the
+ * page calls, the native menu and the tray each live in their own module.
  */
-const e2e = process.env.FEATRA_E2E === "1";
-interface TestHooks {
-  notices: string[];
-  shownInFolder: string[];
-  tray?: Tray;
-  trayMenu?: Menu;
-}
-/**
- * Whether the desktop has a tray. E2E runs fake the answer (`FEATRA_E2E_TRAY=present|absent`, default present) so the
- * tray tests run on any desktop and the no-tray path can be proved too; otherwise the session bus is asked.
- */
-const runCommand: RunCommand = (command, args) =>
-  new Promise((resolve, reject) =>
-    execFile(command, [...args], { timeout: 2000 }, (err, stdout) => (err ? reject(err) : resolve(stdout))),
-  );
-const trayAvailable = (): Promise<boolean> =>
-  e2e
-    ? Promise.resolve(process.env.FEATRA_E2E_TRAY !== "absent" && process.platform !== "darwin")
-    : hasTrayHost(process.platform, runCommand);
-const testHooks: TestHooks = { notices: [], shownInFolder: [] };
-if (e2e) (globalThis as { featraTest?: TestHooks }).featraTest = testHooks;
 
 // Tests (and anyone running a second profile) point userData at their own folder. Must happen before `ready`.
 const userDataDir = process.env.FEATRA_USER_DATA_DIR;
 if (userDataDir) app.setPath("userData", userDataDir);
 
-/** `FEATRA_CLIENT_URL` loads the Vite dev server; otherwise the built client next to this app in the workspace. */
-const clientUrl = process.env.FEATRA_CLIENT_URL;
-const clientIndex = join(__dirname, "../../../packages/client/dist/index.html");
-
-/** Matches the client's --bg tokens so the window never flashes the wrong colour before the page paints. */
-const windowBackground = () => (nativeTheme.shouldUseDarkColors ? "#1c1c1e" : "#fbfbfa");
-
-function createWindow(): BrowserWindow {
-  const isMac = process.platform === "darwin";
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 820,
-    minWidth: 720,
-    minHeight: 480,
-    title: "Featra",
-    show: false,
-    backgroundColor: windowBackground(),
-    // The title bar is drawn by the client. macOS keeps its traffic lights; elsewhere the client draws the controls.
-    ...(isMac ? { titleBarStyle: "hiddenInset" as const } : { frame: false }),
-    webPreferences: {
-      preload: join(__dirname, "preload.cjs"),
-      contextIsolation: true,
-      sandbox: true,
-      nodeIntegration: false,
-    },
-  });
-  win.once("ready-to-show", () => win.show());
-  // Tell the page about every maximize and full-screen change, including the OS's own (title-bar double-click,
-  // Win+Up, snapping, leaving full screen), so the title bar and View > Full Screen never go stale (BUG-1).
-  const sendState = () => {
-    if (!win.isDestroyed()) win.webContents.send(IPC.windowStateChanged, windowState(win));
-  };
-  win.on("maximize", sendState);
-  win.on("unmaximize", sendState);
-  win.on("enter-full-screen", sendState);
-  win.on("leave-full-screen", sendState);
-  if (clientUrl) void win.loadURL(clientUrl);
-  else void win.loadFile(clientIndex);
-  return win;
-}
-
-const windowState = (win: BrowserWindow): WindowState => ({
-  maximized: win.isMaximized(),
-  fullScreen: win.isFullScreen(),
-});
-
-interface MainDeps {
-  store: UiStateStore;
-  lifecycle: Lifecycle;
-  log: Log;
-  troubleshoot: TroubleshootDeps;
-  settings: {
-    store: SettingsStore;
-    current: () => AppSettings;
-    /** Stores new app settings and applies them: the close button at once (the page applies the theme). */
-    apply: (next: AppSettings) => Promise<void>;
-    project: ProjectRef | null;
-  };
-}
-
-function registerIpc({ store, lifecycle, log, troubleshoot, settings }: MainDeps) {
-  const fromOurWindow = (e: IpcMainEvent | IpcMainInvokeEvent) => BrowserWindow.fromWebContents(e.sender);
-
-  ipcMain.handle(IPC.uiStateLoad, () => store.load());
-  ipcMain.handle(IPC.uiStateSave, (_e, state: unknown) => store.save(normalizeUiState(state)));
-  ipcMain.on(IPC.windowMinimize, (e) => fromOurWindow(e)?.minimize());
-  ipcMain.handle(IPC.windowGetState, (e) => {
-    const win = fromOurWindow(e);
-    return win ? windowState(win) : undefined;
-  });
-  ipcMain.on(IPC.windowToggleMaximize, (e) => {
-    const win = fromOurWindow(e);
-    if (!win) return;
-    const action = sizeButtonAction(windowState(win));
-    if (action === "leaveFullScreen") win.setFullScreen(false);
-    else if (action === "unmaximize") win.unmaximize();
-    else win.maximize();
-  });
-  ipcMain.on(IPC.windowClose, (e) => fromOurWindow(e)?.close());
-  ipcMain.on(IPC.windowToggleFullScreen, (e) => {
-    const win = fromOurWindow(e);
-    win?.setFullScreen(!win.isFullScreen());
-  });
-  ipcMain.on(IPC.windowSetZoom, (e, factor: unknown) => e.sender.setZoomFactor(normalizeZoom(factor)));
-  ipcMain.on(IPC.windowSetTheme, (_e, theme: unknown) => {
-    if (THEME_CHOICES.includes(theme as ThemeChoice)) nativeTheme.themeSource = theme as ThemeChoice;
-  });
-  // The same webContents calls Electron's undo/redo/cut/copy/paste/selectAll menu roles make: they act on the
-  // focused field.
-  ipcMain.on(IPC.edit, (e, command: unknown) => {
-    if (EDIT_COMMANDS.includes(command as EditCommand)) e.sender[command as EditCommand]();
-  });
-  ipcMain.handle(IPC.settingsLoad, (): SettingsSnapshot => ({
-    app: settings.current(),
-    closeToTray: closeToTraySupport(lifecycle, process.platform),
-    currentProject: settings.project,
-    projects: settings.project ? [settings.project] : [],
-  }));
-  ipcMain.handle(IPC.settingsSaveApp, (_e, next: unknown) => settings.apply(normalizeAppSettings(next)));
-  // The page may only reach projects main offers it (the current one, until STORY-19 brings the project list).
-  const knownProject = (dir: unknown): dir is string => typeof dir === "string" && dir === settings.project?.dir;
-  const notOpen = (dir: unknown): ProjectSettings => ({
-    dir: String(dir),
-    overrides: {},
-    error: "Not an open project.",
-  });
-  ipcMain.handle(IPC.settingsLoadProject, (_e, dir: unknown) =>
-    knownProject(dir) ? readProjectSettings(dir) : notOpen(dir),
-  );
-  ipcMain.handle(IPC.settingsSetProjectValue, (_e, dir: unknown, key: unknown, value: unknown) => {
-    if (!knownProject(dir)) return notOpen(dir);
-    if (!WORK_SETTING_KEYS.includes(key as WorkSettingKey)) return readProjectSettings(dir);
-    const k = key as WorkSettingKey;
-    if (value === null) return writeProjectValue(dir, k, null);
-    const valid = normalizeWorkOverrides({ [k]: value });
-    return valid[k] !== undefined ? writeProjectValue(dir, k, valid[k]) : readProjectSettings(dir);
-  });
-  ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
-  ipcMain.on(IPC.appReload, (e) => e.sender.reload());
-  ipcMain.on(IPC.appToggleDevTools, (e) => e.sender.toggleDevTools());
-  ipcMain.on(IPC.appShowLogs, () => {
-    // Flush first, so the file exists and holds everything logged so far.
-    void log.flush().then(() => (e2e ? void testHooks.shownInFolder.push(log.file) : shell.showItemInFolder(log.file)));
-  });
-  ipcMain.on(IPC.appClearCacheAndRestart, () => void clearCacheAndRestart(troubleshoot));
-  ipcMain.on(IPC.appResetAppData, () => void resetAppData(troubleshoot));
-  ipcMain.on(IPC.appQuit, () => lifecycle.quit());
-}
-
-/**
- * The menu lives in the client's title bar. Windows and Linux get no native menu (its default accelerators would
- * fight the client's zoom and reload). macOS needs one for the menu bar, Cmd+Q and the system edit shortcuts.
- */
-function setNativeMenu() {
-  if (process.platform !== "darwin") return Menu.setApplicationMenu(null);
-  Menu.setApplicationMenu(Menu.buildFromTemplate([{ role: "appMenu" }, { role: "editMenu" }]));
-}
-
 function showNotice(message: string) {
-  if (e2e) return void testHooks.notices.push(message);
-  if (Notification.isSupported()) new Notification({ title: "Featra", body: message }).show();
-}
-
-/** Placeholder icon until there is a logo (see decisions.md). Electron picks tray@2x.png on high-DPI screens. */
-function createTray(win: BrowserWindow, lifecycle: Lifecycle): Tray {
-  const tray = new Tray(join(__dirname, "../assets/tray.png"));
-  tray.setToolTip("Featra");
-  tray.on("click", () => lifecycle.reveal(win));
-  const menu = Menu.buildFromTemplate(lifecycle.trayMenu(win).map(({ label, click }) => ({ label, click })));
-  tray.setContextMenu(menu);
-  testHooks.tray = tray;
-  testHooks.trayMenu = menu;
-  return tray;
-}
-
-function destroyTray(tray: Tray) {
-  tray.destroy();
-  if (testHooks.tray === tray) {
-    testHooks.tray = undefined;
-    testHooks.trayMenu = undefined;
-  }
+  if (e2e) testHooks.notices.push(message);
+  else if (Notification.isSupported()) new Notification({ title: "Featra", body: message }).show();
 }
 
 // The window only ever shows the bundled client: no navigation away, no pop-up windows.
