@@ -5,7 +5,8 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./guards": "./src/utils/guards.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

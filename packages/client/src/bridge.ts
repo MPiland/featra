@@ -2,7 +2,7 @@
  * The contract between the UI and its host. Electron's preload implements it; a plain browser (Vite dev, later
  * remote control) gets the fallback below. The UI never talks to Electron any other way.
  */
-import { isRecord } from "@featra/work-format";
+import { isRecord } from "@featra/work-format/guards";
 import {
   DEFAULT_APP_SETTINGS,
   normalizeAppSettings,

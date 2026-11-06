@@ -4,13 +4,8 @@
  * project's `.featra/config.yaml` can override any of them. A project overrides a setting exactly when its file sets
  * the key; resetting removes the key so the app default applies again.
  */
-import {
-  isOneOf,
-  isRecord,
-  type KnowledgePermission,
-  type ProgressMode,
-  type ProjectConfig,
-} from "@featra/work-format";
+import type { KnowledgePermission, ProgressMode, ProjectConfig } from "@featra/work-format";
+import { isOneOf, isRecord } from "@featra/work-format/guards";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 
 /** What the window's close button (and Alt+F4) does. */
