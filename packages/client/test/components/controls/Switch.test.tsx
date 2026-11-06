@@ -6,7 +6,15 @@ import { Switch } from "../../../src/components/controls/Switch.tsx";
 
 afterEach(cleanup);
 
-function Labelled({ initial = false, disabled = false, changes = [] as boolean[] }) {
+function Labelled({
+  initial = false,
+  disabled = false,
+  changes,
+}: {
+  initial?: boolean;
+  disabled?: boolean;
+  changes?: boolean[];
+}) {
   const [on, setOn] = useState(initial);
   return (
     <>
@@ -19,7 +27,7 @@ function Labelled({ initial = false, disabled = false, changes = [] as boolean[]
         describedBy="d"
         disabled={disabled}
         onChange={(v) => {
-          changes.push(v);
+          changes?.push(v);
           setOn(v);
         }}
       />

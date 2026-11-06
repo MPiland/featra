@@ -43,7 +43,7 @@ export function evidenceState(card: Card): EvidenceState {
       accepted = e.to === "accepted";
     }
   }
-  const lastStatus = card.history.filter((e) => e.field === "status").at(-1);
+  const lastStatus = card.history.findLast((e) => e.field === "status");
   const provenAcs = [...proven].filter((n) => n >= 1 && n <= card.acs.length).toSorted((a, b) => a - b);
   return {
     reported: !!lastStatus && lastStatus.by.startsWith("session:"),

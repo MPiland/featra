@@ -3,13 +3,15 @@
   "plugins": ["typescript", "react", "jsx-a11y", "import", "unicorn", "oxc", "vitest"],
   "categories": {
     "correctness": "error",
-    "suspicious": "error"
+    "suspicious": "error",
+    "perf": "error"
   },
   "env": { "browser": true, "node": true, "es2024": true },
   "ignorePatterns": ["**/dist/**", "spikes/**"],
   "rules": {
     "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
     "no-console": "error",
+    "no-await-in-loop": "off",
     "vitest/valid-expect": ["error", { "maxArgs": 2 }],
     "react/rules-of-hooks": "error",
     "react/exhaustive-deps": "error",

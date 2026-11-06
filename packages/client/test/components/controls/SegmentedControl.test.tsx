@@ -13,7 +13,7 @@ const OPTIONS = [
 ] as const;
 type Size = (typeof OPTIONS)[number]["value"];
 
-function Sizes({ disabled = false, changes = [] as Size[] }) {
+function Sizes({ disabled = false, changes }: { disabled?: boolean; changes?: Size[] }) {
   const [size, setSize] = useState<Size>("m");
   return (
     <>
@@ -26,7 +26,7 @@ function Sizes({ disabled = false, changes = [] as Size[] }) {
         describedBy="d"
         disabled={disabled}
         onChange={(v) => {
-          changes.push(v);
+          changes?.push(v);
           setSize(v);
         }}
       />
