@@ -2,7 +2,7 @@
 id: STORY-2
 type: story
 title: Open a folder and initialise Featra
-status: New
+status: In Progress
 parent: FEAT-2
 order: 1
 origin: planned
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-06T21:55:07.601Z
+    field: status
+    from: New
+    to: In Progress
+    by: lead
 ---
 
 ## Description
