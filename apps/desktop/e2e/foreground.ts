@@ -34,9 +34,15 @@ public static class FeatraForeground {
 
 function powershell(call: string): string {
   const script = `Add-Type -TypeDefinition @'\n${USER32}\n'@\n${call}`;
-  return execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
-    encoding: "utf8",
-  }).trim();
+  try {
+    // A bounded wait: a hung call should fail as itself, not as the test's 60 s timeout.
+    return execFileSync("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], {
+      encoding: "utf8",
+      timeout: 15_000,
+    }).trim();
+  } catch (e) {
+    throw new Error(`user32 call through PowerShell failed: ${call}`, { cause: e });
+  }
 }
 
 /**
