@@ -12,10 +12,11 @@
     "test:e2e": "pnpm --filter @featra/desktop test:e2e",
     "test:watch": "vitest",
     "typecheck": "pnpm -r --if-present run typecheck",
-    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives",
+    "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives --ignore-pattern \"**/lint-fixtures/**\"",
     "format": "oxfmt",
     "format:check": "oxfmt --check",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit"
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit",
+    "prepare": "node tooling/install-hooks.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

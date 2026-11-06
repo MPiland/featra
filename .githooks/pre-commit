@@ -1,0 +1,4 @@
+#!/bin/sh
+# The commit gate (STORY-41, ADR 0014): format check, lint, typecheck and unit tests must all pass.
+# `pnpm install` turns it on (the prepare script sets core.hooksPath to .githooks).
+exec pnpm check

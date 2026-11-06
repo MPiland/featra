@@ -6,7 +6,7 @@
     "suspicious": "error"
   },
   "env": { "browser": true, "node": true, "es2024": true },
-  "ignorePatterns": ["**/dist/**", "**/lint-fixtures/**", "spikes/**"],
+  "ignorePatterns": ["**/dist/**", "spikes/**"],
   "rules": {
     "max-lines": ["error", { "max": 300, "skipBlankLines": true, "skipComments": true }],
     "no-console": "error",
@@ -38,7 +38,7 @@
   },
   "overrides": [
     {
-      "files": ["packages/work-format/src/**"],
+      "files": ["packages/work-format/src/**", "packages/work-format/lint-fixtures/**"],
       "rules": {
         "import/no-nodejs-modules": "error",
         "no-restricted-imports": [
@@ -51,11 +51,15 @@
             ],
             "patterns": [
               {
-                "group": ["react/*", "react-dom/*"],
+                "group": ["react/**", "react-dom/**"],
                 "message": "work-format is pure domain logic: no React (ADR 0011)."
               },
               {
-                "group": ["@featra/*"],
+                "group": ["electron/**"],
+                "message": "work-format is pure domain logic: no Electron (ADR 0011)."
+              },
+              {
+                "group": ["@featra/*", "@featra/**"],
                 "message": "Dependencies point toward work-format, never out of it (ADR 0011)."
               }
             ]
@@ -64,7 +68,7 @@
       }
     },
     {
-      "files": ["packages/client/src/**"],
+      "files": ["packages/client/src/**", "packages/client/lint-fixtures/**"],
       "rules": {
         "import/no-nodejs-modules": "error",
         "no-restricted-imports": [
@@ -75,11 +79,11 @@
             ],
             "patterns": [
               {
-                "group": ["electron/*"],
+                "group": ["electron/**"],
                 "message": "client reaches the platform only through FeatraBridge (ADR 0011)."
               },
               {
-                "group": ["@featra/desktop", "@featra/desktop/*"],
+                "group": ["@featra/desktop", "@featra/desktop/**"],
                 "message": "Dependencies point toward work-format (ADR 0011)."
               }
             ]
