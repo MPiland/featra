@@ -2,7 +2,7 @@
 id: STORY-20
 type: story
 title: Settings window with app and project scopes
-status: In Review
+status: In Progress
 parent: FEAT-13
 order: 3
 origin: planned
@@ -40,6 +40,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-20
+  - at: 2026-11-06T00:14:27Z
+    field: status
+    from: In Review
+    to: In Progress
+    by: user
 ---
 
 ## Description
@@ -92,3 +97,5 @@ As a builder, I change app-wide and per-project settings in one Settings window.
 - AC7: `packages/client/test/settings.test.tsx` (AC7); `apps/desktop/e2e/settings.spec.ts` "Ctrl+/ and Help >
   Keyboard Shortcuts…"
 - AC8: `packages/client/test/settings.test.tsx` (AC8); `apps/desktop/e2e/settings.spec.ts` "keyboard only…"
+- Sent back by the user (2026-11-05): "Any repetitive text, unnecessary text, etc" and "Duplicate heading" (the
+  Project page title repeated as its first section heading).
