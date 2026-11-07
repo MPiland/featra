@@ -2,7 +2,7 @@
 id: STORY-3
 type: story
 title: Home feature list from owner copies
-status: In Review
+status: Done
 parent: FEAT-2
 order: 2
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-07T03:08:31.516Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-07T03:08:31.516Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
