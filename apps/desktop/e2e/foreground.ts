@@ -21,6 +21,7 @@ const ANSWER_TIMEOUT_MS = 15_000;
 
 interface Helper {
   ask: (command: string) => Promise<string>;
+  stop: () => void;
 }
 
 let helper: Helper | undefined;
@@ -66,7 +67,7 @@ function startHelper(): Helper {
     child.stdin.write(`${command}\n`);
     return answer;
   };
-  return { ask };
+  return { ask, stop: () => child.stdin.end() };
 }
 
 function waitFor(answers: { resolve: (line: string) => void; reject: (e: Error) => void }[], command: string) {
@@ -90,6 +91,12 @@ function waitFor(answers: { resolve: (line: string) => void; reject: (e: Error) 
 
 const user32 = (command: string) => (helper ??= startHelper()).ask(command);
 
+/** Ends this process's user32 helper, so a runner process (global setup) can exit. */
+export function stopHelper() {
+  helper?.stop();
+  helper = undefined;
+}
+
 /**
  * Grants process `pid` the right to take the foreground, as a real click on its tray icon or menu would. Windows
  * only: elsewhere there is no foreground lock to get past, so it does nothing.
@@ -97,7 +104,81 @@ const user32 = (command: string) => (helper ??= startHelper()).ask(command);
 export async function grantForeground(pid: number): Promise<void> {
   if (process.platform !== "win32") return;
   const granted = await user32(`grant ${pid}`);
-  if (granted !== "True") throw new Error(`Could not grant process ${pid} the foreground (AllowSetForegroundWindow)`);
+  if (granted !== "True") {
+    throw new Error(
+      `Could not grant process ${pid} the foreground (AllowSetForegroundWindow). ${await whyNoForeground()}`,
+    );
+  }
+}
+
+/** What the harness's faked input runs into on the Windows desktop (the helper's `desktop` answer). */
+export interface DesktopState {
+  /** The desktop that gets input: "Default", or "Winlogon" while the screen is locked or a UAC prompt is up. */
+  inputDesktop: string;
+  /** Integrity levels: 8192 Medium, 12288 High (elevated), 16384 System; -1 unreadable. */
+  ownIntegrity: number;
+  foreground: { pid: number; integrity: number; name: string };
+  msSinceInput: number;
+}
+
+export function parseDesktopState(answer: string): DesktopState {
+  const [inputDesktop = "?", own, pid, integrity, idle, ...name] = answer.split(" ");
+  return {
+    inputDesktop,
+    ownIntegrity: Number(own),
+    foreground: { pid: Number(pid), integrity: Number(integrity), name: name.join(" ") },
+    msSinceInput: Number(idle),
+  };
+}
+
+const LEVELS: Record<number, string> = { 4096: "Low", 8192: "Medium", 12288: "High", 16384: "System" };
+const level = (n: number) => LEVELS[n] ?? (n < 0 ? "unknown" : String(n));
+
+/**
+ * What stops the harness's input from counting, if it is something the harness can see: Windows sends no input to
+ * another desktop (lock screen, UAC prompt), and drops input injected towards a window of higher integrity (UIPI),
+ * so a grant can't be passed on while an elevated window is in front.
+ */
+export function desktopBlocker(s: DesktopState): string | undefined {
+  if (s.inputDesktop !== "Default") {
+    return `the input desktop is "${s.inputDesktop}", not "Default": the screen is locked or a Windows prompt (UAC) is up`;
+  }
+  const front = `${s.foreground.name || "a window"} (pid ${s.foreground.pid})`;
+  if (s.foreground.integrity > s.ownIntegrity) {
+    return (
+      `${front} is in front at ${level(s.foreground.integrity)} integrity, above the harness's ` +
+      `${level(s.ownIntegrity)}: Windows ignores the harness's input while it is in front`
+    );
+  }
+  // The harness can read the integrity of any process of its own user, elevated ones included. One it can't read runs
+  // as another account or is protected: a SYSTEM process's window (GameInputSvc's, seen in BUG-4) blocks input alike.
+  if (s.foreground.pid !== 0 && s.foreground.integrity < 0) {
+    return (
+      `${front} is in front and its integrity can't be read: it runs as another account (SYSTEM) or is protected, ` +
+      `and Windows ignores the harness's input while it is in front`
+    );
+  }
+  return undefined;
+}
+
+export const describeDesktop = (s: DesktopState) =>
+  `In front: ${s.foreground.name || "?"} (pid ${s.foreground.pid}, ${level(s.foreground.integrity)} integrity); ` +
+  `harness ${level(s.ownIntegrity)} integrity; input desktop ${s.inputDesktop}; last input ${s.msSinceInput} ms ago.`;
+
+/** Reads the Windows desktop (Windows and WSLg). */
+export const desktopState = async () => parseDesktopState(await user32("desktop"));
+
+/** For a failure message: the blocker the harness can see, or that it sees none, and what is in front. */
+async function whyNoForeground(): Promise<string> {
+  try {
+    const s = await desktopState();
+    const blocker = desktopBlocker(s);
+    return blocker
+      ? `Blocked: ${blocker}. ${describeDesktop(s)}`
+      : `No blocker the harness can see. ${describeDesktop(s)}`;
+  } catch (e) {
+    return `The desktop couldn't be read: ${(e as Error).message}`;
+  }
 }
 
 /**
@@ -141,7 +222,12 @@ export async function busyUserInFront(): Promise<{ dispose: () => void }> {
     { stdio: ["ignore", "pipe", "inherit"] },
   );
   let windowsPid: string | undefined;
+  // A test that times out never reaches its own dispose: the window then goes with the test worker, not seconds later
+  // when it notices its parent is gone.
+  const onExit = () => child.kill();
+  process.once("exit", onExit);
   const dispose = () => {
+    process.off("exit", onExit);
     child.kill();
     // Killing WSL's interop stand-in doesn't end the Windows process: ask Windows to.
     if (wslg && windowsPid !== undefined) void user32(`stop ${windowsPid}`).catch(() => {});
@@ -160,7 +246,9 @@ export async function busyUserInFront(): Promise<{ dispose: () => void }> {
     const inFront = async () => (wslg ? BigInt(await user32("foreground")) : await foregroundWindow());
     const deadline = Date.now() + 5_000;
     while ((await inFront()) !== hwnd) {
-      if (Date.now() > deadline) throw new Error("The busy-user window didn't come to the front in 5 s");
+      if (Date.now() > deadline) {
+        throw new Error(`The busy-user window didn't come to the front in 5 s. ${await whyNoForeground()}`);
+      }
       await new Promise((r) => setTimeout(r, 50));
     }
     return { dispose };
