@@ -44,3 +44,7 @@ Two e2e tests have each failed once on WSLg (Ubuntu), with nothing else running.
 - 2026-11-06 (STORY-2 review, Windows): `tray.spec.ts:220` "launching Featra again shows the running app's window"
   failed `windowInForeground` 2 of 7 runs on 94de547, then 0 of 150 on 8a43e99 (the developer's 60 plus 90 of mine).
   Not reproduced. If it comes back, it's likely BUG-2's foreground lock, not WSLg.
+- 2026-11-07 (STORY-4 review, WSLg): `tray.spec.ts:220` failed `windowFocused` in every full run (5 of 5), and
+  `tray.spec.ts:75` "Show Featra and a tray click restore and focus the window" failed in 2 of 5. Both fail just as
+  often on c5d7a9e (before the sizing fix) as on 4cb0685: tray.spec ×3 gave 4 failures on each. The same build passed
+  35 of 35 twice the day before, so this looks like WSLg focus state, not a code change.
