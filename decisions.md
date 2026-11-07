@@ -238,3 +238,10 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   (`e2e/user32-helper.ps1`, about 8 ms a call) instead of one PowerShell per call. The two focus tests start a
   busy-user window (`e2e/busy-user.ps1`) that keeps getting input, so the lock is on in every run instead of only when
   someone happens to be at the desktop.
+
+## 2026-11-06 — Project setup is one guided page, built in FEAT-2
+
+The user found STORY-2's setup banner bare, so STORY-42 replaces it with a full-page "Set up project" screen in Work.
+On that screen, git, `.featra/`, each knowledge file, a starter `.gitignore` and the Workflow settings are chosen
+together and applied with one action. Git still runs first, because cards need it, but the user never sees separate
+steps. STORY-33 later adds its sections (artifacts, acceptance proof, role presets, agent instructions) to this page.
