@@ -51,10 +51,7 @@ export const CARD_COPY = {
   none: "None",
   evidence: "Evidence",
   marks: { reported: "Reported", verified: "Verified", proven: "Proven", accepted: "Accepted" },
-  proof: { passed: "Test passed", linked: "Test not passed yet", none: "No test yet" } satisfies Record<
-    AcProof,
-    string
-  >,
+  proof: { passed: "Test passed", linked: "No result yet", none: "No test yet" } satisfies Record<AcProof, string>,
   count: (done: number, total: number, what: string) => `${done} of ${total} ${what}`,
 } as const;
 

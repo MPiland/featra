@@ -79,7 +79,7 @@ describe("AC2: the pane shows the whole card", () => {
     const acs = within(view.getByRole("region", { name: "Acceptance criteria" }));
     expect(acs.getByText("1 of 2 done")).toBeTruthy();
     expect(acs.getByRole("button", { name: "AC 1: Opens the folder" })).toBeTruthy();
-    expect(acs.getByText("Test not passed yet")).toBeTruthy();
+    expect(acs.getByText("No result yet")).toBeTruthy();
     expect(acs.getByText("e2e/open.spec.ts")).toBeTruthy();
     expect(acs.getByText("No test yet")).toBeTruthy();
     const tasks = within(view.getByRole("region", { name: "Tasks" }));
