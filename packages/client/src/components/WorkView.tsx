@@ -1,19 +1,26 @@
+import type { ReactNode } from "react";
 import type { ProjectMenuActions } from "../project-menu.ts";
 import { PROJECT_LABELS, type ProjectsSnapshot } from "../projects.ts";
-import { viewDef } from "../views.ts";
+import type { WorkBridge } from "../work-list.ts";
+import type { ChosenWidth } from "./work/PaneHandle.tsx";
 import { ViewIcon } from "./icons.tsx";
-import { ViewPlaceholder } from "./ViewPlaceholder.tsx";
+import { WorkList } from "./work/WorkList.tsx";
 
 export interface WorkViewProps {
   projects: ProjectsSnapshot;
   platform: string;
   actions: ProjectMenuActions;
+  work: WorkBridge;
+  paneWidth: ChosenWidth;
+  /** The page that sets the current project up, shown instead of the list when it needs it (STORY-42). */
+  setupPage?: ReactNode;
 }
 
 /** Work shows the current project's features and stories; with no project, the ways to get one. */
-export function WorkView({ projects, platform, actions }: WorkViewProps) {
-  const view = viewDef("work");
-  if (projects.current) return <ViewPlaceholder key={projects.current.dir} view={view} project={projects.current} />;
+export function WorkView({ projects, platform, actions, work, paneWidth, setupPage }: WorkViewProps) {
+  if (projects.current && setupPage) return setupPage;
+  if (projects.current)
+    return <WorkList key={projects.current.dir} work={work} project={projects.current} paneWidth={paneWidth} />;
   return (
     <section className="placeholder" data-view="work">
       <ViewIcon view="work" size={28} />

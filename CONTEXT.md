@@ -22,7 +22,11 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Owner** (owning location) — the single branch or worktree whose copy of a card is authoritative at a given time.
   Drafts/backlog → main; active feature → its feature branch; active story → its worktree; merged story → feature branch;
   merged feature → main. See [ADR 0002](docs/adr/0002-single-card-ownership.md).
-- **Stale copy** — any non-owner copy of a card. Never displayed; edits to it are flagged.
+- **Card pane** — the full-height pane docked beside the Work list that shows one card from its owner copy and edits
+  it a field at a time. Every save goes to the owner copy, and is refused if the owner's value changed meanwhile
+  (ADR 0017).
+- **Stale copy** — any non-owner copy of a card. Never displayed; an uncommitted edit to it is flagged, to apply to
+  the owner or discard (ADR 0016).
 - **History event** — an append-only entry in a card's `history[]` (`at`, `from`, `to`, `by`) recording a status or
   scope change. Burn-up charts are built from these.
 
@@ -45,6 +49,14 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   current, and Work, the chat list and Project settings follow it.
 - **Project switcher** — the control at the top of the sidebar that lists known projects and offers New Project…, Open
   Folder… and Project Settings….
+- **Featra init** — setting a git repository up for Featra: creating `.featra/config.yaml`, `CONTEXT.md`, `docs/adr/`,
+  `decisions.md` and `open-questions.md` where they are missing. It never overwrites a file and never creates or edits
+  agent instructions.
+- **Project setup** — the one screen in Work that sets a project up in one pass: `git init` if needed, Featra init, the
+  knowledge files the user picks, a starter `.gitignore` when there is none, and the project's workflow settings.
+  Shown for a project that isn't set up; reopened from Project settings.
+- **Local server** — the Node process the app starts beside itself, on 127.0.0.1 only, that does the project work
+  (git, files, later the index). The UI reaches it through `FeatraBridge` (ADRs 0012, 0015).
 
 ## Agents
 

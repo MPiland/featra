@@ -1,0 +1,132 @@
+/*
+ * The project setup page (STORY-42): in Work, in the settings page's look. A centred column of sections, each a
+ * heading and a card of rows; the actions at the end, the primary one rightmost.
+ */
+.setup-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 32px 32px 48px;
+}
+
+.setup-content {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.setup-head h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.setup-section {
+  margin: 0 0 28px;
+}
+
+.setup-section > h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tx);
+}
+
+.setup-section-intro {
+  margin: -4px 0 12px;
+  color: var(--tx2);
+  font-size: 12px;
+}
+
+/* Workflow's own groups sit under the section heading. */
+.setup-section .settings-group h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx2);
+}
+
+.setup-item-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Why a checkbox can't be changed: required, or the file is already there. */
+.setup-tag {
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--tx2);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accbg);
+  cursor: pointer;
+}
+
+.checkbox:disabled {
+  cursor: default;
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.setup-error {
+  margin: 0 0 12px;
+  color: var(--bad);
+}
+
+.setup-error:empty {
+  display: none;
+}
+
+.setup-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* The result: what was created and kept, as compact wrapping path lists. */
+.setup-result {
+  margin: 8px 0 24px;
+  padding: 12px 16px;
+}
+
+.setup-result dl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.setup-result dl > div {
+  display: flex;
+  gap: 12px;
+}
+
+.setup-result dt {
+  flex: none;
+  min-width: 64px;
+  color: var(--tx2);
+}
+
+.setup-result dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+.setup-result-empty {
+  margin: 0;
+  color: var(--tx2);
+}

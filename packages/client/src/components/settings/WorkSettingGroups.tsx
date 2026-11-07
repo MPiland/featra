@@ -21,12 +21,15 @@ export interface WorkSettingGroupsProps {
   disabled?: boolean;
   /** The override mark for a key, where the project overrides it. */
   override?: (key: WorkSettingKey) => OverrideMark | undefined;
+  /** The groups' heading level: 4 inside a page section (the setup page). Default 3. */
+  groupLevel?: 3 | 4;
 }
 
 /** The work settings in their groups: the app's defaults or one project's values. */
-export function WorkSettingGroups({ scope, values, onChange, disabled, override }: WorkSettingGroupsProps) {
+export function WorkSettingGroups(props: WorkSettingGroupsProps) {
+  const { scope, values, onChange, disabled, override, groupLevel } = props;
   return WORK_GROUPS.map((g) => (
-    <SettingsGroup key={g.title} title={g.title}>
+    <SettingsGroup key={g.title} title={g.title} level={groupLevel}>
       {g.keys.map((key) => (
         <WorkSettingRow
           key={key}

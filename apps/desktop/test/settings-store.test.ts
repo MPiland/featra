@@ -59,7 +59,11 @@ describe("AC8: the theme survives a restart", () => {
       JSON.stringify({ sidebarCollapsed: true, zoomFactor: 1, theme: "light" }),
     );
     expect((await createSettingsStore(userData).load()).theme).toBe("light");
-    expect(await createUiStateStore(userData).load()).toEqual({ sidebarCollapsed: true, zoomFactor: 1 });
+    expect(await createUiStateStore(userData).load()).toEqual({
+      sidebarCollapsed: true,
+      zoomFactor: 1,
+      cardPaneWidth: null,
+    });
     await createSettingsStore(userData).save({ ...DEFAULT_APP_SETTINGS, theme: "system" });
     expect((await createSettingsStore(userData).load()).theme).toBe("system");
   });

@@ -60,6 +60,11 @@ export const CheckIcon = () => (
     <path d="M5 12l5 5 9-10" />
   </Icon>
 );
+export const CircleIcon = () => (
+  <Icon size={14}>
+    <circle cx="12" cy="12" r="7" />
+  </Icon>
+);
 export const MinimizeIcon = () => (
   <Icon>
     <path d="M6 12h12" />

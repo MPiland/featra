@@ -238,6 +238,65 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   (`e2e/user32-helper.ps1`, about 8 ms a call) instead of one PowerShell per call. The two focus tests start a
   busy-user window (`e2e/busy-user.ps1`) that keeps getting input, so the lock is on in every run instead of only when
   someone happens to be at the desktop.
+- 2026-11-06 — STORY-2 (open a folder and initialise Featra): the server's process model and protocol are ADR 0015.
+  Smaller choices:
+  - The offer is a non-modal banner at the top of Work ("Project setup"), not a dialog. Opening a folder never blocks
+    on it, and "Not now" hides it for that project until Featra restarts. The full guided setup is STORY-33.
+  - Featra init needs a git repository. A plain folder is offered Initialize Git first, then Initialize Featra, so
+    cards always live in git.
+  - Init writes each file with create-only (`wx`), so it never overwrites, even in a race. `docs/adr/README.md` is
+    seeded only when init creates `docs/adr/` itself; a user's own ADR folder is left as it is.
+  - The new `config.yaml` holds only `version: 1`, so every work setting follows the app-wide defaults until the user
+    overrides it.
+  - Git runs with `GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE` and the other repo overrides removed from its env, so a
+    caller's env (a git hook, for one) can't point it at another repository. A git error other than "not a git
+    repository" (dubious ownership, for one) is shown as an error, not as an offer to run `git init`.
+  - A server main stops (on quit) logs nothing: not the stop, nor the child's exit, stderr or messages after it. The
+    stop is part of quitting, so "Quitting" stays the log's last line, right after the line that caused it (e2e checks
+    both). A server that exits on its own is still logged with its exit code.
+- 2026-11-06 — STORY-42 (init confirms what it created): after Featra init succeeds, Work shows a "Featra is set up"
+  banner in place of the offer, listing what the server's `project.init` reported as Created and Kept (each list one
+  wrapping line of paths; an empty list isn't shown). It is client state in memory only, kept per project until
+  Dismiss. Nothing is stored to make "does not come back" hold across restarts: the confirmation exists only as the
+  answer to an init in this run, and a project that is set up (`ready`) is never offered init again, so after Dismiss
+  or a restart there is nothing that could bring it back. The e2e proves this with a relaunch.
+- 2026-11-06 — STORY-42 rescoped to "Set up a project on one screen"; this replaces the entry above (the banner and
+  its confirmation are gone). Decisions:
+  - Two new server methods, `project.setupPlan` and `project.setup`, in their own file (`project-setup-plan.ts`), so
+    STORY-3's server work doesn't collide. `project.gitInit` and `project.init` stay on the server, unused by the
+    client, rather than being changed under STORY-3. `FEATRA_SCAFFOLD` is unchanged; the setup items map ids to its
+    entries plus a starter `.gitignore` (`work-format/setup-items.ts`).
+  - The setup ids, plan shape and params live in `setup-plan.ts`, apart from the items, so the preload bundle stays
+    free of the scaffold's YAML dependency (the preload-bundle test caught it).
+  - The client sends the ticked items and the kept ones; the server adds the required ones. Asking for kept items
+    lets the result list them as Kept. A `.gitignore` that exists isn't offered or sent: the user's own is never
+    merged into.
+  - Workflow settings changed on the page are held until Set up, then written through the same `setProjectValue`
+    storage Project settings uses, once `.featra/config.yaml` exists. A failed write shows on the result step; setup
+    itself has already succeeded.
+  - Skip lasts per project until Featra restarts, like STORY-2's Not now. Done closes the page for the project; it
+    comes back only from Project settings > "Set up project", which switches to that project first if needed and
+    opens Work.
+  - The page is its own component (`ProjectSetupPage` + `useSetupPage`), with its sections in an array so STORY-33 can
+    add more. WorkView only picks the page or the list. The page carries Work's `data-view`/`data-project` marks.
+  - A project the server can't check shows the page with the error, Try again and Skip; a failed Set up keeps the
+    page with the error so the user can retry.
+  - After STORY-3 merged, WorkView shows this page or STORY-3's Work list, never both: the setup offer that sat above
+    the list is gone. Done on the result step shows the list (its empty state when there are no cards).
+- 2026-11-06 — STORY-3 (Work list from owner copies): the index, watching, push frames and stale-copy rules are ADR
+  0016 (rules approved by the Dev Lead). Smaller choices:
+  - The list replaces Work's placeholder below the setup offer. Epics start open and features start closed; what the
+    user opened stays open when a new list arrives. Changing the filter starts the epics open again.
+  - Filter chips show how many features each would show ("In progress · 1"). A feature can count under more than one.
+    Epics left with no matching feature are hidden; an epic's own count is not filtered.
+  - Features and stories are rows of one ARIA table per epic, so story rows share the feature columns. The caret column
+    is spacing, hidden from assistive tech.
+  - Feature statuses read as Draft, Approved, In progress, Done and Cancelled; a story's stage shows as written in the
+    card. Empty counts and a missing PR show "—".
+  - A stale copy is a banner above the list with Apply to owner and Discard, and the card's row carries an "Edited
+    elsewhere" flag. A refusal (a conflict, an owner not
+    checked out) shows on that banner; nothing is written.
+  - When the connection to the server drops, the list keeps the last one it had and says why, then watches again.
 
 ## 2026-11-06 — Project setup is one guided page, built in FEAT-2
 

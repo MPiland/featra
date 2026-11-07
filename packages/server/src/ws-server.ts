@@ -1,0 +1,131 @@
+import { timingSafeEqual } from "node:crypto";
+import type { IncomingMessage } from "node:http";
+import { WebSocketServer, type RawData, type WebSocket } from "ws";
+import { errorMessage, parseRequest, SERVER_HOST, SERVER_PATH, type ServerResponse } from "@featra/work-format";
+import { ApiError, type Api, type Connection } from "./api.ts";
+
+export interface ServerOptions {
+  /** The secret every connection must present (`?token=`): only Featra's own window has it. */
+  token: string;
+  api: Api;
+  /** Logs a line in the host's log: failures only, never params or tokens. */
+  log: (message: string) => void;
+  /** 0 (the default) lets the OS pick a free port. */
+  port?: number;
+}
+
+export interface RunningServer {
+  port: number;
+  /** `ws://127.0.0.1:<port>/v1`, without the token. */
+  url: string;
+  close: () => Promise<void>;
+}
+
+const MAX_FRAME_BYTES = 1024 * 1024;
+
+const sameSecret = (given: string, token: string) => {
+  const a = Buffer.from(given);
+  const b = Buffer.from(token);
+  return a.length === b.length && timingSafeEqual(a, b);
+};
+
+function authorised(req: IncomingMessage, token: string): boolean {
+  const url = new URL(req.url ?? "/", `http://${SERVER_HOST}`);
+  return url.pathname === SERVER_PATH && sameSecret(url.searchParams.get("token") ?? "", token);
+}
+
+function frameText(data: RawData): string {
+  if (Array.isArray(data)) return Buffer.concat(data).toString("utf8");
+  return Buffer.isBuffer(data) ? data.toString("utf8") : new TextDecoder().decode(data);
+}
+
+/** The connection a socket's requests act through: its pushes, and the watches that end when it closes. */
+function connect(socket: WebSocket): { connection: Connection; closeAll: () => void } {
+  const kept = new Map<number, () => void>();
+  const unwatch = (id: number) => {
+    const stop = kept.get(id);
+    kept.delete(id);
+    stop?.();
+    return Boolean(stop);
+  };
+  return {
+    connection: {
+      push(event, watch, data) {
+        if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ event, watch, data }));
+      },
+      keep(id, stop) {
+        unwatch(id);
+        if (socket.readyState === socket.OPEN) kept.set(id, stop);
+        else stop();
+      },
+      unwatch,
+    },
+    closeAll: () => {
+      for (const id of kept.keys()) unwatch(id);
+    },
+  };
+}
+
+/**
+ * Starts the WebSocket API (ADR 0015) on 127.0.0.1. Each request is answered on the socket it came in on; a watch
+ * pushes `{ event, watch, data }` frames on it (ADR 0016) and ends when the socket closes.
+ */
+export function startServer({ token, api, log, port = 0 }: ServerOptions): Promise<RunningServer> {
+  if (!token) return Promise.reject(new Error("The server needs a token."));
+  const wss = new WebSocketServer({
+    host: SERVER_HOST,
+    port,
+    maxPayload: MAX_FRAME_BYTES,
+    verifyClient: ({ req }: { req: IncomingMessage }) => authorised(req, token),
+  });
+
+  const answer = async (socket: WebSocket, connection: Connection, text: string) => {
+    const request = parseRequest(text);
+    let response: ServerResponse;
+    if ("error" in request) {
+      if (request.id === null) return; // nothing to answer to
+      response = { id: request.id, ok: false, error: request.error };
+    } else {
+      try {
+        response = {
+          id: request.id,
+          ok: true,
+          result: await api(request.method, request.params, request.id, connection),
+        };
+      } catch (err) {
+        if (!(err instanceof ApiError)) log(`${request.method} failed: ${errorMessage(err)}`);
+        response = { id: request.id, ok: false, error: errorMessage(err) };
+      }
+    }
+    if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(response));
+  };
+
+  wss.on("connection", (socket) => {
+    const { connection, closeAll } = connect(socket);
+    socket.on("close", closeAll);
+    socket.on("message", (data, isBinary) => {
+      if (isBinary) return socket.close(1003, "Text frames only.");
+      void answer(socket, connection, frameText(data));
+    });
+    socket.on("error", (err) => log(`Socket error: ${err.message}`));
+  });
+
+  return new Promise((resolve, reject) => {
+    wss.once("error", reject);
+    wss.once("listening", () => {
+      wss.off("error", reject);
+      wss.on("error", (err) => log(`Server error: ${err.message}`));
+      const address = wss.address();
+      const bound = typeof address === "object" && address ? address.port : port;
+      resolve({
+        port: bound,
+        url: `ws://${SERVER_HOST}:${bound}${SERVER_PATH}`,
+        close: () =>
+          new Promise<void>((done) => {
+            for (const client of wss.clients) client.terminate();
+            wss.close(() => done());
+          }),
+      });
+    });
+  });
+}

@@ -15,6 +15,7 @@ import { SettingsView } from "./components/settings/SettingsView.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { useProjects } from "./components/useProjects.tsx";
+import { useProjectSetup } from "./components/useProjectSetup.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
@@ -38,7 +39,7 @@ type OpenDialog = "about" | "resetAppData" | null;
 const WEB_KEEPS: ReadonlySet<AppShortcut> = new Set(["fullScreen", "closeWindow", "newProject", "openFolder"]);
 
 const sameUiState = (a: UiState, b: UiState) =>
-  a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor;
+  a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor && a.cardPaneWidth === b.cardPaneWidth;
 
 export function App({ bridge, initialUiState, initialSettings, initialProjects }: AppProps) {
   const [nav, setNav] = useState(() => initialNav());
@@ -61,6 +62,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   }, []);
   const open = useCallback((v: ViewId) => setNav((n) => navigate(n, v)), []);
   const setZoom = useCallback((f: (z: number) => number) => setUi((s) => ({ ...s, zoomFactor: f(s.zoomFactor) })), []);
+  const setPaneWidth = useCallback((w: number) => setUi((s) => ({ ...s, cardPaneWidth: w })), []);
   const back = useCallback(() => setNav(goBack), []);
   const forward = useCallback(() => setNav(goForward), []);
   const showKeyboardShortcuts = useCallback(() => {
@@ -79,6 +81,16 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     actions: projectActions,
     dialog: projectDialog,
   } = useProjects(bridge, initialProjects, projectSettings);
+  const { setupPage, openSetup } = useProjectSetup(bridge, projects.current?.dir ?? null, settings.app.work);
+  // Project settings > Set up project: the page shows in Work, on that project.
+  const reopenSetup = useCallback(
+    (dir: string) => {
+      if (projects.current?.dir !== dir) projectActions.switchTo(dir);
+      openSetup(dir);
+      open("work");
+    },
+    [projects, projectActions, openSetup, open],
+  );
   // The host stores app settings and applies them at once (the close button too); the UI applies the theme.
   const changeAppSettings = useCallback(
     (app: AppSettings) => {
@@ -222,9 +234,17 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 onPage={setSettingsPage}
                 onAppChange={changeAppSettings}
                 shortcuts={shortcuts}
+                onSetUp={reopenSetup}
               />
             ) : view.id === "work" ? (
-              <WorkView projects={projects} platform={bridge.platform} actions={projectActions} />
+              <WorkView
+                projects={projects}
+                platform={bridge.platform}
+                actions={projectActions}
+                work={bridge.work}
+                paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
+                setupPage={setupPage}
+              />
             ) : (
               <ViewPlaceholder view={view} />
             )}

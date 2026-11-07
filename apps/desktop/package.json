@@ -6,13 +6,14 @@
   "type": "module",
   "main": "dist/main.cjs",
   "scripts": {
-    "build": "pnpm --filter @featra/client build && vite build && vite build --mode preload",
+    "build": "pnpm --filter @featra/client build && vite build && vite build --mode preload && vite build --mode server",
     "start": "pnpm run build && electron .",
     "typecheck": "tsc -p . --noEmit",
     "test:e2e": "pnpm run build && playwright test -c e2e"
   },
   "dependencies": {
     "@featra/client": "workspace:*",
+    "@featra/server": "workspace:*",
     "@featra/work-format": "workspace:*"
   },
   "devDependencies": {
