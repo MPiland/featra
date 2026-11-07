@@ -1,5 +1,7 @@
 import {
   assertNever,
+  cardParams,
+  cardUpdateParams,
   copyParams,
   dirParams,
   setupParams,
@@ -10,6 +12,7 @@ import {
   type ServerPushes,
 } from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
+import { cardViewIn, type CardActions } from "./card-actions.ts";
 import type { CopyActions } from "./copy-actions.ts";
 import type { Git } from "./git.ts";
 import { initFeatra, initGit, setupStatus } from "./project-setup.ts";
@@ -24,6 +27,7 @@ export interface ApiDeps {
   allowed: AllowedProjects;
   watches: WorkWatches;
   copies: CopyActions;
+  cards: CardActions;
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -46,7 +50,7 @@ export type Api = (
   connection: Connection,
 ) => Promise<ServerMethods[ServerMethod]["result"]>;
 
-export function createApi({ git, allowed, watches, copies }: ApiDeps): Api {
+export function createApi({ git, allowed, watches, copies, cards }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
     return dir;
@@ -104,6 +108,25 @@ export function createApi({ git, allowed, watches, copies }: ApiDeps): Api {
         const result = await copies.discard(p.dir, p.key);
         await watches.refresh(p.dir);
         return result;
+      }
+      case "card.watch": {
+        const p = cardParams(params);
+        if (!p) throw new ApiError("Expected { dir, id }.");
+        const dir = allow(p.dir);
+        const { value, stop } = await watches.observe(
+          dir,
+          (scan) => cardViewIn(scan, p.id),
+          (next) => {
+            if (allowed.has(dir)) connection.push("card.view", id, next);
+          },
+        );
+        connection.keep(id, stop);
+        return value;
+      }
+      case "card.update": {
+        const p = cardUpdateParams(params);
+        if (!p) throw new ApiError("Expected { dir, id, edit }.");
+        return cards.update(allow(p.dir), p.id, p.edit);
       }
       default:
         return assertNever(method);

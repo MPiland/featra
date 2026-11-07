@@ -13,6 +13,8 @@ import {
   type WorkFilter,
   type WorkList,
 } from "@featra/work-format/work-list";
+import { CONTAINER_STATUS_LABELS } from "@featra/work-format/card-view";
+import { noCards, serverCards, type CardBridge } from "./card-pane.ts";
 import type { ServerClient } from "./server-client.ts";
 
 export type { CopyActionResult, WorkList };
@@ -23,7 +25,8 @@ export interface WorkUpdate {
   error: string | null;
 }
 
-export interface WorkBridge {
+/** The list, the stale-copy actions, and the card pane's card (ADR 0017). */
+export interface WorkBridge extends CardBridge {
   /** Calls back with the project's list now and on every change; returns the stop. */
   watch: (dir: string, listener: (update: WorkUpdate) => void) => () => void;
   /** Writes a stale copy's edit to the owner's card, then puts the copy back as git has it. */
@@ -67,15 +70,8 @@ export const WORK_COPY = {
 } as const;
 
 /** How a feature's status reads in the list. */
-const FEATURE_STATUS: Record<string, string> = {
-  draft: "Draft",
-  approved: "Approved",
-  active: "In progress",
-  done: "Done",
-  cancelled: "Cancelled",
-};
 export const featureStatusLabel = (status: string | null) =>
-  status === null ? WORK_COPY.none : (FEATURE_STATUS[status] ?? status);
+  status === null ? WORK_COPY.none : (CONTAINER_STATUS_LABELS[status] ?? status);
 
 /** How many features each chip shows. A feature can count under more than one. */
 export function filterCounts(epics: readonly EpicRow[]): Record<ListFilter, number> {
@@ -105,6 +101,7 @@ const copyError = (err: unknown): CopyActionResult => ({ ok: false, error: error
 /** The bridge's work methods over the server client. */
 export function serverWork(server: ServerClient): WorkBridge {
   return {
+    ...serverCards(server),
     watch(dir, listener) {
       let last = EMPTY_WORK_LIST;
       return server.watch(
@@ -127,6 +124,7 @@ export function serverWork(server: ServerClient): WorkBridge {
 /** A browser tab has no folders, so no cards. */
 export function noWork(error: string): WorkBridge {
   return {
+    ...noCards(error),
     watch(_dir, listener) {
       listener({ list: EMPTY_WORK_LIST, error });
       return () => {};

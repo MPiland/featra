@@ -3,6 +3,7 @@ import type { FeatureRow, StoryRow, Tone } from "@featra/work-format/work-list";
 import { featureStatusLabel, WORK_COPY } from "../../work-list.ts";
 import { ChevronRightIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
+import { useCardSelection } from "./card-selection.tsx";
 import { StaleMark } from "./stale-mark.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
@@ -34,11 +35,21 @@ function Scope({ added, openBugs }: FeatureRow["scope"]) {
 }
 
 function Story({ story }: { story: StoryRow }) {
+  const { selected, paneId, open } = useCardSelection();
+  const shown = selected === story.id;
   return (
-    <div className="prow" role="row" data-card={story.id}>
+    <div className={shown ? "prow shown" : "prow"} role="row" data-card={story.id}>
       <span aria-hidden="true" />
       <span role="cell" className="pn">
-        {story.title}
+        <button
+          type="button"
+          className="row-open"
+          aria-expanded={shown}
+          aria-controls={shown ? paneId : undefined}
+          onClick={() => open(story.id)}
+        >
+          {story.title}
+        </button>
         {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
         <StaleMark id={story.id} />
       </span>

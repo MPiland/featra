@@ -1,0 +1,273 @@
+/* The card pane (STORY-4, ADR 0017): docked beside the Work list, full height, after docs/mockups/app.html (.dock). */
+.work-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.work-split > .work-list {
+  min-width: 0;
+}
+
+.row-open {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.row-open:hover {
+  text-decoration: underline;
+}
+
+.row-open:focus-visible,
+.card-close:focus-visible,
+.inline-text:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.prow.shown {
+  background: var(--row);
+}
+
+.card-pane {
+  flex: 0 0 clamp(320px, 38%, 480px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--side);
+}
+
+.card-pane:focus {
+  outline: none;
+}
+
+.card-pane .meta {
+  color: var(--tx3);
+}
+
+.card-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 10px 18px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.card-close {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--tx2);
+  cursor: pointer;
+}
+
+.card-close:hover {
+  background: var(--row);
+}
+
+.card-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 18px;
+}
+
+.card-body p {
+  margin: 0;
+}
+
+.card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.card-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-error,
+.inline-refusal {
+  margin: 0;
+  color: var(--bad);
+  font-size: 12px;
+}
+
+.inline-refusal {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.card-sec .sh {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tx2);
+}
+
+/* Text that edits in place: reads as text, edits in a field of the same size. */
+.inline-text {
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+button.inline-text {
+  cursor: text;
+}
+
+button.inline-text:hover {
+  border-color: var(--line);
+}
+
+.inline-text.editing {
+  border-color: var(--acc);
+  background: var(--bg);
+  outline: none;
+  resize: vertical;
+}
+
+.inline-text.editing[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.inline-edit {
+  margin: 0 -6px;
+}
+
+.inline-edit .inline-text {
+  margin: 0;
+}
+
+.card-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card-items .ac {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.card-items .ac + .ac {
+  border-top: 1px solid var(--line);
+}
+
+.ac-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-items .task {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.chk,
+.box0 {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border-radius: 4px;
+}
+
+.chk {
+  display: grid;
+  place-items: center;
+  background: var(--accbg);
+  color: #fff;
+}
+
+.chk svg {
+  width: 10px;
+  height: 10px;
+}
+
+.box0 {
+  border: 1.5px solid var(--tx3);
+}
+
+.proof {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.proof-passed {
+  color: var(--ok);
+}
+
+.proof code {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ev {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.ev li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ev .y {
+  color: var(--ok);
+}

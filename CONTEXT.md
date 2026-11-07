@@ -22,6 +22,9 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Owner** (owning location) — the single branch or worktree whose copy of a card is authoritative at a given time.
   Drafts/backlog → main; active feature → its feature branch; active story → its worktree; merged story → feature branch;
   merged feature → main. See [ADR 0002](docs/adr/0002-single-card-ownership.md).
+- **Card pane** — the full-height pane docked beside the Work list that shows one card from its owner copy and edits
+  it a field at a time. Every save goes to the owner copy, and is refused if the owner's value changed meanwhile
+  (ADR 0017).
 - **Stale copy** — any non-owner copy of a card. Never displayed; an uncommitted edit to it is flagged, to apply to
   the owner or discard (ADR 0016).
 - **History event** — an append-only entry in a card's `history[]` (`at`, `from`, `to`, `by`) recording a status or

@@ -23,6 +23,8 @@ import {
   type WorkUpdate,
 } from "../src/bridge.ts";
 import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
+import type { Card } from "@featra/work-format";
+import { fakeCardServer } from "./card-server.ts";
 import type { CopyActionResult } from "@featra/work-format/protocol";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
@@ -59,7 +61,14 @@ export interface HostOptions {
   work?: Record<string, WorkList>;
   /** What apply and discard answer. Default: ok. */
   copyResult?: CopyActionResult;
+  /**
+   * Each folder's cards, owned by main and checked out: the Work list and the card pane are built from them by
+   * work-format, and the pane's edits change them. Overrides `work` for that folder.
+   */
+  cards?: Record<string, Card[]>;
 }
+
+export { EDIT_AT } from "./card-server.ts";
 
 const noop = () => {};
 const ref = (dir: string): ProjectRef => ({ dir, name: dir.split("/").at(-1) ?? dir });
@@ -98,6 +107,10 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   // The server's Work list per folder, and who is watching it.
   const workLists = new Map(Object.entries(host.work ?? {}));
   const watchers = new Map<string, Set<(u: WorkUpdate) => void>>();
+  const cards = fakeCardServer(host.cards ?? {}, calls, (dir, next) => {
+    for (const l of watchers.get(dir) ?? []) l({ list: next, error: null });
+  });
+  const listOf = (dir: string) => cards.listOf(dir) ?? workLists.get(dir) ?? EMPTY_WORK_LIST;
   const bridge: FeatraBridge = {
     platform,
     uiState: {
@@ -178,7 +191,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       watch: (dir, listener) => {
         const set = watchers.get(dir) ?? new Set();
         watchers.set(dir, set.add(listener));
-        queueMicrotask(() => listener({ list: workLists.get(dir) ?? EMPTY_WORK_LIST, error: null }));
+        queueMicrotask(() => listener({ list: listOf(dir), error: null }));
         return () => {
           set.delete(listener);
         };
@@ -191,6 +204,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
         calls.push(`discardCopy:${dir}:${key}`);
         return host.copyResult ?? { ok: true };
       },
+      ...cards.bridge,
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.
     edit: (command) => void calls.push(`edit:${command}:${(document.activeElement as HTMLElement | null)?.id ?? ""}`),
@@ -217,9 +231,14 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       workLists.set(dir, u.list);
       for (const l of watchers.get(dir) ?? []) l(u);
     });
+  /** A card changes outside the pane (an agent, an editor): the server pushes the change. */
+  const pushCard = (dir: string, card: Card) => act(() => cards.changed(dir, card));
   return {
     bridge,
     pushWork,
+    pushCard,
+    cardsIn: cards.cardsIn,
+    watchingCards: cards.watching,
     /** How many watches are open on `dir`. */
     watching: (dir: string) => watchers.get(dir)?.size ?? 0,
     saves,

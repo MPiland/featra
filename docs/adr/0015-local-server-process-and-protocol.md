@@ -60,17 +60,19 @@ ws://127.0.0.1:*`, since the port changes on every start.
 
 The methods so far are:
 
-| Method                | Params           | Result                                                                   |
-| --------------------- | ---------------- | ------------------------------------------------------------------------ |
-| `project.setupStatus` | `{ dir }`        | `no-git`, `no-featra`, `ready` or `error`                                |
-| `project.gitInit`     | `{ dir }`        | The new setup status                                                     |
-| `project.init`        | `{ dir }`        | `{ ok, created, kept }` or `{ ok: false, error }`                        |
-| `project.setupPlan`   | `{ dir }`        | `{ ok, git, items: [{ id, exists }] }` or `{ ok: false, error }`         |
-| `project.setup`       | `{ dir, items }` | `{ ok, created, kept }` or `{ ok: false, error }`: git first, then items |
-| `work.watch`          | `{ dir }`        | The Work list, then pushes (ADR 0016)                                    |
-| `work.unwatch`        | `{ watch }`      | `null`                                                                   |
-| `work.applyCopy`      | `{ dir, key }`   | `{ ok: true }` or `{ ok: false, error }`                                 |
-| `work.discardCopy`    | `{ dir, key }`   | `{ ok: true }` or `{ ok: false, error }`                                 |
+| Method                | Params              | Result                                                                   |
+| --------------------- | ------------------- | ------------------------------------------------------------------------ |
+| `project.setupStatus` | `{ dir }`           | `no-git`, `no-featra`, `ready` or `error`                                |
+| `project.gitInit`     | `{ dir }`           | The new setup status                                                     |
+| `project.init`        | `{ dir }`           | `{ ok, created, kept }` or `{ ok: false, error }`                        |
+| `project.setupPlan`   | `{ dir }`           | `{ ok, git, items: [{ id, exists }] }` or `{ ok: false, error }`         |
+| `project.setup`       | `{ dir, items }`    | `{ ok, created, kept }` or `{ ok: false, error }`: git first, then items |
+| `work.watch`          | `{ dir }`           | The Work list, then pushes (ADR 0016)                                    |
+| `work.unwatch`        | `{ watch }`         | `null`                                                                   |
+| `work.applyCopy`      | `{ dir, key }`      | `{ ok: true }` or `{ ok: false, error }`                                 |
+| `work.discardCopy`    | `{ dir, key }`      | `{ ok: true }` or `{ ok: false, error }`                                 |
+| `card.watch`          | `{ dir, id }`       | The card pane's view of one card, then pushes (ADR 0017)                 |
+| `card.update`         | `{ dir, id, edit }` | `{ ok, view }` or `{ ok: false, error, view }`: one field, at the owner  |
 
 `project.setupPlan` and `project.setup` (STORY-42) serve the one-screen setup page; `items` are setup item ids
 (`work-format/setup-plan`), and the required ones are always set up. The client no longer calls `project.gitInit` or
