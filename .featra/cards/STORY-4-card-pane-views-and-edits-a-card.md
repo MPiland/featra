@@ -83,3 +83,7 @@ As a builder, I open a story in a full-height pane beside the list and edit its 
 - Sizing fix: before it, the new e2e failed at 1280×800 with the work area scrolling sideways by 390 px
   (`main` and `.work-split`); after it, `pnpm check` passes (624 tests), Windows e2e 36/36, `tray.spec.ts
   --repeat-each=5` 45/45. Three UI-state fixtures gained the new `cardPaneWidth` field. Not run: the e2e on WSLg.
+- WSLg review: the sizing e2e failed in 2 of 9 full-suite runs, with the page at 1280×820 (the window's default)
+  instead of 800: a resize made right after launch, before the window was first shown, was lost when the window
+  was mapped. `sizeTo` now waits for the window to be shown, out of full screen and not maximized, then asks again
+  until the content size and the page hold (5 tries), and fails naming the size it got. The AC checks are unchanged.
