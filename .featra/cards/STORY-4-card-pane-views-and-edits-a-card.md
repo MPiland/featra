@@ -2,7 +2,7 @@
 id: STORY-4
 type: story
 title: Card pane views and edits a card
-status: New
+status: In Progress
 parent: FEAT-2
 order: 3
 origin: planned
@@ -19,6 +19,11 @@ history:
     field: status
     from: null
     to: New
+    by: user
+  - at: 2026-11-07T05:12:12.946Z
+    field: status
+    from: New
+    to: In Progress
     by: user
 ---
 
