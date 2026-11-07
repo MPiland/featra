@@ -2,7 +2,7 @@
 id: STORY-42
 type: story
 title: Set up a project on one screen
-status: In Review
+status: Done
 parent: FEAT-2
 order: 4
 origin: added
@@ -40,6 +40,16 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-07T05:10:49.929Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-07T05:10:49.929Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
