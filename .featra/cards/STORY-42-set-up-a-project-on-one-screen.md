@@ -2,7 +2,7 @@
 id: STORY-42
 type: story
 title: Set up a project on one screen
-status: In Progress
+status: In Review
 parent: FEAT-2
 order: 4
 origin: added
@@ -34,6 +34,11 @@ history:
     field: status
     from: In Review
     to: In Progress
+    by: developer
+  - at: 2026-11-07T00:35:52Z
+    field: status
+    from: In Progress
+    to: In Review
     by: developer
 ---
 
@@ -75,4 +80,5 @@ As a builder, when I open or create a project that isn't set up, I set it up in 
 - Tests: `pnpm check` passes (448 unit/integration tests). Windows e2e: 31 passed, 2 failed, both in the new
   `setup.spec.ts`, on a test-helper bug (the `row()` locator passed a page-rooted locator to `filter({ has })`, which
   Playwright resolves inside each row, so it never matched). The helper is fixed; the e2e is not yet rerun, per the
-  Dev Lead (STORY-3 is verifying first). The card stays In Progress until that rerun passes.
+  Dev Lead (STORY-3 is verifying first). Rerun once cleared: Windows e2e 33/33 passed; `tray.spec.ts
+  --repeat-each=5` passed. Not run: the e2e on WSLg (skipped, per the brief).
