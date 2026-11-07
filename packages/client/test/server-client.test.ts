@@ -88,8 +88,8 @@ describe("the bridge's setup methods over the client", () => {
     const { client } = setup([null]);
     const setupBridge = serverSetup(client);
     expect(await setupBridge.status("/p")).toEqual({ state: "error", error: SERVER_UNAVAILABLE });
-    expect(await setupBridge.initGit("/p")).toEqual({ state: "error", error: SERVER_UNAVAILABLE });
-    expect(await setupBridge.initFeatra("/p")).toEqual({ ok: false, error: SERVER_UNAVAILABLE });
+    expect(await setupBridge.plan("/p")).toEqual({ ok: false, error: SERVER_UNAVAILABLE });
+    expect(await setupBridge.run("/p", ["context"])).toEqual({ ok: false, error: SERVER_UNAVAILABLE });
   });
 });
 

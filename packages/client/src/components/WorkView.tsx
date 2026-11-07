@@ -10,20 +10,14 @@ export interface WorkViewProps {
   platform: string;
   actions: ProjectMenuActions;
   work: WorkBridge;
-  /** The offer to set the current project up, when it needs it. */
-  setupOffer?: ReactNode;
+  /** The page that sets the current project up, shown instead of the list when it needs it (STORY-42). */
+  setupPage?: ReactNode;
 }
 
 /** Work shows the current project's features and stories; with no project, the ways to get one. */
-export function WorkView({ projects, platform, actions, work, setupOffer }: WorkViewProps) {
-  if (projects.current) {
-    return (
-      <>
-        {setupOffer}
-        <WorkList key={projects.current.dir} work={work} project={projects.current} />
-      </>
-    );
-  }
+export function WorkView({ projects, platform, actions, work, setupPage }: WorkViewProps) {
+  if (projects.current && setupPage) return setupPage;
+  if (projects.current) return <WorkList key={projects.current.dir} work={work} project={projects.current} />;
   return (
     <section className="placeholder" data-view="work">
       <ViewIcon view="work" size={28} />

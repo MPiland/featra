@@ -80,7 +80,16 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     actions: projectActions,
     dialog: projectDialog,
   } = useProjects(bridge, initialProjects, projectSettings);
-  const setupOffer = useProjectSetup(bridge, projects.current?.dir ?? null);
+  const { setupPage, openSetup } = useProjectSetup(bridge, projects.current?.dir ?? null, settings.app.work);
+  // Project settings > Set up project: the page shows in Work, on that project.
+  const reopenSetup = useCallback(
+    (dir: string) => {
+      if (projects.current?.dir !== dir) projectActions.switchTo(dir);
+      openSetup(dir);
+      open("work");
+    },
+    [projects, projectActions, openSetup, open],
+  );
   // The host stores app settings and applies them at once (the close button too); the UI applies the theme.
   const changeAppSettings = useCallback(
     (app: AppSettings) => {
@@ -224,6 +233,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 onPage={setSettingsPage}
                 onAppChange={changeAppSettings}
                 shortcuts={shortcuts}
+                onSetUp={reopenSetup}
               />
             ) : view.id === "work" ? (
               <WorkView
@@ -231,7 +241,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 platform={bridge.platform}
                 actions={projectActions}
                 work={bridge.work}
-                setupOffer={setupOffer}
+                setupPage={setupPage}
               />
             ) : (
               <ViewPlaceholder view={view} />

@@ -67,8 +67,8 @@ describe("browser bridge", () => {
     const { setup } = browserBridge(fake);
     const error = "No project folder in a browser tab.";
     expect(await setup.status("/p")).toEqual({ state: "error", error });
-    expect(await setup.initGit("/p")).toEqual({ state: "error", error });
-    expect(await setup.initFeatra("/p")).toEqual({ ok: false, error });
+    expect(await setup.plan("/p")).toEqual({ ok: false, error });
+    expect(await setup.run("/p", ["context"])).toEqual({ ok: false, error });
   });
 
   it("recovers from corrupt storage", async () => {

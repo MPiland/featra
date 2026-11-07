@@ -2,6 +2,7 @@ import {
   assertNever,
   copyParams,
   dirParams,
+  setupParams,
   unwatchParams,
   type PushEvent,
   type ServerMethod,
@@ -12,6 +13,7 @@ import type { AllowedProjects } from "./allowed-projects.ts";
 import type { CopyActions } from "./copy-actions.ts";
 import type { Git } from "./git.ts";
 import { initFeatra, initGit, setupStatus } from "./project-setup.ts";
+import { setUpProject, setupPlan } from "./project-setup-plan.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
 /** A request the server refuses: its message goes back to the client as the response's `error`. */
@@ -69,6 +71,13 @@ export function createApi({ git, allowed, watches, copies }: ApiDeps): Api {
         return initGit(project(params), git);
       case "project.init":
         return initFeatra(project(params), git);
+      case "project.setupPlan":
+        return setupPlan(project(params), git);
+      case "project.setup": {
+        const p = setupParams(params);
+        if (!p) throw new ApiError("Expected { dir, items }.");
+        return setUpProject(allow(p.dir), p.items, git);
+      }
       case "work.watch": {
         const dir = project(params);
         const { list, stop } = await watches.watch(dir, (next) => {

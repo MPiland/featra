@@ -8,6 +8,7 @@ import {
   isRecord,
   type InitResult,
   type ProjectSetup,
+  type ScaffoldEntry,
 } from "@featra/work-format";
 import type { Git } from "./git.ts";
 
@@ -57,37 +58,58 @@ async function createFile(file: string, content: string): Promise<boolean> {
   }
 }
 
+/**
+ * Writes scaffold entries into `dir`, creating only what is missing. Answers with what it created and kept, or throws
+ * (a file in the way of a folder, a write that fails). Agent instruction files are refused whatever the list says.
+ */
+export async function writeScaffold(
+  dir: string,
+  entries: readonly ScaffoldEntry[],
+): Promise<{ created: string[]; kept: string[] }> {
+  const created: string[] = [];
+  const kept: string[] = [];
+  for (const entry of entries) {
+    // A rule that guards the scaffold itself: agent instructions are the user's, whatever the list says.
+    const paths = [entry.path, ...(entry.kind === "folder" ? entry.seed.map((s) => `${entry.path}/${s.name}`) : [])];
+    const agentFile = paths.find(isAgentInstructionFile);
+    if (agentFile) throw new Error(`Featra never writes ${agentFile}.`);
+    const target = join(dir, ...entry.path.split("/"));
+    if (entry.kind === "file") {
+      ((await createFile(target, entry.content)) ? created : kept).push(entry.path);
+      continue;
+    }
+    const label = `${entry.path}/`;
+    if (await isDir(target)) {
+      kept.push(label);
+      continue;
+    }
+    await mkdir(target, { recursive: true });
+    created.push(label);
+    for (const seed of entry.seed) {
+      if (await createFile(join(target, seed.name), seed.content)) created.push(`${entry.path}/${seed.name}`);
+    }
+  }
+  return { created, kept };
+}
+
+/** Whether a scaffold entry is already in `dir`: a file at a file's path, a folder at a folder's. */
+export async function scaffoldExists(dir: string, entry: ScaffoldEntry): Promise<boolean> {
+  const target = join(dir, ...entry.path.split("/"));
+  if (entry.kind === "folder") return isDir(target);
+  return stat(target).then(
+    () => true,
+    () => false,
+  );
+}
+
 /** Scaffolds Featra (see `FEATRA_SCAFFOLD`) in a git repository: what is missing is created, the rest kept. */
 export async function initFeatra(dir: string, git: Git): Promise<InitResult> {
   const status = await setupStatus(dir, git);
   if (status.state === "error") return { ok: false, error: status.error };
   if (status.state === "no-git") return { ok: false, error: "Initialize git in this folder first." };
-  const created: string[] = [];
-  const kept: string[] = [];
   try {
-    for (const entry of FEATRA_SCAFFOLD) {
-      // A rule that guards the scaffold itself: agent instructions are the user's, whatever the list says.
-      const paths = [entry.path, ...(entry.kind === "folder" ? entry.seed.map((s) => `${entry.path}/${s.name}`) : [])];
-      const agentFile = paths.find(isAgentInstructionFile);
-      if (agentFile) throw new Error(`Featra never writes ${agentFile}.`);
-      const target = join(dir, ...entry.path.split("/"));
-      if (entry.kind === "file") {
-        ((await createFile(target, entry.content)) ? created : kept).push(entry.path);
-        continue;
-      }
-      const label = `${entry.path}/`;
-      if (await isDir(target)) {
-        kept.push(label);
-        continue;
-      }
-      await mkdir(target, { recursive: true });
-      created.push(label);
-      for (const seed of entry.seed) {
-        if (await createFile(join(target, seed.name), seed.content)) created.push(`${entry.path}/${seed.name}`);
-      }
-    }
+    return { ok: true, ...(await writeScaffold(dir, FEATRA_SCAFFOLD)) };
   } catch (err) {
     return { ok: false, error: `Can't initialize Featra: ${errorMessage(err)}` };
   }
-  return { ok: true, created, kept };
 }
