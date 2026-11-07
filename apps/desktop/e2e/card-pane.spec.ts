@@ -139,15 +139,18 @@ test.describe("STORY-4: the card pane", () => {
   test("at 1280×800 and at the app's minimum size nothing scrolls sideways; the pane resizes and keeps its width (AC5, AC6)", async () => {
     const profile = await tempUserData();
     const repo = await planRepo();
+    // Closed in finally, so a failed check reports itself instead of a cleanup timeout.
+    let app: ElectronApplication | undefined;
     try {
-      let { app, page } = await launch(profile.dir, { FEATRA_PROJECT_DIR: repo.main });
+      let page: Page;
+      ({ app, page } = await launch(profile.dir, { FEATRA_PROJECT_DIR: repo.main }));
       await sizeTo(app, page, 1280, 800);
       let pane = await openStory(page);
 
       // AC6: long proof paths are cut short in place, and the close button is in view.
-      await expect(pane.getByText(LONG_PATH).first()).toHaveAttribute("title", LONG_PATH);
       expect(await sideways(page)).toEqual(NONE);
       expect(await closeInView(page)).toBe(true);
+      await expect(pane.getByText(LONG_PATH).first()).toHaveAttribute("title", LONG_PATH);
       // The default is 40% of the work area: 1280 less the 272 px sidebar.
       expect(Math.round((await pane.boundingBox())!.width)).toBe(403);
 
@@ -168,6 +171,7 @@ test.describe("STORY-4: the card pane", () => {
       pane = await openStory(page, false);
       expect(Math.round((await pane.boundingBox())!.width)).toBe(523);
       await app.close();
+      app = undefined;
       ({ app, page } = await launch(profile.dir, { FEATRA_PROJECT_DIR: repo.main }));
       await sizeTo(app, page, 1280, 800);
       pane = await openStory(page);
@@ -181,8 +185,8 @@ test.describe("STORY-4: the card pane", () => {
       expect((await list.boundingBox())!.width).toBeGreaterThanOrEqual(180);
       await pane.getByRole("button", { name: "Close card" }).click();
       await expect(pane).toHaveCount(0);
-      await app.close();
     } finally {
+      await app?.close();
       await repo.dispose();
       await profile.dispose();
     }

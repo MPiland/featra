@@ -2,7 +2,7 @@
 id: STORY-4
 type: story
 title: Card pane views and edits a card
-status: In Progress
+status: In Review
 parent: FEAT-2
 order: 3
 origin: planned
@@ -35,6 +35,11 @@ history:
     from: In Review
     to: In Progress
     by: user
+  - at: 2026-11-07T09:10:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: user
 ---
 
 ## Description
@@ -47,8 +52,8 @@ As a builder, I open a story in a full-height pane beside the list and edit its 
 - [x] The pane shows the user story, evidence, acceptance criteria with their proof, tasks, notes and PR (test: packages/client/test/components/card-pane.test.tsx AC2, packages/work-format/test/card-view.test.ts, apps/desktop/e2e/card-pane.spec.ts)
 - [x] Clicking the user story or another text field edits it in place; leaving the field saves to the owner copy, and Escape cancels (test: packages/client/test/components/card-pane.test.tsx AC3, packages/server/test/card-actions.test.ts, packages/work-format/test/card-edit.test.ts, apps/desktop/e2e/card-pane.spec.ts)
 - [x] Status and parent changes append a history event (test: packages/client/test/components/card-pane.test.tsx AC4, packages/server/test/card-actions.test.ts, packages/work-format/test/card-edit.test.ts, apps/desktop/e2e/card-pane.spec.ts)
-- [ ] The pane can be resized by dragging its edge, or with the keyboard on the handle; the list and the pane keep a minimum width and the width is remembered
-- [ ] At any window size down to the app's minimum, nothing scrolls sideways and the close button is visible
+- [x] The pane can be resized by dragging its edge, or with the keyboard on the handle; the list and the pane keep a minimum width and the width is remembered (test: packages/client/test/pane-width.test.ts, packages/client/test/components/card-pane.test.tsx AC5, packages/client/test/bridge.test.ts, apps/desktop/test/ui-state-store.test.ts, apps/desktop/e2e/card-pane.spec.ts)
+- [x] At any window size down to the app's minimum, nothing scrolls sideways and the close button is visible (test: packages/client/test/pane-width.test.ts, packages/client/test/components/card-pane.test.tsx AC6, apps/desktop/e2e/card-pane.spec.ts)
 
 ## Tasks
 
@@ -75,3 +80,6 @@ As a builder, I open a story in a full-height pane beside the list and edit its 
 - Sent back by the user (2026-11-07): "Pane isn't properly sized when not full screen. You can see the horizontal
   scroll bar, the "x" to close is hidden, and I can't resize the pane." In a window of about 1300 px the pane took
   nearly the whole width: a long AC test path didn't truncate and pushed it out. AC5 and AC6 added.
+- Sizing fix: before it, the new e2e failed at 1280×800 with the work area scrolling sideways by 390 px
+  (`main` and `.work-split`); after it, `pnpm check` passes (624 tests), Windows e2e 36/36, `tray.spec.ts
+  --repeat-each=5` 45/45. Three UI-state fixtures gained the new `cardPaneWidth` field. Not run: the e2e on WSLg.
