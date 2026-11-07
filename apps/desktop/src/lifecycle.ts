@@ -17,6 +17,13 @@ export interface ManagedWindow {
   isMinimized: () => boolean;
 }
 
+/**
+ * Whether Featra runs under WSLg (Linux GUI apps on Windows). There each window is also a Windows window, drawn by
+ * msrdc.exe (BUG-4).
+ */
+export const onWslg = (platform: string, env: Record<string, string | undefined>) =>
+  platform === "linux" && Boolean(env.WSL_DISTRO_NAME);
+
 export interface LifecycleOptions {
   platform: string;
   /**

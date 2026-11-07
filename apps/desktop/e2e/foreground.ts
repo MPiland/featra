@@ -1,6 +1,7 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { onWslg } from "../src/lifecycle.ts";
 
 /**
  * The OS foreground window, for the e2e harness only (BUG-2 and BUG-3, see decisions.md).
@@ -24,15 +25,25 @@ interface Helper {
 
 let helper: Helper | undefined;
 
+/**
+ * WSLg: Featra's windows are Windows windows too (msrdc.exe draws them), so the harness asks Windows what is in front,
+ * through WSL's interop, the same way it does on Windows.
+ */
+export const wslg = onWslg(process.platform, process.env);
+
+/** Windows PowerShell, and a script path it can open: under WSLg, by their Windows paths. */
+function powershell(script: string): [string, string] {
+  const path = fileURLToPath(new URL(script, import.meta.url));
+  if (!wslg) return ["powershell.exe", path];
+  const windowsPath = execFileSync("wslpath", ["-w", path], { encoding: "utf8" }).trim();
+  return ["/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe", windowsPath];
+}
+
 function startHelper(): Helper {
-  const script = fileURLToPath(new URL("user32-helper.ps1", import.meta.url));
-  const child = spawn(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script],
-    {
-      stdio: ["pipe", "pipe", "inherit"],
-    },
-  );
+  const [exe, script] = powershell("user32-helper.ps1");
+  const child = spawn(exe, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script], {
+    stdio: ["pipe", "pipe", "inherit"],
+  });
   // The helper ends when its stdin closes; this also covers a worker that exits without cleaning up.
   process.once("exit", () => child.kill());
   const answers: { resolve: (line: string) => void; reject: (e: Error) => void }[] = [];
@@ -104,21 +115,36 @@ export async function foregroundWindow(): Promise<bigint | undefined> {
 }
 
 /**
+ * WSLg only: the Windows foreground window, which is what the user sees in front. The X server's active window can
+ * be Featra's while Windows shows another app, or shows Featra's window minimised (BUG-4).
+ */
+export async function windowsForegroundWindow(): Promise<{ process: string; minimized: boolean; title: string }> {
+  const [process, minimized, ...title] = (await user32("window")).split(" ");
+  return { process: process ?? "", minimized: minimized === "True", title: title.join(" ") };
+}
+
+/**
  * Puts a stand-in for someone working in another app in front (`busy-user.ps1`): a small window that keeps getting
  * input, so Windows' foreground lock is on for Featra, as it is while a person types elsewhere. Focus tests start one
- * so they prove focus under the lock on every run, not only when someone happens to be using the desktop. Resolves
- * once that window is the foreground window; `dispose` closes it. Windows only: elsewhere it does nothing.
+ * so they prove focus under the lock on every run, not only when someone happens to be using the desktop. Under WSLg
+ * the same window puts a Windows app in front of Featra's, which `focus()` alone can't get past there (BUG-4).
+ * Resolves once that window is the foreground window; `dispose` closes it. Windows and WSLg: elsewhere it does nothing.
  */
 export async function busyUserInFront(): Promise<{ dispose: () => void }> {
-  if (process.platform !== "win32") return { dispose: () => {} };
-  const script = fileURLToPath(new URL("busy-user.ps1", import.meta.url));
+  if (process.platform !== "win32" && !wslg) return { dispose: () => {} };
+  const [exe, script] = powershell("busy-user.ps1");
+  // Under WSLg this process has no Windows pid; the helper's PowerShell lives as long as the test worker.
+  const parent = wslg ? await user32("pid") : String(process.pid);
   const child: ChildProcess = spawn(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, "-ParentPid", String(process.pid)],
+    exe,
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, "-ParentPid", parent],
     { stdio: ["ignore", "pipe", "inherit"] },
   );
+  let windowsPid: string | undefined;
   const dispose = () => {
     child.kill();
+    // Killing WSL's interop stand-in doesn't end the Windows process: ask Windows to.
+    if (wslg && windowsPid !== undefined) void user32(`stop ${windowsPid}`).catch(() => {});
   };
   try {
     const hwnd = await new Promise<bigint>((resolve, reject) => {
@@ -126,11 +152,14 @@ export async function busyUserInFront(): Promise<{ dispose: () => void }> {
       child.once("exit", (code) => reject(new Error(`The busy-user window exited (code ${code})`)));
       createInterface({ input: child.stdout! }).once("line", (line) => {
         clearTimeout(timer);
-        resolve(BigInt(line.split(" ")[1] ?? "0"));
+        const [, handle, pid] = line.split(" ");
+        windowsPid = pid;
+        resolve(BigInt(handle ?? "0"));
       });
     });
+    const inFront = async () => (wslg ? BigInt(await user32("foreground")) : await foregroundWindow());
     const deadline = Date.now() + 5_000;
-    while ((await foregroundWindow()) !== hwnd) {
+    while ((await inFront()) !== hwnd) {
       if (Date.now() > deadline) throw new Error("The busy-user window didn't come to the front in 5 s");
       await new Promise((r) => setTimeout(r, 50));
     }
