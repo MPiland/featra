@@ -92,8 +92,9 @@ test.describe("AC6: close to tray", () => {
       await recordMinimize(app);
       await page.getByRole("button", { name: "Minimize" }).click();
       await expect.poll(() => minimizeCalls(app)).toBe(1);
-      // Where the window manager can't minimise (WSLg, xvfb: see windowManagerCanMinimize), the request is all
-      // Featra can do, and the window stays where the user sees it; elsewhere it must really minimise.
+      // Where the window manager doesn't report minimising (WSLg, xvfb: see windowManagerCanMinimize), the request is
+      // all Featra can see, and Electron keeps calling the window unminimised (under WSLg it is minimised on the
+      // Windows side all the same, BUG-4); elsewhere it must really minimise.
       if (windowManagerCanMinimize()) await expect.poll(minimized).toBe(true);
       else expect(await minimized()).toBe(false);
       // Linux trays often ignore clicks, so there the restore path is the right-click menu's Show Featra.

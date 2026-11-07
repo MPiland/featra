@@ -142,9 +142,10 @@ export async function chooseTrayItem(app: ElectronApplication, label: string) {
   }, label);
 }
 /**
- * Whether the desktop's window manager can minimise windows. Windows always can. On X11, minimising is a request to
- * the window manager, and one that doesn't list `_NET_WM_STATE_HIDDEN` in `_NET_SUPPORTED` ignores it: WSLg's
- * doesn't, and xvfb has no window manager at all. There, even a framed Electron window stays unminimised.
+ * Whether the desktop's window manager reports minimised windows. Windows always does. On X11, minimising is a
+ * request to the window manager, and Electron only sees it happen if `_NET_SUPPORTED` lists `_NET_WM_STATE_HIDDEN`:
+ * WSLg's doesn't, and xvfb has no window manager at all. There Electron always calls the window unminimised, even a
+ * framed one, though under WSLg the window is minimised on the Windows side (BUG-4).
  */
 export const windowManagerCanMinimize = () => windowManagerSupports("_NET_WM_STATE_HIDDEN");
 

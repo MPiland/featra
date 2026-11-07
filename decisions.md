@@ -101,7 +101,8 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - Maximising is up to the window manager too: WSLg's can, xvfb (none) can't. There the e2e test proves the button
     keeps saying Maximize after a maximize request goes nowhere, instead of maximizing.
   - Minimise is up to the window manager. WSLg's does not advertise `_NET_WM_STATE_HIDDEN` and xvfb has none, so there
-    `minimize()` has no effect, even on a framed window (checked with plain Electron). The tray test asserts that the
+    Electron never reports the window minimised, even a framed one (checked with plain Electron). Corrected by BUG-4:
+    under WSLg `minimize()` does minimise the window on the Windows side; only Electron and X don't know it. The tray test asserts that the
     title bar asked to minimise and then the outcome the WM supports (minimised, or still shown); the restore and focus
     after Show Featra are asserted everywhere.
   - E2E runs set `FEATRA_E2E=1`: main then records notifications and Show Logs' "show in folder" instead of doing
@@ -238,6 +239,15 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   (`e2e/user32-helper.ps1`, about 8 ms a call) instead of one PowerShell per call. The two focus tests start a
   busy-user window (`e2e/busy-user.ps1`) that keeps getting input, so the lock is on in every run instead of only when
   someone happens to be at the desktop.
+- 2026-11-07 — BUG-4 (WSLg tray restore): WSLg draws each Linux window as a Windows window (msrdc.exe). There
+  `focus()` doesn't bring a shown window in front of a Windows app, and `minimize()` minimises the Windows window
+  while Electron and X still report it shown, focused and not minimised. Showing a hidden window always brings it to
+  the front. So under WSLg (`onWslg`: Linux with `WSL_DISTRO_NAME` set) `reveal()` hides a shown window and shows it
+  again. Elsewhere it is unchanged. The cost, on WSLg only: each reveal of a shown window gives it a new Windows
+  window, so its taskbar button can blink, and Windows may place it as a fresh window (the e2e tests don't check
+  its position). Accepted, because otherwise the window can't come back at all. In the e2e tests under WSLg, being in front means Windows' foreground window is
+  msrdc's "<title> (<distro>)" and is not minimised, as well as X's active window. The busy-user window runs there
+  too, through WSL's interop. No foreground grant is needed under WSLg: msrdc took the foreground every time.
 - 2026-11-06 — STORY-2 (open a folder and initialise Featra): the server's process model and protocol are ADR 0015.
   Smaller choices:
   - The offer is a non-modal banner at the top of Work ("Project setup"), not a dialog. Opening a folder never blocks
