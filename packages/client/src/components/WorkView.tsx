@@ -1,26 +1,26 @@
 import type { ReactNode } from "react";
 import type { ProjectMenuActions } from "../project-menu.ts";
 import { PROJECT_LABELS, type ProjectsSnapshot } from "../projects.ts";
-import { viewDef } from "../views.ts";
+import type { WorkBridge } from "../work-list.ts";
 import { ViewIcon } from "./icons.tsx";
-import { ViewPlaceholder } from "./ViewPlaceholder.tsx";
+import { WorkList } from "./work/WorkList.tsx";
 
 export interface WorkViewProps {
   projects: ProjectsSnapshot;
   platform: string;
   actions: ProjectMenuActions;
+  work: WorkBridge;
   /** The offer to set the current project up, when it needs it. */
   setupOffer?: ReactNode;
 }
 
 /** Work shows the current project's features and stories; with no project, the ways to get one. */
-export function WorkView({ projects, platform, actions, setupOffer }: WorkViewProps) {
-  const view = viewDef("work");
+export function WorkView({ projects, platform, actions, work, setupOffer }: WorkViewProps) {
   if (projects.current) {
     return (
       <>
         {setupOffer}
-        <ViewPlaceholder key={projects.current.dir} view={view} project={projects.current} />
+        <WorkList key={projects.current.dir} work={work} project={projects.current} />
       </>
     );
   }
