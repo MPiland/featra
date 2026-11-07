@@ -29,8 +29,14 @@ describe("stored UI state", () => {
     expect(normalizeUiState({ zoomFactor: 9 }).zoomFactor).toBe(2);
   });
 
-  it("starts with the sidebar open, at 100% zoom, following the OS theme", () => {
-    expect(DEFAULT_UI_STATE).toEqual({ sidebarCollapsed: false, zoomFactor: 1 });
+  it("keeps a stored card pane width and drops an unusable one (STORY-4 AC5)", () => {
+    expect(normalizeUiState({ cardPaneWidth: 480 }).cardPaneWidth).toBe(480);
+    expect(normalizeUiState({ cardPaneWidth: "wide" }).cardPaneWidth).toBeNull();
+    expect(normalizeUiState({ cardPaneWidth: -1 }).cardPaneWidth).toBeNull();
+  });
+
+  it("starts with the sidebar open, at 100% zoom, the card pane at its default width, following the OS theme", () => {
+    expect(DEFAULT_UI_STATE).toEqual({ sidebarCollapsed: false, zoomFactor: 1, cardPaneWidth: null });
     expect(DEFAULT_APP_SETTINGS.theme).toBe("system");
   });
 });
@@ -43,7 +49,7 @@ describe("browser bridge", () => {
       getItem: (k: string) => storage.get(k) ?? null,
       setItem: (k: string, v: string) => void storage.set(k, v),
     } as Storage;
-    const state = { sidebarCollapsed: true, zoomFactor: 1.5 } as const;
+    const state = { sidebarCollapsed: true, zoomFactor: 1.5, cardPaneWidth: 480 } as const;
     await browserBridge(fake).uiState.save(state);
     expect(await browserBridge(fake).uiState.load()).toEqual(state);
     const app = { ...DEFAULT_APP_SETTINGS, theme: "dark" } as const;

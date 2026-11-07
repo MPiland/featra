@@ -39,7 +39,7 @@ type OpenDialog = "about" | "resetAppData" | null;
 const WEB_KEEPS: ReadonlySet<AppShortcut> = new Set(["fullScreen", "closeWindow", "newProject", "openFolder"]);
 
 const sameUiState = (a: UiState, b: UiState) =>
-  a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor;
+  a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor && a.cardPaneWidth === b.cardPaneWidth;
 
 export function App({ bridge, initialUiState, initialSettings, initialProjects }: AppProps) {
   const [nav, setNav] = useState(() => initialNav());
@@ -62,6 +62,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   }, []);
   const open = useCallback((v: ViewId) => setNav((n) => navigate(n, v)), []);
   const setZoom = useCallback((f: (z: number) => number) => setUi((s) => ({ ...s, zoomFactor: f(s.zoomFactor) })), []);
+  const setPaneWidth = useCallback((w: number) => setUi((s) => ({ ...s, cardPaneWidth: w })), []);
   const back = useCallback(() => setNav(goBack), []);
   const forward = useCallback(() => setNav(goForward), []);
   const showKeyboardShortcuts = useCallback(() => {
@@ -241,6 +242,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 platform={bridge.platform}
                 actions={projectActions}
                 work={bridge.work}
+                paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
                 setupPage={setupPage}
               />
             ) : (

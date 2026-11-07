@@ -64,14 +64,25 @@ describe("AC2: sidebar state survives a restart", () => {
 // The theme moved to app settings in STORY-20: its restart test is in settings-store.test.ts (AC8).
 describe("AC5: zoom survives a restart", () => {
   it("a restarted app reads back the zoom factor the last one saved", async () => {
-    await createUiStateStore(dir).save({ sidebarCollapsed: false, zoomFactor: 1.25 });
-    expect(await createUiStateStore(dir).load()).toEqual({ sidebarCollapsed: false, zoomFactor: 1.25 });
+    await createUiStateStore(dir).save({ sidebarCollapsed: false, zoomFactor: 1.25, cardPaneWidth: null });
+    expect(await createUiStateStore(dir).load()).toEqual({
+      sidebarCollapsed: false,
+      zoomFactor: 1.25,
+      cardPaneWidth: null,
+    });
   });
 
   it("a file from before zoom existed loads with 100% zoom", async () => {
     const store = createUiStateStore(dir);
     await writeFile(store.file, JSON.stringify({ sidebarCollapsed: true }), "utf8");
-    expect(await store.load()).toEqual({ sidebarCollapsed: true, zoomFactor: 1 });
+    expect(await store.load()).toEqual({ sidebarCollapsed: true, zoomFactor: 1, cardPaneWidth: null });
+  });
+});
+
+describe("STORY-4 AC5: the card pane width survives a restart", () => {
+  it("a restarted app reads back the width the last one saved", async () => {
+    await createUiStateStore(dir).save({ sidebarCollapsed: false, zoomFactor: 1, cardPaneWidth: 523 });
+    expect((await createUiStateStore(dir).load()).cardPaneWidth).toBe(523);
   });
 });
 

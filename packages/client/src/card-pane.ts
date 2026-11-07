@@ -31,6 +31,7 @@ export interface CardBridge {
 
 export const CARD_COPY = {
   close: "Close card",
+  resize: "Resize card pane",
   pane: (id: string) => `${id} card`,
   loading: "Loading…",
   gone: "This card isn't in the project any more.",

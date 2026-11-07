@@ -45,6 +45,13 @@ fields use `InlineText`: Enter or a click edits, leaving the field saves, Escape
 don't replace what the user typed. A refused save keeps the typed text, shows the refusal and the value now, and the
 next save is made from that value.
 
+**Width.** The list and the pane share the work area. `pane-width.ts` fits the pane: 40% of the area by default,
+between 320 and 720 px, always leaving the list 240 px; when the area is too narrow for both minimums (the app's
+smallest window), they share it in that proportion, so nothing scrolls sideways. The pane's left edge is a
+`role="separator"` handle: drag it, or focus it and use Left and Right (Home and End for the limits). The chosen width
+is window chrome, so it is kept in the UI state (`cardPaneWidth`, beside the sidebar and zoom), not in Settings or
+`localStorage`. Nothing inside the pane may widen it: long test paths are cut short with the whole path in the title.
+
 ## Consequences
 
 - Two writers can't silently overwrite each other through the pane: the later one is refused and sees the other's

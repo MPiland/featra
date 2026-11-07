@@ -18,6 +18,7 @@ import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
 import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./projects.ts";
 import { noWork, type WorkBridge } from "./work-list.ts";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
+import { normalizePaneWidth } from "./pane-width.ts";
 import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
@@ -31,9 +32,11 @@ export * from "./work-list.ts";
 export interface UiState {
   sidebarCollapsed: boolean;
   zoomFactor: number;
+  /** The card pane width the user chose by its handle; null for the default (STORY-4, `pane-width.ts`). */
+  cardPaneWidth: number | null;
 }
 
-export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: DEFAULT_ZOOM };
+export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: DEFAULT_ZOOM, cardPaneWidth: null };
 
 /** Reads stored state defensively: unknown or malformed fields fall back to defaults. */
 export function normalizeUiState(raw: unknown): UiState {
@@ -41,6 +44,7 @@ export function normalizeUiState(raw: unknown): UiState {
   return {
     sidebarCollapsed: typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
     zoomFactor: normalizeZoom(r.zoomFactor),
+    cardPaneWidth: normalizePaneWidth(r.cardPaneWidth),
   };
 }
 

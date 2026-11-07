@@ -1,6 +1,10 @@
-/* The card pane (STORY-4, ADR 0017): docked beside the Work list, full height, after docs/mockups/app.html (.dock). */
+/*
+ * The card pane (STORY-4, ADR 0017): docked beside the Work list, full height, after docs/mockups/app.html (.dock).
+ * Its width is set inline, fitted by pane-width.ts so the list keeps its minimum; nothing here may widen it.
+ */
 .work-split {
   flex: 1;
+  min-width: 0;
   min-height: 0;
   display: flex;
 }
@@ -29,6 +33,7 @@
 
 .row-open:focus-visible,
 .card-close:focus-visible,
+.pane-handle:focus-visible,
 .inline-text:focus-visible {
   outline: 2px solid var(--acc);
   outline-offset: 2px;
@@ -39,10 +44,12 @@
 }
 
 .card-pane {
-  flex: 0 0 clamp(320px, 38%, 480px);
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
+  min-width: 0;
   min-height: 0;
+  overflow: hidden;
   border-left: 1px solid var(--line);
   background: var(--side);
 }
@@ -51,21 +58,63 @@
   outline: none;
 }
 
+/* The pane's left edge, over its border: takes no width of its own. */
+.pane-handle {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  width: 7px;
+  margin: 0 -4px 0 -3px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-handle::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  transition: background 0.15s;
+}
+
+.pane-handle:hover::after,
+.pane-handle:active::after,
+.pane-handle:focus-visible::after {
+  background: var(--acc);
+}
+
+.pane-handle:focus-visible {
+  outline-offset: -2px;
+}
+
 .card-pane .meta {
   color: var(--tx3);
 }
 
 .card-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
+  background: var(--side);
   padding: 10px 12px 10px 18px;
   border-bottom: 1px solid var(--line);
   font-size: 12px;
   color: var(--tx3);
 }
 
+.card-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .card-close {
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
   width: 28px;
@@ -245,7 +294,15 @@ button.inline-text:hover {
   color: var(--ok);
 }
 
+.proof > svg,
+.proof > span {
+  flex: 0 0 auto;
+}
+
+/* A long test path is cut short; its title holds the whole path. */
 .proof code {
+  flex: 0 1 auto;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

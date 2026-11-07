@@ -74,7 +74,7 @@ export function AcSection({ view, save }: SectionProps) {
               <div className={`proof proof-${ac.proof}`}>
                 {ac.proof === "passed" ? <CheckIcon /> : <CircleIcon />}
                 <span>{CARD_COPY.proof[ac.proof]}</span>
-                {ac.test && <code>{ac.test}</code>}
+                {ac.test && <code title={ac.test}>{ac.test}</code>}
               </div>
             </div>
           </li>

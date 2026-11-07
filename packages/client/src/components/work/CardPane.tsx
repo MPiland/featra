@@ -11,6 +11,8 @@ export interface CardPaneProps {
   dir: string;
   id: string;
   paneId: string;
+  /** In CSS px: chosen by the handle beside it, fitted to the work area. */
+  width: number;
   onClose: () => void;
 }
 
@@ -23,7 +25,7 @@ const fromChoice = (v: string) => (v === "" ? null : v);
  * and parent are chosen from what the rules allow, and every save goes to the owner copy. Escape closes it unless a
  * field or list inside is using Escape itself.
  */
-export function CardPane({ work, dir, id, paneId, onClose }: CardPaneProps) {
+export function CardPane({ work, dir, id, paneId, width, onClose }: CardPaneProps) {
   const card = useCard(work, dir, id);
   const pane = useRef<HTMLElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +122,15 @@ export function CardPane({ work, dir, id, paneId, onClose }: CardPaneProps) {
   return (
     // The pane takes focus on open so Escape reaches it; it isn't a stop in the Tab order.
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-    <aside id={paneId} ref={pane} className="card-pane" aria-label={CARD_COPY.pane(id)} tabIndex={-1} onKeyDown={onKey}>
+    <aside
+      id={paneId}
+      ref={pane}
+      className="card-pane"
+      style={{ width }}
+      aria-label={CARD_COPY.pane(id)}
+      tabIndex={-1}
+      onKeyDown={onKey}
+    >
       <div className="card-bar">
         <span className="card-id">{id}</span>
         <button

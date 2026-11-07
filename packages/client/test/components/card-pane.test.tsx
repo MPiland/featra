@@ -187,3 +187,47 @@ describe("AC4: status and parent changes append a history event", () => {
     expect(owner(app).history.at(-1)).toMatchObject({ field: "parent", from: "FEAT-2", to: "FEAT-3", by: "user" });
   });
 });
+
+const handle = () => screen.getByRole("separator", { name: "Resize card pane" });
+
+describe("AC5: the pane resizes from its handle", () => {
+  it("is a vertical separator that takes the arrow keys, and the width is saved and kept when the pane reopens", async () => {
+    const app = await openStory();
+    expect(handle().getAttribute("aria-orientation")).toBe("vertical");
+    expect(handle().getAttribute("aria-valuemin")).toBe("320");
+    expect(handle().getAttribute("aria-valuemax")).toBe("720");
+    expect(handle().getAttribute("aria-valuenow")).toBe("320");
+    handle().focus();
+    await app.user.keyboard("{ArrowLeft}{ArrowLeft}");
+    expect(handle().getAttribute("aria-valuenow")).toBe("352");
+    expect(app.pane.style.width).toBe("352px");
+    await app.user.keyboard("{ArrowRight}");
+    expect(handle().getAttribute("aria-valuenow")).toBe("336");
+    expect(app.saves.at(-1)?.cardPaneWidth).toBe(336);
+    // Escape on the handle still closes the pane, back to the row.
+    await app.user.keyboard("{Escape}");
+    expect(screen.queryByRole("complementary")).toBeNull();
+    await app.user.click(app.row);
+    const pane = await screen.findByRole("complementary", { name: `${STORY} card` });
+    expect(handle().getAttribute("aria-valuenow")).toBe("336");
+    expect(pane.style.width).toBe("336px");
+  });
+
+  it("opens at the width stored from an earlier run", async () => {
+    const app = renderApp({ cards: { [PROJECT.dir]: cards() }, state: { cardPaneWidth: 500 } });
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: "Cards and the feature list" }));
+    await app.user.click(screen.getByRole("button", { name: "Open a folder" }));
+    const pane = await screen.findByRole("complementary", { name: `${STORY} card` });
+    expect(pane.style.width).toBe("500px");
+    expect(handle().getAttribute("aria-valuenow")).toBe("500");
+  });
+});
+
+describe("AC6: long proof paths don't widen the pane", () => {
+  it("shows a test path cut short, with the whole path in its tooltip", async () => {
+    const app = await openStory();
+    const path = within(app.pane).getByText("e2e/open.spec.ts");
+    expect(path.getAttribute("title")).toBe("e2e/open.spec.ts");
+  });
+});
