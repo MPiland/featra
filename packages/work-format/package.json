@@ -7,7 +7,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./guards": "./src/utils/guards.ts",
-    "./protocol": "./src/protocol.ts"
+    "./protocol": "./src/protocol.ts",
+    "./setup-plan": "./src/setup-plan.ts",
+    "./setup-items": "./src/setup-items.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

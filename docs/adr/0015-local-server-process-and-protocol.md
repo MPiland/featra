@@ -60,11 +60,17 @@ ws://127.0.0.1:*`, since the port changes on every start.
 
 The methods so far are:
 
-| Method                | Params    | Result                                            |
-| --------------------- | --------- | ------------------------------------------------- |
-| `project.setupStatus` | `{ dir }` | `no-git`, `no-featra`, `ready` or `error`         |
-| `project.gitInit`     | `{ dir }` | The new setup status                              |
-| `project.init`        | `{ dir }` | `{ ok, created, kept }` or `{ ok: false, error }` |
+| Method                | Params           | Result                                                                   |
+| --------------------- | ---------------- | ------------------------------------------------------------------------ |
+| `project.setupStatus` | `{ dir }`        | `no-git`, `no-featra`, `ready` or `error`                                |
+| `project.gitInit`     | `{ dir }`        | The new setup status                                                     |
+| `project.init`        | `{ dir }`        | `{ ok, created, kept }` or `{ ok: false, error }`                        |
+| `project.setupPlan`   | `{ dir }`        | `{ ok, git, items: [{ id, exists }] }` or `{ ok: false, error }`         |
+| `project.setup`       | `{ dir, items }` | `{ ok, created, kept }` or `{ ok: false, error }`: git first, then items |
+
+`project.setupPlan` and `project.setup` (STORY-42) serve the one-screen setup page; `items` are setup item ids
+(`work-format/setup-plan`), and the required ones are always set up. The client no longer calls `project.gitInit` or
+`project.init`; they stay until a story removes them.
 
 A new method is added to `ServerMethods` first; both ends check against it.
 

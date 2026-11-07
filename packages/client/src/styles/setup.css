@@ -1,69 +1,132 @@
-/* The offer to set a project up (git init, Featra init), at the top of Work. */
-.setup-offer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 16px;
-  margin: 16px 16px 0;
-  padding: 10px 12px 10px 16px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--side);
-  color: var(--tx);
-}
-
-.setup-offer p {
+/*
+ * The project setup page (STORY-42): in Work, in the settings page's look. A centred column of sections, each a
+ * heading and a card of rows; the actions at the end, the primary one rightmost.
+ */
+.setup-page {
   flex: 1;
-  min-width: 200px;
-  margin: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 32px 32px 48px;
 }
 
-.setup-offer .setup-error {
-  flex-basis: 100%;
-  order: 3;
-  color: var(--bad);
-  font-size: 12px;
+.setup-content {
+  max-width: 720px;
+  margin: 0 auto;
 }
 
-.setup-offer .setup-error:empty {
-  display: none;
-}
-
-.setup-offer .placeholder-actions {
-  margin-top: 0;
-}
-
-/* The confirmation after Featra init: a title and two compact, wrapping path lists. */
-.setup-done-body {
-  flex: 1;
-  min-width: 200px;
-}
-
-.setup-done h2 {
-  margin: 0 0 4px;
-  font-size: inherit;
+.setup-head h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
   font-weight: 600;
 }
 
-.setup-done dl {
-  margin: 0;
+.setup-section {
+  margin: 0 0 28px;
+}
+
+.setup-section > h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--tx);
+}
+
+.setup-section-intro {
+  margin: -4px 0 12px;
+  color: var(--tx2);
   font-size: 12px;
+}
+
+/* Workflow's own groups sit under the section heading. */
+.setup-section .settings-group h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--tx2);
 }
 
-.setup-done dl > div {
+.setup-item-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Why a checkbox can't be changed: required, or the file is already there. */
+.setup-tag {
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--tx2);
+  font-size: 11px;
+  line-height: 18px;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accbg);
+  cursor: pointer;
+}
+
+.checkbox:disabled {
+  cursor: default;
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.setup-error {
+  margin: 0 0 12px;
+  color: var(--bad);
+}
+
+.setup-error:empty {
+  display: none;
+}
+
+.setup-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
 }
 
-.setup-done dt {
+/* The result: what was created and kept, as compact wrapping path lists. */
+.setup-result {
+  margin: 8px 0 24px;
+  padding: 12px 16px;
+}
+
+.setup-result dl {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+}
+
+.setup-result dl > div {
+  display: flex;
+  gap: 12px;
+}
+
+.setup-result dt {
   flex: none;
-  min-width: 56px;
+  min-width: 64px;
+  color: var(--tx2);
 }
 
-.setup-done dd {
+.setup-result dd {
   display: flex;
   flex-wrap: wrap;
-  gap: 2px 10px;
+  gap: 4px 12px;
   margin: 0;
+}
+
+.setup-result-empty {
+  margin: 0;
+  color: var(--tx2);
 }

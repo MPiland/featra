@@ -48,6 +48,9 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Featra init** — setting a git repository up for Featra: creating `.featra/config.yaml`, `CONTEXT.md`, `docs/adr/`,
   `decisions.md` and `open-questions.md` where they are missing. It never overwrites a file and never creates or edits
   agent instructions.
+- **Project setup** — the one screen in Work that sets a project up in one pass: `git init` if needed, Featra init, the
+  knowledge files the user picks, a starter `.gitignore` when there is none, and the project's workflow settings.
+  Shown for a project that isn't set up; reopened from Project settings.
 - **Local server** — the Node process the app starts beside itself, on 127.0.0.1 only, that does the project work
   (git, files, later the index). The UI reaches it through `FeatraBridge` (ADRs 0012, 0015).
 

@@ -6,16 +6,23 @@ import { expect, test, type Page } from "@playwright/test";
 import { launch, queueFolderPicks, tempUserData } from "./app.ts";
 
 /**
- * STORY-2: open a folder and initialise Featra, in the real app with its real local server and real git. Only the
- * platform is faked: the userData and project folders are temporary, and the OS folder dialog answers with folders
- * the test queued.
+ * STORY-42 (which replaced STORY-2's offer): set a project up on one screen, in the real app with its real local
+ * server and real git. Only the platform is faked: the userData and project folders are temporary, and the OS folder
+ * dialog answers with folders the test queued.
  */
-const offer = (page: Page) => page.getByRole("region", { name: "Project setup" });
-/** STORY-42: the confirmation after Featra init. */
-const confirmation = (page: Page) => page.getByRole("region", { name: "Featra is set up" });
-/** The paths a confirmation list shows, by its label ("Created", "Kept"). */
+const setupPage = (page: Page) => page.getByRole("region", { name: "Set up project" });
+const resultStep = (page: Page) => page.getByRole("region", { name: "Project is set up" });
+/** Work's list for the current project (a placeholder until its story lands). */
+const list = (page: Page) => page.locator("main .placeholder[data-view=work][data-project]");
+const box = (page: Page, name: string) => setupPage(page).getByRole("checkbox", { name, exact: true });
+// `has` is resolved inside each row, so it takes the checkbox alone, not a locator rooted at the page's region.
+const row = (page: Page, name: string) =>
+  setupPage(page)
+    .locator(".setting-row")
+    .filter({ has: page.getByRole("checkbox", { name, exact: true }) });
+/** The paths a result list shows, by its label ("Created", "Kept"). */
 const listed = (page: Page, label: string) =>
-  confirmation(page)
+  resultStep(page)
     .locator("dl > div")
     .filter({ has: page.locator("dt", { hasText: label }) })
     .locator("dd code");
@@ -31,86 +38,127 @@ const exists = (path: string) =>
     () => false,
   );
 
-function isRepo(dir: string): boolean {
+function git(dir: string, ...args: string[]): string {
   const env = { ...process.env };
   for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
-  return (
-    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: dir, env, encoding: "utf8" }).trim() === "true"
-  );
+  return execFileSync("git", args, { cwd: dir, env, encoding: "utf8" }).trim();
 }
 
-test.describe("STORY-2: open a folder and initialise Featra", () => {
-  test("open a plain folder, init git, then Featra; the files exist and CLAUDE.md is untouched (AC1-AC3)", async () => {
+test.describe("STORY-42: set up a project on one screen", () => {
+  test("a plain folder: untick one file, set up, see the result and the files, Done shows the list (AC1-AC5)", async () => {
     const profile = await tempUserData();
     const project = await tempFolder("featra-plain-");
-    const other = await tempFolder("featra-other-");
     await writeFile(join(project.dir, "CLAUDE.md"), "# My own agent rules\n");
-    // STORY-42: a knowledge file the user already has, so the confirmation has something it kept.
-    await writeFile(join(project.dir, "CONTEXT.md"), "# My own context\n");
     try {
       const { app, page } = await launch(profile.dir);
-      await expect(offer(page)).toHaveCount(0);
+      await expect(setupPage(page)).toHaveCount(0);
 
-      // AC1: a folder that isn't a git repository offers git init.
+      // AC1: a folder that isn't set up shows the page in Work, not the list.
       await queueFolderPicks(app, project.dir);
       await page.keyboard.press("Control+O");
-      await expect(offer(page)).toContainText("This folder isn't a git repository.");
-      await offer(page).getByRole("button", { name: "Initialize Git" }).click();
+      await expect(setupPage(page).getByRole("heading", { name: "Set up project", level: 2 })).toBeVisible();
+      await expect(list(page)).toHaveCount(0);
 
-      // AC1 (and STORY-42 AC2): a repository without .featra/ offers Featra init, with no reload.
-      await expect(offer(page)).toContainText("Featra isn't set up in this project.");
-      expect(isRepo(project.dir)).toBe(true);
-      expect(await exists(join(project.dir, ".featra"))).toBe(false);
-      await offer(page).getByRole("button", { name: "Initialize Featra" }).click();
-      await expect(offer(page)).toHaveCount(0);
+      // AC2: git and the Featra folder are required; every file is offered; a starter .gitignore too.
+      for (const name of ["Git", "Featra folder"]) {
+        await expect(box(page, name)).toBeChecked();
+        await expect(box(page, name)).toBeDisabled();
+        await expect(row(page, name)).toContainText("Required");
+      }
+      await expect(row(page, "Git")).not.toContainText("Already a git repository");
+      for (const name of ["CONTEXT.md", "decisions.md", "open-questions.md", "docs/adr/", ".gitignore"]) {
+        await expect(box(page, name)).toBeChecked();
+        await expect(box(page, name)).toBeEnabled();
+      }
+      await box(page, "open-questions.md").uncheck();
+      await setupPage(page).getByRole("radio", { name: "Tasks" }).check();
 
-      // STORY-42 AC1: Work confirms what init created and what it kept, as the real server reported it.
-      await expect(confirmation(page).getByRole("heading", { name: "Featra is set up" })).toBeVisible();
+      // AC3, AC4: one Set up; the result lists what the real server created.
+      await setupPage(page).getByRole("button", { name: "Set up", exact: true }).click();
+      await expect(resultStep(page).getByRole("heading", { name: "Project is set up" })).toBeVisible();
       await expect(listed(page, "Created")).toHaveText([
+        ".git/",
         ".featra/config.yaml",
+        "CONTEXT.md",
+        "decisions.md",
         "docs/adr/",
         "docs/adr/README.md",
-        "decisions.md",
-        "open-questions.md",
+        ".gitignore",
       ]);
-      await expect(listed(page, "Kept")).toHaveText(["CONTEXT.md"]);
-      expect(await readFile(join(project.dir, "CONTEXT.md"), "utf8")).toBe("# My own context\n");
+      await expect(listed(page, "Kept")).toHaveCount(0);
 
-      // AC2: the scaffold is on disk.
-      expect(await readFile(join(project.dir, ".featra", "config.yaml"), "utf8")).toContain("version: 1");
-      for (const file of ["CONTEXT.md", "decisions.md", "open-questions.md"]) {
+      // The files are on disk, git first; the unticked one isn't; the workflow choice is in the config.
+      expect(git(project.dir, "rev-parse", "--is-inside-work-tree")).toBe("true");
+      const config = await readFile(join(project.dir, ".featra", "config.yaml"), "utf8");
+      expect(config).toContain("version: 1");
+      expect(config).toMatch(/progress: tasks/);
+      for (const file of ["CONTEXT.md", "decisions.md", ".gitignore", "docs/adr/README.md"]) {
         expect(await exists(join(project.dir, file)), file).toBe(true);
       }
-      expect((await stat(join(project.dir, "docs", "adr"))).isDirectory()).toBe(true);
+      expect(await exists(join(project.dir, "open-questions.md"))).toBe(false);
+      expect(await readFile(join(project.dir, ".gitignore"), "utf8")).toContain("node_modules/");
 
-      // AC3: the user's CLAUDE.md is as it was, and no AGENTS.md appeared.
+      // AC5: the user's CLAUDE.md is as it was, and no AGENTS.md appeared.
       expect(await readFile(join(project.dir, "CLAUDE.md"), "utf8")).toBe("# My own agent rules\n");
       expect((await readdir(project.dir)).filter((f) => /^agents\.md$/i.test(f))).toEqual([]);
 
-      // STORY-42 AC3: Dismiss hides the confirmation, and nothing comes back for the project after a restart.
-      await confirmation(page).getByRole("button", { name: "Dismiss" }).click();
-      await expect(confirmation(page)).toHaveCount(0);
+      // AC4: Done shows the list, and the page doesn't come back after a restart.
+      await resultStep(page).getByRole("button", { name: "Done" }).click();
+      await expect(list(page)).toHaveAttribute("data-project", project.dir);
       await app.close();
       const again = await launch(profile.dir);
-      // A plain folder first, to see the real status check answer, then back to the project that is set up.
-      await queueFolderPicks(again.app, other.dir, project.dir);
-      await again.page.keyboard.press("Control+O");
-      await expect(offer(again.page)).toContainText("This folder isn't a git repository.");
-      await again.page.keyboard.press("Control+O");
-      await expect(offer(again.page)).toHaveCount(0);
+      await expect(list(again.page)).toHaveAttribute("data-project", project.dir);
       // Nothing is waiting to appear: give the status check time to answer before the final look.
       await again.page.waitForTimeout(1000);
-      await expect(offer(again.page)).toHaveCount(0);
-      await expect(confirmation(again.page)).toHaveCount(0);
+      await expect(setupPage(again.page)).toHaveCount(0);
+
+      // AC1: "Set up project" in Project settings reopens it; everything is kept now.
+      await again.page.keyboard.press("Control+Shift+,");
+      await again.page.getByRole("button", { name: "Set up project" }).click();
+      await expect(row(again.page, "Git")).toContainText("Already a git repository");
+      await expect(row(again.page, "CONTEXT.md")).toContainText("Kept");
+      await expect(box(again.page, "open-questions.md")).toBeEnabled();
       await again.app.close();
     } finally {
       await profile.dispose();
       await project.dispose();
-      await other.dispose();
     }
   });
 
-  test("a new project is offered git init; Not now hides the offer", async () => {
+  test("an existing repository: a file it has is kept as it was, and no .gitignore is offered", async () => {
+    const profile = await tempUserData();
+    const project = await tempFolder("featra-repo-");
+    git(project.dir, "init");
+    await writeFile(join(project.dir, "CONTEXT.md"), "# My own context\n");
+    await writeFile(join(project.dir, ".gitignore"), "secret/\n");
+    try {
+      const { app, page } = await launch(profile.dir);
+      await queueFolderPicks(app, project.dir);
+      await page.keyboard.press("Control+O");
+      await expect(row(page, "Git")).toContainText("Already a git repository");
+      await expect(row(page, "CONTEXT.md")).toContainText("Kept");
+      await expect(box(page, "CONTEXT.md")).toBeDisabled();
+      await expect(box(page, ".gitignore")).toHaveCount(0);
+
+      await setupPage(page).getByRole("button", { name: "Set up", exact: true }).click();
+      await expect(listed(page, "Created")).toHaveText([
+        ".featra/config.yaml",
+        "decisions.md",
+        "open-questions.md",
+        "docs/adr/",
+        "docs/adr/README.md",
+      ]);
+      await expect(listed(page, "Kept")).toHaveText(["CONTEXT.md"]);
+      expect(await readFile(join(project.dir, "CONTEXT.md"), "utf8")).toBe("# My own context\n");
+      expect(await readFile(join(project.dir, ".gitignore"), "utf8")).toBe("secret/\n");
+      await app.close();
+    } finally {
+      await profile.dispose();
+      await project.dispose();
+    }
+  });
+
+  test("a new project shows the page; Skip goes to the empty list and changes nothing", async () => {
     const profile = await tempUserData();
     const home = await tempFolder("featra-home-");
     try {
@@ -120,9 +168,10 @@ test.describe("STORY-2: open a folder and initialise Featra", () => {
       await dialog.getByRole("textbox", { name: "Location" }).fill(home.dir);
       await dialog.getByRole("textbox", { name: "Name" }).fill("fresh");
       await page.keyboard.press("Enter");
-      await expect(offer(page)).toContainText("This folder isn't a git repository.");
-      await offer(page).getByRole("button", { name: "Not now" }).click();
-      await expect(offer(page)).toHaveCount(0);
+      await expect(box(page, "Git")).toBeVisible();
+      await setupPage(page).getByRole("button", { name: "Skip" }).click();
+      await expect(setupPage(page)).toHaveCount(0);
+      await expect(list(page)).toHaveAttribute("data-project", join(home.dir, "fresh"));
       expect(await readdir(join(home.dir, "fresh"))).toEqual([]);
       await app.close();
     } finally {

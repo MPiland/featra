@@ -20,13 +20,15 @@ export interface SettingsViewProps {
   onPage: (page: SettingsPage) => void;
   onAppChange: (settings: AppSettings) => void;
   shortcuts: readonly ShortcutEntry[];
+  /** Reopens a project's setup page (STORY-42). */
+  onSetUp?: (dir: string) => void;
 }
 
 const SCOPES: readonly SettingsScope[] = ["app", "project"];
 
 /** Settings: the page list, by scope, and the chosen page. */
 export function SettingsView(props: SettingsViewProps) {
-  const { bridge, snapshot, projects, projectKey, page, onPage, onAppChange, shortcuts } = props;
+  const { bridge, snapshot, projects, projectKey, page, onPage, onAppChange, shortcuts, onSetUp } = props;
   const pages = settingsPages(snapshot);
   const current = pages.find((p) => p.id === page) ?? pages[0];
   return (
@@ -65,6 +67,7 @@ export function SettingsView(props: SettingsViewProps) {
               snapshot={snapshot}
               projects={projects}
               title={current.title}
+              onSetUp={onSetUp}
             />
           ) : (
             current && (

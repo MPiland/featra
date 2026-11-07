@@ -1,5 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { SETUP_ITEM_IDS } from "@featra/work-format/setup-plan";
 import { App } from "../src/App.tsx";
 import { act } from "react";
 import {
@@ -13,6 +14,7 @@ import {
   type ProjectRef,
   type ProjectSetup,
   type ProjectsResult,
+  type SetupItemId,
   type ProjectsSnapshot,
   type SettingsSnapshot,
   type UiState,
@@ -42,9 +44,13 @@ export interface HostOptions {
   slowProjectWrites?: boolean;
   /** Each folder's setup as the server would find it on disk. Default: set up ("ready"). */
   setup?: Record<string, ProjectSetup>;
-  /** Folders where the server's Featra init fails: its error. */
+  /** Setup items already in each folder, as the server would find them. Default: none. */
+  existing?: Record<string, SetupItemId[]>;
+  /** Folders the server can't check for setup: its error. */
+  planFailures?: Record<string, string>;
+  /** Folders where the server's setup fails: its error. */
   initFailures?: Record<string, string>;
-  /** What the server's Featra init reports it created and kept, by folder. Default: it created config.yaml only. */
+  /** What the server's setup reports it created and kept, by folder. Default: it created config.yaml only. */
   initResults?: Record<string, { created: string[]; kept: string[] }>;
 }
 
@@ -140,13 +146,18 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     },
     setup: {
       status: async (dir) => setupOf(dir),
-      initGit: async (dir) => {
-        calls.push(`initGit:${dir}`);
-        if (setupOf(dir).state === "no-git") setupOnDisk.set(dir, { state: "no-featra" });
-        return setupOf(dir);
+      plan: async (dir) => {
+        const failure = host.planFailures?.[dir];
+        if (failure) return { ok: false, error: failure };
+        const existing = new Set(host.existing?.[dir] ?? []);
+        return {
+          ok: true,
+          git: setupOf(dir).state !== "no-git",
+          items: SETUP_ITEM_IDS.map((id) => ({ id, exists: existing.has(id) })),
+        };
       },
-      initFeatra: async (dir) => {
-        calls.push(`initFeatra:${dir}`);
+      run: async (dir, items) => {
+        calls.push(`setup:${dir}:${items.join(",")}`);
         const failure = host.initFailures?.[dir];
         if (failure) return { ok: false, error: failure };
         setupOnDisk.set(dir, { state: "ready" });

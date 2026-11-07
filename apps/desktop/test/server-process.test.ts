@@ -52,14 +52,14 @@ describe("the server child process", () => {
     expect(logged.join("\n")).not.toContain(endpoint?.token);
   }, 20_000);
 
-  it("takes a plain folder through git init and Featra init, through the client the preload uses", async () => {
+  it("sets a plain folder up in one pass, git first, through the client the preload uses (STORY-42)", async () => {
     const dir = await folder();
     await server.setProjects([dir]);
     const setup = serverSetup(client());
     expect(await setup.status(dir)).toEqual({ state: "no-git" });
-    expect(await setup.initGit(dir)).toEqual({ state: "no-featra" });
-    const result = await setup.initFeatra(dir);
-    expect(result).toMatchObject({ ok: true, kept: [] });
+    expect(await setup.plan(dir)).toMatchObject({ ok: true, git: false });
+    const result = await setup.run(dir, ["decisions"]);
+    expect(result).toEqual({ ok: true, created: [".git/", ".featra/config.yaml", "decisions.md"], kept: [] });
     expect(await readFile(join(dir, ".featra", "config.yaml"), "utf8")).toContain("version: 1");
     expect(await setup.status(dir)).toEqual({ state: "ready" });
   }, 20_000);
@@ -70,7 +70,8 @@ describe("the server child process", () => {
     await server.setProjects([first]);
     const setup = serverSetup(client());
     expect(await setup.status(second)).toEqual({ state: "error", error: "Not an open project." });
-    expect(await setup.initFeatra(second)).toEqual({ ok: false, error: "Not an open project." });
+    expect(await setup.plan(second)).toEqual({ ok: false, error: "Not an open project." });
+    expect(await setup.run(second, [])).toEqual({ ok: false, error: "Not an open project." });
     await server.setProjects([first, second]);
     expect(await setup.status(second)).toEqual({ state: "no-featra" });
   }, 20_000);

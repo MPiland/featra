@@ -260,3 +260,24 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   Dismiss. Nothing is stored to make "does not come back" hold across restarts: the confirmation exists only as the
   answer to an init in this run, and a project that is set up (`ready`) is never offered init again, so after Dismiss
   or a restart there is nothing that could bring it back. The e2e proves this with a relaunch.
+- 2026-11-06 — STORY-42 rescoped to "Set up a project on one screen"; this replaces the entry above (the banner and
+  its confirmation are gone). Decisions:
+  - Two new server methods, `project.setupPlan` and `project.setup`, in their own file (`project-setup-plan.ts`), so
+    STORY-3's server work doesn't collide. `project.gitInit` and `project.init` stay on the server, unused by the
+    client, rather than being changed under STORY-3. `FEATRA_SCAFFOLD` is unchanged; the setup items map ids to its
+    entries plus a starter `.gitignore` (`work-format/setup-items.ts`).
+  - The setup ids, plan shape and params live in `setup-plan.ts`, apart from the items, so the preload bundle stays
+    free of the scaffold's YAML dependency (the preload-bundle test caught it).
+  - The client sends the ticked items and the kept ones; the server adds the required ones. Asking for kept items
+    lets the result list them as Kept. A `.gitignore` that exists isn't offered or sent: the user's own is never
+    merged into.
+  - Workflow settings changed on the page are held until Set up, then written through the same `setProjectValue`
+    storage Project settings uses, once `.featra/config.yaml` exists. A failed write shows on the result step; setup
+    itself has already succeeded.
+  - Skip lasts per project until Featra restarts, like STORY-2's Not now. Done closes the page for the project; it
+    comes back only from Project settings > "Set up project", which switches to that project first if needed and
+    opens Work.
+  - The page is its own component (`ProjectSetupPage` + `useSetupPage`), with its sections in an array so STORY-33 can
+    add more. WorkView only picks the page or the list. The page carries Work's `data-view`/`data-project` marks.
+  - A project the server can't check shows the page with the error, Try again and Skip; a failed Set up keeps the
+    page with the error so the user can retry.

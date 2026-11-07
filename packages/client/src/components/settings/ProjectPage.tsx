@@ -1,20 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { FeatraBridge } from "../../bridge.ts";
 import type { ProjectsSnapshot } from "../../projects.ts";
-import {
-  effectiveWork,
-  isOverridden,
-  workSettingDef,
-  workValueLabel,
-  type ProjectSettings,
-  type SettingsSnapshot,
-  type WorkSettingKey,
-  type WorkSettings,
-} from "../../settings.ts";
-import { resetLabel } from "../../settings-pages.ts";
+import type { ProjectSettings, SettingsSnapshot, WorkSettingKey, WorkSettings } from "../../settings.ts";
+import { SETUP_PAGE_COPY } from "../../setup-page.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
 import { PageHeader } from "./PageHeader.tsx";
-import { WorkSettingGroups } from "./WorkSettingGroups.tsx";
+import { ProjectWorkGroups } from "./ProjectWorkGroups.tsx";
 
 export interface ProjectPageProps {
   bridge: FeatraBridge;
@@ -22,10 +13,12 @@ export interface ProjectPageProps {
   /** The picker lists every known project and starts on the current one. */
   projects: ProjectsSnapshot;
   title: string;
+  /** Reopens the project setup page for a project (STORY-42); absent where there are no folders. */
+  onSetUp?: (dir: string) => void;
 }
 
 /** The Project scope's Workflow page: one project's work settings, each either the app default or an override. */
-export function ProjectPage({ bridge, snapshot, projects, title }: ProjectPageProps) {
+export function ProjectPage({ bridge, snapshot, projects, title, onSetUp }: ProjectPageProps) {
   const [dir, setDir] = useState(projects.current?.dir ?? projects.projects[0]?.dir ?? null);
   // Settings are kept with the folder they were read from, so switching folders shows nothing until the new one loads.
   const [loaded, setLoaded] = useState<{ dir: string; settings: ProjectSettings } | null>(null);
@@ -79,6 +72,11 @@ export function ProjectPage({ bridge, snapshot, projects, title }: ProjectPagePr
           options={projects.projects.map((p) => ({ value: p.dir, label: p.name }))}
           onChange={setDir}
         />
+        {onSetUp && (
+          <button type="button" className="btn" onClick={() => onSetUp(dir)}>
+            {SETUP_PAGE_COPY.reopen}
+          </button>
+        )}
       </PageHeader>
       <p className="settings-intro">
         <span title="Stored in the project's .featra/config.yaml">Saved in the project, shared through git.</span>
@@ -88,20 +86,11 @@ export function ProjectPage({ bridge, snapshot, projects, title }: ProjectPagePr
           Can't read project settings: {project.error}
         </p>
       )}
-      <WorkSettingGroups
-        scope="project"
-        values={effectiveWork(defaults, overrides)}
+      <ProjectWorkGroups
+        defaults={defaults}
+        overrides={overrides}
         disabled={!project || project.error !== null}
-        onChange={(key, value) => void set(key, value)}
-        override={(key) =>
-          isOverridden(overrides, key)
-            ? {
-                defaultLabel: workValueLabel(key, defaults[key]),
-                resetLabel: resetLabel(workSettingDef(key).label),
-                onReset: () => void reset(key),
-              }
-            : undefined
-        }
+        onSet={(key, value) => void (value === null ? reset(key) : set(key, value))}
       />
     </div>
   );

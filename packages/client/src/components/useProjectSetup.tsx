@@ -1,84 +1,87 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { FeatraBridge } from "../bridge.ts";
-import type { InitDone, ProjectSetup } from "../project-setup.ts";
-import { SetupDone } from "./SetupDone.tsx";
-import { SetupOffer } from "./SetupOffer.tsx";
+import type { ProjectSetup } from "../project-setup.ts";
+import type { WorkSettings } from "../settings.ts";
+import { ProjectSetupPage } from "./ProjectSetupPage.tsx";
 
-/** Each result is kept with the project it belongs to, so switching projects never shows another one's. */
+/** A status is kept with the project it belongs to, so switching projects never shows another one's. */
 interface ForDir<T> {
   dir: string;
   value: T;
 }
 
+export interface ProjectSetupControl {
+  /** The setup page for the current project, or null when Work should show its list. */
+  setupPage: ReactNode;
+  /** Shows the setup page for a project again (Project settings > Set up project). */
+  openSetup: (dir: string) => void;
+}
+
 /**
- * The current project's setup, checked with the server whenever the project changes (opened, created or switched
- * to), and the offer to take the next step. "Not now" hides the offer for that project until Featra restarts.
- * After Featra init, a confirmation lists what it created and kept until it is dismissed. It lives in memory only: a
- * project that is set up is never offered init again, so a dismissed confirmation has no way back (decisions.md).
+ * When the current project gets the setup page (STORY-42). The server's status is checked whenever the project
+ * changes; a project that isn't set up shows the page until it is skipped or set up. Skip lasts until Featra
+ * restarts. Done closes the page; it comes back only when reopened from Project settings.
  */
-export function useProjectSetup(bridge: FeatraBridge, dir: string | null): ReactNode {
+export function useProjectSetup(bridge: FeatraBridge, dir: string | null, defaults: WorkSettings): ProjectSetupControl {
   const [checked, setChecked] = useState<ForDir<ProjectSetup> | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<ForDir<string> | null>(null);
-  const [dismissed, setDismissed] = useState<ReadonlySet<string>>(() => new Set());
-  const [done, setDone] = useState<ForDir<InitDone> | null>(null);
+  const [skipped, setSkipped] = useState<ReadonlySet<string>>(() => new Set());
+  // The project whose page was reopened from settings, and how often, so each reopen starts afresh.
+  const [reopened, setReopened] = useState<ForDir<number> | null>(null);
   const folders = bridge.platform !== "web";
 
+  const check = useCallback(
+    (project: string, isLive: () => boolean = () => true) =>
+      void bridge.setup.status(project).then((value) => isLive() && setChecked({ dir: project, value })),
+    [bridge],
+  );
   useEffect(() => {
     if (!dir || !folders) return undefined;
     let live = true;
-    void bridge.setup.status(dir).then((value) => live && setChecked({ dir, value }));
+    check(dir, () => live);
     return () => {
       live = false;
     };
-  }, [bridge, dir, folders]);
+  }, [check, dir, folders]);
 
-  /** Runs one setup step on the current project; shows its new status, or why it failed. */
-  const step = useCallback(
-    async (run: (project: string) => Promise<ProjectSetup | { error: string }>) => {
-      if (!dir) return;
-      setBusy(true);
-      setError(null);
-      const outcome = await run(dir);
-      setBusy(false);
-      if ("error" in outcome) setError({ dir, value: outcome.error });
-      else setChecked({ dir, value: outcome });
-    },
-    [dir],
-  );
-  const initGit = useCallback(
-    () =>
-      void step(async (project) => {
-        const setup = await bridge.setup.initGit(project);
-        return setup.state === "error" ? { error: setup.error } : setup;
-      }),
-    [bridge, step],
-  );
-  const initFeatra = useCallback(
-    () =>
-      void step(async (project) => {
-        const result = await bridge.setup.initFeatra(project);
-        if (!result.ok) return { error: result.error };
-        setDone({ dir: project, value: result });
-        return bridge.setup.status(project);
-      }),
-    [bridge, step],
-  );
-  const dismiss = useCallback(() => {
-    if (dir) setDismissed((d) => new Set(d).add(dir));
-  }, [dir]);
-  const dismissDone = useCallback(() => setDone(null), []);
+  const close = useCallback((project: string) => {
+    setReopened((r) => (r?.dir === project ? null : r));
+  }, []);
+  const skip = useCallback(() => {
+    if (!dir) return;
+    setSkipped((s) => new Set(s).add(dir));
+    close(dir);
+  }, [dir, close]);
+  const done = useCallback(() => {
+    if (!dir) return;
+    // Set up now; the server's answer follows. Either way the page waits for a reopen from settings.
+    setChecked({ dir, value: { state: "ready" } });
+    setSkipped((s) => new Set(s).add(dir));
+    close(dir);
+    check(dir);
+  }, [dir, close, check]);
+  const openSetup = useCallback((project: string) => {
+    setSkipped((s) => {
+      const next = new Set(s);
+      next.delete(project);
+      return next;
+    });
+    setReopened((r) => ({ dir: project, value: r?.dir === project ? r.value + 1 : 1 }));
+  }, []);
 
-  if (dir && done?.dir === dir) return <SetupDone done={done.value} onDismiss={dismissDone} />;
-  if (!dir || checked?.dir !== dir || dismissed.has(dir)) return null;
-  return (
-    <SetupOffer
-      setup={checked.value}
-      busy={busy}
-      error={error?.dir === dir ? error.value : null}
-      onInitGit={initGit}
-      onInitFeatra={initFeatra}
-      onDismiss={dismiss}
-    />
-  );
+  const forced = reopened !== null && reopened.dir === dir;
+  const needed = checked?.dir === dir && checked.value.state !== "ready" && !skipped.has(dir ?? "");
+  const show = dir !== null && folders && (forced || needed);
+  return {
+    setupPage: show ? (
+      <ProjectSetupPage
+        key={`${dir}:${forced ? reopened.value : 0}`}
+        bridge={bridge}
+        dir={dir}
+        defaults={defaults}
+        onSkip={skip}
+        onDone={done}
+      />
+    ) : null,
+    openSetup,
+  };
 }

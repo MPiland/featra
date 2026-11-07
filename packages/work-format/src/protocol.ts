@@ -3,6 +3,7 @@
  * client sends `{ id, method, params }`; the server answers each with `{ id, ok: true, result }` or
  * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
  */
+import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /** Only loopback, always: the server must not be reachable from another machine (docs/architecture.md). */
@@ -29,10 +30,20 @@ export interface ServerMethods {
   "project.gitInit": { params: { dir: string }; result: ProjectSetup };
   /** Scaffolds `.featra/` and the knowledge files that are missing, in a git repository. */
   "project.init": { params: { dir: string }; result: InitResult };
+  /** Before one-screen setup (STORY-42): whether the folder is a repository and which setup items it already has. */
+  "project.setupPlan": { params: { dir: string }; result: SetupPlan };
+  /** One-screen setup: `git init` if needed, then the chosen items (required ones always), creating only what is missing. */
+  "project.setup": { params: { dir: string; items: SetupItemId[] }; result: InitResult };
 }
 
 export type ServerMethod = keyof ServerMethods;
-export const SERVER_METHODS: readonly ServerMethod[] = ["project.setupStatus", "project.gitInit", "project.init"];
+export const SERVER_METHODS: readonly ServerMethod[] = [
+  "project.setupStatus",
+  "project.gitInit",
+  "project.init",
+  "project.setupPlan",
+  "project.setup",
+];
 
 export interface ServerRequest {
   id: number;
