@@ -2,7 +2,7 @@
 id: FEAT-2
 type: feature
 title: Cards, ownership and feature list
-status: active
+status: done
 parent: EPIC-1
 order: 3
 origin: planned
@@ -18,6 +18,16 @@ history:
     from: approved
     to: active
     by: lead
+  - at: 2026-11-07T15:46:00.145Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-07T15:46:00.145Z
+    field: status
+    from: active
+    to: done
+    by: user
 ---
 
 ## Description
