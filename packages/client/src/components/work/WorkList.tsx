@@ -10,6 +10,7 @@ import {
 } from "../../work-list.ts";
 import { Epic } from "./Epic.tsx";
 import { StaleCopies } from "./StaleCopies.tsx";
+import { StaleCards } from "./stale-mark.tsx";
 import { useWorkList } from "./useWorkList.ts";
 
 /**
@@ -42,9 +43,11 @@ export function WorkList({ work, project }: { work: WorkBridge; project: Project
           ))}
         </div>
         {epics.length === 0 && <p className="meta">{WORK_COPY.noMatch}</p>}
-        {epics.map((e) => (
-          <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
-        ))}
+        <StaleCards value={new Set(list.stale.map((s) => s.cardId))}>
+          {epics.map((e) => (
+            <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
+          ))}
+        </StaleCards>
       </>
     );
   }

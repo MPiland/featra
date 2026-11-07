@@ -3,6 +3,7 @@ import type { FeatureRow, StoryRow, Tone } from "@featra/work-format/work-list";
 import { featureStatusLabel, WORK_COPY } from "../../work-list.ts";
 import { ChevronRightIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
+import { StaleMark } from "./stale-mark.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
 
@@ -39,6 +40,7 @@ function Story({ story }: { story: StoryRow }) {
       <span role="cell" className="pn">
         {story.title}
         {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
+        <StaleMark id={story.id} />
       </span>
       <span role="cell">
         <Status tone={story.tone} label={story.stage} />
@@ -63,6 +65,7 @@ export function Feature({ feature }: { feature: FeatureRow }) {
             <ChevronRightIcon />
             <span>{title}</span>
           </button>
+          <StaleMark id={feature.id} />
         </span>
         <span role="cell">
           <Status tone={feature.tone} label={featureStatusLabel(feature.status)} />

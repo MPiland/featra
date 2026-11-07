@@ -53,6 +53,7 @@ export const WORK_COPY = {
   columns: ["Feature", "Status", "Progress", "Tasks", "Scope"],
   storyColumns: ["Story", "Stage", "Criteria", "Tasks", "PR"],
   stale: "Edited outside its owner",
+  staleMark: "Edited elsewhere",
   staleDetail: (where: string, owner: string) => `Changed in ${where}. The card is owned by ${owner}.`,
   apply: "Apply to owner",
   discard: "Discard",

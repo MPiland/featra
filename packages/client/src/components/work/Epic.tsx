@@ -4,6 +4,7 @@ import { WORK_COPY } from "../../work-list.ts";
 import { ChevronRightIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
 import { Feature } from "./FeatureRows.tsx";
+import { StaleMark } from "./stale-mark.tsx";
 
 /** An epic's header, which folds its features away, and the features on one grid. */
 export function Epic({ epic }: { epic: EpicRow }) {
@@ -20,6 +21,7 @@ export function Epic({ epic }: { epic: EpicRow }) {
           </button>
         </h2>
         {epic.id !== null && <span className="meta">{WORK_COPY.epic}</span>}
+        <StaleMark id={epic.id} />
         <Progress label={epic.progress.label} segments={epic.bar} total={epic.progress.total} />
       </div>
       {open && (

@@ -193,6 +193,17 @@ describe("AC6: a stale copy is flagged with Apply to owner and Discard", () => {
     ).toEqual(["Apply to owner", "Discard"]);
   });
 
+  it("flags the card's own row, and only that one", async () => {
+    const { user } = renderApp({ work: staleWork });
+    await staleList();
+    await user.click(toggle("Cards and the feature list"));
+    const table = screen.getByRole("table", { name: "Prove the core" });
+    const flagged = within(table)
+      .getAllByText("Edited elsewhere")
+      .map((m) => m.closest("[role=row]")?.getAttribute("data-card"));
+    expect(flagged).toEqual(["STORY-2"]);
+  });
+
   it.each([
     ["Apply to owner", "applyCopy"],
     ["Discard", "discardCopy"],
