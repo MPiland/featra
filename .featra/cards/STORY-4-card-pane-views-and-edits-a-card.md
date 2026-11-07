@@ -2,7 +2,7 @@
 id: STORY-4
 type: story
 title: Card pane views and edits a card
-status: In Review
+status: Done
 parent: FEAT-2
 order: 3
 origin: planned
@@ -39,6 +39,16 @@ history:
     field: status
     from: In Progress
     to: In Review
+    by: user
+  - at: 2026-11-07T14:50:46.762Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-07T14:50:46.762Z
+    field: status
+    from: In Review
+    to: Done
     by: user
 ---
 
