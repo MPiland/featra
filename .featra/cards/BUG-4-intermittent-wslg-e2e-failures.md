@@ -2,7 +2,7 @@
 id: BUG-4
 type: bug
 title: Intermittent WSLg e2e failures
-status: New
+status: In Progress
 parent: null
 order: 0
 origin: bug
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: session:dev-lead
+  - at: 2026-11-07T15:54:44.804Z
+    field: status
+    from: New
+    to: In Progress
+    by: user
 ---
 
 ## Description
@@ -32,7 +37,7 @@ Two e2e tests have each failed once on WSLg (Ubuntu), with nothing else running.
 ## Acceptance criteria
 
 - [ ] Each failure is reproduced, with its error and trace kept, and its cause is recorded in Notes. If the cause is a product bug, a regression test fails before the fix.
-- [ ] Both tests pass in 20 full WSLg runs in a row, with their assertions unchanged.
+- [ ] All four tests in Notes and Description (contrast dark, menu Edit/Paste, tray.spec:75 Show Featra, tray.spec:220 launch again) pass in 20 full WSLg runs in a row, and the tray tests pass 150 Windows runs, with their assertions unchanged.
 
 ## Tasks
 
@@ -40,6 +45,7 @@ Two e2e tests have each failed once on WSLg (Ubuntu), with nothing else running.
 - [ ] Fix the cause, in the product or in the test's isolation, without weakening any assertion
 
 ## Notes
+
 - 2026-11-06 (STORY-2 review): `menu.spec.ts` "Edit items act on the focused field" failed again on WSLg, 1 of 4 runs.
 - 2026-11-06 (STORY-2 review, Windows): `tray.spec.ts:220` "launching Featra again shows the running app's window"
   failed `windowInForeground` 2 of 7 runs on 94de547, then 0 of 150 on 8a43e99 (the developer's 60 plus 90 of mine).
