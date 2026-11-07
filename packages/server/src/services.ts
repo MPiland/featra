@@ -1,5 +1,6 @@
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { createApi, type Api } from "./api.ts";
+import { createCardActions } from "./card-actions.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createRepoGit } from "./repo-git.ts";
@@ -24,7 +25,12 @@ export function createServices({ allowed, log, now = () => new Date(), gitComman
   const scanner = createScanner(repoGit);
   const watches = createWorkWatches(scanner, log);
   const copies = createCopyActions({ git: repoGit, scanner, now });
-  const api = createApi({ git: createGit(gitCommand), allowed, watches, copies });
+  const cards = createCardActions({
+    scanner,
+    now,
+    rescan: async (dir) => (await watches.refresh(dir)) ?? scanner.scan(dir),
+  });
+  const api = createApi({ git: createGit(gitCommand), allowed, watches, copies, cards });
   return {
     api,
     async close() {

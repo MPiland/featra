@@ -139,3 +139,42 @@ describe("work.watch", () => {
     expect(logged).toEqual([]);
   });
 });
+
+describe("card.watch and card.update (ADR 0017)", () => {
+  it("answers with the card, pushes it on an outside edit, and saves an edit to the owner", async () => {
+    // After the tests above, STORY-1 is owned by its worktree, story-1.
+    const tree = `${repo.root}/story-1`;
+    const socket = await open();
+    try {
+      socket.send({ id: 10, method: "card.watch", params: { dir: repo.main, id: "STORY-1" } });
+      const answer = await socket.next((f) => f.id === 10);
+      expect(answer.result).toMatchObject({ id: "STORY-1", title: "Edited in main", owner: "worktree claude/story-1" });
+
+      const started = Date.now();
+      await repo.write(tree, card("STORY-1", "story", "FEAT-1", "Ready", { title: "Edited outside", notes: "n" }));
+      const push = await socket.next((f) => f.event === "card.view", 1000);
+      expect(Date.now() - started).toBeLessThan(1000);
+      expect(push).toMatchObject({ watch: 10, data: { title: "Edited outside", notes: "n" } });
+
+      const edit = { field: "notes", from: "n", to: "from the pane" };
+      socket.send({ id: 11, method: "card.update", params: { dir: repo.main, id: "STORY-1", edit } });
+      expect(await socket.next((f) => f.id === 11)).toMatchObject({
+        ok: true,
+        result: { ok: true, view: { notes: "from the pane" } },
+      });
+      expect(await repo.read(tree, "STORY-1")).toContain("from the pane");
+
+      socket.send({ id: 12, method: "card.update", params: { dir: repo.root, id: "STORY-1", edit } });
+      expect(await socket.next((f) => f.id === 12)).toEqual({ id: 12, ok: false, error: "Not an open project." });
+      socket.send({ id: 13, method: "card.update", params: { dir: repo.main, id: "STORY-1", edit: { field: "id" } } });
+      expect(await socket.next((f) => f.id === 13)).toEqual({
+        id: 13,
+        ok: false,
+        error: "Expected { dir, id, edit }.",
+      });
+    } finally {
+      socket.close();
+    }
+    expect(logged).toEqual([]);
+  });
+});

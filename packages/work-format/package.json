@@ -10,7 +10,8 @@
     "./protocol": "./src/protocol.ts",
     "./setup-plan": "./src/setup-plan.ts",
     "./setup-items": "./src/setup-items.ts",
-    "./work-list": "./src/work-list-types.ts"
+    "./work-list": "./src/work-list-types.ts",
+    "./card-view": "./src/card-view-types.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

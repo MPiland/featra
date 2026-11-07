@@ -10,11 +10,19 @@ import type { Scan, Scanner } from "./work-scan.ts";
 
 export type WorkListener = (list: WorkList) => void;
 
+/** What one listener takes from a scan: the Work list, or one card's view (ADR 0017). */
+export type ScanPick<T> = (scan: Scan | null, list: WorkList) => T;
+
 export interface WorkWatches {
   /** Starts or joins the watch on `dir`: answers with the list now, then calls `listener` with each change. */
   watch: (dir: string, listener: WorkListener) => Promise<{ list: WorkList; stop: () => void }>;
-  /** Rescans `dir` now, as after the server wrote to it. */
-  refresh: (dir: string) => Promise<void>;
+  /**
+   * Like `watch`, for what `pick` takes from each scan: answers with it now, then calls `listener` each time its
+   * JSON changes.
+   */
+  observe: <T>(dir: string, pick: ScanPick<T>, listener: (value: T) => void) => Promise<{ value: T; stop: () => void }>;
+  /** Rescans `dir` now, as after the server wrote to it; the scan, or undefined when nothing watches `dir`. */
+  refresh: (dir: string) => Promise<Scan | null | undefined>;
   close: () => void;
 }
 
@@ -28,12 +36,14 @@ interface Target {
   names?: readonly string[];
 }
 
+/** Hears every scan; it decides itself whether anything it cares about changed. */
+type ScanListener = (scan: Scan | null, list: WorkList) => void;
+
 interface Entry {
   dir: string;
-  listeners: Set<WorkListener>;
+  listeners: Set<ScanListener>;
   watchers: Map<string, FSWatcher>;
-  last: string;
-  queue: Promise<WorkList>;
+  queue: Promise<{ scan: Scan | null; list: WorkList }>;
   timer: ReturnType<typeof setTimeout> | undefined;
   closed: boolean;
 }
@@ -86,7 +96,7 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
     }
   };
 
-  const scanOnce = async (e: Entry): Promise<WorkList> => {
+  const scanOnce = async (e: Entry): Promise<{ scan: Scan | null; list: WorkList }> => {
     let list: WorkList;
     let scan: Scan | null = null;
     try {
@@ -96,14 +106,10 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
       log(`work scan failed: ${errorMessage(err)}`);
       list = { ...EMPTY_WORK_LIST, problems: [`Can't read the cards: ${errorMessage(err)}`] };
     }
-    if (e.closed) return list;
+    if (e.closed) return { scan, list };
     rewatch(e, targetsOf(e.dir, scan));
-    const json = JSON.stringify(list);
-    if (json !== e.last) {
-      e.last = json;
-      for (const listener of e.listeners) listener(list);
-    }
-    return list;
+    for (const listener of e.listeners) listener(scan, list);
+    return { scan, list };
   };
 
   const run = (e: Entry) => {
@@ -128,36 +134,49 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
     entries.delete(e.dir);
   };
 
+  const observe = async <T>(dir: string, pick: ScanPick<T>, listener: (value: T) => void) => {
+    let e = entries.get(dir);
+    if (!e) {
+      e = {
+        dir,
+        listeners: new Set(),
+        watchers: new Map(),
+        queue: Promise.resolve({ scan: null, list: EMPTY_WORK_LIST }),
+        timer: undefined,
+        closed: false,
+      };
+      entries.set(dir, e);
+    }
+    const entry = e;
+    const first = await run(entry);
+    const value = pick(first.scan, first.list);
+    let last = JSON.stringify(value);
+    const own: ScanListener = (scan, list) => {
+      const next = pick(scan, list);
+      const json = JSON.stringify(next);
+      if (json === last) return;
+      last = json;
+      listener(next);
+    };
+    entry.listeners.add(own);
+    return {
+      value,
+      stop: () => {
+        entry.listeners.delete(own);
+        if (!entry.listeners.size && !entry.closed) end(entry);
+      },
+    };
+  };
+
   return {
     async watch(dir, listener) {
-      let e = entries.get(dir);
-      if (!e) {
-        e = {
-          dir,
-          listeners: new Set(),
-          watchers: new Map(),
-          last: "",
-          queue: Promise.resolve(EMPTY_WORK_LIST),
-          timer: undefined,
-          closed: false,
-        };
-        entries.set(dir, e);
-      }
-      const entry = e;
-      const list = await run(entry);
-      const own: WorkListener = (l) => listener(l);
-      entry.listeners.add(own);
-      return {
-        list,
-        stop: () => {
-          entry.listeners.delete(own);
-          if (!entry.listeners.size && !entry.closed) end(entry);
-        },
-      };
+      const { value, stop } = await observe(dir, (_scan, list) => list, listener);
+      return { list: value, stop };
     },
+    observe,
     async refresh(dir) {
       const e = entries.get(dir);
-      if (e) await run(e);
+      return e ? (await run(e)).scan : undefined;
     },
     close() {
       for (const e of entries.values()) end(e);

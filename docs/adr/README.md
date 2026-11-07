@@ -48,3 +48,4 @@ What becomes easier or harder, and what we must now do.
 | [0014](0014-quality-gate.md)                      | OXC for lint and format, with a pre-commit quality gate  | accepted |
 | [0015](0015-local-server-process-and-protocol.md) | The local server's process model and WebSocket protocol  | accepted |
 | [0016](0016-work-list-owner-copies.md)            | The Work list from owner copies                          | accepted |
+| [0017](0017-card-pane-edits-owner-copy.md)        | The card pane edits the owner copy                       | accepted |

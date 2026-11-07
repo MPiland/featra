@@ -3,6 +3,7 @@
  * client sends `{ id, method, params }`; the server answers each with `{ id, ok: true, result }` or
  * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
  */
+import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 import type { WorkList } from "./work-list-types.ts";
@@ -49,16 +50,25 @@ export interface ServerMethods {
   "work.applyCopy": { params: { dir: string; key: string }; result: CopyActionResult };
   /** Throws a stale copy's edit away: restores the copy from git. */
   "work.discardCopy": { params: { dir: string; key: string }; result: CopyActionResult };
+  /**
+   * One card as the card pane shows it, from its owner (null when there is no such card); then, until
+   * `work.unwatch`, a `card.view` push each time it changes (ADR 0017). The request's id names the watch.
+   */
+  "card.watch": { params: { dir: string; id: string }; result: CardView | null };
+  /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
+  "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
 }
 
 /** Frames the server sends unasked, and the data each carries. */
 export interface ServerPushes {
   /** The Work list changed: the whole new list, for the watch the frame names. */
   "work.list": WorkList;
+  /** The watched card changed: the whole new view, or null when the card is gone. */
+  "card.view": CardView | null;
 }
 
 export type PushEvent = keyof ServerPushes;
-const PUSH_EVENTS: readonly PushEvent[] = ["work.list"];
+const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view"];
 
 /**
  * A pushed frame: `{ event, watch, data }`. It never has an `id`, so neither end can take it for an answer, and a
@@ -81,6 +91,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "work.unwatch",
   "work.applyCopy",
   "work.discardCopy",
+  "card.watch",
+  "card.update",
 ];
 
 export interface ServerRequest {

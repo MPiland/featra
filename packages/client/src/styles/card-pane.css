@@ -1,0 +1,330 @@
+/*
+ * The card pane (STORY-4, ADR 0017): docked beside the Work list, full height, after docs/mockups/app.html (.dock).
+ * Its width is set inline, fitted by pane-width.ts so the list keeps its minimum; nothing here may widen it.
+ */
+.work-split {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
+.work-split > .work-list {
+  min-width: 0;
+}
+
+.row-open {
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.row-open:hover {
+  text-decoration: underline;
+}
+
+.row-open:focus-visible,
+.card-close:focus-visible,
+.pane-handle:focus-visible,
+.inline-text:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.prow.shown {
+  background: var(--row);
+}
+
+.card-pane {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: var(--side);
+}
+
+.card-pane:focus {
+  outline: none;
+}
+
+/* The pane's left edge, over its border: takes no width of its own. */
+.pane-handle {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  width: 7px;
+  margin: 0 -4px 0 -3px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pane-handle::after {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  transition: background 0.15s;
+}
+
+.pane-handle:hover::after,
+.pane-handle:active::after,
+.pane-handle:focus-visible::after {
+  background: var(--acc);
+}
+
+.pane-handle:focus-visible {
+  outline-offset: -2px;
+}
+
+.card-pane .meta {
+  color: var(--tx3);
+}
+
+.card-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--side);
+  padding: 10px 12px 10px 18px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.card-id {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-close {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--tx2);
+  cursor: pointer;
+}
+
+.card-close:hover {
+  background: var(--row);
+}
+
+.card-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 18px;
+}
+
+.card-body p {
+  margin: 0;
+}
+
+.card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.card-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.card-error,
+.inline-refusal {
+  margin: 0;
+  color: var(--bad);
+  font-size: 12px;
+}
+
+.inline-refusal {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.card-sec .sh {
+  display: flex;
+  justify-content: space-between;
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tx2);
+}
+
+/* Text that edits in place: reads as text, edits in a field of the same size. */
+.inline-text {
+  display: block;
+  width: 100%;
+  padding: 4px 6px;
+  margin: 0 -6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  line-height: 1.5;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+button.inline-text {
+  cursor: text;
+}
+
+button.inline-text:hover {
+  border-color: var(--line);
+}
+
+.inline-text.editing {
+  border-color: var(--acc);
+  background: var(--bg);
+  outline: none;
+  resize: vertical;
+}
+
+.inline-text.editing[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.inline-edit {
+  margin: 0 -6px;
+}
+
+.inline-edit .inline-text {
+  margin: 0;
+}
+
+.card-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.card-items .ac {
+  display: flex;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.card-items .ac + .ac {
+  border-top: 1px solid var(--line);
+}
+
+.ac-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.card-items .task {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.chk,
+.box0 {
+  flex: 0 0 14px;
+  width: 14px;
+  height: 14px;
+  margin-top: 4px;
+  border-radius: 4px;
+}
+
+.chk {
+  display: grid;
+  place-items: center;
+  background: var(--accbg);
+  color: #fff;
+}
+
+.chk svg {
+  width: 10px;
+  height: 10px;
+}
+
+.box0 {
+  border: 1.5px solid var(--tx3);
+}
+
+.proof {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.proof-passed {
+  color: var(--ok);
+}
+
+.proof > svg,
+.proof > span {
+  flex: 0 0 auto;
+}
+
+/* A long test path is cut short; its title holds the whole path. */
+.proof code {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ev {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.ev li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ev .y {
+  color: var(--ok);
+}

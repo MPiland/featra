@@ -27,12 +27,16 @@ export interface ServerClient {
   /** Sends one request; resolves with the raw result for the caller to check, or rejects with the server's error. */
   call: <M extends ServerMethod>(method: M, params: ServerMethods[M]["params"]) => Promise<unknown>;
   /**
-   * Starts a `work.watch` (ADR 0016): the listener hears the answer, then every push for it. When the connection
-   * drops, the listener hears why, and the watch starts again on a new connection. Returns the stop.
+   * Starts a `work.watch` (ADR 0016) or a `card.watch` (ADR 0017): the listener hears the answer, then every push
+   * for it. When the connection drops, the listener hears why, and the watch starts again on a new connection.
+   * Returns the stop.
    */
-  watch: (method: "work.watch", params: ServerMethods["work.watch"]["params"], listener: WatchListener) => () => void;
+  watch: <M extends WatchMethod>(method: M, params: ServerMethods[M]["params"], listener: WatchListener) => () => void;
   close: () => void;
 }
+
+/** The methods that start a watch: its pushes go on until `work.unwatch`. */
+export type WatchMethod = "work.watch" | "card.watch";
 
 /** How long a dropped watch waits before it tries again. */
 export const REWATCH_MS = 1000;
@@ -50,7 +54,8 @@ interface Pending {
 }
 
 interface Watch {
-  params: ServerMethods["work.watch"]["params"];
+  method: WatchMethod;
+  params: unknown;
   listener: WatchListener;
   /** The id of the request that started it on the current connection; null while it isn't running. */
   id: number | null;
@@ -126,7 +131,7 @@ export function createServerClient(
   function start(w: Watch) {
     w.retry = undefined;
     if (w.stopped) return;
-    void send("work.watch", w.params, (id) => {
+    void send(w.method, w.params, (id) => {
       w.id = id;
       byId.set(id, w);
     }).then(
@@ -150,8 +155,8 @@ export function createServerClient(
 
   return {
     call: (method, params) => send(method, params),
-    watch(_method, params, listener) {
-      const w: Watch = { params, listener, id: null, retry: undefined, stopped: false };
+    watch(method, params, listener) {
+      const w: Watch = { method, params, listener, id: null, retry: undefined, stopped: false };
       watches.add(w);
       start(w);
       return () => {
