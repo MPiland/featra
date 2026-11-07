@@ -14,8 +14,8 @@ export async function shown() {
   return region;
 }
 export const result = () => screen.findByRole("region", { name: RESULT });
-/** Work's list for the current project (a placeholder until its story lands). */
-export const list = () => document.querySelector('main .placeholder[data-view="work"][data-project]');
+/** Work's list for the current project (STORY-3). */
+export const list = () => document.querySelector<HTMLElement>('main section[aria-label="Work list"][data-project]');
 export const button = async (name: string) => within(await shown()).getByRole("button", { name });
 export const box = (name: string) => screen.getByRole<HTMLInputElement>("checkbox", { name });
 /** The tag beside a row's checkbox ("Required", "Kept"), or null. */

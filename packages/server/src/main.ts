@@ -5,16 +5,16 @@
  */
 import { errorMessage } from "@featra/work-format";
 import { createAllowedProjects } from "./allowed-projects.ts";
-import { createApi } from "./api.ts";
-import { createGit } from "./git.ts";
 import { parseHostMessage, type ServerMessage } from "./host-messages.ts";
+import { createServices } from "./services.ts";
 import { startServer, type RunningServer } from "./ws-server.ts";
 
 const send = (message: ServerMessage) => process.send?.(message);
 const log = (message: string) => send({ type: "log", message });
 
 const allowed = createAllowedProjects();
-const api = createApi({ git: createGit(), allowed });
+const services = createServices({ allowed, log });
+const { api } = services;
 let server: RunningServer | undefined;
 
 process.on("message", (raw) => {
@@ -44,5 +44,5 @@ process.on("message", (raw) => {
 });
 
 process.on("disconnect", () => {
-  void (server?.close() ?? Promise.resolve()).finally(() => process.exit(0));
+  void (server?.close() ?? Promise.resolve()).then(() => services.close()).finally(() => process.exit(0));
 });

@@ -2,8 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAllowedProjects } from "../src/allowed-projects.ts";
-import { createApi } from "../src/api.ts";
-import { createGit } from "../src/git.ts";
+import { createServices } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { tempFolder } from "./temp-folder.ts";
 import { connect, request } from "./ws-client.ts";
@@ -13,6 +12,7 @@ const TOKEN = "test-token-0123456789";
 const allowed = createAllowedProjects();
 const logged: string[] = [];
 let server: RunningServer;
+const services = createServices({ allowed, log: (m) => logged.push(m) });
 let repo: Awaited<ReturnType<typeof tempFolder>>;
 
 beforeAll(async () => {
@@ -20,12 +20,13 @@ beforeAll(async () => {
   allowed.set([repo.dir]);
   server = await startServer({
     token: TOKEN,
-    api: createApi({ git: createGit(), allowed }),
+    api: services.api,
     log: (m) => logged.push(m),
   });
 });
 afterAll(async () => {
   await server.close();
+  await services.close();
   await repo.dispose();
 });
 

@@ -9,7 +9,8 @@
     "./guards": "./src/utils/guards.ts",
     "./protocol": "./src/protocol.ts",
     "./setup-plan": "./src/setup-plan.ts",
-    "./setup-items": "./src/setup-items.ts"
+    "./setup-items": "./src/setup-items.ts",
+    "./work-list": "./src/work-list-types.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

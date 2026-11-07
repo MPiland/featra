@@ -13,3 +13,8 @@ export * from "./scaffold.ts";
 export * from "./protocol.ts";
 export * from "./setup-plan.ts";
 export * from "./setup-items.ts";
+export * from "./branch-rules.ts";
+export * from "./owner-copies.ts";
+export * from "./copy-edit.ts";
+export * from "./work-list-types.ts";
+export * from "./work-list.ts";

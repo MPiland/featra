@@ -11,6 +11,7 @@ import {
   normalizeUiState,
   normalizeWindowState,
   serverSetup,
+  serverWork,
   type FeatraBridge,
 } from "@featra/client/bridge";
 
@@ -63,6 +64,7 @@ const bridge: FeatraBridge = {
       normalizeProjectsResult(await ipcRenderer.invoke(IPC.projectsCreate, location, name)),
   },
   setup: serverSetup(server),
+  work: serverWork(server),
   edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {
     info: () => ipcRenderer.invoke(IPC.appInfo),

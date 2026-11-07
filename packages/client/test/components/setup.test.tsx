@@ -105,6 +105,7 @@ describe("AC4: the result step lists what was created and kept; Done goes to the
     await user.click(within(done).getByRole("button", { name: "Done" }));
     expect(screen.queryByRole("region", { name: "Project is set up" })).toBeNull();
     expect(list()).toBeTruthy();
+    expect(await within(list()!).findByText("No cards yet.")).toBeTruthy();
     await switchTo(user, "other");
     await switchTo(user, "manager");
     await settle();

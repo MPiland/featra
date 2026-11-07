@@ -67,6 +67,10 @@ The methods so far are:
 | `project.init`        | `{ dir }`        | `{ ok, created, kept }` or `{ ok: false, error }`                        |
 | `project.setupPlan`   | `{ dir }`        | `{ ok, git, items: [{ id, exists }] }` or `{ ok: false, error }`         |
 | `project.setup`       | `{ dir, items }` | `{ ok, created, kept }` or `{ ok: false, error }`: git first, then items |
+| `work.watch`          | `{ dir }`        | The Work list, then pushes (ADR 0016)                                    |
+| `work.unwatch`        | `{ watch }`      | `null`                                                                   |
+| `work.applyCopy`      | `{ dir, key }`   | `{ ok: true }` or `{ ok: false, error }`                                 |
+| `work.discardCopy`    | `{ dir, key }`   | `{ ok: true }` or `{ ok: false, error }`                                 |
 
 `project.setupPlan` and `project.setup` (STORY-42) serve the one-screen setup page; `items` are setup item ids
 (`work-format/setup-plan`), and the required ones are always set up. The client no longer calls `project.gitInit` or
@@ -84,9 +88,11 @@ A new method is added to `ServerMethods` first; both ends check against it.
 - A crashed server costs one failed call, and the next call starts a new one. Its stderr and log messages land in
   main's log.
 - Another local process can't use the API without the token, and the page can't reach folders the user hasn't opened.
+- Services are built by `createServices` and closed after the socket server on disconnect, so no scan holds the
+  index file when the server exits.
 - Lint keeps `packages/server` free of React, Electron, `client` and `desktop`. Lint also keeps `client` from
   importing the server.
-- The protocol is request and answer only. STORY-3's change notifications will add server-pushed frames. They will
-  need a shape that can't be mistaken for an answer, for example one without `id`.
+- Besides request and answer, the server pushes `{ event, watch, data }` frames, with no `id`, for a running watch
+  (STORY-3, ADR 0016). A watch ends with `work.unwatch` or when its socket closes.
 - No installer exists yet. When packaging lands, it must check that the forked `server.cjs` still loads from the
   packaged app, and unpack it from the asar if it doesn't.

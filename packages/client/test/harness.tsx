@@ -20,7 +20,10 @@ import {
   type UiState,
   type WindowState,
   type WorkOverrides,
+  type WorkUpdate,
 } from "../src/bridge.ts";
+import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
+import type { CopyActionResult } from "@featra/work-format/protocol";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
 /** Where New Project… suggests a folder by default. */
@@ -52,6 +55,10 @@ export interface HostOptions {
   initFailures?: Record<string, string>;
   /** What the server's setup reports it created and kept, by folder. Default: it created config.yaml only. */
   initResults?: Record<string, { created: string[]; kept: string[] }>;
+  /** Each folder's Work list as the server would send it. Default: empty. */
+  work?: Record<string, WorkList>;
+  /** What apply and discard answer. Default: ok. */
+  copyResult?: CopyActionResult;
 }
 
 const noop = () => {};
@@ -88,6 +95,9 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   // The project folders on disk, as the server sees them: git init and Featra init move a folder to the next state.
   const setupOnDisk = new Map(Object.entries(host.setup ?? {}));
   const setupOf = (dir: string): ProjectSetup => setupOnDisk.get(dir) ?? { state: "ready" };
+  // The server's Work list per folder, and who is watching it.
+  const workLists = new Map(Object.entries(host.work ?? {}));
+  const watchers = new Map<string, Set<(u: WorkUpdate) => void>>();
   const bridge: FeatraBridge = {
     platform,
     uiState: {
@@ -164,6 +174,24 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
         return { ok: true, ...(host.initResults?.[dir] ?? { created: [".featra/config.yaml"], kept: [] }) };
       },
     },
+    work: {
+      watch: (dir, listener) => {
+        const set = watchers.get(dir) ?? new Set();
+        watchers.set(dir, set.add(listener));
+        queueMicrotask(() => listener({ list: workLists.get(dir) ?? EMPTY_WORK_LIST, error: null }));
+        return () => {
+          set.delete(listener);
+        };
+      },
+      applyCopy: async (dir, key) => {
+        calls.push(`applyCopy:${dir}:${key}`);
+        return host.copyResult ?? { ok: true };
+      },
+      discardCopy: async (dir, key) => {
+        calls.push(`discardCopy:${dir}:${key}`);
+        return host.copyResult ?? { ok: true };
+      },
+    },
     // Records which element had focus when the command reached the host: that is the field it acts on.
     edit: (command) => void calls.push(`edit:${command}:${(document.activeElement as HTMLElement | null)?.id ?? ""}`),
     app: {
@@ -182,8 +210,18 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       windowState = { ...windowState, ...s };
       for (const l of listeners) l(windowState);
     });
+  /** What the server does when a card file changes: push the new list to every watcher of the folder. */
+  const pushWork = (dir: string, update: WorkList | WorkUpdate) =>
+    act(() => {
+      const u = "list" in update ? update : { list: update, error: null };
+      workLists.set(dir, u.list);
+      for (const l of watchers.get(dir) ?? []) l(u);
+    });
   return {
     bridge,
+    pushWork,
+    /** How many watches are open on `dir`. */
+    watching: (dir: string) => watchers.get(dir)?.size ?? 0,
     saves,
     appSaves,
     projectFiles,

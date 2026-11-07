@@ -12,8 +12,8 @@ import { launch, queueFolderPicks, tempUserData } from "./app.ts";
  */
 const setupPage = (page: Page) => page.getByRole("region", { name: "Set up project" });
 const resultStep = (page: Page) => page.getByRole("region", { name: "Project is set up" });
-/** Work's list for the current project (a placeholder until its story lands). */
-const list = (page: Page) => page.locator("main .placeholder[data-view=work][data-project]");
+/** Work's list for the current project (STORY-3). */
+const list = (page: Page) => page.getByRole("region", { name: "Work list" });
 const box = (page: Page, name: string) => setupPage(page).getByRole("checkbox", { name, exact: true });
 // `has` is resolved inside each row, so it takes the checkbox alone, not a locator rooted at the page's region.
 const row = (page: Page, name: string) =>
@@ -105,6 +105,7 @@ test.describe("STORY-42: set up a project on one screen", () => {
       // AC4: Done shows the list, and the page doesn't come back after a restart.
       await resultStep(page).getByRole("button", { name: "Done" }).click();
       await expect(list(page)).toHaveAttribute("data-project", project.dir);
+      await expect(list(page)).toContainText("No cards yet.");
       await app.close();
       const again = await launch(profile.dir);
       await expect(list(again.page)).toHaveAttribute("data-project", project.dir);

@@ -236,7 +236,13 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 onSetUp={reopenSetup}
               />
             ) : view.id === "work" ? (
-              <WorkView projects={projects} platform={bridge.platform} actions={projectActions} setupPage={setupPage} />
+              <WorkView
+                projects={projects}
+                platform={bridge.platform}
+                actions={projectActions}
+                work={bridge.work}
+                setupPage={setupPage}
+              />
             ) : (
               <ViewPlaceholder view={view} />
             )}

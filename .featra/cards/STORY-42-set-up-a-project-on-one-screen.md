@@ -82,3 +82,7 @@ As a builder, when I open or create a project that isn't set up, I set it up in 
   Playwright resolves inside each row, so it never matched). The helper is fixed; the e2e is not yet rerun, per the
   Dev Lead (STORY-3 is verifying first). Rerun once cleared: Windows e2e 33/33 passed; `tray.spec.ts
   --repeat-each=5` passed. Not run: the e2e on WSLg (skipped, per the brief).
+- Merged STORY-3 (feature/2-cards-and-feature-list, 21a280f): WorkView shows this page or STORY-3's Work list; the
+  old setup offer above the list is gone. The setup tests now find STORY-3's list, and Done is checked to show its
+  empty state. After the merge: `pnpm check` passes (576 tests); Windows e2e 34/34; `tray.spec.ts --repeat-each=5`
+  45/45.

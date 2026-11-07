@@ -4,10 +4,11 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { SETUP_ITEMS, type SetupItemId } from "@featra/work-format";
 import { createAllowedProjects } from "../src/allowed-projects.ts";
-import { ApiError, createApi } from "../src/api.ts";
+import { ApiError, type Connection } from "../src/api.ts";
 import { createGit } from "../src/git.ts";
 import { setupStatus } from "../src/project-setup.ts";
 import { setUpProject, setupPlan } from "../src/project-setup-plan.ts";
+import { createServices } from "../src/services.ts";
 import { filesIn, tempFolder } from "./temp-folder.ts";
 
 const git = createGit();
@@ -91,7 +92,12 @@ describe("AC3: one call sets the project up, git first", () => {
     const repo = await folder({ git: true });
     const allowed = createAllowedProjects();
     allowed.set([repo]);
-    const api = createApi({ git, allowed });
+    const services = createServices({ allowed, log: () => {} });
+    cleanups.push(services.close);
+    // Setup never watches, so the socket it came in on is never used.
+    const connection: Connection = { push: () => {}, keep: () => {}, unwatch: () => false };
+    const api = (method: "project.setup" | "project.setupPlan", params: unknown) =>
+      services.api(method, params, 1, connection);
     await expect(api("project.setup", { dir: repo, items: ["claude"] })).rejects.toThrow(ApiError);
     await expect(api("project.setup", { dir: repo })).rejects.toThrow("Expected { dir, items }.");
     await expect(api("project.setup", { dir: await folder(), items: [] })).rejects.toThrow("Not an open project.");
