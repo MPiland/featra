@@ -15,11 +15,12 @@ export interface ManagedWindow {
   focus: () => void;
   restore: () => void;
   isMinimized: () => boolean;
+  isVisible: () => boolean;
 }
 
 /**
  * Whether Featra runs under WSLg (Linux GUI apps on Windows). There each window is also a Windows window, drawn by
- * msrdc.exe (BUG-4).
+ * msrdc.exe, and only showing a hidden window brings it to the front on Windows (BUG-4).
  */
 export const onWslg = (platform: string, env: Record<string, string | undefined>) =>
   platform === "linux" && Boolean(env.WSL_DISTRO_NAME);
@@ -44,6 +45,12 @@ export interface LifecycleOptions {
   rememberNotice: () => void;
   /** Exits the app (Electron's `app.quit`). */
   exit: () => void;
+  /**
+   * Reveal hides a shown window before showing it again (WSLg, see `onWslg`). There `focus()` doesn't bring a shown
+   * window in front of a Windows app, and a minimised window stays minimised on the Windows side while Electron
+   * reports it shown and not minimised; only a fresh show brings it back.
+   */
+  remapOnReveal?: boolean;
 }
 
 export interface TrayMenuItem {
@@ -106,6 +113,7 @@ export function createLifecycle(o: LifecycleOptions): Lifecycle {
       });
     },
     reveal(win) {
+      if (o.remapOnReveal && win.isVisible()) win.hide();
       if (win.isMinimized()) win.restore();
       win.show();
       win.focus();

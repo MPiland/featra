@@ -4,6 +4,7 @@ import { NO_TRAY_REASON } from "@featra/client/bridge";
 import {
   closeToTraySupport,
   createLifecycle,
+  onWslg,
   TRAY_NOTICE,
   type LifecycleOptions,
   type ManagedWindow,
@@ -14,21 +15,30 @@ class FakeWindow extends EventEmitter implements ManagedWindow {
   visible = true;
   minimized = false;
   focused = false;
+  /** The calls the lifecycle made, in order. */
+  calls: string[] = [];
   hide() {
+    this.calls.push("hide");
     this.visible = false;
     this.focused = false;
   }
   show() {
+    this.calls.push("show");
     this.visible = true;
   }
   focus() {
+    this.calls.push("focus");
     this.focused = true;
   }
   restore() {
+    this.calls.push("restore");
     this.minimized = false;
   }
   isMinimized() {
     return this.minimized;
+  }
+  isVisible() {
+    return this.visible;
   }
   /** What the OS does on the close button or Alt+F4: emit `close`, then close unless a listener prevented it. */
   tryClose(): "closed" | "kept" {
@@ -151,6 +161,37 @@ describe("AC7: Linux", () => {
     expect(lc.closeHides).toBe(false);
     expect(win.tryClose()).toBe("closed");
     expect(log.notices).toEqual([]);
+  });
+});
+
+describe("BUG-4: reveal under WSLg", () => {
+  it("knows WSLg by the distro WSL names, on Linux only", () => {
+    expect(onWslg("linux", { WSL_DISTRO_NAME: "Ubuntu" })).toBe(true);
+    expect(onWslg("linux", {})).toBe(false);
+    expect(onWslg("linux", { WSL_DISTRO_NAME: "" })).toBe(false);
+    expect(onWslg("win32", { WSL_DISTRO_NAME: "Ubuntu" })).toBe(false);
+  });
+
+  it("a shown window (behind another app, or minimised on the Windows side) is hidden and shown afresh, then focused", () => {
+    const { lc, win } = setup({ platform: "linux", remapOnReveal: true });
+    lc.reveal(win);
+    expect(win.calls).toEqual(["hide", "show", "focus"]);
+    expect(win).toMatchObject({ visible: true, focused: true });
+  });
+
+  it("a hidden window is just shown and focused, as everywhere", () => {
+    const { lc, win } = setup({ platform: "linux", remapOnReveal: true });
+    win.tryClose();
+    win.calls = [];
+    lc.reveal(win);
+    expect(win.calls).toEqual(["show", "focus"]);
+  });
+
+  it("elsewhere a shown window is never hidden: reveal restores, shows and focuses it", () => {
+    const { lc, win } = setup({ platform: "linux" });
+    win.minimized = true;
+    lc.reveal(win);
+    expect(win.calls).toEqual(["restore", "show", "focus"]);
   });
 });
 
