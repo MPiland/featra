@@ -2,7 +2,7 @@
 id: STORY-4
 type: story
 title: Card pane views and edits a card
-status: In Progress
+status: In Review
 parent: FEAT-2
 order: 3
 origin: planned
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: user
+  - at: 2026-11-07T07:45:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: user
 ---
 
 ## Description
@@ -33,10 +38,10 @@ As a builder, I open a story in a full-height pane beside the list and edit its 
 
 ## Acceptance criteria
 
-- [ ] Clicking a story opens a full-height docked card pane (never a floating popover); the list stays visible and the pane can be closed
-- [ ] The pane shows the user story, evidence, acceptance criteria with their proof, tasks, notes and PR
-- [ ] Clicking the user story or another text field edits it in place; leaving the field saves to the owner copy, and Escape cancels
-- [ ] Status and parent changes append a history event
+- [x] Clicking a story opens a full-height docked card pane (never a floating popover); the list stays visible and the pane can be closed (test: packages/client/test/components/card-pane.test.tsx AC1, apps/desktop/e2e/card-pane.spec.ts)
+- [x] The pane shows the user story, evidence, acceptance criteria with their proof, tasks, notes and PR (test: packages/client/test/components/card-pane.test.tsx AC2, packages/work-format/test/card-view.test.ts, apps/desktop/e2e/card-pane.spec.ts)
+- [x] Clicking the user story or another text field edits it in place; leaving the field saves to the owner copy, and Escape cancels (test: packages/client/test/components/card-pane.test.tsx AC3, packages/server/test/card-actions.test.ts, packages/work-format/test/card-edit.test.ts, apps/desktop/e2e/card-pane.spec.ts)
+- [x] Status and parent changes append a history event (test: packages/client/test/components/card-pane.test.tsx AC4, packages/server/test/card-actions.test.ts, packages/work-format/test/card-edit.test.ts, apps/desktop/e2e/card-pane.spec.ts)
 
 ## Tasks
 
@@ -47,3 +52,15 @@ As a builder, I open a story in a full-height pane beside the list and edit its 
 - [x] Docs: ADR 0017, ADR 0015 method table, architecture.md, CONTEXT.md (Card pane)
 
 ## Notes
+
+- Built per the Dev Lead's notes: writes are atomic (a temp file in the same folder, then a rename) and the
+  watch's per-listener dedupe keeps the pane from flashing back; keyboard flow (Enter opens and focuses the pane,
+  Escape closes back to the row, fields reachable with Tab and edited on Enter); status choices come only from the
+  transition rules (no Done before Verified and Accepted; Accept and Send back are a later story); a field being
+  edited ignores pushes, and a refused save keeps the typed text and shows the value now.
+- Limits (ADR 0017): a parent change that changes the owner is written to the old owner, and the next scan resolves
+  the new one; ticking, adding or removing ACs and tasks isn't a pane edit yet.
+- A unit test expected Done among a feature's status choices; the rules rightly exclude it while one of its stories
+  is open, so the expectation was corrected (not the code).
+- Tests: `pnpm check` passes (612 unit/integration tests). Windows e2e 35/35, including `card-pane.spec.ts`;
+  `tray.spec.ts --repeat-each=5` 45/45. Not run: the e2e on WSLg.
