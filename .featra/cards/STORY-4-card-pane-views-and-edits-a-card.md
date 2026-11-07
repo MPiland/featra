@@ -2,7 +2,7 @@
 id: STORY-4
 type: story
 title: Card pane views and edits a card
-status: In Review
+status: In Progress
 parent: FEAT-2
 order: 3
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: user
+  - at: 2026-11-07T08:30:00Z
+    field: status
+    from: In Review
+    to: In Progress
+    by: user
 ---
 
 ## Description
@@ -42,6 +47,8 @@ As a builder, I open a story in a full-height pane beside the list and edit its 
 - [x] The pane shows the user story, evidence, acceptance criteria with their proof, tasks, notes and PR (test: packages/client/test/components/card-pane.test.tsx AC2, packages/work-format/test/card-view.test.ts, apps/desktop/e2e/card-pane.spec.ts)
 - [x] Clicking the user story or another text field edits it in place; leaving the field saves to the owner copy, and Escape cancels (test: packages/client/test/components/card-pane.test.tsx AC3, packages/server/test/card-actions.test.ts, packages/work-format/test/card-edit.test.ts, apps/desktop/e2e/card-pane.spec.ts)
 - [x] Status and parent changes append a history event (test: packages/client/test/components/card-pane.test.tsx AC4, packages/server/test/card-actions.test.ts, packages/work-format/test/card-edit.test.ts, apps/desktop/e2e/card-pane.spec.ts)
+- [ ] The pane can be resized by dragging its edge, or with the keyboard on the handle; the list and the pane keep a minimum width and the width is remembered
+- [ ] At any window size down to the app's minimum, nothing scrolls sideways and the close button is visible
 
 ## Tasks
 
@@ -64,3 +71,6 @@ As a builder, I open a story in a full-height pane beside the list and edit its 
   is open, so the expectation was corrected (not the code).
 - Tests: `pnpm check` passes (612 unit/integration tests). Windows e2e 35/35, including `card-pane.spec.ts`;
   `tray.spec.ts --repeat-each=5` 45/45. Not run: the e2e on WSLg.
+- Sent back by the user (2026-11-07): "Pane isn't properly sized when not full screen. You can see the horizontal
+  scroll bar, the "x" to close is hidden, and I can't resize the pane." In a window of about 1300 px the pane took
+  nearly the whole width: a long AC test path didn't truncate and pushed it out. AC5 and AC6 added.
