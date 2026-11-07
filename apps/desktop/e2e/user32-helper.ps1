@@ -37,6 +37,8 @@ public static class FeatraUser32 {
   }
 }
 '@
+# UTF-8, so window titles reach the harness intact (Featra's has a "·").
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
 [Console]::Out.WriteLine("ready"); [Console]::Out.Flush()
 while ($null -ne ($line = [Console]::In.ReadLine())) {
   $words = $line.Split(' ')
