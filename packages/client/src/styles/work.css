@@ -1,0 +1,304 @@
+/* The Work list (STORY-3): epics, features and stories on one grid, after docs/mockups/app.html. */
+.work-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+.work-list .meta {
+  color: var(--tx3);
+}
+
+.work-list > p {
+  margin: 0;
+}
+
+.work-error,
+.stale-error {
+  margin: 0;
+  color: var(--bad);
+  font-size: 12px;
+}
+
+.work-problems summary {
+  cursor: pointer;
+  color: var(--warn);
+}
+
+.work-problems ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  color: var(--tx2);
+}
+
+/* Filter chips. */
+.wfilter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fchip {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--row);
+  color: var(--tx2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.fchip.on {
+  background: var(--row2);
+  color: var(--tx);
+  box-shadow: inset 0 0 0 1px var(--acc);
+}
+
+.fchip:focus-visible,
+.row-toggle:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* Epic: a header that folds its features. */
+.epicblk {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.epich {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.epich h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.row-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row-toggle > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-toggle .i {
+  flex: none;
+  transition: transform 0.15s;
+}
+
+.row-toggle[aria-expanded="true"] .i {
+  transform: rotate(90deg);
+}
+
+/* Features and stories share one column grid. */
+.fl {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.frow,
+.prow {
+  display: grid;
+  grid-template-columns: 14px minmax(0, 2.2fr) 1.25fr 1.35fr 0.65fr 1.25fr;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line);
+}
+
+.frow.hdr {
+  border-top: 0;
+  padding: 8px 14px;
+  background: var(--side);
+}
+
+.frow.hdr,
+.prow.phdr {
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.frow:not(.hdr):hover,
+.prow:not(.phdr):hover,
+.frow.open {
+  background: var(--row);
+}
+
+.frow .fn {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  font-weight: 500;
+}
+
+/* The toggle starts in the caret column, so the title lines up with the story titles. */
+.frow .fn .row-toggle {
+  margin-left: -28px;
+}
+
+.kidsbox {
+  background: var(--side);
+}
+
+.prow .pn,
+.prow.phdr > :nth-child(2) {
+  padding-left: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status dots and bar slices, by tone. */
+.st {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--tx3);
+}
+
+.tone-done {
+  --tone: var(--ok);
+}
+.tone-review {
+  --tone: var(--pur);
+}
+.tone-active {
+  --tone: var(--warn);
+}
+.tone-cancelled {
+  --tone: var(--tx3);
+}
+
+.st .dot,
+.pbar i[class] {
+  background: var(--tone, var(--tx3));
+}
+
+.st.tone-review {
+  color: var(--pur);
+}
+
+.prog {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.prog .pl {
+  white-space: nowrap;
+}
+
+.pbar {
+  display: flex;
+  flex: 1;
+  min-width: 40px;
+  max-width: 120px;
+  height: 5px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: var(--row2);
+}
+
+.epich .prog .pl {
+  color: var(--tx2);
+}
+
+.epich .pbar {
+  flex: none;
+  width: 140px;
+}
+
+.scope-added {
+  color: var(--warn);
+}
+
+.scope-bugs {
+  color: var(--bad);
+}
+
+/* Stale copies: an edit outside the owner, with what to do about it. */
+.stale-copies {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stale-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: var(--side);
+}
+
+.stale-copy > p:first-child {
+  flex: 1;
+  min-width: 200px;
+  margin: 0;
+}
+
+.stale-copy .placeholder-actions {
+  margin-top: 0;
+}
+
+.stale-copy .stale-error {
+  flex-basis: 100%;
+}
+
+/* Not started: an empty slice of the bar. */
+.pbar i.tone-idle {
+  background: transparent;
+}
+
+/* A card whose copy elsewhere has an edit: the banner above says where. */
+.stale-mark {
+  flex: none;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--warn);
+  border-radius: 999px;
+  color: var(--warn);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}

@@ -16,6 +16,7 @@ import {
 } from "./settings.ts";
 import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
 import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./projects.ts";
+import { noWork, type WorkBridge } from "./work-list.ts";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
 
@@ -24,6 +25,7 @@ export * from "./project-setup.ts";
 export * from "./projects.ts";
 export * from "./server-client.ts";
 export * from "./settings.ts";
+export * from "./work-list.ts";
 
 /** Window chrome state that survives a restart. The theme is an app setting (Settings > Appearance), not chrome. */
 export interface UiState {
@@ -129,6 +131,8 @@ export interface FeatraBridge {
   };
   /** Git and Featra init for a project folder, done by the local server (ADR 0015). */
   readonly setup: ProjectSetupBridge;
+  /** The project's live Work list and the stale-copy actions, from the local server (ADR 0016). */
+  readonly work: WorkBridge;
   edit: (command: EditCommand) => void;
   readonly app: {
     info: () => Promise<AppInfo>;
@@ -243,6 +247,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       create: async () => noFolders,
     },
     setup: noSetup(NO_FOLDERS),
+    work: noWork(NO_FOLDERS),
     edit: (command) => {
       document.execCommand(command);
     },

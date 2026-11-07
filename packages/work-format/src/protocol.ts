@@ -4,6 +4,7 @@
  * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
  */
 import { isOneOf, isRecord } from "./utils/guards.ts";
+import type { WorkList } from "./work-list-types.ts";
 
 /** Only loopback, always: the server must not be reachable from another machine (docs/architecture.md). */
 export const SERVER_HOST = "127.0.0.1";
@@ -21,6 +22,9 @@ export type ProjectSetup =
 /** What Featra init did: the paths it created and the ones it found and kept, relative to the project. */
 export type InitResult = { ok: true; created: string[]; kept: string[] } | { ok: false; error: string };
 
+/** What applying or discarding a stale copy did. */
+export type CopyActionResult = { ok: true } | { ok: false; error: string };
+
 /** Every method, its params and its result. A new method is added here first. */
 export interface ServerMethods {
   /** Whether the project folder is a git repository and holds `.featra/`. */
@@ -29,10 +33,48 @@ export interface ServerMethods {
   "project.gitInit": { params: { dir: string }; result: ProjectSetup };
   /** Scaffolds `.featra/` and the knowledge files that are missing, in a git repository. */
   "project.init": { params: { dir: string }; result: InitResult };
+  /**
+   * The project's Work list now; then, until `work.unwatch`, a `work.list` push on this socket each time it changes.
+   * The request's id names the watch.
+   */
+  "work.watch": { params: { dir: string }; result: WorkList };
+  /** Stops the watch the `work.watch` request with id `watch` started. */
+  "work.unwatch": { params: { watch: number }; result: null };
+  /** Applies a stale copy's edit to the owner's file, then restores the copy from git (ADR 0016). */
+  "work.applyCopy": { params: { dir: string; key: string }; result: CopyActionResult };
+  /** Throws a stale copy's edit away: restores the copy from git. */
+  "work.discardCopy": { params: { dir: string; key: string }; result: CopyActionResult };
+}
+
+/** Frames the server sends unasked, and the data each carries. */
+export interface ServerPushes {
+  /** The Work list changed: the whole new list, for the watch the frame names. */
+  "work.list": WorkList;
+}
+
+export type PushEvent = keyof ServerPushes;
+const PUSH_EVENTS: readonly PushEvent[] = ["work.list"];
+
+/**
+ * A pushed frame: `{ event, watch, data }`. It never has an `id`, so neither end can take it for an answer, and a
+ * client that doesn't know the event ignores it.
+ */
+export interface ServerPush {
+  event: PushEvent;
+  watch: number;
+  data: unknown;
 }
 
 export type ServerMethod = keyof ServerMethods;
-export const SERVER_METHODS: readonly ServerMethod[] = ["project.setupStatus", "project.gitInit", "project.init"];
+export const SERVER_METHODS: readonly ServerMethod[] = [
+  "project.setupStatus",
+  "project.gitInit",
+  "project.init",
+  "work.watch",
+  "work.unwatch",
+  "work.applyCopy",
+  "work.discardCopy",
+];
 
 export interface ServerRequest {
   id: number;
@@ -67,6 +109,13 @@ export function parseResponse(text: string): ServerResponse | null {
   return { id: raw.id, ok: false, error: typeof raw.error === "string" && raw.error ? raw.error : "Request failed." };
 }
 
+/** A pushed frame, or null for anything else (an answer has an `id`; a push never does). */
+export function parsePush(text: string): ServerPush | null {
+  const raw = json(text);
+  if (!isRecord(raw) || "id" in raw || !isOneOf(PUSH_EVENTS, raw.event) || !isId(raw.watch)) return null;
+  return { event: raw.event, watch: raw.watch, data: raw.data };
+}
+
 /** The `{ dir }` params every project method takes, or null. */
 export function dirParams(params: unknown): { dir: string } | null {
   return isRecord(params) && typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
@@ -86,5 +135,22 @@ const strings = (raw: unknown): string[] =>
 export function normalizeInitResult(raw: unknown): InitResult {
   const r = isRecord(raw) ? raw : {};
   if (r.ok === true) return { ok: true, created: strings(r.created), kept: strings(r.kept) };
+  return { ok: false, error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
+}
+
+/** The `{ dir, key }` params of the stale-copy actions, or null. */
+export function copyParams(params: unknown): { dir: string; key: string } | null {
+  const dir = dirParams(params);
+  return dir && isRecord(params) && typeof params.key === "string" && params.key ? { ...dir, key: params.key } : null;
+}
+
+/** The `{ watch }` params of `work.unwatch`, or null. */
+export function unwatchParams(params: unknown): { watch: number } | null {
+  return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
+}
+
+export function normalizeCopyActionResult(raw: unknown): CopyActionResult {
+  const r = isRecord(raw) ? raw : {};
+  if (r.ok === true) return { ok: true };
   return { ok: false, error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
 }

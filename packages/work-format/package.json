@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./guards": "./src/utils/guards.ts",
-    "./protocol": "./src/protocol.ts"
+    "./protocol": "./src/protocol.ts",
+    "./work-list": "./src/work-list-types.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

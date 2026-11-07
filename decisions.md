@@ -254,3 +254,17 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
   - A server main stops (on quit) logs nothing: not the stop, nor the child's exit, stderr or messages after it. The
     stop is part of quitting, so "Quitting" stays the log's last line, right after the line that caused it (e2e checks
     both). A server that exits on its own is still logged with its exit code.
+- 2026-11-06 — STORY-3 (Work list from owner copies): the index, watching, push frames and stale-copy rules are ADR
+  0016 (rules approved by the Dev Lead). Smaller choices:
+  - The list replaces Work's placeholder below the setup offer. Epics start open and features start closed; what the
+    user opened stays open when a new list arrives. Changing the filter starts the epics open again.
+  - Filter chips show how many features each would show ("In progress · 1"). A feature can count under more than one.
+    Epics left with no matching feature are hidden; an epic's own count is not filtered.
+  - Features and stories are rows of one ARIA table per epic, so story rows share the feature columns. The caret column
+    is spacing, hidden from assistive tech.
+  - Feature statuses read as Draft, Approved, In progress, Done and Cancelled; a story's stage shows as written in the
+    card. Empty counts and a missing PR show "—".
+  - A stale copy is a banner above the list with Apply to owner and Discard, and the card's row carries an "Edited
+    elsewhere" flag. A refusal (a conflict, an owner not
+    checked out) shows on that banner; nothing is written.
+  - When the connection to the server drops, the list keeps the last one it had and says why, then watches again.

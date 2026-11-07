@@ -36,16 +36,20 @@ One file per decision that is hard to reverse or that a future contributor would
 new ADR that supersedes it.
 `;
 
+/** The folder that marks a project as set up for Featra. */
+export const FEATRA_DIR = ".featra";
+/** Where cards live in every location, as a repository path. */
+export const CARDS_DIR = ".featra/cards";
+/** The project settings file, as a repository path. */
+export const CONFIG_FILE = ".featra/config.yaml";
+
 export const FEATRA_SCAFFOLD: readonly ScaffoldEntry[] = [
-  { kind: "file", path: ".featra/config.yaml", content: NEW_CONFIG },
+  { kind: "file", path: CONFIG_FILE, content: NEW_CONFIG },
   { kind: "file", path: "CONTEXT.md", content: CONTEXT },
   { kind: "folder", path: "docs/adr", seed: [{ name: "README.md", content: ADR_README }] },
   { kind: "file", path: "decisions.md", content: DECISIONS },
   { kind: "file", path: "open-questions.md", content: OPEN_QUESTIONS },
 ];
-
-/** The folder that marks a project as set up for Featra. */
-export const FEATRA_DIR = ".featra";
 
 /** Whether `path` (relative, "/" separated) names an agent instruction file, in any folder and any case. */
 export function isAgentInstructionFile(path: string): boolean {

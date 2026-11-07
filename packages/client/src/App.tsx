@@ -230,6 +230,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 projects={projects}
                 platform={bridge.platform}
                 actions={projectActions}
+                work={bridge.work}
                 setupOffer={setupOffer}
               />
             ) : (
