@@ -2,7 +2,7 @@
 id: FEAT-18
 type: feature
 title: Tests run on CI
-status: approved
+status: done
 parent: EPIC-1
 order: 4
 origin: added
@@ -12,6 +12,21 @@ history:
     field: status
     from: null
     to: approved
+    by: user
+  - at: 2026-11-08T01:28:39.915Z
+    field: status
+    from: approved
+    to: active
+    by: user
+  - at: 2026-11-08T15:02:33.453Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-08T15:02:33.453Z
+    field: status
+    from: active
+    to: done
     by: user
 ---
 
