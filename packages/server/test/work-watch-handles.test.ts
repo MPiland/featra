@@ -8,7 +8,7 @@ import { createScanner } from "../src/work-scan.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 import { countedGit } from "./counted-git.ts";
-import { until } from "./until.ts";
+import { GIT_ASKED_MS, until } from "./until.ts";
 
 /**
  * Every file watcher a watch opens is closed when the watch ends (BUG-6). On Windows an open watcher keeps its folder
@@ -102,7 +102,7 @@ describe("watch handles", () => {
       calls.length = 0;
       // Node doesn't promise a name; without one the event can't be ruled out (BUG-6).
       worktrees?.hear("rename", null);
-      await until(() => calls.includes("worktrees"));
+      await until(() => calls.includes("worktrees"), GIT_ASKED_MS);
     } finally {
       stop();
       watches.close();

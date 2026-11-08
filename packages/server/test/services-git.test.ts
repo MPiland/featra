@@ -6,7 +6,7 @@ import type { Connection } from "../src/api.ts";
 import { createServices } from "../src/services.ts";
 import { card, cardPath, cardRepo, type CardRepo } from "./card-repo.ts";
 import { countedGit } from "./counted-git.ts";
-import { until } from "./until.ts";
+import { GIT_ASKED_MS, until } from "./until.ts";
 
 /**
  * The server's own writes while a folder is watched run no git beyond the write itself (BUG-6). Under load each git
@@ -99,7 +99,7 @@ describe("writes while watched (BUG-6)", () => {
     repo.git(repo.main, "worktree", "remove", "--force", join(repo.root, "story-2"));
     repo.git(repo.main, "branch", "-q", "-D", "claude/story-2");
     // Heard the git event: the rescan it starts asks git again, and the edit below queues behind it.
-    await until(() => calls.includes("worktrees"));
+    await until(() => calls.includes("worktrees"), GIT_ASKED_MS);
 
     const edit = { field: "notes", from: "", to: "back in main" };
     const result = await services.api("card.update", { dir: repo.main, id: "STORY-2", edit }, 5, connection);

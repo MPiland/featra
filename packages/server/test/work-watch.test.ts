@@ -5,7 +5,7 @@ import { createWorkWatches } from "../src/work-watch.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 import { countedGit } from "./counted-git.ts";
-import { until } from "./until.ts";
+import { GIT_ASKED_MS, until } from "./until.ts";
 
 /** The shared per-folder watch (ADR 0016), on a real repository, the real git and the real file watcher. */
 // Every call the scans make to git.
@@ -121,7 +121,7 @@ describe("work watches", () => {
       for (const path of paths) {
         gitCalls.length = 0;
         repo.git(repo.main, "worktree", "remove", "--force", path);
-        await until(() => gitCalls.includes("worktrees"));
+        await until(() => gitCalls.includes("worktrees"), GIT_ASKED_MS);
       }
     } finally {
       stop();

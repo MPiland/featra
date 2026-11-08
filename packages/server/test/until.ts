@@ -6,3 +6,10 @@ export async function until(ok: () => boolean, ms = 5000): Promise<void> {
     await new Promise((r) => setTimeout(r, 20));
   }
 }
+
+/**
+ * How long a test waits to see the watch ask git again. No criterion promises a time for it, and a missed event never
+ * asks, so the test still fails. But now and then the whole PC stalls: every git start took about 2.8 s at once,
+ * and a rescan took 5.6 s (BUG-6).
+ */
+export const GIT_ASKED_MS = 20_000;
