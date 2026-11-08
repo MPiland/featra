@@ -1,7 +1,7 @@
 /**
  * Reads every copy of every card (ADR 0016): main, each feature branch and each worktree. A location checked out in
- * a working tree is read from disk, so edits show at once; one that isn't is read from git. Deciding which copy
- * counts is work-format's job (`branchStateOf`, `resolveCopies`).
+ * a working tree is read from disk, so edits show at once; one that isn't is read from git. Git's part can be kept
+ * for the next scan. Deciding which copy counts is work-format's job (`branchStateOf`, `resolveCopies`).
  */
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
@@ -23,7 +23,7 @@ import {
   type ProjectConfig,
 } from "@featra/work-format";
 import type { CardIndex } from "./card-index.ts";
-import type { RepoGit, RepoPaths, WorktreeInfo } from "./repo-git.ts";
+import type { BranchInfo, RepoGit, RepoPaths, WorktreeInfo } from "./repo-git.ts";
 
 export interface Collected {
   paths: RepoPaths;
@@ -35,6 +35,8 @@ export interface Collected {
   /** What HEAD has for each working-tree copy, by `copyKey(location, path)`; null when HEAD has no such file. */
   headTexts: Map<string, string | null>;
   problems: string[];
+  /** What git said, for the next rescan to reuse. */
+  git: GitState;
 }
 
 export const locationKey = (loc: OwnerLocation) => copyKey(loc, "");
@@ -70,32 +72,81 @@ export interface CollectDeps {
   index: (paths: RepoPaths) => CardIndex;
 }
 
-/** Every copy in the repository `dir` is in, or null when `dir` isn't a Featra project in git. */
-export async function collect(dir: string, { git, index }: CollectDeps): Promise<Collected | null> {
-  const paths = await git.paths(dir);
-  if (!paths || !(await isDir(join(paths.top, FEATRA_DIR)))) return null;
+/** One location to read: from disk with what its HEAD has, or the card files of a commit. */
+type Source =
+  | { location: OwnerLocation; tree: WorktreeInfo; inHead: Map<string, string> }
+  | { location: OwnerLocation; files: { path: string; text: string }[] };
+
+/**
+ * What git told one scan. A rescan for a card edit alone reuses it and runs no git (ADR 0016); a change to refs,
+ * HEAD or the worktrees, or another base branch in the config, reads it again.
+ */
+export interface GitState {
+  paths: RepoPaths;
+  baseBranch: string;
+  trees: WorktreeInfo[];
+  branches: BranchInfo[];
+  sources: Source[];
+}
+
+async function readGit(paths: RepoPaths, baseBranch: string, { git, index }: CollectDeps): Promise<GitState> {
   const { top } = paths;
   const idx = index(paths);
-  const blobs = (shas: string[]) => idx.blobs(shas, (m) => git.blobs(top, m));
-  const problems: string[] = [];
-  const config = await readConfig(top, problems);
-  const [trees, branches] = await Promise.all([git.worktrees(top), git.branches(top, config.baseBranch)]);
+  const [trees, branches] = await Promise.all([git.worktrees(top), git.branches(top, baseBranch)]);
+  const committed = async (rev: string) => {
+    const files = await git.cardFiles(top, rev);
+    const texts = await idx.blobs(
+      files.map((f) => f.sha),
+      (m) => git.blobs(top, m),
+    );
+    return files.map((f) => ({ path: f.path, text: texts.get(f.sha) ?? "" }));
+  };
+  const fromGit = async (location: OwnerLocation, rev: string): Promise<Source> => ({
+    location,
+    files: await committed(rev),
+  });
+  const fromDisk = async (location: OwnerLocation, tree: WorktreeInfo): Promise<Source> => ({
+    location,
+    tree,
+    inHead: new Map(tree.head ? (await committed(tree.head)).map((f) => [f.path, f.text]) : []),
+  });
 
-  const copies: CardCopy[] = [];
+  const treeOf = (branch: string) => trees.find((t) => t.branch === branch);
+  const reads: Promise<Source>[] = [];
+  const base = treeOf(baseBranch);
+  if (base) reads.push(fromDisk({ kind: "main" }, base));
+  else if (branches.some((b) => b.name === baseBranch))
+    reads.push(fromGit({ kind: "main" }, `refs/heads/${baseBranch}`));
+  for (const b of branches) {
+    if (!featureIdOfBranch(b.name)) continue;
+    const location: OwnerLocation = { kind: "feature", branch: b.name };
+    const tree = treeOf(b.name);
+    reads.push(tree ? fromDisk(location, tree) : fromGit(location, `refs/heads/${b.name}`));
+  }
+  for (const t of trees) {
+    if (!t.branch || t.branch === baseBranch || featureIdOfBranch(t.branch)) continue;
+    reads.push(fromDisk({ kind: "worktree", branch: t.branch, path: t.path }, t));
+  }
+  return { paths, baseBranch, trees, branches, sources: await Promise.all(reads) };
+}
+
+/**
+ * Every copy in the repository `dir` is in, or null when `dir` isn't a Featra project in git. With `reuse`, git's
+ * part comes from that earlier scan, so only the files are read again.
+ */
+export async function collect(dir: string, deps: CollectDeps, reuse?: GitState): Promise<Collected | null> {
+  const paths = reuse?.paths ?? (await deps.git.paths(dir));
+  if (!paths || !(await isDir(join(paths.top, FEATRA_DIR)))) return null;
+  const problems: string[] = [];
+  const config = await readConfig(paths.top, problems);
+  const git = reuse?.baseBranch === config.baseBranch ? reuse : await readGit(paths, config.baseBranch, deps);
+
   const roots = new Map<string, string>();
   const headTexts = new Map<string, string | null>();
 
-  const fromGit = async (location: OwnerLocation, rev: string) => {
-    const files = await git.cardFiles(top, rev);
-    const texts = await blobs(files.map((f) => f.sha));
-    for (const f of files) copies.push(parsed(location, f.path, texts.get(f.sha) ?? "", false, false));
-  };
-
-  const fromDisk = async (location: OwnerLocation, tree: WorktreeInfo) => {
+  const fromDisk = async (location: OwnerLocation, tree: WorktreeInfo, inHead: Map<string, string>) => {
     roots.set(locationKey(location), tree.path);
-    const head = tree.head ? await git.cardFiles(top, tree.head) : [];
-    const headBlobs = await blobs(head.map((f) => f.sha));
-    const inHead = new Map(head.map((f) => [f.path, headBlobs.get(f.sha) ?? ""]));
+    const out: CardCopy[] = [];
     let names: string[] = [];
     try {
       names = (await readdir(join(tree.path, ...CARDS_DIR.split("/")))).filter((n) => n.endsWith(".md"));
@@ -114,28 +165,19 @@ export async function collect(dir: string, { git, index }: CollectDeps): Promise
       const committed = inHead.get(path);
       headTexts.set(copyKey(location, path), committed ?? null);
       const edited = committed === undefined || normalized(committed) !== normalized(text);
-      copies.push(parsed(location, path, text, true, edited));
+      out.push(parsed(location, path, text, true, edited));
     }
+    return out;
   };
 
-  const treeOf = (branch: string) => trees.find((t) => t.branch === branch);
-  const reads: Promise<void>[] = [];
-  const base = treeOf(config.baseBranch);
-  if (base) reads.push(fromDisk({ kind: "main" }, base));
-  else if (branches.some((b) => b.name === config.baseBranch)) {
-    reads.push(fromGit({ kind: "main" }, `refs/heads/${config.baseBranch}`));
-  }
-  for (const b of branches) {
-    if (!featureIdOfBranch(b.name)) continue;
-    const location: OwnerLocation = { kind: "feature", branch: b.name };
-    const tree = treeOf(b.name);
-    reads.push(tree ? fromDisk(location, tree) : fromGit(location, `refs/heads/${b.name}`));
-  }
-  for (const t of trees) {
-    if (!t.branch || t.branch === config.baseBranch || featureIdOfBranch(t.branch)) continue;
-    reads.push(fromDisk({ kind: "worktree", branch: t.branch, path: t.path }, t));
-  }
-  await Promise.all(reads);
+  const read = await Promise.all(
+    git.sources.map((s) =>
+      "files" in s
+        ? Promise.resolve(s.files.map((f) => parsed(s.location, f.path, f.text, false, false)))
+        : fromDisk(s.location, s.tree, s.inHead),
+    ),
+  );
+  const copies = read.flat();
 
   const cardBranches = new Map<string, string[]>();
   for (const c of copies) {
@@ -144,9 +186,9 @@ export async function collect(dir: string, { git, index }: CollectDeps): Promise
   }
   const state = branchStateOf({
     baseBranch: config.baseBranch,
-    worktrees: trees.map((t) => ({ path: t.path, branch: t.branch })),
-    branches,
+    worktrees: git.trees.map((t) => ({ path: t.path, branch: t.branch })),
+    branches: git.branches,
     cardBranches,
   });
-  return { paths, config, copies, state, roots, headTexts, problems };
+  return { paths, config, copies, state, roots, headTexts, problems, git };
 }

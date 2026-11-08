@@ -4,7 +4,7 @@ type: feature
 title: Shaping
 status: approved
 parent: EPIC-1
-order: 5
+order: 6
 origin: planned
 created: 2026-11-04T23:00:00Z
 history:

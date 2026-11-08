@@ -4,7 +4,7 @@ type: feature
 title: Delegation
 status: approved
 parent: EPIC-1
-order: 6
+order: 7
 origin: planned
 created: 2026-11-04T23:00:00Z
 history:

@@ -11,5 +11,7 @@ export default defineConfig({
   globalTeardown: "./global-teardown.ts",
   reporter: [["list"]],
   outputDir: "../test-results",
+  // Keeps a failed test's output (traces from app.ts's launch(), screenshots) and drops a passing test's.
+  preserveOutput: "failures-only",
   use: { trace: "retain-on-failure" },
 });

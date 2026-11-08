@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
+import { _electron as electron, test, type ElectronApplication, type Page } from "@playwright/test";
 import electronPath from "electron";
 import { foregroundWindow, grantForeground, windowsForegroundWindow, wslg } from "./foreground.ts";
 
@@ -51,9 +51,30 @@ export async function launch(
     args: [appDir],
     env,
   });
+  traceUntilClosed(app);
   const page = await app.firstWindow();
   await page.getByRole("banner").waitFor();
   return { app, page };
+}
+
+let traceCount = 0;
+
+/**
+ * Playwright's `trace` option only records browser contexts, not an Electron app, so the app's own actions, DOM
+ * snapshots and screenshots are traced here. Closing the app saves `electron-<n>.zip` to the test's output folder;
+ * `preserveOutput: "failures-only"` keeps it only when the test fails. An app that exits on its own leaves no trace.
+ */
+function traceUntilClosed(app: ElectronApplication): void {
+  const context = app.context();
+  const started = context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  const close = app.close.bind(app);
+  app.close = async () => {
+    traceCount += 1;
+    await started
+      .then(() => context.tracing.stop({ path: test.info().outputPath(`electron-${traceCount}.zip`) }))
+      .catch(() => undefined);
+    await close();
+  };
 }
 
 /**

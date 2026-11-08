@@ -1,0 +1,80 @@
+# Soak run: one spec (or the whole suite) repeated on one platform, stopping at the first failure and keeping its
+# trace. Start it from the Actions tab, with `gh workflow run soak.yml -f spec=tray.spec.ts -f platform=windows -f runs=150`
+# (needs this file on main), or by pushing a branch named soak/<platform>/<specs>/<runs>, e.g. soak/windows/tray/150.
+# tooling/ci/soak-plan.ts reads either form.
+name: Soak
+
+on:
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: Spec file(s) under apps/desktop/e2e, space-separated; empty runs the whole suite.
+        type: string
+        default: ""
+      platform:
+        description: Runner OS.
+        type: choice
+        options: [windows, ubuntu]
+        default: windows
+      runs:
+        description: How many times to run each test.
+        type: number
+        default: 20
+  push:
+    branches: ["soak/**"]
+
+run-name: Soak ${{ github.event_name == 'push' && github.ref_name || format('{0} on {1} x{2}', inputs.spec || 'full suite', inputs.platform, inputs.runs) }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      platform: ${{ steps.plan.outputs.platform }}
+      specs: ${{ steps.plan.outputs.specs }}
+      runs: ${{ steps.plan.outputs.runs }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: plan
+        env:
+          SPEC: ${{ inputs.spec }}
+          PLATFORM: ${{ inputs.platform }}
+          RUNS: ${{ inputs.runs }}
+        run: node tooling/ci/soak-plan.ts
+
+  soak:
+    name: Soak (${{ needs.plan.outputs.platform }})
+    needs: plan
+    runs-on: ${{ needs.plan.outputs.platform == 'windows' && 'windows-2025' || 'ubuntu-24.04' }}
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          e2e: "true"
+      - name: Soak
+        shell: bash
+        env:
+          SPECS: ${{ needs.plan.outputs.specs }}
+          RUNS: ${{ needs.plan.outputs.runs }}
+          PLATFORM: ${{ needs.plan.outputs.platform }}
+        run: |
+          read -ra specs <<<"$SPECS"
+          cmd=(pnpm --filter @featra/desktop test:e2e "${specs[@]}" --repeat-each "$RUNS" --max-failures 1)
+          if [ "$PLATFORM" = ubuntu ]; then cmd=(tooling/e2e/xvfb.sh "${cmd[@]}"); fi
+          "${cmd[@]}"
+      - name: Upload the failing run's trace
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-${{ needs.plan.outputs.platform }}-traces
+          path: apps/desktop/test-results
+          retention-days: 30
+          if-no-files-found: ignore

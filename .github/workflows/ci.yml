@@ -1,0 +1,67 @@
+# The three checks main's branch protection requires (decisions.md, 2026-11-07): Gate, E2E (Windows), E2E (Ubuntu).
+# Renaming a job renames its check, so branch protection must be updated with it.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      - name: Format, lint, typecheck and unit tests
+        run: pnpm check
+
+  e2e-windows:
+    name: E2E (Windows)
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          e2e: "true"
+      - name: E2E suite
+        shell: bash
+        run: pnpm test:e2e
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-windows-traces
+          path: apps/desktop/test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+  e2e-ubuntu:
+    name: E2E (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          e2e: "true"
+      - name: E2E suite under Xvfb and Openbox
+        run: tooling/e2e/xvfb.sh pnpm test:e2e
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-ubuntu-traces
+          path: apps/desktop/test-results
+          retention-days: 14
+          if-no-files-found: ignore

@@ -314,3 +314,36 @@ The user found STORY-2's setup banner bare, so STORY-42 replaces it with a full-
 On that screen, git, `.featra/`, each knowledge file, a starter `.gitignore` and the Workflow settings are chosen
 together and applied with one action. Git still runs first, because cards need it, but the user never sees separate
 steps. STORY-33 later adds its sections (artifacts, acceptance proof, role presets, agent instructions) to this page.
+
+## 2026-11-07 — Tests run off the user's desktop, on GitHub Actions
+
+E2e runs that take focus clashed with the user working on their only PC. So:
+
+- The repo becomes public as `MPiland/featra`. Public repos get unlimited free minutes on standard runners. Before the
+  first push, the history is checked for secrets, personal paths and email.
+- CI runs Windows e2e, Ubuntu e2e (under Xvfb with a window manager) and the unit tests. All must pass before a PR can
+  merge to main (branch protection), and the user's Accept is still required.
+- The Dev Lead may push branches to this repo, never force and never directly to main. No other remote is pushed to.
+- WSLg was only how we tested Linux, not a supported platform. Linux runs move to Xvfb on Ubuntu, both locally in WSL
+  and on CI. WSLg comes off the acceptance criteria, including BUG-4's.
+- BUG-4 keeps its counts on CI: 150 Windows tray runs and 20 full Linux runs, with assertions unchanged.
+- A local Windows VM is the fallback only if the Windows foreground tests can't pass on GitHub's runners.
+
+## 2026-11-07 — History rewritten before going public
+
+Before the first push, the history was rewritten once with git filter-repo, in a separate clone. Personal paths are
+masked (the user name in the spike results and docs, and `D:\dev\manager` in a mockup, a history-only cache file and
+BUG-4's harness test). Every commit's author and committer email is now the user's GitHub noreply address, which all
+future commits use too. Local branches were moved onto the rewritten history, and branches already merged under the
+old history were deleted. The repo is public at https://github.com/MPiland/featra.
+
+## 2026-11-07 — BUG-5: card edits stay fast on a busy PC
+
+BUG-5 had two causes. The first is a race in the work watch: a listener that joins as the last one leaves never gets
+pushes. That broke CI. The second is speed. Each rescan ran about 4 git commands in series, which takes 1.5–2.7 s
+when other sessions load the PC. Featra normally runs next to many agents, so the user chose to fix the speed inside
+BUG-5: a card-only edit rescans from disk and reuses git state unless refs, HEAD or worktrees changed (ADR 0016 is
+amended). STORY-3's 1 s and 2 s criteria stay as written. The unit-test time limit goes from vitest's 5 s default to
+30 s, because it only catches hung tests and slow but correct tests failed under load.
+
+BUG-5 lands through STORY-43's branch, since main has no CI workflows until FEAT-18 merges.
