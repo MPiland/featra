@@ -2,7 +2,7 @@
 id: STORY-43
 type: story
 title: Every PR runs CI on Windows and Ubuntu
-status: New
+status: In Progress
 parent: FEAT-18
 order: 1
 origin: added
@@ -19,6 +19,11 @@ history:
     field: status
     from: null
     to: New
+    by: user
+  - at: 2026-11-08T01:28:39.915Z
+    field: status
+    from: New
+    to: In Progress
     by: user
 ---
 
