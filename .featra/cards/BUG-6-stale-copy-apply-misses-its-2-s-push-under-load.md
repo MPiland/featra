@@ -2,7 +2,7 @@
 id: BUG-6
 type: bug
 title: Stale-copy Apply misses its 2 s push under load
-status: New
+status: In Progress
 parent: null
 order: 0
 origin: bug
@@ -11,7 +11,7 @@ agent: null
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/bug-6-stale-copy-8622e4
 pr: null
 created: 2026-11-08T16:00:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: session:dev-lead
+  - at: 2026-11-08T19:25:32Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:bug-6
 ---
 
 ## Description
@@ -30,6 +35,7 @@ history:
 
 - [ ] The failure is reproduced under the full parallel unit run, the slow step is measured, and the cause is recorded in Notes. If the cause is a product bug, a regression test fails before the fix.
 - [ ] The AC6 test passes 50 full `pnpm test:unit` runs in a row on Windows, with its assertions and its 2 s wait unchanged.
+- [ ] The `card.watch` stale "Unwatched" answer is explained. Either it is shown to follow only from the AC6 test failing before Apply finishes, since the tests share one repo and run in order, or it is logged as its own bug card (BUG-7) with its cause.
 
 ## Tasks
 
@@ -39,3 +45,4 @@ history:
 ## Notes
 
 - Not traced to the feature in progress (STORY-3's code is in main), so this is on the project bug list.
+- 2026-11-08, on the BUG-4 branch at 10aff67 with only card edits, while the user was using the PC: "applies a stale copy" failed in 3 of 4 full `pnpm test:unit` runs in the pre-commit hook with "No matching frame in 2000 ms" (`ws-work.test.ts:56`). A standalone run between them passed 645 of 645. Two of those runs also failed `card.watch and card.update (ADR 0017)` at `ws-work.test.ts:151`: card.watch answered STORY-1 with title "Unwatched" instead of "Edited in main".
