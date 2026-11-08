@@ -2,7 +2,7 @@
 id: BUG-5
 type: bug
 title: Unit tests time out under load
-status: New
+status: In Progress
 parent: null
 order: 0
 origin: bug
@@ -11,7 +11,7 @@ agent: null
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/bug-5-timeouts-1d5c10
 pr: null
 created: 2026-11-07T21:37:53Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: session:dev-lead
+  - at: 2026-11-07T21:10:00Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:bug-5
 ---
 
 ## Description
