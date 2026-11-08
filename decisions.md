@@ -337,3 +337,14 @@ amended). STORY-3's 1 s and 2 s criteria stay as written. The unit-test time lim
 30 s, because it only catches hung tests and slow but correct tests failed under load.
 
 BUG-5 lands through STORY-43's branch, since main has no CI workflows until FEAT-18 merges.
+
+## 2026-11-08 — BUG-6: the server's own writes reuse the watch's git answers
+
+BUG-6's cause was serial git starts. Under the full parallel unit run, each git start takes 150–1100 ms. Apply ran
+about nine in a row: a full scan, the restore, and then a refresh that forced git again, though writing a card and
+`git restore` change no ref, HEAD or worktree. That took 2.1–3.3 s. A new watch's first scan ran four rounds and
+took 1.2–2.6 s. Both missed the AC6 test's 2 s wait. Now apply, discard and card edits scan through the watch both
+before and after they write, and reuse its git part unless a git target fired. A fresh scan reads every rev's card
+tree and the missing blobs through one `cat-file --batch`, so it takes three rounds. Apply now runs one git command
+and answers in 0.35–0.7 s, and the first watch answer takes 0.8–1.0 s. ADR 0016 and ADR 0017 are amended. The test
+and its 2 s wait are unchanged.

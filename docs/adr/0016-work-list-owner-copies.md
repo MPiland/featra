@@ -21,7 +21,9 @@ request and answer only, and said change notifications would need frames that ca
 - each other branch that has a worktree: that worktree, from disk.
 
 The pure rules live in work-format (`branch-rules.ts`, `owner-copies.ts`), and the server imports them; it never
-re-implements them. Card files from git objects are read with `ls-tree -z` and one `cat-file --batch` per scan.
+re-implements them. Card files from git objects are read through one `cat-file --batch` per scan, which gives the
+`.featra/cards` tree of every rev and then the blobs the index lacks (amended 2026-11-08, BUG-6; it was an `ls-tree -z`
+per rev, then a `cat-file --batch` per rev).
 
 **Ownership rules.**
 
@@ -64,7 +66,9 @@ anything, and exists for the agent tools and later views. The index opens with a
 
 Events settle for 50 ms, then the server rescans. Rescans run one at a time. The targets are set again after each scan,
 so a new worktree or branch is picked up. Listeners hear only a list whose JSON changed. The last listener to stop ends
-the watch. After the server applies or discards a copy, it rescans at once rather than waiting for the events.
+the watch. After the server applies or discards a copy, or saves a card edit, it rescans at once through the watch
+rather than waiting for the events. It also scans through the watch before it acts, so both scans reuse the watch's git
+part.
 
 **Rescans reuse git's answers (amended 2026-11-07, BUG-5).** A scan has a git part and a disk part. The git part is the
 repository paths, the worktrees, the branches, and the card files of every HEAD and of every location read from git
@@ -74,7 +78,6 @@ The next rescan runs git again only when one of these happened since:
 - an event on a git target: the common dir's `HEAD` or `packed-refs`, `refs/heads`, or `worktrees`;
 - a watcher error;
 - a failed scan;
-- `refresh`, which the server calls after its own writes (apply, discard, card update);
 - a config whose base branch differs from the one the git part was read for.
 
 Otherwise, a card edit rereads only the files and runs no git. A commit, checkout, branch or worktree change always
@@ -84,6 +87,13 @@ git event during a scan marks the one after it.
 Why: on Windows under load, each git process takes about 200 ms to start, and over 1.9 s at worst. A scan ran four
 serial steps of git, so a card edit took 1.5–2.7 s to reach the list, against the 1 s that STORY-3 promises. The disk
 part alone takes a few milliseconds.
+
+**The server's own writes run no extra git (amended 2026-11-08, BUG-6).** Writing a card file and `git restore` move no
+ref, `HEAD` or worktree, so the scans around apply, discard and a card edit reuse the watch's git part like any card
+edit. They no longer force git as `refresh` did. Apply now runs one git command, the restore, where it ran about nine
+in series: 2.1–3.3 s under the full parallel unit run, against the 2 s its socket test allows. A git event already
+fired but not yet delivered when the user clicks is the same small window every card edit has. A fresh scan takes
+three serial git starts (the paths; the worktrees and branches side by side; one `cat-file --batch`) instead of four.
 
 **Protocol additions (ADR 0015).**
 

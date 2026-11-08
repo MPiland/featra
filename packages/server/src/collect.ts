@@ -93,41 +93,30 @@ async function readGit(paths: RepoPaths, baseBranch: string, { git, index }: Col
   const { top } = paths;
   const idx = index(paths);
   const [trees, branches] = await Promise.all([git.worktrees(top), git.branches(top, baseBranch)]);
-  const committed = async (rev: string) => {
-    const files = await git.cardFiles(top, rev);
-    const texts = await idx.blobs(
-      files.map((f) => f.sha),
-      (m) => git.blobs(top, m),
-    );
-    return files.map((f) => ({ path: f.path, text: texts.get(f.sha) ?? "" }));
-  };
-  const fromGit = async (location: OwnerLocation, rev: string): Promise<Source> => ({
-    location,
-    files: await committed(rev),
-  });
-  const fromDisk = async (location: OwnerLocation, tree: WorktreeInfo): Promise<Source> => ({
-    location,
-    tree,
-    inHead: new Map(tree.head ? (await committed(tree.head)).map((f) => [f.path, f.text]) : []),
-  });
-
+  // Each location: from disk with its HEAD's cards, or from a branch's cards in git.
+  const plan: { location: OwnerLocation; tree?: WorktreeInfo; rev: string | null }[] = [];
   const treeOf = (branch: string) => trees.find((t) => t.branch === branch);
-  const reads: Promise<Source>[] = [];
   const base = treeOf(baseBranch);
-  if (base) reads.push(fromDisk({ kind: "main" }, base));
+  if (base) plan.push({ location: { kind: "main" }, tree: base, rev: base.head });
   else if (branches.some((b) => b.name === baseBranch))
-    reads.push(fromGit({ kind: "main" }, `refs/heads/${baseBranch}`));
+    plan.push({ location: { kind: "main" }, rev: `refs/heads/${baseBranch}` });
   for (const b of branches) {
     if (!featureIdOfBranch(b.name)) continue;
-    const location: OwnerLocation = { kind: "feature", branch: b.name };
     const tree = treeOf(b.name);
-    reads.push(tree ? fromDisk(location, tree) : fromGit(location, `refs/heads/${b.name}`));
+    plan.push({ location: { kind: "feature", branch: b.name }, tree, rev: tree ? tree.head : `refs/heads/${b.name}` });
   }
   for (const t of trees) {
     if (!t.branch || t.branch === baseBranch || featureIdOfBranch(t.branch)) continue;
-    reads.push(fromDisk({ kind: "worktree", branch: t.branch, path: t.path }, t));
+    plan.push({ location: { kind: "worktree", branch: t.branch, path: t.path }, tree: t, rev: t.head });
   }
-  return { paths, baseBranch, trees, branches, sources: await Promise.all(reads) };
+
+  const revs = [...new Set(plan.flatMap((p) => (p.rev ? [p.rev] : [])))];
+  const committed = await git.committedCards(top, revs, (shas, load) => idx.blobs(shas, load));
+  const sources = plan.map(({ location, tree, rev }): Source => {
+    const files = (rev && committed.get(rev)) || [];
+    return tree ? { location, tree, inHead: new Map(files.map((f) => [f.path, f.text])) } : { location, files };
+  });
+  return { paths, baseBranch, trees, branches, sources };
 }
 
 /**

@@ -23,10 +23,10 @@ export interface WorkWatches {
    */
   observe: <T>(dir: string, pick: ScanPick<T>, listener: (value: T) => void) => Promise<{ value: T; stop: () => void }>;
   /**
-   * Rescans `dir` now, git included, as after the server wrote to it; the scan, or undefined when nothing watches
-   * `dir`.
+   * Scans `dir` now. A watched folder scans through its watch, so the scan reaches every listener and reuses git's
+   * answers unless a git target fired (BUG-6); any other folder gets a full scan.
    */
-  refresh: (dir: string) => Promise<Scan | null | undefined>;
+  scan: (dir: string) => Promise<Scan | null>;
   close: () => void;
 }
 
@@ -198,11 +198,9 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
       return { list: value, stop };
     },
     observe,
-    async refresh(dir) {
+    async scan(dir) {
       const e = entries.get(dir);
-      if (!e) return undefined;
-      e.gitChanged = true;
-      return (await run(e)).scan;
+      return e ? (await run(e)).scan : scanner.scan(dir);
     },
     close() {
       for (const e of entries.values()) end(e);

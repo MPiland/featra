@@ -1,28 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { WorkList } from "@featra/work-format";
-import { createRepoGit, type RepoGit } from "../src/repo-git.ts";
 import { createWorkWatches } from "../src/work-watch.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
+import { countedGit } from "./counted-git.ts";
 
 /** The shared per-folder watch (ADR 0016), on a real repository, the real git and the real file watcher. */
-const real = createRepoGit();
-/** Every call the scans make to git. */
-const gitCalls: string[] = [];
-const counted =
-  <A extends unknown[], R>(name: string, f: (...args: A) => R) =>
-  (...args: A) => {
-    gitCalls.push(name);
-    return f(...args);
-  };
-const git: RepoGit = {
-  paths: counted("paths", real.paths),
-  worktrees: counted("worktrees", real.worktrees),
-  branches: counted("branches", real.branches),
-  cardFiles: counted("cardFiles", real.cardFiles),
-  blobs: counted("blobs", real.blobs),
-  restore: counted("restore", real.restore),
-};
+// Every call the scans make to git.
+const { git, calls: gitCalls } = countedGit();
 const scanner = createScanner(git);
 const logged: string[] = [];
 const watches = createWorkWatches(scanner, (m) => logged.push(m));

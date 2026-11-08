@@ -33,16 +33,20 @@ history:
 
 ## Acceptance criteria
 
-- [ ] The failure is reproduced under the full parallel unit run, the slow step is measured, and the cause is recorded in Notes. If the cause is a product bug, a regression test fails before the fix.
+- [x] The failure is reproduced under the full parallel unit run, the slow step is measured, and the cause is recorded in Notes. If the cause is a product bug, a regression test fails before the fix.
 - [ ] The AC6 test passes 50 full `pnpm test:unit` runs in a row on Windows, with its assertions and its 2 s wait unchanged.
-- [ ] The `card.watch` stale "Unwatched" answer is explained. Either it is shown to follow only from the AC6 test failing before Apply finishes, since the tests share one repo and run in order, or it is logged as its own bug card (BUG-7) with its cause.
+- [x] The `card.watch` stale "Unwatched" answer is explained. Either it is shown to follow only from the AC6 test failing before Apply finishes, since the tests share one repo and run in order, or it is logged as its own bug card (BUG-7) with its cause.
 
 ## Tasks
 
-- [ ] Reproduce under the full unit run and time each step of Apply
-- [ ] Fix the cause without weakening the test
+- [x] Reproduce under the full unit run and time each step of Apply
+- [x] Fix the cause without weakening the test
 
 ## Notes
 
 - Not traced to the feature in progress (STORY-3's code is in main), so this is on the project bug list.
 - 2026-11-08, on the BUG-4 branch at 10aff67 with only card edits, while the user was using the PC: "applies a stale copy" failed in 3 of 4 full `pnpm test:unit` runs in the pre-commit hook with "No matching frame in 2000 ms" (`ws-work.test.ts:56`). A standalone run between them passed 645 of 645. Two of those runs also failed `card.watch and card.update (ADR 0017)` at `ws-work.test.ts:151`: card.watch answered STORY-1 with title "Unwatched" instead of "Edited in main".
+- AC1, reproduced: the pre-commit hook failed on AC6 in 4 of 5 tries of this card's first commit. The fifth passed only because the fix was already in the working tree. AC6 also failed 7 of 7 full `pnpm test:unit` runs. Each git call was timed with a temporary log, since removed. Under the full run, one git start takes 150–1100 ms. Apply ran about 9 of them in series: a 4-round scan, the restore, then `refresh` forcing a full git rescan. So the `work.applyCopy` answer came 2.1–3.3 s after the request. The fresh `work.watch` answer took 4 rounds, 1.2–2.6 s, and missed the wait in 1 of 7 runs.
+- AC1, cause: a product bug. Writing a card file and `git restore` move no ref, HEAD or worktree, so the git work around Apply, Discard and card edits was not needed. The regression test `packages/server/test/services-git.test.ts` failed before the fix: Apply ran 10 git calls, not just `restore`, and `card.update` ran 10 instead of none.
+- AC1, fix: Apply, Discard and `card.update` scan through the watch (`WorkWatches.scan`) before and after they write, and reuse its git part unless a git target fired. A fresh scan reads every rev's `.featra/cards` tree and the missing blobs through one `git cat-file --batch` (`git-batch.ts`, tested in `git-batch.test.ts`). That is 3 git rounds, not 4. After the fix, in full runs, the watch answer takes 0.8–1.0 s and Apply 0.35–0.7 s. The assertions and the 2 s wait are unchanged. ADR 0016 and ADR 0017 are amended, and decisions.md has an entry.
+- AC3: the "Unwatched" answer follows from AC6 failing first. Before the fix, in 11 runs that failed AC6, `card.watch` failed 5 times. It never failed in a run where AC6 passed, and it never failed in the 12 runs after the fix. "Unwatched" is STORY-1 as the `titles` commit has it, checked out in the story-1 worktree, which owns it. When AC6 times out before `work.applyCopy` is sent or answered, the next test reads the owner before Apply writes "Edited in main" there. In the other form, `card.watch`'s own answer misses its 2 s; that is the same slow fresh scan. No BUG-7 is needed.

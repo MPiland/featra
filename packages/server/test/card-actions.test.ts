@@ -19,7 +19,7 @@ const story2 = card("STORY-2", "story", null, "New", { description: "As a builde
 
 beforeEach(async () => {
   scanner = createScanner(git);
-  actions = createCardActions({ scanner, now: () => NOW });
+  actions = createCardActions({ scan: scanner.scan, now: () => NOW });
   repo = await cardRepo();
   await repo.write(repo.main, card("FEAT-1", "feature", null, "active"));
   await repo.write(repo.main, story1);
