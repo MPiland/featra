@@ -2,7 +2,7 @@
 id: STORY-43
 type: story
 title: Every PR runs CI on Windows and Ubuntu
-status: In Review
+status: Done
 parent: FEAT-18
 order: 1
 origin: added
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-08T14:53:35.120Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-08T14:53:35.120Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
