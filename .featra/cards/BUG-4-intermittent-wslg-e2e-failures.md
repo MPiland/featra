@@ -37,7 +37,7 @@ Two e2e tests have each failed once on WSLg (Ubuntu), with nothing else running.
 ## Acceptance criteria
 
 - [ ] Each failure is reproduced, with its error and trace kept, and its cause is recorded in Notes. If the cause is a product bug, a regression test fails before the fix.
-- [ ] All four tests in Notes and Description (contrast dark, menu Edit/Paste, tray.spec:75 Show Featra, tray.spec:220 launch again) pass in 20 full WSLg runs in a row, and the tray tests pass 150 Windows runs, with their assertions unchanged.
+- [ ] All four tests in Notes and Description (contrast dark, menu Edit/Paste, tray.spec:75 Show Featra, tray.spec:220 launch again) pass in 20 full Linux runs in a row (Ubuntu, Xvfb with a window manager, on CI), and the tray tests pass 150 Windows runs on CI, with their assertions unchanged.
 
 ## Tasks
 
@@ -95,3 +95,6 @@ Two e2e tests have each failed once on WSLg (Ubuntu), with nothing else running.
     - Verification loops stop at the first failing block.
   - **Still open:** the Windows tray 150-run check (25 of 150 done), and running global setup once under WSLg (not yet
     exercised there). Testing is paused by the user.
+- 2026-11-07 (session:bug-4): **Blocked by STORY-43 "Every PR runs CI on Windows and Ubuntu" (FEAT-18).** The user
+  decided (decisions.md, 18013d9) that WSLg was only a test stand-in, not a supported platform: Linux runs move to
+  Ubuntu under Xvfb with a window manager, and the soak runs move to GitHub Actions. AC2 now asks for those CI runs.
