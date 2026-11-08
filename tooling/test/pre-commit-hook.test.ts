@@ -66,8 +66,9 @@ beforeAll(() => {
   chmodSync(join(bin, "pnpm"), 0o755);
   mkdirSync(join(repo, ".githooks"), { recursive: true });
   git(repo, "init", "--quiet", "--initial-branch=main");
-  // Never touch any other repository: stop unless git resolves to the one just made.
-  if (realpathSync(git(repo, "rev-parse", "--show-toplevel")) !== realpathSync(repo)) {
+  // Never touch any other repository: stop unless git resolves to the one just made. `native` expands Windows 8.3
+  // names such as RUNNER~1 in the temp path, which git reports in full (BUG-5).
+  if (realpathSync.native(git(repo, "rev-parse", "--show-toplevel")) !== realpathSync.native(repo)) {
     throw new Error("git does not resolve to the temp repository; refusing to continue");
   }
   git(repo, "config", "user.name", "Hook Test");

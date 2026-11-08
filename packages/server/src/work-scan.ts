@@ -4,7 +4,7 @@
  */
 import { buildWorkList, EMPTY_WORK_LIST, resolveCopies, type Resolution, type WorkList } from "@featra/work-format";
 import { indexFile, openCardIndex, type CardIndex } from "./card-index.ts";
-import { collect, locationKey, type Collected } from "./collect.ts";
+import { collect, locationKey, type Collected, type GitState } from "./collect.ts";
 import type { RepoGit } from "./repo-git.ts";
 
 export interface Scan {
@@ -14,8 +14,8 @@ export interface Scan {
 }
 
 export interface Scanner {
-  /** Null when `dir` isn't a Featra project in git. */
-  scan: (dir: string) => Promise<Scan | null>;
+  /** Null when `dir` isn't a Featra project in git. With `reuse`, git isn't asked again (ADR 0016). */
+  scan: (dir: string, reuse?: GitState) => Promise<Scan | null>;
   /** The Work list of `dir`: empty when it isn't a Featra project in git. */
   list: (dir: string) => Promise<WorkList>;
   /** Waits for scans in flight, then closes the indexes (a later scan opens them again). */
@@ -34,8 +34,8 @@ export function createScanner(git: RepoGit): Scanner {
   };
 
   const inFlight = new Set<Promise<Scan | null>>();
-  const scanNow = async (dir: string): Promise<Scan | null> => {
-    const collected = await collect(dir, { git, index: indexOf });
+  const scanNow = async (dir: string, reuse?: GitState): Promise<Scan | null> => {
+    const collected = await collect(dir, { git, index: indexOf }, reuse);
     if (!collected) return null;
     const resolution = resolveCopies(collected.copies, collected.state);
     const list = buildWorkList(resolution, collected.config);
@@ -52,8 +52,8 @@ export function createScanner(git: RepoGit): Scanner {
     );
     return { collected, resolution, list };
   };
-  const scan = (dir: string) => {
-    const running = scanNow(dir);
+  const scan = (dir: string, reuse?: GitState) => {
+    const running = scanNow(dir, reuse);
     inFlight.add(running);
     void running.then(
       () => inFlight.delete(running),
