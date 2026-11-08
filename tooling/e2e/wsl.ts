@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { basename } from "node:path";
+import { win32 } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -18,7 +18,7 @@ export function wslArgs(distro: string, root: string, name: string, playwrightAr
 
 /** A folder name for the copy inside WSL: the checkout's own, so worktrees don't share one. */
 export function copyName(windowsRoot: string): string {
-  return basename(windowsRoot).replace(/[^A-Za-z0-9._-]/g, "-");
+  return win32.basename(windowsRoot).replace(/[^A-Za-z0-9._-]/g, "-");
 }
 
 function main(): number {
