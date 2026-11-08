@@ -2,7 +2,7 @@
 id: BUG-5
 type: bug
 title: Unit tests time out under load
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-5-fix
-pr: null
+pr: https://github.com/MPiland/featra/pull/3
 created: 2026-11-07T21:37:53Z
 history:
   - at: 2026-11-07T21:37:53Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: session:bug-5
+  - at: 2026-11-08T06:12:40Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:bug-5
 ---
 
 ## Description
@@ -36,13 +41,13 @@ Two unit tests failed the pre-commit `pnpm check` once on 2026-11-07, on BUG-4's
 
 ## Acceptance criteria
 
-- [ ] Each failure is reproduced under load (for example `pnpm check` alongside an e2e run, or vitest with high parallelism), and its cause is recorded in Notes.
-- [ ] Each test passes 50 runs in a row under that load, with its assertions unchanged. Any time limit that changes is justified in Notes, not raised just to pass.
+- [x] Each failure is reproduced under load (for example `pnpm check` alongside an e2e run, or vitest with high parallelism), and its cause is recorded in Notes.
+- [x] Each test passes 50 runs in a row under that load, with its assertions unchanged. Any time limit that changes is justified in Notes, not raised just to pass.
 
 ## Tasks
 
-- [ ] Reproduce under load and keep the output
-- [ ] Fix the cause (test isolation, waiting on a real event instead of a fixed time, or the product)
+- [x] Reproduce under load and keep the output
+- [x] Fix the cause (test isolation, waiting on a real event instead of a fixed time, or the product)
 
 ## Notes
 - 2026-11-07 (Dev Lead): `ws-work.test.ts` failed again with "No matching frame in 2000 ms" on main at 0223de8, during the pre-commit check for this card. No e2e or other session test run was going at the time, so load from e2e isn't needed to trigger it.
@@ -59,4 +64,4 @@ Two unit tests failed the pre-commit `pnpm check` once on 2026-11-07, on BUG-4's
   - **The 30 s vitest timeout was allowed by the user ("Allow 30 s").** The justification and measurements are in the note above.
 - 2026-11-07 (BUG-5 Developer): **Soaks after the speed fix.** Local Windows under normal load: 50 of 50 full `pnpm test:unit` runs passed. CI Ubuntu: 50 of 50 passed. CI Windows failed on run 1 in `tooling/test/pre-commit-hook.test.ts`, with "git does not resolve to the temp repository". On the runner, `tmpdir()` is an 8.3 short path (`RUNNER~1`). Git reports the long path, and JS `realpathSync` doesn't expand short names, so the safety guard tripped. Reproduced here with `TMP` set to an 8.3 name. Fixed with `realpathSync.native`; the guard itself is unchanged.
   - **Still tight under double load.** With two full unit suites running at once, STORY-3 AC6 missed its 2 s once: Apply runs its own full scan, a `git restore` and a full `refresh`. It passed 3 of 3 runs alone and 50 of 50 in the soak under normal load.
-
+- 2026-11-08 (BUG-5 Developer): **50 runs in a row, final.** Local Windows (normal load): 50 of 50. CI soak run 42450475476: Ubuntu 50 of 50, Windows 50 of 50. PR #3 into `claude/story-43-ci-e105f9`: Gate, E2E (Ubuntu) and E2E (Windows) green. Not merged.
