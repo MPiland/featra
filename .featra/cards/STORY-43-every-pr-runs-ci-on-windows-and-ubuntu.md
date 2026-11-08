@@ -33,7 +33,7 @@ As a builder working on my only PC, I want every test to run on GitHub Actions i
 
 ## Acceptance criteria
 
-- [ ] Before the first push, the full git history is checked for secrets, personal paths and email addresses. The findings and any fixes are recorded in Notes.
+- [x] Before the first push, the full git history is checked for secrets, personal paths and email addresses. The findings and any fixes are recorded in Notes. (proof: History audit in Notes; the rewritten history was re-audited with zero hits before the first push)
 - [ ] Each PR to main shows separate checks for the gate (format, lint, typecheck, unit tests), Windows e2e and Ubuntu e2e. Branch protection blocks the merge unless all three pass.
 - [ ] Every e2e test passes on GitHub's Windows runner, including the foreground tests (tray, window state, menu). Ubuntu runs the full suite under Xvfb with a window manager, so the BUG-1 maximize test runs instead of being skipped. If the Windows foreground tests can't pass on the runner, the user decides on a local VM before anything is weakened.
 - [ ] A soak run can be started on demand for a chosen spec, platform and run count, and stops at the first failure while keeping its trace.
@@ -41,7 +41,7 @@ As a builder working on my only PC, I want every test to run on GitHub Actions i
 
 ## Tasks
 
-- [ ] Audit the history and record the findings; create the public repo `MPiland/featra` and push main
+- [x] Audit the history and record the findings; create the public repo `MPiland/featra` and push main
 - [x] Workflow: gate job, Windows e2e job, Ubuntu e2e job (Xvfb plus a window manager); upload Playwright traces on failure
 - [ ] Branch protection on main requiring the three checks
 - [x] On-demand soak workflow (`workflow_dispatch`: spec, platform, runs)
@@ -62,9 +62,10 @@ Windows user name, and email addresses.
 
 - **Secrets: none.** The only hit is the fake `test-token-0123456789` in `packages/server/test/ws-*.test.ts`. No
   `.env`, key or credential file was ever committed. The SDK spike recorded `apiKeySource: "none"`.
-- **Emails: none outside metadata.** All 140 commits carry `<personal email>` as author and committer, which goes
-  public with the repo. Trailers use `noreply@anthropic.com`; fixtures use `@example.invalid`.
+- **Emails: none outside metadata.** All 140 commits carried the personal email as author and committer. Trailers use
+  `noreply@anthropic.com`; fixtures use `@example.invalid`.
 - **Personal paths: four places, all low risk.** They show the Windows user name and where the repo lives on disk.
+  Hashes below are from before the rewrite.
   - `docs/spike-claude-sdk.md` and `spikes/claude-sdk/results.json` (since `5f0f103`, still on every branch):
     `C:\Users\<user>\.local\bin\claude.exe` and `C:\Users\<user>\AppData\Local\Temp\featra-spike-*`.
   - `.impeccable/hook.cache.json` (added `280ca04`, removed `85c8507`, history only): five
@@ -73,7 +74,16 @@ Windows user name, and email addresses.
   - `apps/desktop/test/e2e-harness.test.ts` (`c0c7c5a`, BUG-4 branch): `D:\dev\example\apps\desktop` and
     `/mnt/d/src/...` as test inputs.
   - Not personal: `/mnt/c/Windows/System32/...` in the e2e harness, `/home/me/...` in client test fixtures.
-- **Fix: none applied.** Rewriting history is the user's call (proposal in the report to the Dev Lead).
+- **Fix: history rewritten before the first push (the user's decision, "Rewrite, then push").**
+  - `git filter-repo` in a separate `--no-local` clone, all branches. Personal paths became `<user>` or
+    repo-relative paths, the session id became `<session>`. Masked test-input paths keep their length, so oxfmt's
+    wrapping is unchanged.
+  - Every commit's author and committer is now `Mark Piland <22205085+MPiland@users.noreply.github.com>`. New
+    commits use that address.
+  - Verified before pushing: the audit re-run found zero hits, each branch's tree differs from the original only in
+    masked lines, and `pnpm check` passes on main.
+  - Pushed: main `b4ae45b`, `feature/18-tests-run-on-ci` `daaa751`, this branch `eb43b11`,
+    `claude/bug-4-wslg-flakes-592641` `e67f31f`. Local branches move onto the rewritten history (Dev Lead).
 
 ### Build notes
 

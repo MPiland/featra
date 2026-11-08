@@ -1,5 +1,7 @@
-# On-demand soak run: one spec (or the whole suite) repeated on one platform, stopping at the first failure and keeping
-# its trace. Start it from the Actions tab or `gh workflow run soak.yml -f spec=tray.spec.ts -f platform=windows -f runs=150`.
+# Soak run: one spec (or the whole suite) repeated on one platform, stopping at the first failure and keeping its
+# trace. Start it from the Actions tab, with `gh workflow run soak.yml -f spec=tray.spec.ts -f platform=windows -f runs=150`
+# (needs this file on main), or by pushing a branch named soak/<platform>/<specs>/<runs>, e.g. soak/windows/tray/150.
+# tooling/ci/soak-plan.ts reads either form.
 name: Soak
 
 on:
@@ -18,16 +20,39 @@ on:
         description: How many times to run each test.
         type: number
         default: 20
+  push:
+    branches: ["soak/**"]
 
-run-name: Soak ${{ inputs.spec || 'full suite' }} on ${{ inputs.platform }} x${{ inputs.runs }}
+run-name: Soak ${{ github.event_name == 'push' && github.ref_name || format('{0} on {1} x{2}', inputs.spec || 'full suite', inputs.platform, inputs.runs) }}
 
 permissions:
   contents: read
 
 jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      platform: ${{ steps.plan.outputs.platform }}
+      specs: ${{ steps.plan.outputs.specs }}
+      runs: ${{ steps.plan.outputs.runs }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: plan
+        env:
+          SPEC: ${{ inputs.spec }}
+          PLATFORM: ${{ inputs.platform }}
+          RUNS: ${{ inputs.runs }}
+        run: node tooling/ci/soak-plan.ts
+
   soak:
-    name: Soak (${{ inputs.platform }})
-    runs-on: ${{ inputs.platform == 'windows' && 'windows-2025' || 'ubuntu-24.04' }}
+    name: Soak (${{ needs.plan.outputs.platform }})
+    needs: plan
+    runs-on: ${{ needs.plan.outputs.platform == 'windows' && 'windows-2025' || 'ubuntu-24.04' }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
@@ -37,12 +62,11 @@ jobs:
       - name: Soak
         shell: bash
         env:
-          SPEC: ${{ inputs.spec }}
-          RUNS: ${{ inputs.runs }}
-          PLATFORM: ${{ inputs.platform }}
+          SPECS: ${{ needs.plan.outputs.specs }}
+          RUNS: ${{ needs.plan.outputs.runs }}
+          PLATFORM: ${{ needs.plan.outputs.platform }}
         run: |
-          [[ "$RUNS" =~ ^[1-9][0-9]*$ ]] || { echo "runs must be a positive whole number" >&2; exit 2; }
-          read -ra specs <<<"$SPEC"
+          read -ra specs <<<"$SPECS"
           cmd=(pnpm --filter @featra/desktop test:e2e "${specs[@]}" --repeat-each "$RUNS" --max-failures 1)
           if [ "$PLATFORM" = ubuntu ]; then cmd=(tooling/e2e/xvfb.sh "${cmd[@]}"); fi
           "${cmd[@]}"
@@ -50,7 +74,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: soak-${{ inputs.platform }}-traces
+          name: soak-${{ needs.plan.outputs.platform }}-traces
           path: apps/desktop/test-results
           retention-days: 30
           if-no-files-found: ignore

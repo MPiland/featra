@@ -8,5 +8,5 @@
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["*.ts", "e2e", "test"]
+  "include": ["*.ts", "ci", "e2e", "test"]
 }
