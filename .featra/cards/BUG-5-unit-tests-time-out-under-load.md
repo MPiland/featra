@@ -2,7 +2,7 @@
 id: BUG-5
 type: bug
 title: Unit tests time out under load
-status: In Review
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-5
+  - at: 2026-11-08T14:42:20.503Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-08T14:42:20.503Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -50,6 +60,7 @@ Two unit tests failed the pre-commit `pnpm check` once on 2026-11-07, on BUG-4's
 - [x] Fix the cause (test isolation, waiting on a real event instead of a fixed time, or the product)
 
 ## Notes
+
 - 2026-11-07 (Dev Lead): `ws-work.test.ts` failed again with "No matching frame in 2000 ms" on main at 0223de8, during the pre-commit check for this card. No e2e or other session test run was going at the time, so load from e2e isn't needed to trigger it.
 - 2026-11-07 (BUG-5 Developer): **Cause: a product race in `work-watch.ts` `observe()`, not load.** Reproduced 5 of 5 on an idle WSL Ubuntu (Node 24.22.2) and on every CI Gate run: `ws-work.test.ts` card.watch gets "No matching frame in 1000 ms".
   - **How it happens.** The AC6 test closes its socket and the card.watch test opens a new one on the same folder. The server sees the close only after `card.watch` has joined the folder's existing watch entry. `observe()` awaited the first scan before it added its listener. Meanwhile the old socket's `stop()` saw no listeners, ended the entry and closed every file watcher. The new listener was then added to a dead entry, so it never heard an edit. A trace of watcher events showed no new `fs.watch` calls after the join, and file events stopped reaching the entry.
