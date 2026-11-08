@@ -1,0 +1,26 @@
+name: Set up Featra
+description: Node, pnpm and the workspace's dependencies; on Linux, also the Xvfb desktop the e2e suite runs on.
+inputs:
+  e2e:
+    description: Also prepare the OS for Electron e2e runs.
+    default: "false"
+runs:
+  using: composite
+  steps:
+    # pnpm's version comes from package.json's packageManager field.
+    - uses: pnpm/action-setup@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 24
+        cache: pnpm
+    - name: Install dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+    - name: Install Xvfb and Openbox
+      if: inputs.e2e == 'true' && runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update -q
+        sudo apt-get install -yq --no-install-recommends xvfb openbox x11-utils
+        # Ubuntu 24.04 blocks the unprivileged user namespaces Chromium's sandbox needs; allow them on this runner.
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
