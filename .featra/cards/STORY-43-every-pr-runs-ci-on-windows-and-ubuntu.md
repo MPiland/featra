@@ -2,7 +2,7 @@
 id: STORY-43
 type: story
 title: Every PR runs CI on Windows and Ubuntu
-status: In Progress
+status: In Review
 parent: FEAT-18
 order: 1
 origin: added
@@ -11,8 +11,8 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
-pr: null
+branch: claude/story-43-ci-e105f9
+pr: https://github.com/MPiland/featra/pull/1
 created: 2026-11-07T19:20:00Z
 history:
   - at: 2026-11-07T19:20:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: user
+  - at: 2026-11-08T14:50:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: developer
 ---
 
 ## Description
@@ -34,7 +39,7 @@ As a builder working on my only PC, I want every test to run on GitHub Actions i
 ## Acceptance criteria
 
 - [x] Before the first push, the full git history is checked for secrets, personal paths and email addresses. The findings and any fixes are recorded in Notes. (proof: History audit in Notes; the rewritten history was re-audited with zero hits before the first push)
-- [ ] Each PR to main shows separate checks for the gate (format, lint, typecheck, unit tests), Windows e2e and Ubuntu e2e. Branch protection blocks the merge unless all three pass. (proof: main's protection requires Gate, E2E (Windows) and E2E (Ubuntu), applies to admins and needs a PR; throwaway PR #2 showed the three checks failing and `mergeStateStatus: BLOCKED`, run https://github.com/MPiland/featra/actions/runs/42440011619. A green Gate waits on BUG-5, see Notes)
+- [ ] Each PR to main shows separate checks for the gate (format, lint, typecheck, unit tests), Windows e2e and Ubuntu e2e. Branch protection blocks the merge unless all three pass. (proof: main's protection requires Gate, E2E (Windows) and E2E (Ubuntu), applies to admins and needs a PR; throwaway PR #2 showed the three checks failing and `mergeStateStatus: BLOCKED`, run https://github.com/MPiland/featra/actions/runs/42440011619. with BUG-5 merged, all three passed and PR #1 showed `CLEAN` at 488ded6, https://github.com/MPiland/featra/actions/runs/42491334531)
 - [ ] Every e2e test passes on GitHub's Windows runner, including the foreground tests (tray, window state, menu). Ubuntu runs the full suite under Xvfb with a window manager, so the BUG-1 maximize test runs instead of being skipped. If the Windows foreground tests can't pass on the runner, the user decides on a local VM before anything is weakened. (proof: https://github.com/MPiland/featra/actions/runs/42440511425 at 9b6ab17, E2E (Windows) 36 passed with tray, window state and menu among them, E2E (Ubuntu) 36 passed under Xvfb + Openbox with the BUG-1 maximize tests run; 0 skipped on either)
 - [ ] A soak run can be started on demand for a chosen spec, platform and run count, and stops at the first failure while keeping its trace. (proof: pushing `soak/ubuntu/throwaway-blocked/5` ran https://github.com/MPiland/featra/actions/runs/42440537065, which stopped after the first failure (1 failed, 4 did not run) and kept the `soak-ubuntu-traces` artifact; `soak/windows/tray/5` passed, https://github.com/MPiland/featra/actions/runs/42440536860; the app's own trace (`electron-<n>.zip`) was proved by a failing local probe under Xvfb, which kept clicks and screenshots while passing tests kept nothing; `tooling/test/soak-plan.test.ts`)
 - [x] The same Ubuntu Xvfb run works locally in WSL with one command, and nothing appears on the user's desktop. (proof: `pnpm test:e2e:wsl` on 2026-11-07, 36 passed, 0 skipped, with the BUG-1 maximize test among them; Windows was polled every 2 s during the run and showed no WSLg window; `tooling/test/e2e-wsl.test.ts`)
@@ -106,7 +111,8 @@ Windows user name, and email addresses.
 - Found by CI: `copyName` used `path.basename`, which doesn't split on `\` on Linux (fixed, 54b14ed).
 - BUG-5 on CI: `packages/server/test/ws-work.test.ts` failed Gate with "No matching frame in 1000 ms" on every PR #1
   run so far: https://github.com/MPiland/featra/actions/runs/42439610499, https://github.com/MPiland/featra/actions/runs/42440180196, https://github.com/MPiland/featra/actions/runs/42440511425 (and PR #2's https://github.com/MPiland/featra/actions/runs/42440011619).
-  The Gate is not re-run to green; BUG-5 is with the user.
+  The Gate was not re-run to green. BUG-5 was fixed in PR #3 (merged into this branch at e6baa43), and the next
+  run passed Gate and both e2e suites (36 passed each): https://github.com/MPiland/featra/actions/runs/42491334531.
 - PR #2 (`throwaway/story-43-blocked`) was closed and its branch deleted; the soak branches were deleted after
   their runs.
 - Merge point with BUG-4: the trace fix adds `traceUntilClosed()` to `launch()` in `apps/desktop/e2e/app.ts` (and
