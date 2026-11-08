@@ -61,8 +61,8 @@ interface Entry {
 
 /** Whether an event for `name` (relative to the target, or absolute for the target itself) counts. */
 function counts(t: Target, name: string | null): boolean {
-  if (!t.names) return true;
-  if (!name) return false;
+  // Node doesn't promise a name, and an event without one can't be ruled out (BUG-6).
+  if (!t.names || !name) return true;
   if (t.names.includes(basename(name))) return true;
   return Boolean(t.children) && !/[\\/]/.test(name);
 }
@@ -87,7 +87,14 @@ function targetsOf(dir: string, scan: Scan | null): Target[] {
   return targets;
 }
 
-export function createWorkWatches(scanner: Scanner, log: (message: string) => void): WorkWatches {
+/** `fs.watch`, or a stand-in for tests that drive a watcher's events and errors themselves. */
+export type WatchFolder = typeof watch;
+
+export function createWorkWatches(
+  scanner: Scanner,
+  log: (message: string) => void,
+  watchFolder: WatchFolder = watch,
+): WorkWatches {
   const entries = new Map<string, Entry>();
 
   const rewatch = (e: Entry, targets: Target[]) => {
@@ -102,11 +109,13 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
       try {
         const gone = () => {
           w.close();
+          // A closed watcher's late event or error must not drop the newer watcher under its key (BUG-6).
+          if (e.watchers.get(key) !== w) return;
           e.watchers.delete(key);
           e.gitChanged = true;
           trigger(e);
         };
-        const w = watch(t.path, { recursive: t.recursive, persistent: false }, (_type, name) => {
+        const w = watchFolder(t.path, { recursive: t.recursive, persistent: false }, (_type, name) => {
           // Windows names the folder itself, absolute, without end once it's deleted (BUG-6).
           if (name && isAbsolute(name)) return gone();
           if (!counts(t, name)) return;
@@ -122,6 +131,8 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
   };
 
   const scanOnce = async (e: Entry): Promise<{ scan: Scan | null; list: WorkList }> => {
+    // A scan queued before the watch ended would start after the scanner closed and reopen its index (BUG-6).
+    if (e.closed) return { scan: e.last, list: e.last?.list ?? EMPTY_WORK_LIST };
     let list: WorkList;
     let scan: Scan | null = null;
     // Taken before the scan: a git event while it runs marks the next one.

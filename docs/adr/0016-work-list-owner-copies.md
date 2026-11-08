@@ -54,7 +54,9 @@ per rev, then a `cat-file --batch` per rev).
 `blobs` saves re-reading unchanged files from git objects. `owners` is written after every scan; it is not yet read by
 anything, and exists for the agent tools and later views. The index opens with a 2 s busy timeout and
 `PRAGMA quick_check`. A file that fails the check, or has another schema version, is deleted with its `-journal`,
-`-wal` and `-shm` files and built again. Deleting it loses nothing.
+`-wal` and `-shm` files and built again. Deleting it loses nothing. Each repository's index stays open from its first
+scan until the scanner closes, which waits for the scans in flight. Nothing may scan after that: an ended watch runs
+no queued scan (amended 2026-11-08, BUG-6).
 
 **Watching.** A watch on a folder is shared by every listener of that folder. It watches with `fs.watch`:
 
@@ -102,6 +104,14 @@ recursively watched folder (that worktree's `.featra`) by its own absolute path,
 reset the 50 ms settle, so the rescan never ran. Now each worktree's folder counts as a git target. An event that names
 the watched folder itself is handled like a watcher error: that watch closes and git is asked again. Tests add and
 remove worktrees under a watch, the last one included, and apply and edit through it afterwards.
+
+Three more rules keep the watch sound:
+
+- An event without a file name counts on every target. Node doesn't promise a name.
+- A late event or error from a watcher that has already closed leaves the newer watcher under its key alone. When the
+  watch ends, every watcher it opened is closed.
+- A scan queued before the watch ended doesn't run. It would start after the scanner closed and reopen the card index,
+  and an open index can't be deleted on Windows.
 
 **Protocol additions (ADR 0015).**
 
