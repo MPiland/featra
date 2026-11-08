@@ -34,19 +34,19 @@ As a builder working on my only PC, I want every test to run on GitHub Actions i
 ## Acceptance criteria
 
 - [x] Before the first push, the full git history is checked for secrets, personal paths and email addresses. The findings and any fixes are recorded in Notes. (proof: History audit in Notes; the rewritten history was re-audited with zero hits before the first push)
-- [ ] Each PR to main shows separate checks for the gate (format, lint, typecheck, unit tests), Windows e2e and Ubuntu e2e. Branch protection blocks the merge unless all three pass.
-- [ ] Every e2e test passes on GitHub's Windows runner, including the foreground tests (tray, window state, menu). Ubuntu runs the full suite under Xvfb with a window manager, so the BUG-1 maximize test runs instead of being skipped. If the Windows foreground tests can't pass on the runner, the user decides on a local VM before anything is weakened.
-- [ ] A soak run can be started on demand for a chosen spec, platform and run count, and stops at the first failure while keeping its trace.
+- [ ] Each PR to main shows separate checks for the gate (format, lint, typecheck, unit tests), Windows e2e and Ubuntu e2e. Branch protection blocks the merge unless all three pass. (proof: main's protection requires Gate, E2E (Windows) and E2E (Ubuntu), applies to admins and needs a PR; throwaway PR #2 showed the three checks failing and `mergeStateStatus: BLOCKED`, run https://github.com/MPiland/featra/actions/runs/42440011619. A green Gate waits on BUG-5, see Notes)
+- [ ] Every e2e test passes on GitHub's Windows runner, including the foreground tests (tray, window state, menu). Ubuntu runs the full suite under Xvfb with a window manager, so the BUG-1 maximize test runs instead of being skipped. If the Windows foreground tests can't pass on the runner, the user decides on a local VM before anything is weakened. (proof: https://github.com/MPiland/featra/actions/runs/42440511425 at 9b6ab17, E2E (Windows) 36 passed with tray, window state and menu among them, E2E (Ubuntu) 36 passed under Xvfb + Openbox with the BUG-1 maximize tests run; 0 skipped on either)
+- [ ] A soak run can be started on demand for a chosen spec, platform and run count, and stops at the first failure while keeping its trace. (proof: pushing `soak/ubuntu/throwaway-blocked/5` ran https://github.com/MPiland/featra/actions/runs/42440537065, which stopped after the first failure (1 failed, 4 did not run) and kept the `soak-ubuntu-traces` artifact; `soak/windows/tray/5` passed, https://github.com/MPiland/featra/actions/runs/42440536860; the app's own trace (`electron-<n>.zip`) was proved by a failing local probe under Xvfb, which kept clicks and screenshots while passing tests kept nothing; `tooling/test/soak-plan.test.ts`)
 - [x] The same Ubuntu Xvfb run works locally in WSL with one command, and nothing appears on the user's desktop. (proof: `pnpm test:e2e:wsl` on 2026-11-07, 36 passed, 0 skipped, with the BUG-1 maximize test among them; Windows was polled every 2 s during the run and showed no WSLg window; `tooling/test/e2e-wsl.test.ts`)
 
 ## Tasks
 
 - [x] Audit the history and record the findings; create the public repo `MPiland/featra` and push main
 - [x] Workflow: gate job, Windows e2e job, Ubuntu e2e job (Xvfb plus a window manager); upload Playwright traces on failure
-- [ ] Branch protection on main requiring the three checks
-- [x] On-demand soak workflow (`workflow_dispatch`: spec, platform, runs)
+- [x] Branch protection on main requiring the three checks
+- [x] On-demand soak workflow (`workflow_dispatch`: spec, platform, runs; or push `soak/<platform>/<specs>/<runs>`)
 - [x] Local WSL script for the Xvfb run; document both in the testing docs
-- [ ] Prove each AC with a PR whose checks are visible, plus one deliberately failing branch that is blocked
+- [x] Prove each AC with a PR whose checks are visible, plus one deliberately failing branch that is blocked
 
 ## Notes
 
@@ -98,3 +98,17 @@ Windows user name, and email addresses.
   - The distro has no openbox and no passwordless sudo, so the script unpacks Ubuntu's openbox packages into
     `~/.cache` without root.
 - Local runs copy the tree to `~/featra-e2e/<checkout>`, leaving the BUG-4 session's `~/featra` clone alone.
+- Soak branches: GitHub only dispatches workflows that are on the default branch, so `soak.yml` also runs on a push
+  to `soak/<platform>/<specs>/<runs>` (Dev Lead's call). `tooling/ci/soak-plan.ts` reads and validates both forms.
+- Traces: Playwright's `trace` option records browser contexts only, so a failing Electron test kept a trace with no
+  app actions in it. `launch()` in `apps/desktop/e2e/app.ts` now traces the app's context and saves
+  `electron-<n>.zip` on close; `preserveOutput: "failures-only"` drops a passing test's output.
+- Found by CI: `copyName` used `path.basename`, which doesn't split on `\` on Linux (fixed, 54b14ed).
+- BUG-5 on CI: `packages/server/test/ws-work.test.ts` failed Gate with "No matching frame in 1000 ms" on every PR #1
+  run so far: https://github.com/MPiland/featra/actions/runs/42439610499, https://github.com/MPiland/featra/actions/runs/42440180196, https://github.com/MPiland/featra/actions/runs/42440511425 (and PR #2's https://github.com/MPiland/featra/actions/runs/42440011619).
+  The Gate is not re-run to green; BUG-5 is with the user.
+- PR #2 (`throwaway/story-43-blocked`) was closed and its branch deleted; the soak branches were deleted after
+  their runs.
+- Merge point with BUG-4: the trace fix adds `traceUntilClosed()` to `launch()` in `apps/desktop/e2e/app.ts` (and
+  imports `test` there), which BUG-4's branch also changes. Whichever lands second keeps the `traceUntilClosed(app)`
+  call right after `electron.launch()` and before `firstWindow()`.

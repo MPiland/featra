@@ -33,8 +33,10 @@ Branch protection on main requires all three checks, plus the user's Accept. The
 Renaming a job means updating branch protection with it.
 
 When an e2e job fails, its Playwright output (traces, screenshots) is uploaded as an artifact named
-`e2e-windows-traces` or `e2e-ubuntu-traces`. Download it from the run's summary page, then open a trace with
-`pnpm --filter @featra/desktop exec playwright show-trace <path>/trace.zip`.
+`e2e-windows-traces` or `e2e-ubuntu-traces`. Download it from the run's summary page. Each failed test has a folder
+with `electron-<n>.zip`, the app's trace (its actions, DOM snapshots and screenshots, one per launch), and
+`trace.zip`, the test's own steps. Open one with `pnpm --filter @featra/desktop exec playwright show-trace <file>`.
+Passing tests keep no output.
 
 ## Soak runs
 
