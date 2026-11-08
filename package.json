@@ -10,6 +10,7 @@
     "test": "vitest run && pnpm run test:e2e",
     "test:unit": "vitest run",
     "test:e2e": "pnpm --filter @featra/desktop test:e2e",
+    "test:e2e:wsl": "node tooling/e2e/wsl.ts",
     "test:watch": "vitest",
     "typecheck": "pnpm -r --if-present run typecheck",
     "lint": "oxlint --type-aware --deny-warnings --report-unused-disable-directives --ignore-pattern \"**/lint-fixtures/**\"",
@@ -28,5 +29,6 @@
   },
   "engines": {
     "node": ">=24"
-  }
+  },
+  "packageManager": "pnpm@11.17.0"
 }
