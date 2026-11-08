@@ -105,13 +105,12 @@ export function createRepoGit(command = "git"): RepoGit {
       return parseWorktrees(await ok(top, ["worktree", "list", "--porcelain"]));
     },
     async branches(top, base) {
-      const all = (await ok(top, ["for-each-ref", "--format=%(refname:short)", "refs/heads"])).split("\n");
-      const merged = await run(top, [
-        "for-each-ref",
-        `--merged=refs/heads/${base}`,
-        "--format=%(refname:short)",
-        "refs/heads",
+      // Side by side: each git start adds to every scan, about 200 ms apiece on Windows under load (BUG-5).
+      const [listed, merged] = await Promise.all([
+        ok(top, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]),
+        run(top, ["for-each-ref", `--merged=refs/heads/${base}`, "--format=%(refname:short)", "refs/heads"]),
       ]);
+      const all = listed.split("\n");
       // No base branch yet (no commits): nothing is in it.
       const inBase = new Set(merged.code === 0 ? merged.stdout.split("\n") : []);
       return all.filter(Boolean).map((name) => ({ name, inBase: inBase.has(name) }));

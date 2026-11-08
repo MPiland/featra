@@ -1,7 +1,8 @@
 /**
  * Keeps each watched project's Work list current (ADR 0016). File-system watches on every working tree's `.featra`
  * and on git's refs and worktree list trigger a rescan, debounced and one at a time; listeners hear only lists that
- * changed. Watches are shared per folder and end when the last listener stops.
+ * changed. A rescan reuses what git said last time unless a git target fired, so a card edit runs no git. Watches are
+ * shared per folder and end when the last listener stops.
  */
 import { watch, type FSWatcher } from "node:fs";
 import { basename, join } from "node:path";
@@ -21,7 +22,10 @@ export interface WorkWatches {
    * JSON changes.
    */
   observe: <T>(dir: string, pick: ScanPick<T>, listener: (value: T) => void) => Promise<{ value: T; stop: () => void }>;
-  /** Rescans `dir` now, as after the server wrote to it; the scan, or undefined when nothing watches `dir`. */
+  /**
+   * Rescans `dir` now, git included, as after the server wrote to it; the scan, or undefined when nothing watches
+   * `dir`.
+   */
   refresh: (dir: string) => Promise<Scan | null | undefined>;
   close: () => void;
 }
@@ -34,6 +38,8 @@ interface Target {
   recursive: boolean;
   /** Only events for these file names count. */
   names?: readonly string[];
+  /** An event here means git's state changed, so the rescan asks git again. */
+  git?: boolean;
 }
 
 /** Hears every scan; it decides itself whether anything it cares about changed. */
@@ -46,6 +52,9 @@ interface Entry {
   queue: Promise<{ scan: Scan | null; list: WorkList }>;
   timer: ReturnType<typeof setTimeout> | undefined;
   closed: boolean;
+  /** The last scan, whose git state the next rescan reuses unless `gitChanged`. */
+  last: Scan | null;
+  gitChanged: boolean;
 }
 
 function targetsOf(dir: string, scan: Scan | null): Target[] {
@@ -60,9 +69,9 @@ function targetsOf(dir: string, scan: Scan | null): Target[] {
     );
   }
   targets.push(
-    { path: common, recursive: false, names: ["HEAD", "packed-refs"] },
-    { path: join(common, "refs", "heads"), recursive: true },
-    { path: join(common, "worktrees"), recursive: true, names: ["HEAD", "gitdir"] },
+    { path: common, recursive: false, names: ["HEAD", "packed-refs"], git: true },
+    { path: join(common, "refs", "heads"), recursive: true, git: true },
+    { path: join(common, "worktrees"), recursive: true, names: ["HEAD", "gitdir"], git: true },
   );
   return targets;
 }
@@ -82,11 +91,13 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
       try {
         const w = watch(t.path, { recursive: t.recursive, persistent: false }, (_type, name) => {
           if (t.names && !(name && t.names.includes(basename(name)))) return;
+          if (t.git) e.gitChanged = true;
           trigger(e);
         });
         w.on("error", () => {
           w.close();
           e.watchers.delete(key);
+          e.gitChanged = true;
           trigger(e);
         });
         e.watchers.set(key, w);
@@ -99,13 +110,18 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
   const scanOnce = async (e: Entry): Promise<{ scan: Scan | null; list: WorkList }> => {
     let list: WorkList;
     let scan: Scan | null = null;
+    // Taken before the scan: a git event while it runs marks the next one.
+    const reuse = e.gitChanged ? undefined : e.last?.collected.git;
+    e.gitChanged = false;
     try {
-      scan = await scanner.scan(e.dir);
+      scan = await scanner.scan(e.dir, reuse);
       list = scan?.list ?? EMPTY_WORK_LIST;
     } catch (err) {
+      e.gitChanged = true;
       log(`work scan failed: ${errorMessage(err)}`);
       list = { ...EMPTY_WORK_LIST, problems: [`Can't read the cards: ${errorMessage(err)}`] };
     }
+    e.last = scan;
     if (e.closed) return { scan, list };
     rewatch(e, targetsOf(e.dir, scan));
     for (const listener of e.listeners) listener(scan, list);
@@ -144,14 +160,18 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
         queue: Promise.resolve({ scan: null, list: EMPTY_WORK_LIST }),
         timer: undefined,
         closed: false,
+        last: null,
+        gitChanged: true,
       };
       entries.set(dir, e);
     }
     const entry = e;
-    const first = await run(entry);
-    const value = pick(first.scan, first.list);
-    let last = JSON.stringify(value);
+    // Join before the first scan, so another listener stopping meanwhile can't end the entry under us (BUG-5).
+    // Scans before our own answer are left to that answer.
+    let answered = false;
+    let last: string | undefined;
     const own: ScanListener = (scan, list) => {
+      if (!answered) return;
       const next = pick(scan, list);
       const json = JSON.stringify(next);
       if (json === last) return;
@@ -159,6 +179,10 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
       listener(next);
     };
     entry.listeners.add(own);
+    const first = await run(entry);
+    const value = pick(first.scan, first.list);
+    last = JSON.stringify(value);
+    answered = true;
     return {
       value,
       stop: () => {
@@ -176,7 +200,9 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
     observe,
     async refresh(dir) {
       const e = entries.get(dir);
-      return e ? (await run(e)).scan : undefined;
+      if (!e) return undefined;
+      e.gitChanged = true;
+      return (await run(e)).scan;
     },
     close() {
       for (const e of entries.values()) end(e);
