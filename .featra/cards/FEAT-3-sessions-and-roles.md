@@ -4,7 +4,7 @@ type: feature
 title: Sessions and roles
 status: approved
 parent: EPIC-1
-order: 4
+order: 5
 origin: planned
 created: 2026-11-04T23:00:00Z
 history:

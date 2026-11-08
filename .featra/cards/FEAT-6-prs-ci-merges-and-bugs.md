@@ -4,7 +4,7 @@ type: feature
 title: PRs, CI, merges and bugs
 status: approved
 parent: EPIC-1
-order: 7
+order: 8
 origin: planned
 created: 2026-11-04T23:00:00Z
 history:
