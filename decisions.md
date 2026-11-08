@@ -348,3 +348,9 @@ before and after they write, and reuse its git part unless a git target fired. A
 tree and the missing blobs through one `cat-file --batch`, so it takes three rounds. Apply now runs one git command
 and answers in 0.35–0.7 s, and the first watch answer takes 0.8–1.0 s. ADR 0016 and ADR 0017 are amended. The test
 and its 2 s wait are unchanged.
+
+Reuse is only safe if every git change fires a git target, and removing a worktree did not. Git deletes
+`worktrees/<name>` as one folder, which the `HEAD`/`gitdir` name filter dropped. Windows also keeps reporting a
+deleted folder under a recursive watch by its absolute path, and each of those events reset the 50 ms settle, so the
+rescan never ran. Each worktree's folder, and the `worktrees` folder itself, now count as git targets. An event that
+names the watched folder itself closes that watch, like a watcher error. Tests for both cases failed before the fix.

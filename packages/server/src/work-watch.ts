@@ -5,7 +5,7 @@
  * shared per folder and end when the last listener stops.
  */
 import { watch, type FSWatcher } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join } from "node:path";
 import { EMPTY_WORK_LIST, errorMessage, FEATRA_DIR, type WorkList } from "@featra/work-format";
 import type { Scan, Scanner } from "./work-scan.ts";
 
@@ -38,6 +38,8 @@ interface Target {
   recursive: boolean;
   /** Only events for these file names count. */
   names?: readonly string[];
+  /** Events for the folder's own entries count too: a worktree's folder added or removed (BUG-6). */
+  children?: boolean;
   /** An event here means git's state changed, so the rescan asks git again. */
   git?: boolean;
 }
@@ -57,6 +59,14 @@ interface Entry {
   gitChanged: boolean;
 }
 
+/** Whether an event for `name` (relative to the target, or absolute for the target itself) counts. */
+function counts(t: Target, name: string | null): boolean {
+  if (!t.names) return true;
+  if (!name) return false;
+  if (t.names.includes(basename(name))) return true;
+  return Boolean(t.children) && !/[\\/]/.test(name);
+}
+
 function targetsOf(dir: string, scan: Scan | null): Target[] {
   // The opened folder itself, so a `.featra` made there (by init) starts the list.
   const targets: Target[] = [{ path: dir, recursive: false, names: [FEATRA_DIR] }];
@@ -69,9 +79,10 @@ function targetsOf(dir: string, scan: Scan | null): Target[] {
     );
   }
   targets.push(
-    { path: common, recursive: false, names: ["HEAD", "packed-refs"], git: true },
+    // `worktrees` itself comes with the first worktree and goes with the last.
+    { path: common, recursive: false, names: ["HEAD", "packed-refs", "worktrees"], git: true },
     { path: join(common, "refs", "heads"), recursive: true, git: true },
-    { path: join(common, "worktrees"), recursive: true, names: ["HEAD", "gitdir"], git: true },
+    { path: join(common, "worktrees"), recursive: true, names: ["HEAD", "gitdir"], children: true, git: true },
   );
   return targets;
 }
@@ -89,17 +100,20 @@ export function createWorkWatches(scanner: Scanner, log: (message: string) => vo
     for (const [key, t] of wanted) {
       if (e.watchers.has(key)) continue;
       try {
-        const w = watch(t.path, { recursive: t.recursive, persistent: false }, (_type, name) => {
-          if (t.names && !(name && t.names.includes(basename(name)))) return;
-          if (t.git) e.gitChanged = true;
-          trigger(e);
-        });
-        w.on("error", () => {
+        const gone = () => {
           w.close();
           e.watchers.delete(key);
           e.gitChanged = true;
           trigger(e);
+        };
+        const w = watch(t.path, { recursive: t.recursive, persistent: false }, (_type, name) => {
+          // Windows names the folder itself, absolute, without end once it's deleted (BUG-6).
+          if (name && isAbsolute(name)) return gone();
+          if (!counts(t, name)) return;
+          if (t.git) e.gitChanged = true;
+          trigger(e);
         });
+        w.on("error", gone);
         e.watchers.set(key, w);
       } catch {
         // Not there (yet): the next scan tries again.

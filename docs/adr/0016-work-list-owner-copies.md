@@ -60,9 +60,10 @@ anything, and exists for the agent tools and later views. The index opens with a
 
 - the opened folder, for a `.featra` made there (by init);
 - each location's folder, for `.featra`, and each `.featra`, recursively;
-- the git common dir, for `HEAD` and `packed-refs`;
+- the git common dir, for `HEAD`, `packed-refs` and `worktrees` (which comes with the first worktree and goes with the
+  last);
 - `refs/heads`, recursively;
-- `worktrees`, recursively, for `HEAD` and `gitdir`.
+- `worktrees`, recursively, for `HEAD`, `gitdir` and each worktree's own folder, so a worktree removed is heard.
 
 Events settle for 50 ms, then the server rescans. Rescans run one at a time. The targets are set again after each scan,
 so a new worktree or branch is picked up. Listeners hear only a list whose JSON changed. The last listener to stop ends
@@ -94,6 +95,13 @@ edit. They no longer force git as `refresh` did. Apply now runs one git command,
 in series: 2.1–3.3 s under the full parallel unit run, against the 2 s its socket test allows. A git event already
 fired but not yet delivered when the user clicks is the same small window every card edit has. A fresh scan takes
 three serial git starts (the paths; the worktrees and branches side by side; one `cat-file --batch`) instead of four.
+
+Since Apply now trusts that rule, it must hold when the watched folders themselves go. Removing a worktree fired no git
+target: git deletes `worktrees/<name>` as one folder, and the name filter dropped it. Windows also reports a deleted,
+recursively watched folder (that worktree's `.featra`) by its own absolute path, without end. Each of those events
+reset the 50 ms settle, so the rescan never ran. Now each worktree's folder counts as a git target. An event that names
+the watched folder itself is handled like a watcher error: that watch closes and git is asked again. Tests add and
+remove worktrees under a watch, the last one included, and apply and edit through it afterwards.
 
 **Protocol additions (ADR 0015).**
 
