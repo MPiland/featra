@@ -2,7 +2,7 @@
 id: STORY-6
 type: story
 title: Built-in, custom and provider roles
-status: In Progress
+status: In Review
 parent: FEAT-3
 order: 6
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-6-roles
-pr: null
+pr: 12
 created: 2026-11-04T23:00:00Z
 history:
   - at: 2026-11-04T23:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:story-6
+  - at: 2026-11-09T20:07:34Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:story-6
 ---
 
