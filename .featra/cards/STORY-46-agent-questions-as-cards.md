@@ -2,7 +2,7 @@
 id: STORY-46
 type: story
 title: Agent questions as cards
-status: In Review
+status: Acceptance
 parent: FEAT-3
 order: 5
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-46
+  - at: 2026-11-09T17:48:21Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
