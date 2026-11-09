@@ -2,7 +2,7 @@
 id: STORY-5
 type: story
 title: Start a chat from a role and stream it
-status: In Review
+status: Done
 parent: FEAT-3
 order: 1
 origin: planned
@@ -29,6 +29,16 @@ history:
     field: status
     from: In Progress
     to: In Review
+    by: session:story-5
+  - at: 2026-11-09T13:20:16Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-09T13:20:16Z
+    field: status
+    from: In Review
+    to: Done
     by: session:story-5
 ---
 
