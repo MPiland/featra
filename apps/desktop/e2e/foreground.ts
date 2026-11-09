@@ -1,6 +1,7 @@
 import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
+import { onWslg } from "../src/lifecycle.ts";
 
 /**
  * The OS foreground window, for the e2e harness only (BUG-2 and BUG-3, see decisions.md).
@@ -20,19 +21,30 @@ const ANSWER_TIMEOUT_MS = 15_000;
 
 interface Helper {
   ask: (command: string) => Promise<string>;
+  stop: () => void;
 }
 
 let helper: Helper | undefined;
 
+/**
+ * WSLg: Featra's windows are Windows windows too (msrdc.exe draws them), so the harness asks Windows what is in front,
+ * through WSL's interop, the same way it does on Windows.
+ */
+export const wslg = onWslg(process.platform, process.env);
+
+/** Windows PowerShell, and a script path it can open: under WSLg, by their Windows paths. */
+function powershell(script: string): [string, string] {
+  const path = fileURLToPath(new URL(script, import.meta.url));
+  if (!wslg) return ["powershell.exe", path];
+  const windowsPath = execFileSync("wslpath", ["-w", path], { encoding: "utf8" }).trim();
+  return ["/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe", windowsPath];
+}
+
 function startHelper(): Helper {
-  const script = fileURLToPath(new URL("user32-helper.ps1", import.meta.url));
-  const child = spawn(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script],
-    {
-      stdio: ["pipe", "pipe", "inherit"],
-    },
-  );
+  const [exe, script] = powershell("user32-helper.ps1");
+  const child = spawn(exe, ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script], {
+    stdio: ["pipe", "pipe", "inherit"],
+  });
   // The helper ends when its stdin closes; this also covers a worker that exits without cleaning up.
   process.once("exit", () => child.kill());
   const answers: { resolve: (line: string) => void; reject: (e: Error) => void }[] = [];
@@ -55,7 +67,7 @@ function startHelper(): Helper {
     child.stdin.write(`${command}\n`);
     return answer;
   };
-  return { ask };
+  return { ask, stop: () => child.stdin.end() };
 }
 
 function waitFor(answers: { resolve: (line: string) => void; reject: (e: Error) => void }[], command: string) {
@@ -79,6 +91,12 @@ function waitFor(answers: { resolve: (line: string) => void; reject: (e: Error) 
 
 const user32 = (command: string) => (helper ??= startHelper()).ask(command);
 
+/** Ends this process's user32 helper, so a runner process (global setup) can exit. */
+export function stopHelper() {
+  helper?.stop();
+  helper = undefined;
+}
+
 /**
  * Grants process `pid` the right to take the foreground, as a real click on its tray icon or menu would. Windows
  * only: elsewhere there is no foreground lock to get past, so it does nothing.
@@ -86,7 +104,81 @@ const user32 = (command: string) => (helper ??= startHelper()).ask(command);
 export async function grantForeground(pid: number): Promise<void> {
   if (process.platform !== "win32") return;
   const granted = await user32(`grant ${pid}`);
-  if (granted !== "True") throw new Error(`Could not grant process ${pid} the foreground (AllowSetForegroundWindow)`);
+  if (granted !== "True") {
+    throw new Error(
+      `Could not grant process ${pid} the foreground (AllowSetForegroundWindow). ${await whyNoForeground()}`,
+    );
+  }
+}
+
+/** What the harness's faked input runs into on the Windows desktop (the helper's `desktop` answer). */
+export interface DesktopState {
+  /** The desktop that gets input: "Default", or "Winlogon" while the screen is locked or a UAC prompt is up. */
+  inputDesktop: string;
+  /** Integrity levels: 8192 Medium, 12288 High (elevated), 16384 System; -1 unreadable. */
+  ownIntegrity: number;
+  foreground: { pid: number; integrity: number; name: string };
+  msSinceInput: number;
+}
+
+export function parseDesktopState(answer: string): DesktopState {
+  const [inputDesktop = "?", own, pid, integrity, idle, ...name] = answer.split(" ");
+  return {
+    inputDesktop,
+    ownIntegrity: Number(own),
+    foreground: { pid: Number(pid), integrity: Number(integrity), name: name.join(" ") },
+    msSinceInput: Number(idle),
+  };
+}
+
+const LEVELS: Record<number, string> = { 4096: "Low", 8192: "Medium", 12288: "High", 16384: "System" };
+const level = (n: number) => LEVELS[n] ?? (n < 0 ? "unknown" : String(n));
+
+/**
+ * What stops the harness's input from counting, if it is something the harness can see: Windows sends no input to
+ * another desktop (lock screen, UAC prompt), and drops input injected towards a window of higher integrity (UIPI),
+ * so a grant can't be passed on while an elevated window is in front.
+ */
+export function desktopBlocker(s: DesktopState): string | undefined {
+  if (s.inputDesktop !== "Default") {
+    return `the input desktop is "${s.inputDesktop}", not "Default": the screen is locked or a Windows prompt (UAC) is up`;
+  }
+  const front = `${s.foreground.name || "a window"} (pid ${s.foreground.pid})`;
+  if (s.foreground.integrity > s.ownIntegrity) {
+    return (
+      `${front} is in front at ${level(s.foreground.integrity)} integrity, above the harness's ` +
+      `${level(s.ownIntegrity)}: Windows ignores the harness's input while it is in front`
+    );
+  }
+  // The harness can read the integrity of any process of its own user, elevated ones included. One it can't read runs
+  // as another account or is protected: a SYSTEM process's window (GameInputSvc's, seen in BUG-4) blocks input alike.
+  if (s.foreground.pid !== 0 && s.foreground.integrity < 0) {
+    return (
+      `${front} is in front and its integrity can't be read: it runs as another account (SYSTEM) or is protected, ` +
+      `and Windows ignores the harness's input while it is in front`
+    );
+  }
+  return undefined;
+}
+
+export const describeDesktop = (s: DesktopState) =>
+  `In front: ${s.foreground.name || "?"} (pid ${s.foreground.pid}, ${level(s.foreground.integrity)} integrity); ` +
+  `harness ${level(s.ownIntegrity)} integrity; input desktop ${s.inputDesktop}; last input ${s.msSinceInput} ms ago.`;
+
+/** Reads the Windows desktop (Windows and WSLg). */
+export const desktopState = async () => parseDesktopState(await user32("desktop"));
+
+/** For a failure message: the blocker the harness can see, or that it sees none, and what is in front. */
+async function whyNoForeground(): Promise<string> {
+  try {
+    const s = await desktopState();
+    const blocker = desktopBlocker(s);
+    return blocker
+      ? `Blocked: ${blocker}. ${describeDesktop(s)}`
+      : `No blocker the harness can see. ${describeDesktop(s)}`;
+  } catch (e) {
+    return `The desktop couldn't be read: ${(e as Error).message}`;
+  }
 }
 
 /**
@@ -104,21 +196,41 @@ export async function foregroundWindow(): Promise<bigint | undefined> {
 }
 
 /**
+ * WSLg only: the Windows foreground window, which is what the user sees in front. The X server's active window can
+ * be Featra's while Windows shows another app, or shows Featra's window minimised (BUG-4).
+ */
+export async function windowsForegroundWindow(): Promise<{ process: string; minimized: boolean; title: string }> {
+  const [process, minimized, ...title] = (await user32("window")).split(" ");
+  return { process: process ?? "", minimized: minimized === "True", title: title.join(" ") };
+}
+
+/**
  * Puts a stand-in for someone working in another app in front (`busy-user.ps1`): a small window that keeps getting
  * input, so Windows' foreground lock is on for Featra, as it is while a person types elsewhere. Focus tests start one
- * so they prove focus under the lock on every run, not only when someone happens to be using the desktop. Resolves
- * once that window is the foreground window; `dispose` closes it. Windows only: elsewhere it does nothing.
+ * so they prove focus under the lock on every run, not only when someone happens to be using the desktop. Under WSLg
+ * the same window puts a Windows app in front of Featra's, which `focus()` alone can't get past there (BUG-4).
+ * Resolves once that window is the foreground window; `dispose` closes it. Windows and WSLg: elsewhere it does nothing.
  */
 export async function busyUserInFront(): Promise<{ dispose: () => void }> {
-  if (process.platform !== "win32") return { dispose: () => {} };
-  const script = fileURLToPath(new URL("busy-user.ps1", import.meta.url));
+  if (process.platform !== "win32" && !wslg) return { dispose: () => {} };
+  const [exe, script] = powershell("busy-user.ps1");
+  // Under WSLg this process has no Windows pid; the helper's PowerShell lives as long as the test worker.
+  const parent = wslg ? await user32("pid") : String(process.pid);
   const child: ChildProcess = spawn(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, "-ParentPid", String(process.pid)],
+    exe,
+    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script, "-ParentPid", parent],
     { stdio: ["ignore", "pipe", "inherit"] },
   );
+  let windowsPid: string | undefined;
+  // A test that times out never reaches its own dispose: the window then goes with the test worker, not seconds later
+  // when it notices its parent is gone.
+  const onExit = () => child.kill();
+  process.once("exit", onExit);
   const dispose = () => {
+    process.off("exit", onExit);
     child.kill();
+    // Killing WSL's interop stand-in doesn't end the Windows process: ask Windows to.
+    if (wslg && windowsPid !== undefined) void user32(`stop ${windowsPid}`).catch(() => {});
   };
   try {
     const hwnd = await new Promise<bigint>((resolve, reject) => {
@@ -126,12 +238,17 @@ export async function busyUserInFront(): Promise<{ dispose: () => void }> {
       child.once("exit", (code) => reject(new Error(`The busy-user window exited (code ${code})`)));
       createInterface({ input: child.stdout! }).once("line", (line) => {
         clearTimeout(timer);
-        resolve(BigInt(line.split(" ")[1] ?? "0"));
+        const [, handle, pid] = line.split(" ");
+        windowsPid = pid;
+        resolve(BigInt(handle ?? "0"));
       });
     });
+    const inFront = async () => (wslg ? BigInt(await user32("foreground")) : await foregroundWindow());
     const deadline = Date.now() + 5_000;
-    while ((await foregroundWindow()) !== hwnd) {
-      if (Date.now() > deadline) throw new Error("The busy-user window didn't come to the front in 5 s");
+    while ((await inFront()) !== hwnd) {
+      if (Date.now() > deadline) {
+        throw new Error(`The busy-user window didn't come to the front in 5 s. ${await whyNoForeground()}`);
+      }
       await new Promise((r) => setTimeout(r, 50));
     }
     return { dispose };

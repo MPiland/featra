@@ -1,7 +1,7 @@
-# A stand-in for someone working in another app (BUG-3), for the e2e focus tests on Windows. Opens a small window,
-# brings it to the front once, then feeds itself zero-distance mouse moves every 100 ms, so it keeps being the process
-# that got the last input. Windows' foreground lock then stays on for every other process, as it does when a person
-# is typing elsewhere. Prints `busy <hwnd>` once it is shown. Test-only.
+# A stand-in for someone working in another app (BUG-3), for the e2e focus tests on Windows and WSLg. Opens a small
+# window, brings it to the front once, then feeds itself zero-distance mouse moves every 100 ms, so it keeps being the
+# process that got the last input. Windows' foreground lock then stays on for every other process, as it does when a
+# person is typing elsewhere. Prints `busy <hwnd> <pid>` once it is shown. Test-only.
 param([Parameter(Mandatory)][int]$ParentPid)
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -TypeDefinition @'
@@ -28,7 +28,7 @@ $timer.Add_Tick({ [FeatraBusyUser]::Nudge() })
 $form.Add_Shown({
   [FeatraBusyUser]::Nudge()
   [void][FeatraBusyUser]::SetForegroundWindow($form.Handle)
-  [Console]::Out.WriteLine("busy $($form.Handle.ToInt64())"); [Console]::Out.Flush()
+  [Console]::Out.WriteLine("busy $($form.Handle.ToInt64()) $PID"); [Console]::Out.Flush()
   $timer.Start()
 })
 # The harness kills it when the test ends; if the test worker dies first, it closes itself.

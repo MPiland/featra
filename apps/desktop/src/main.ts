@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
 import { allowedDirs, registerIpc } from "./ipc.ts";
-import { createLifecycle } from "./lifecycle.ts";
+import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog } from "./log.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
@@ -78,6 +78,7 @@ if (!app.requestSingleInstanceLock()) {
       notify: showNotice,
       rememberNotice: () => void appState.save({ trayNoticeShown: true }),
       exit: () => app.quit(),
+      remapOnReveal: onWslg(process.platform, process.env),
     });
     // The tray icon is there while close keeps Featra running, and goes when the Close button is set to quit.
     const syncTray = (w: BrowserWindow) => {
