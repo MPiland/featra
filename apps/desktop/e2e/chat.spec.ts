@@ -1,5 +1,5 @@
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,9 +42,10 @@ test("a Developer chat streams replies, shows tool rows, denies what needs appro
   const userData = await tempUserData();
   const project = await tempProject("version: 1\n");
   const bin = await tempDir("featra-claude-");
-  const claude = join(bin.dir, CLAUDE);
-  await writeFile(claude, "");
-  await chmod(claude, 0o755);
+  await writeFile(join(bin.dir, CLAUDE), "");
+  await chmod(join(bin.dir, CLAUDE), 0o755);
+  // The stand-in as `where` and `which` name it: on Windows the temp folder can be an 8.3 short path.
+  const claude = realpathSync.native(join(bin.dir, CLAUDE));
   const agentLog = join(bin.dir, "agent.log");
   const { app, page } = await launch(userData.dir, {
     FEATRA_PROJECT_DIR: project.dir,

@@ -453,3 +453,7 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
 - 2026-11-09, user decision ("Add New chat to list"): the sidebar keeps New chat above Work, and STORY-18's shell
   journey (`e2e/shell.spec.ts`, both sidebar checks) and `app.test.tsx` expect it. Why: the PR changed the sidebar on purpose; the tests
   follow the intended sidebar, with every other check left as it was.
+- The located `claude` path is used as `where`/`which` print it, not canonicalized. Why: it is what the user's shell
+  runs, and it is only spawned, so an 8.3 short or long form names the same file; a `realpath` adds a filesystem call
+  and changes nothing. The chat e2e names its stand-in with `realpathSync.native`, as `where` does, so its exact
+  options check holds on Windows runners whose temp folder is a short path.
