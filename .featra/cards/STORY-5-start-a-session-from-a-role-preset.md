@@ -65,3 +65,5 @@ inside Featra instead of a terminal.
 - The roles here are fixed definitions. STORY-6 adds editing, custom roles and provider roles.
 - Behaviour change (review): logged out is read only from the SDK's `error: "authentication_failed"`. A result or
   reply that only mentions logging in now shows as itself (a failed result shows its message), not as logged out.
+- User decision 2026-11-09 ("Add New chat to list"): New chat stays in the sidebar above Work. STORY-18's shell
+  journey (`e2e/shell.spec.ts`, both sidebar checks) and `app.test.tsx` now expect it; every other check is unchanged.

@@ -450,3 +450,6 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
 - `claude-locate` reads a Windows lookup's paths with `path.win32` on every host. Why: on Linux the host `join` made
   `C:\npm/node_modules/...`, so CI couldn't follow the npm shim (the same class of bug as `copyName`).
 - The chat header reads "model · effort · Ask", like the role picker. Why: the parts ran together as "sonnethighAsk".
+- 2026-11-09, user decision ("Add New chat to list"): the sidebar keeps New chat above Work, and STORY-18's shell
+  journey (`e2e/shell.spec.ts`, both sidebar checks) and `app.test.tsx` expect it. Why: the PR changed the sidebar on purpose; the tests
+  follow the intended sidebar, with every other check left as it was.
