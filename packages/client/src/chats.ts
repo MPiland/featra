@@ -43,7 +43,8 @@ export type ChatStart = { ok: true; id: string } | { ok: false; error: string };
 export interface ChatBridge {
   /** The roles a chat in the project can start from. */
   roles: (dir: string) => Promise<Role[]>;
-  start: (dir: string, role: string) => Promise<ChatStart>;
+  /** Starts a chat from a role, on a card when it is for one (STORY-7: the Inbox names the card). */
+  start: (dir: string, role: string, card?: string) => Promise<ChatStart>;
   /** Calls back with the chat now and on every change; returns the stop. */
   watch: (id: string, listener: (update: ChatUpdate) => void) => () => void;
   /** Sends a message; resolves with why it wasn't sent, or null. */
@@ -137,8 +138,8 @@ export function toolMark(item: Extract<ChatItem, { kind: "tool" }>): string | nu
 export function serverChats(server: ServerClient): ChatBridge {
   return {
     roles: (dir) => server.call("chat.roles", { dir }).then(normalizeRoles),
-    start: (dir, role) =>
-      server.call("chat.start", { dir, role }).then(
+    start: (dir, role, card) =>
+      server.call("chat.start", { dir, role, ...(card ? { card } : {}) }).then(
         (r): ChatStart =>
           isRecord(r) && typeof r.id === "string" ? { ok: true, id: r.id } : { ok: false, error: "No chat id." },
         (err: unknown): ChatStart => ({ ok: false, error: errorMessage(err) }),

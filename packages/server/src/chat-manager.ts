@@ -6,14 +6,13 @@
 import { randomUUID } from "node:crypto";
 import {
   CHAT_MESSAGES,
+  chatName,
   idleSummary,
   newSummary,
   reduceRow,
   savedChat,
-  type Ask,
   type ChatEvent,
   type ChatSummary,
-  type ModeInfo,
   type ProviderId,
   type Role,
 } from "@featra/work-format";
@@ -23,56 +22,12 @@ import { ChatError } from "./chat-error.ts";
 import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
 import { chatSaver, memoryChatStore, savedHistory } from "./chat-store.ts";
+import { restored, type Chat } from "./chat-state.ts";
+import { createInbox } from "./inbox.ts";
 import type { ProviderAdapter, ProviderSession } from "./provider.ts";
 
 export { ChatError };
 export type { ChatManager, ChatManagerDeps };
-
-interface Chat {
-  id: string;
-  dir: string;
-  /** Its row in the chat list. */
-  summary: ChatSummary;
-  /** The requests it waits on the user to answer (STORY-45). */
-  asks: readonly Ask[];
-  /** The provider's session it goes on with: the one the agent reported, or the one it was saved with. */
-  session: string | null;
-  /** A new session the agent reported, saved once the agent answers: before then Claude may not have written it. */
-  pending: string | null;
-  /** The log; null until a restored chat is opened, when its transcript is read. */
-  events: ChatEvent[] | null;
-  opening: Promise<void> | null;
-  listeners: Set<(event: ChatEvent) => void>;
-  /** The agent session, made when the chat starts or opens; null when its role or provider is missing. */
-  agent: ProviderSession | null;
-  /** Why it can't take a message without an agent: its role or provider is missing. */
-  refusal: string | null;
-  running: boolean;
-  /** The mode and note its role gave it when its agent was made (STORY-6): what the composer shows. */
-  mode: ModeInfo | null;
-  note: string | null;
-  /** Its project is closed: the chat is kept, out of the list, until the project opens again. */
-  closed: boolean;
-}
-
-/** A chat not yet opened: a saved one, or a new one before its log and agent are made. */
-const restored = (id: string, dir: string, summary: ChatSummary, session: string | null): Chat => ({
-  id,
-  dir,
-  summary: idleSummary(summary),
-  asks: [],
-  session,
-  pending: null,
-  events: null,
-  opening: null,
-  listeners: new Set(),
-  agent: null,
-  refusal: null,
-  running: false,
-  mode: null,
-  note: null,
-  closed: false,
-});
 
 const oldestFirst = (a: ChatSummary, b: ChatSummary) => a.startedAt.localeCompare(b.startedAt);
 
@@ -81,6 +36,7 @@ export function createChatManager({
   roles,
   approve,
   mcp,
+  timers,
   newId = randomUUID,
   now = () => new Date(),
   log = () => {},
@@ -94,6 +50,18 @@ export function createChatManager({
     if (c && c.events !== null && !c.closed) record(c, event);
   });
   const decide = approve ?? desk.approve;
+  // The Inbox (STORY-7) hears each request open and close, and answers nothing: the desk does, in the chat or here.
+  const inbox = createInbox({
+    now: () => now().getTime(),
+    ...(timers ? { timers } : {}),
+    chat: (id) => {
+      const c = chats.get(id);
+      if (!c || c.closed) return null;
+      return { dir: c.dir, chatName: chatName(c.summary), ...(c.summary.card ? { card: c.summary.card } : {}) };
+    },
+    same: (a, b) => projectKey(a, platform) === projectKey(b, platform),
+    log,
+  });
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
 
   const chat = (id: string): Chat => {
@@ -139,7 +107,10 @@ export function createChatManager({
     const session = answered && c.pending ? c.pending : c.session;
     if (answered) c.pending = null;
     const { summary, asks } = reduceRow(c, event);
+    const asksChanged = asks !== c.asks;
     c.asks = asks;
+    if (event.type === "approval" || event.type === "question") inbox.opened(c.id, event);
+    if (asksChanged) inbox.keep(c.id, asks);
     if (summary === c.summary && session === c.session) return;
     const rowChanged = summary !== c.summary;
     c.session = session;
@@ -190,6 +161,7 @@ export function createChatManager({
     c.listeners.clear();
     mcp?.release(c.id);
     desk.forget(c.id);
+    inbox.ended(c.id);
     c.agent?.close();
     c.agent = null;
     c.events = null;
@@ -200,13 +172,13 @@ export function createChatManager({
   }
 
   return {
-    async start(dir, roleId) {
+    async start(dir, roleId, card) {
       const role = await roles.get(dir, roleId);
       if (!role) throw new ChatError(CHAT_MESSAGES.unknownRole);
       const adapter = provider(role.provider);
       if (!adapter) throw new ChatError(CHAT_MESSAGES.noProvider);
       const id = newId();
-      const c = restored(id, dir, newSummary(id, role.provider, role, now().toISOString()), null);
+      const c = restored(id, dir, newSummary(id, role.provider, role, now().toISOString(), card), null);
       c.events = [];
       c.agent = agentFor(c, adapter, role);
       chats.set(id, c);
@@ -260,6 +232,8 @@ export function createChatManager({
     },
     list,
     watchList: (dir, listener) => lists.watch(dir, listener),
+    watchInbox: inbox.watch,
+    watchAsked: inbox.watchAsked,
     providers: () =>
       Promise.all(
         providers.map(async (p) => ({ id: p.id, name: p.name, installed: await p.installed().catch(() => false) })),
@@ -280,6 +254,7 @@ export function createChatManager({
     close() {
       for (const c of chats.values()) end(c);
       lists.clear();
+      inbox.close();
     },
     flush: () => saver.flush(),
     ready: () => saver.loaded,

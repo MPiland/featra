@@ -22,3 +22,12 @@
   Non-blocking (STORY-47).
 - Undo is unavailable for an entry after the server restarts, and a logged row is not restored into a restored chat's
   history. Recommendation: keep a small ledger beside the chats' store if users ask. Non-blocking (STORY-47).
+- No chat has a card until STORY-9 starts chats from one, so the Inbox shows a card only where `chat.start` was given
+  one. Recommendation: pass the card from the card pane when STORY-9 lands. Non-blocking (STORY-7).
+- Notifications and the Inbox cover the project in front only, so a request in another open project is neither listed
+  nor notified. Recommendation: watch every open project once there is a place to show which project it is in.
+  Non-blocking (STORY-7).
+- The card says "Settings › App"; the settings are in Settings › General, the page for app-wide settings. Recommendation:
+  keep them there and read the card's "App" as the app's settings. Non-blocking (STORY-7).
+- The placeholder test in `packages/client/test/app.test.tsx` listed Inbox among the views with no page yet; it now skips
+  Inbox, as it has one, and asserts the Inbox. That is a changed filter, not a changed assertion. Non-blocking (STORY-7).

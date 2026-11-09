@@ -86,6 +86,8 @@ interface TestHooks {
   shownInFolder: string[];
   folderPicks: string[];
   folderDialogs: string[];
+  notifications: { title: string; body: string; click: () => void }[];
+  focused: boolean | null;
   tray?: { emit: (event: string) => void; isDestroyed: () => boolean };
   trayMenu?: { items: { label: string; click: () => void }[] };
 }
@@ -225,3 +227,17 @@ export async function launchAgain(userDataDir: string, running: ElectronApplicat
     child.once("exit", (code) => resolve(code));
   });
 }
+
+/** The desktop notifications Featra showed (STORY-7): what each said. */
+export const notificationsShown = (app: ElectronApplication) =>
+  app.evaluate(() =>
+    (globalThis as MainGlobal).featraTest.notifications.map((n) => ({ title: n.title, body: n.body })),
+  );
+/** Says whether Featra counts as the focused app, which a test can't make the desktop decide. */
+export const setFocused = (app: ElectronApplication, focused: boolean) =>
+  app.evaluate((_e, value) => {
+    (globalThis as MainGlobal).featraTest.focused = value;
+  }, focused);
+/** Clicks the newest notification, as a user would. */
+export const clickLastNotification = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as MainGlobal).featraTest.notifications.at(-1)!.click());

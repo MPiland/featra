@@ -102,6 +102,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   let windowState: WindowState = { ...DEFAULT_WINDOW_STATE };
   const listeners = new Set<(s: WindowState) => void>();
   let releaseWrites: () => void = noop;
+  let openChat: (chat: string, project?: string) => void = noop;
   const writesReleased = new Promise<void>((r) => (releaseWrites = r));
   // The project folders on disk, as the server sees them: git init and Featra init move a folder to the next state.
   const setupOnDisk = new Map(Object.entries(host.setup ?? {}));
@@ -213,6 +214,14 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     // Records which element had focus when the command reached the host: that is the field it acts on.
     chats: chats.bridge,
     roles: roles.bridge,
+    inbox: chats.inbox.bridge,
+    notifications: {
+      asked: (item) => void calls.push(`notify:${item.chat}:${item.request.id}`),
+      onOpenChat: (listener) => {
+        openChat = listener;
+        return () => void (openChat = noop);
+      },
+    },
     edit: (command) => void calls.push(`edit:${command}:${(document.activeElement as HTMLElement | null)?.id ?? ""}`),
     app: {
       info: async () => ({ name: "Featra", version: "1.2.3" }),
@@ -256,6 +265,8 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     list,
     setWindowState,
     releaseWrites: () => act(async () => releaseWrites()),
+    /** The user clicks a desktop notification: the host tells the page which chat it named. */
+    clickNotification: (chat: string, dir?: string) => act(() => openChat(chat, dir)),
   };
 }
 

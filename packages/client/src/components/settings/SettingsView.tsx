@@ -99,15 +99,7 @@ function AppPage({
   const setApp = (patch: Partial<AppSettings>) => onAppChange({ ...app, ...patch });
   switch (id) {
     case "general":
-      return (
-        snapshot.closeToTray && (
-          <GeneralPage
-            app={app}
-            support={snapshot.closeToTray}
-            onCloseButton={(closeButton) => setApp({ closeButton })}
-          />
-        )
-      );
+      return snapshot.closeToTray && <GeneralPage app={app} support={snapshot.closeToTray} onChange={setApp} />;
     case "appearance":
       return <AppearancePage theme={app.theme} onTheme={(theme) => setApp({ theme })} />;
     case "workDefaults":

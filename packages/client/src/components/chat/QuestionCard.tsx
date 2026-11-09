@@ -35,7 +35,7 @@ interface QuestionFormProps {
  * allows it, an Other field for the user's own words, and Submit once every question is answered. Native controls in
  * reading order, so Tab reaches each; Enter in an Other field submits when the answers are complete.
  */
-function QuestionForm({ questions, onAnswer }: QuestionFormProps) {
+export function QuestionForm({ questions, onAnswer }: QuestionFormProps) {
   const [drafts, setDrafts] = useState<Draft[]>(() => questions.map(() => EMPTY));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -8,6 +8,7 @@ import type { ApprovalChoice } from "./approvals.ts";
 import type { Answers } from "./questions.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
+import type { Inbox, InboxItem } from "./inbox.ts";
 import type { Role } from "./roles.ts";
 import type { RoleEdit, RoleEditResult, RoleList } from "./role-edit.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
@@ -73,7 +74,7 @@ export interface ServerMethods {
   /** Applies one edit to the project's roles, writing only `.featra/roles/`; answers with the role it made or why not. */
   "roles.edit": { params: { dir: string; edit: RoleEdit }; result: RoleEditResult };
   /** Starts a chat from a role in the project folder; answers with its id. Its agent starts with the first message. */
-  "chat.start": { params: { dir: string; role: string }; result: { id: string } };
+  "chat.start": { params: { dir: string; role: string; card?: string }; result: { id: string } };
   /**
    * The chat's event log so far; then, until `work.unwatch`, a `chat.event` push for each new event. The request's id
    * names the watch.
@@ -106,6 +107,17 @@ export interface ServerMethods {
    * each time a row changes. The request's id names the watch.
    */
   "chat.list": { params: { dir: string }; result: ChatList };
+  /**
+   * The approvals and questions (of one project, or of every open one without `dir`) that have waited on the user at least `waitMs` on the server's clock, oldest
+   * first (STORY-7); then, until `work.unwatch`, an `inbox.list` push each time that set changes. The request's id names
+   * the watch.
+   */
+  "inbox.watch": { params: { dir?: string; waitMs: number }; result: Inbox };
+  /**
+   * Nothing, then until `work.unwatch` an `inbox.asked` push as soon as a chat of the project asks for an approval or an
+   * answer, whatever the wait (STORY-7): what a desktop notification is made from. The request's id names the watch.
+   */
+  "inbox.asked": { params: { dir?: string }; result: null };
 }
 
 /** Frames the server sends unasked, and the data each carries. */
@@ -120,10 +132,22 @@ export interface ServerPushes {
   "roles.list": RoleList;
   /** A row of the watched chat list changed, or a chat came or went: the whole new list. */
   "chat.list": ChatList;
+  /** The Inbox changed: the whole new Inbox, for the watch the frame names. */
+  "inbox.list": Inbox;
+  /** A chat asked for an approval or an answer just now. */
+  "inbox.asked": InboxItem;
 }
 
 export type PushEvent = keyof ServerPushes;
-const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view", "chat.event", "chat.list", "roles.list"];
+const PUSH_EVENTS: readonly PushEvent[] = [
+  "work.list",
+  "card.view",
+  "chat.event",
+  "chat.list",
+  "roles.list",
+  "inbox.list",
+  "inbox.asked",
+];
 
 /**
  * A pushed frame: `{ event, watch, data }`. It never has an `id`, so neither end can take it for an answer, and a
@@ -159,6 +183,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "chat.answer",
   "chat.undoLog",
   "chat.list",
+  "inbox.watch",
+  "inbox.asked",
 ];
 
 export interface ServerRequest {

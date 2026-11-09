@@ -891,3 +891,64 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   runs it over stdio, so a bundle that doesn't run fails the unit tests.
 - **An agent's secret is compared with the same constant-time `sameSecret` as the window's token.** Why: a guess must
   not learn anything from how long the lookup took.
+
+## 2026-11-09 — STORY-7: question inbox and notifications
+
+- **The Inbox is a second view of the chat's own requests, never a second way of deciding.** Its items render the chat's
+  `ApprovalPrompt` and `QuestionForm` and answer through `chat.approve` and `chat.answer`; the server's Inbox only
+  watches what the chat manager already holds. Why: one path means one answer is taken once, and an answer in either
+  place clears the item in both because the clearing comes from the chat's own event, not from the Inbox.
+- **The server holds each request with its asked time on the server's clock, and a request is due when `now - at` is at
+  least the wait.** Why: the page's clock can drift or sleep with the window; the server's is the one that was running
+  while the user was away. Tests move a manual clock and timers by hand and never sleep.
+- **The wait is sent by the page in each `inbox.watch`, not stored by the server.** Why: Settings stays the one place
+  the wait lives; a changed setting makes the page watch again, so each watcher has its own wait and nothing on the
+  server needs to learn about settings.
+- **The wait is 10 minutes by default and may be set from 1 second to 24 hours, fractions allowed; Settings offers
+  presets (1, 2, 5, 10, 15, 30, 60 minutes) and the current value.** Why: 10 minutes is the card's decision. The
+  1-second floor lets an e2e journey seed `settings.json` with 0.05 (3 seconds) and wait for the real clock instead of
+  faking it; the day cap keeps a timer within what `setTimeout` can hold.
+- **Notifications are decided in the main process, not the page.** The page tells main about each new request over
+  `notifications:asked` (from `inbox.asked`, which pushes at once, before the wait); main checks the setting and focus
+  and shows it. Why: focus is the window's, which main knows without asking the page; the setting is main's own copy.
+  Electron's `Notification` is held in a set so it isn't collected before it is clicked; a click reveals the window and
+  asks the page to open the chat.
+- **In e2e, `testHooks` records each notification with a way to click it, and holds a focus flag the test can set.**
+  Why: the OS notification centre and window focus can't be driven in CI, and the boundary faked is only Electron's
+  `Notification` and the focus check, not the notifier's rules.
+- **The sidebar count is the number of items in the Inbox, so it is zero while requests are inside the wait.** Why: the
+  count must match what the view lists; the chat's own dot already shows an unanswered request at once. The badge's
+  number is hidden from assistive tech and a "N waiting" label is read instead, set off by a comma so the name reads
+  "Inbox, 1 waiting".
+- **The Inbox and notifications are for the project in front.** Why: the server's watches are per project folder, as
+  chats are. Notifying for a project that isn't open is in open-questions.md.
+- **`ChatSummary` gains an optional `card`, set by an optional `card` in `chat.start`.** Why: AC1 shows the chat's card
+  and no chat knows its card yet; STORY-9 is where a chat starts from one, and the field is ready for it.
+- **The settings live in Settings › General, as the page that holds the app's other settings.** Why: the card says
+  "Settings › App", and the app's settings page in this build is General. The browser tab hides the page, as before.
+- **`QuestionForm` is exported from `QuestionCard.tsx`, and the Inbox reuses it.** Why: the form is the card without its
+  chat frame; copying it would let the two drift.
+
+### STORY-7 review fixes (PR #14)
+
+- **The Inbox, its count and its notifications cover every open project; this replaces the "project in front" decision
+  above.** "Open" means the projects the server holds chats for. `inbox.watch` and `inbox.asked` take an optional
+  `dir`; without it they cover all of them, and the API still filters by the projects the client may see. Items carry
+  `project` (the chat's folder), the view shows its name, and a click or notification switches to that project first,
+  then opens the chat. Why: a request waiting in another project is as unanswered as one in front.
+- **At most one OS notification per chat: a new request closes that chat's earlier toast.** Why: the chat has one thing
+  to answer at a time, and a stack of stale toasts for one chat is noise. The notifier keeps the handle per chat.
+- **The question notification's body is the question's text, cut to 80 characters with an ellipsis.** Why: it says what
+  is asked without opening the app.
+- **`inbox.opened` for a request already held changes nothing: `at` is kept and `inbox.asked` isn't pushed again.**
+  Why: a repeat would restart the wait and re-notify. Regression test added.
+- **Timers are per Inbox, and every scheduled one is tracked so `close()` clears all.** Why: module-global state leaked
+  between servers and tests.
+- **`useInbox` ignores pushes from a watch it has replaced.** Why: a late push from the old watch would overwrite the
+  new list.
+- **Item 1 of the review (the General page showing only when `closeToTray` is known) is not changed.** Existing
+  assertions require the page hidden in that case; changing it means changing them. Left for the Dev Lead.
+- **Dev Lead ruling on item 1: no change.** The desktop app always reports `closeToTray` (`closeToTraySupport` returns
+  an object on every platform), so General, with Inbox wait and Notifications, is always reachable there. It is hidden
+  only in a plain browser tab, which has no desktop notifications. When remote control (M2) brings the client to a
+  browser, the Inbox wait must get a page of its own there.

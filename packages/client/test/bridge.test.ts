@@ -29,6 +29,18 @@ describe("stored UI state", () => {
     expect(normalizeUiState({ zoomFactor: 9 }).zoomFactor).toBe(2);
   });
 
+  it("keeps stored Inbox and notification settings (STORY-7), and falls back to 10 minutes and on", () => {
+    expect(DEFAULT_APP_SETTINGS).toMatchObject({ notifications: true, inboxWaitMinutes: 10 });
+    expect(normalizeAppSettings({ notifications: false, inboxWaitMinutes: 0.05 })).toMatchObject({
+      notifications: false,
+      inboxWaitMinutes: 0.05,
+    });
+    expect(normalizeAppSettings({ notifications: "no", inboxWaitMinutes: 0 })).toMatchObject({
+      notifications: true,
+      inboxWaitMinutes: 10,
+    });
+  });
+
   it("keeps a stored card pane width and drops an unusable one (STORY-4 AC5)", () => {
     expect(normalizeUiState({ cardPaneWidth: 480 }).cardPaneWidth).toBe(480);
     expect(normalizeUiState({ cardPaneWidth: "wide" }).cardPaneWidth).toBeNull();

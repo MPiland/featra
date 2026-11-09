@@ -35,6 +35,7 @@ export * from "./chat-events.ts";
 export * from "./chat-state.ts";
 export * from "./chat-list.ts";
 export * from "./chat-saved.ts";
+export * from "./inbox.ts";
 export * from "./tool-summary.ts";
 export * from "./knowledge-log.ts";
 export * from "./agent-protocol.ts";
