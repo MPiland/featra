@@ -4,7 +4,12 @@ import { assertNever } from "@featra/work-format/guards";
 import { CHAT_COPY, noticeText } from "../../chats.ts";
 import { ToolRow } from "./ToolRow.tsx";
 
-function Item({ item }: { item: ChatItem }) {
+/** What the transcript offers: a new chat with the same role, for a chat whose history is gone. */
+export interface TranscriptActions {
+  onNewChat: () => void;
+}
+
+function Item({ item, actions }: { item: ChatItem; actions: TranscriptActions }) {
   switch (item.kind) {
     case "user":
       return <div className="chat-msg user">{item.text}</div>;
@@ -16,6 +21,11 @@ function Item({ item }: { item: ChatItem }) {
       return (
         <p className={item.notice.type === "stopped" ? "chat-notice" : "chat-notice bad"} role="status">
           {noticeText(item.notice)}
+          {item.notice.type === "gone" && (
+            <button type="button" className="btn" onClick={actions.onNewChat}>
+              {CHAT_COPY.newChat}
+            </button>
+          )}
         </p>
       );
     default:
@@ -24,7 +34,15 @@ function Item({ item }: { item: ChatItem }) {
 }
 
 /** The chat's messages, tool rows and notices, kept scrolled to the newest. */
-export function Transcript({ items, running }: { items: readonly ChatItem[]; running: boolean }) {
+export function Transcript({
+  items,
+  running,
+  actions,
+}: {
+  items: readonly ChatItem[];
+  running: boolean;
+  actions: TranscriptActions;
+}) {
   const end = useRef<HTMLDivElement>(null);
   const last = items.at(-1);
   useEffect(() => {
@@ -33,7 +51,7 @@ export function Transcript({ items, running }: { items: readonly ChatItem[]; run
   return (
     <div className="chat-log" role="log" aria-label={CHAT_COPY.transcript}>
       {items.map((item) => (
-        <Item key={item.key} item={item} />
+        <Item key={item.key} item={item} actions={actions} />
       ))}
       {running && <p className="chat-working">{CHAT_COPY.working}</p>}
       <div ref={end} />

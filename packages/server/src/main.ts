@@ -13,7 +13,8 @@ const send = (message: ServerMessage) => process.send?.(message);
 const log = (message: string) => send({ type: "log", message });
 
 const allowed = createAllowedProjects();
-const services = createServices({ allowed, log });
+// The host names the app's data folder, where chats are saved (STORY-44).
+const services = createServices({ allowed, log, dataDir: process.env.FEATRA_DATA_DIR || undefined });
 const { api } = services;
 let server: RunningServer | undefined;
 

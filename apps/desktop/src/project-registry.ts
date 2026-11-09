@@ -8,7 +8,7 @@ import {
   type ProjectsSnapshot,
 } from "@featra/client/bridge";
 import { errorMessage, isRecord } from "@featra/work-format";
-import { createJsonStore, type JsonStore } from "./ui-state-store.ts";
+import { createJsonStore, type JsonStore } from "@featra/server/json-store";
 
 /**
  * The project list: `projects.json` in userData. Free of Electron imports. It keeps every folder the user opened or

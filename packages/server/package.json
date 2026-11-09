@@ -6,7 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./host-messages": "./src/host-messages.ts"
+    "./host-messages": "./src/host-messages.ts",
+    "./json-store": "./src/json-store.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

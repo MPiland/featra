@@ -9,7 +9,7 @@ import {
   type WorkSettingKey,
   type WorkSettings,
 } from "@featra/client/bridge";
-import { createJsonStore, type JsonStore } from "./ui-state-store.ts";
+import { createJsonStore, type JsonStore } from "@featra/server/json-store";
 
 export type SettingsStore = JsonStore<AppSettings>;
 

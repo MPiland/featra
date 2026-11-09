@@ -5,8 +5,15 @@
  */
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
-/** Why a chat can't go on: its agent isn't installed, isn't logged in, or failed with a message. */
-export type ChatProblem = { type: "not-installed" } | { type: "logged-out" } | { type: "failed"; message: string };
+/**
+ * Why a chat can't go on: its agent isn't installed, isn't logged in, failed with a message, or its provider no longer
+ * has the session a restored chat would resume (STORY-44).
+ */
+export type ChatProblem =
+  | { type: "not-installed" }
+  | { type: "logged-out" }
+  | { type: "failed"; message: string }
+  | { type: "gone" };
 
 /** How a turn ended: the agent finished, the user stopped it, or it failed (a `problem` event says why). */
 export type TurnOutcome = "done" | "stopped" | "failed";
@@ -38,7 +45,7 @@ const nonEmpty = (v: unknown): v is string => str(v) && v.length > 0;
 
 function normalizeProblem(raw: unknown): ChatProblem | null {
   if (!isRecord(raw)) return null;
-  if (raw.type === "not-installed" || raw.type === "logged-out") return { type: raw.type };
+  if (raw.type === "not-installed" || raw.type === "logged-out" || raw.type === "gone") return { type: raw.type };
   if (raw.type === "failed") return { type: "failed", message: nonEmpty(raw.message) ? raw.message : "Failed." };
   return null;
 }
@@ -102,6 +109,8 @@ export const CHAT_MESSAGES = {
   noProvider: "This role's agent isn't available.",
   noChat: "No such chat.",
   busy: "Wait for the reply, or stop it.",
+  /** A restored chat whose session its provider no longer has: it can't go on. */
+  gone: "This chat's history is gone. Start a new chat.",
   /** Told to the agent when a tool is denied until approvals exist (STORY-45). */
   denied: "Featra can't ask for approval yet, so it denied this tool. Carry on without it.",
 } as const;

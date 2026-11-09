@@ -498,3 +498,49 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   `card-pane.test.tsx` ("opens beside the list…") each failed once under a full parallel run and passed on retry.
   On the PR's first CI run, E2E (Ubuntu) failed once in `settings.spec.ts` (keyboard theme change): `settings.json`
   was read before it was first written (ENOENT inside `expect.poll`).
+
+## 2026-11-09 — STORY-44: chats come back after a restart
+
+- The transcript is read with the Agent SDK's own session reader (`getSessionInfo`, `getSessionMessages`), not by
+  parsing Claude's `.jsonl` files. Why: the format and location are Claude's; the SDK keeps up with them, skips corrupt
+  lines, and reading runs no agent, so it costs no tokens. It sits behind `ProviderAdapter.history`, so the manager and
+  the protocol name no provider.
+- `chats.json` in the app's data folder holds each chat's project, session id and row. The desktop passes the folder
+  to the server as `FEATRA_DATA_DIR`. Why: AC1, and the server owns the chats. `json-store` moved from the desktop to
+  `@featra/server/json-store` so both use one atomic writer.
+- Reset App Data keeps the chats. Why: it resets settings and window state; chats are the user's work, and their
+  transcripts live in Claude's own files, which Featra never deletes.
+- A restored chat is listed at once but read only when opened. Why: a long chat list shouldn't read every session file
+  at start-up. Turns read back from history end as done; a stopped or failed turn isn't recorded in the file.
+- A chat whose session file is gone stays listed, shows "This chat's history is gone." with a New chat button (same
+  role, same project), and hides the composer; the server refuses a message to it. Why: AC4; the user sees why, and
+  the chat doesn't silently start a new session under the old title.
+- A closed project's chats are kept (saved, out of the list) and come back when it is opened again. Why: closing a
+  project isn't deleting its chats.
+- A new session id is saved but pushes no list. Why: the row doesn't show it, and STORY-21 says a push is a row change.
+- Tests fake only `query`, the clock and Claude's folder: `CLAUDE_CONFIG_DIR` points the real reader at a temp folder,
+  and test helpers (`claude-sessions.ts`) and the E2E fake SDK write session files there as Claude does. The fake SDK
+  only writes when `CLAUDE_CONFIG_DIR` is set and logs `resume` only when it is set, so other journeys are unchanged.
+- `chat-manager.ts` stays under 300 lines: saving and the history read live in `chat-store.ts`, and the list's
+  watchers in `chat-list-watch.ts`.
+
+### Review fixes (PR #9)
+
+- `chats.json` is read strictly (`JsonStore.read`): a missing file is no chats, one that isn't JSON is renamed to
+  `chats.json.bad` and the app starts afresh, and any other read error (EBUSY from antivirus, EACCES) is logged and the
+  file is not saved over that run; the run's chats stay in memory. Why: a bug. One locked read at start-up read as "no
+  chats", and the next save wiped every saved chat. The desktop's own stores keep the lenient `load`: they are
+  settings, and they load at start-up where a rejection would stop the app. Regression tests in `chat-restore.test.ts`.
+- Chats compare project folders through `projectKey`, exported from `allowed-projects.ts`, so `D:\Dev\Foo` and
+  `d:\dev\foo` are one project on Windows and macOS. Why: a bug; a project reopened under another case showed no chats.
+- A session id is saved once the agent answers, not on `started`. Why: a bug. A chat stopped, or an app that crashed,
+  before Claude wrote the session came back as "history is gone"; it now comes back as a fresh chat.
+- `chat.list` waits for the saved chats to be read before it answers (`ChatManager.ready`). Why: a bug. On a slow
+  disk the first list after a restart came back empty. Regression test in `ws-chat-restore.test.ts`.
+- The E2E fake SDK names a session's folder after the cwd's real path (`realpathSync.native`), as Claude does. Why: the
+  fake was wrong, not the product. On the Windows runner the temp folder is an 8.3 short path (`RUNNER~1`); the SDK's
+  reader spells it out in full before it looks for the session, so it never found the fake's file and the restored
+  chat read as gone. Checked locally against the real reader under a short path: the old fake's session is not found,
+  the new one's is.
+- Known limits, not changed here: restored chats load before their project is opened (the API still gates them with
+  `allow`), and the session file is read whole, with no size cap.

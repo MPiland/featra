@@ -51,6 +51,7 @@ if (!app.requestSingleInstanceLock()) {
     script: join(app.getAppPath(), "dist", "server.cjs"),
     execPath: process.execPath,
     log: (message) => log.info(message),
+    dataDir: app.getPath("userData"),
   });
   let win: BrowserWindow | undefined;
   let tray: Tray | undefined;

@@ -63,6 +63,7 @@ export const CHAT_COPY = {
   notInstalled: "Claude Code isn't installed.",
   loggedOut: "Claude Code isn't logged in. Run claude in a terminal to log in.",
   stopped: "Stopped.",
+  gone: "This chat's history is gone.",
 } as const;
 
 /** The one line a notice shows. */
@@ -76,6 +77,8 @@ export function noticeText(notice: ChatNotice): string {
       return CHAT_COPY.stopped;
     case "failed":
       return notice.message;
+    case "gone":
+      return CHAT_COPY.gone;
     default:
       return assertNever(notice);
   }
