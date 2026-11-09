@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { EMPTY_CHAT } from "@featra/work-format/chat";
-import { CHAT_COPY, type ChatBridge, type ChatUpdate, type Role } from "../../chats.ts";
+import { CHAT_MESSAGES } from "@featra/work-format/chat-events";
+import { CHAT_COPY, type ChatBridge, type ChatRoleRef, type ChatUpdate } from "../../chats.ts";
 import { Composer } from "./Composer.tsx";
 import { Transcript } from "./Transcript.tsx";
 
 /** The chat the user opened: its id and the role it started from. */
 export interface OpenChat {
   id: string;
-  role: Role;
+  role: ChatRoleRef;
 }
 
 /** One chat: the role it runs as, its transcript, and the composer. */
@@ -40,5 +41,16 @@ export function ChatView({ chats, chat }: { chats: ChatBridge; chat: OpenChat })
         }}
       />
     </section>
+  );
+}
+
+/** The chat history points at: its view, or a line saying it is gone (its project was closed). */
+export function ChatPane({ chats, chat }: { chats: ChatBridge; chat: OpenChat | null }) {
+  return chat ? (
+    <ChatView key={chat.id} chats={chats} chat={chat} />
+  ) : (
+    <p className="chat-error" role="alert">
+      {CHAT_MESSAGES.noChat}
+    </p>
   );
 }

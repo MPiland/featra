@@ -4,7 +4,17 @@
  * (STORY-44 brings them back after a restart, from the provider's own session files).
  */
 import { randomUUID } from "node:crypto";
-import { CHAT_MESSAGES, errorMessage, type ChatEvent, type ProviderId, type Role } from "@featra/work-format";
+import {
+  CHAT_MESSAGES,
+  errorMessage,
+  newSummary,
+  reduceSummary,
+  type ChatEvent,
+  type ChatSummary,
+  type ProviderId,
+  type ProviderInfo,
+  type Role,
+} from "@featra/work-format";
 import type { ApprovalHandler, ProviderAdapter, ProviderSession } from "./provider.ts";
 import type { RoleRegistry } from "./role-registry.ts";
 
@@ -22,6 +32,8 @@ interface Chat {
   listeners: Set<(event: ChatEvent) => void>;
   session: ProviderSession;
   running: boolean;
+  /** Its row in the chat list. */
+  summary: ChatSummary;
 }
 
 export interface ChatManager {
@@ -34,6 +46,15 @@ export interface ChatManager {
   stop: (id: string) => Promise<void>;
   /** The chat's project folder, or null when there is no such chat. */
   dirOf: (id: string) => string | null;
+  /** The project's chats as the list shows them, oldest first. */
+  list: (dir: string) => ChatSummary[];
+  /**
+   * The project's chats now, and the whole list again to `listener` each time a row changes or a chat comes or goes,
+   * until `stop`. A streamed reply doesn't change a row, so it doesn't call it.
+   */
+  watchList: (dir: string, listener: (chats: ChatSummary[]) => void) => { chats: ChatSummary[]; stop: () => void };
+  /** Every provider the manager runs, and whether its agent is installed. */
+  providers: () => Promise<ProviderInfo[]>;
   /** Ends the chats of every project `keep` turns down (a project the user closed): no more events, no more turns. */
   closeProjects: (keep: (dir: string) => boolean) => void;
   close: () => void;
@@ -44,6 +65,8 @@ export interface ChatManagerDeps {
   roles: RoleRegistry;
   approve?: ApprovalHandler;
   newId?: () => string;
+  /** The clock a chat's start is stamped with. */
+  now?: () => Date;
   log?: (message: string) => void;
 }
 
@@ -52,9 +75,12 @@ export function createChatManager({
   roles,
   approve = denyUntilApprovals,
   newId = randomUUID,
+  now = () => new Date(),
   log = () => {},
 }: ChatManagerDeps): ChatManager {
+  // STORY-44's seam: chats restored after a restart join this map with their saved summary, and the list shows them.
   const chats = new Map<string, Chat>();
+  const listWatchers = new Set<{ dir: string; listener: (chats: ChatSummary[]) => void }>();
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
 
   const chat = (id: string): Chat => {
@@ -63,18 +89,37 @@ export function createChatManager({
     return found;
   };
 
-  function record(c: Chat, event: ChatEvent) {
-    if (event.type === "user") c.running = true;
-    if (event.type === "turn-end") c.running = false;
-    c.events.push(event);
-    // One watcher's failure (a closed socket, say) must not stop the others or the agent's stream.
-    for (const listener of c.listeners) {
+  const list = (dir: string) => [...chats.values()].filter((c) => c.dir === dir).map((c) => c.summary);
+
+  /** Calls each listener; one watcher's failure (a closed socket, say) must not stop the others or the agent. */
+  function tell<T>(listeners: Iterable<(value: T) => void>, value: T) {
+    for (const listener of listeners) {
       try {
-        listener(event);
+        listener(value);
       } catch (err) {
         log(`A chat watcher failed: ${errorMessage(err)}`);
       }
     }
+  }
+
+  function listChanged(dir: string) {
+    const watching = [...listWatchers].filter((w) => w.dir === dir);
+    if (watching.length > 0)
+      tell(
+        watching.map((w) => w.listener),
+        list(dir),
+      );
+  }
+
+  function record(c: Chat, event: ChatEvent) {
+    if (event.type === "user") c.running = true;
+    if (event.type === "turn-end") c.running = false;
+    c.events.push(event);
+    tell(c.listeners, event);
+    const summary = reduceSummary(c.summary, event);
+    if (summary === c.summary) return;
+    c.summary = summary;
+    listChanged(c.dir);
   }
 
   function end(c: Chat) {
@@ -106,8 +151,10 @@ export function createChatManager({
           return decision;
         },
       });
-      self = { id, dir, role, events: [], listeners: new Set(), session, running: false };
+      const summary = newSummary(id, role.provider, role, now().toISOString());
+      self = { id, dir, role, events: [], listeners: new Set(), session, running: false, summary };
       chats.set(id, self);
+      listChanged(dir);
       return id;
     },
     watch(id, listener) {
@@ -126,11 +173,28 @@ export function createChatManager({
       if (c.running) await c.session.interrupt();
     },
     dirOf: (id) => chats.get(id)?.dir ?? null,
+    list,
+    watchList(dir, listener) {
+      const watcher = { dir, listener };
+      listWatchers.add(watcher);
+      return { chats: list(dir), stop: () => listWatchers.delete(watcher) };
+    },
+    providers: () =>
+      Promise.all(
+        providers.map(async (p) => ({ id: p.id, name: p.name, installed: await p.installed().catch(() => false) })),
+      ),
     closeProjects(keep) {
-      for (const c of chats.values()) if (!keep(c.dir)) end(c);
+      const closed = new Set<string>();
+      for (const c of chats.values())
+        if (!keep(c.dir)) {
+          end(c);
+          closed.add(c.dir);
+        }
+      for (const dir of closed) listChanged(dir);
     },
     close() {
       for (const c of chats.values()) end(c);
+      listWatchers.clear();
     },
   };
 }

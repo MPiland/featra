@@ -15,6 +15,8 @@ export interface SidebarProps {
   project: ProjectRef | null;
   /** Opens the role picker for a new chat in the project. */
   onNewChat: () => void;
+  /** The project's chat list (STORY-21), between the top views and the foot. */
+  chats: ReactNode;
 }
 
 function NavList({
@@ -46,7 +48,7 @@ function NavList({
 }
 
 /** A collapsed sidebar is `inert`: out of the tab order and hidden from assistive tech, not just squeezed to 0px. */
-export function Sidebar({ collapsed, current, onOpen, switcher, project, onNewChat }: SidebarProps) {
+export function Sidebar({ collapsed, current, onOpen, switcher, project, onNewChat, chats }: SidebarProps) {
   return (
     <nav id="sidebar" className="side" aria-label="Featra" inert={collapsed} data-collapsed={collapsed}>
       {switcher}
@@ -54,8 +56,9 @@ export function Sidebar({ collapsed, current, onOpen, switcher, project, onNewCh
         {CHAT_COPY.newChat}
       </button>
       <NavList views={VIEWS.filter((v) => v.placement === "top")} current={current} onOpen={onOpen} />
-      {/* STORY-21: the chat list, grouped by provider, fills this space. */}
-      <section key={project?.dir} className="chats" aria-label="Chats" data-project={project?.dir} />
+      <section key={project?.dir} className="chats" aria-label={CHAT_COPY.chats} data-project={project?.dir}>
+        {chats}
+      </section>
       <NavList views={VIEWS.filter((v) => v.placement === "bottom")} current={current} onOpen={onOpen} />
     </nav>
   );

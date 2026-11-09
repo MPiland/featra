@@ -457,3 +457,30 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   runs, and it is only spawned, so an 8.3 short or long form names the same file; a `realpath` adds a filesystem call
   and changes nothing. The chat e2e names its stand-in with `realpathSync.native`, as `where` does, so its exact
   options check holds on Windows runners whose temp folder is a short path.
+
+## 2026-11-09 — STORY-21: chat list grouped by provider
+
+- The server builds each chat's row (`ChatSummary`, `work-format/chat-list`) from the same events as its log, and
+  pushes the project's list over `chat.list` (ADR 0018). Why: one copy of the rules, and the client never folds every
+  chat's log just to draw the sidebar.
+- A row's title is the first line of the user's first message, cut to 60 characters; before that the row shows the
+  role's name. Why: the first message is what the chat is about, and a new chat still needs a name.
+- Groups come from the registered adapters, each with its own `name` and `installed()`; a provider shows when it is
+  installed or still has chats. Why: AC2 says not to hard-code Claude, and a chat never goes missing from the list.
+- Waiting: a turn that ends done or failed waits for the user's reply; one the user stopped doesn't; a message clears
+  it. A streamed delta changes no row, so it pushes no list. Why: "waiting" means the agent is done and the user has
+  to act; after Stop the user already acted. STORY-45 and STORY-46 add their reasons to `WaitReason`.
+- File > New Chat (Ctrl+N, ⌘N on macOS) is the File menu's first item, then a separator, then New Project…, Open
+  Folder…, a separator and the rest, unchanged. A browser tab leaves New Chat out and keeps Ctrl+N for the browser.
+  This follows the user-approved AC4, decided by the Dev Lead. Six tests that listed the File menu or Ctrl+N were
+  updated to it, every other check unchanged: `shortcuts.test.ts` (Ctrl+N is New Chat), `ShortcutsPage.test.tsx`
+  (newChat listed), `menu.test.tsx` (New Chat in the PC and macOS lists, one more ArrowDown), `e2e/projects.spec.ts`
+  (`slice(1, 5)`), and `projects.test.tsx` "uses Cmd on macOS" (`slice(1, 4)` with the same three labels, plus item 0
+  is "New Chat⌘N", so the start of the File menu stays fully checked).
+- New Chat without a project opens Work, where the user can open one. Why: the chat needs a project to run in.
+- Chats join Back/Forward history (`chat:<id>` entries), as STORY-5 said STORY-21 would. Opening a chat from the list
+  is one navigation, like a sidebar view.
+- The list holds this run's chats; STORY-44 saves and loads the manager's chat map and rows.
+- The e2e chat journeys share the stand-in `claude` setup (`e2e/agent.ts`). Why: two specs copying it would drift.
+- Seen while building, not caused by this story: `ws-work.test.ts` (card.watch, "No matching frame in 2000 ms") and
+  `card-pane.test.tsx` ("opens beside the list…") each failed once under a full parallel run and passed on retry.

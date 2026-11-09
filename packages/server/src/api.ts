@@ -167,6 +167,15 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
       case "chat.stop":
         await chats.stop(chat(params));
         return null;
+      case "chat.list": {
+        const dir = project(params);
+        const providers = await chats.providers();
+        const { chats: now, stop } = chats.watchList(dir, (next) => {
+          if (allowed.has(dir)) connection.push("chat.list", id, { providers, chats: next });
+        });
+        connection.keep(id, stop);
+        return { providers, chats: now };
+      }
       default:
         return assertNever(method);
     }

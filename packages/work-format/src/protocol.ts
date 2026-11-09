@@ -5,6 +5,7 @@
  */
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
+import type { ChatList } from "./chat-list.ts";
 import type { Role } from "./roles.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
@@ -72,6 +73,11 @@ export interface ServerMethods {
   "chat.send": { params: { id: string; text: string }; result: null };
   /** Interrupts the running turn. */
   "chat.stop": { params: { id: string }; result: null };
+  /**
+   * The project's chats and the providers they group under (STORY-21); then, until `work.unwatch`, a `chat.list` push
+   * each time a row changes. The request's id names the watch.
+   */
+  "chat.list": { params: { dir: string }; result: ChatList };
 }
 
 /** Frames the server sends unasked, and the data each carries. */
@@ -82,10 +88,12 @@ export interface ServerPushes {
   "card.view": CardView | null;
   /** A watched chat has a new event. */
   "chat.event": ChatEvent;
+  /** A row of the watched chat list changed, or a chat came or went: the whole new list. */
+  "chat.list": ChatList;
 }
 
 export type PushEvent = keyof ServerPushes;
-const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view", "chat.event"];
+const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view", "chat.event", "chat.list"];
 
 /**
  * A pushed frame: `{ event, watch, data }`. It never has an `id`, so neither end can take it for an answer, and a
@@ -115,6 +123,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "chat.watch",
   "chat.send",
   "chat.stop",
+  "chat.list",
 ];
 
 export interface ServerRequest {

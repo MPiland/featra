@@ -4,6 +4,7 @@ export type KeyInput = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey
 
 /** Shortcuts the app handles itself. Edit shortcuts are left to the browser engine, which already does them. */
 export type AppShortcut =
+  | "newChat"
   | "newProject"
   | "openFolder"
   | "projectSettings"
@@ -61,6 +62,7 @@ export function matchShortcut(e: KeyInput, platform: string): AppShortcut | null
   if (e.shiftKey && (e.code === "Comma" || e.key === "," || e.key === "<")) return "projectSettings";
   if (e.shiftKey && letter(e, "n")) return "newProject";
   if (e.shiftKey) return null;
+  if (letter(e, "n")) return "newChat";
   if (letter(e, "o")) return "openFolder";
   if (e.key === "-" || e.code === "NumpadSubtract") return "zoomOut";
   if (e.key === "0" || e.code === "Numpad0") return "zoomReset";
@@ -73,6 +75,7 @@ export function matchShortcut(e: KeyInput, platform: string): AppShortcut | null
 }
 
 const LABELS: Record<Exclude<ShortcutId, "quit">, [pc: string, mac: string]> = {
+  newChat: ["Ctrl+N", "⌘N"],
   newProject: ["Ctrl+Shift+N", "⇧⌘N"],
   openFolder: ["Ctrl+O", "⌘O"],
   projectSettings: ["Ctrl+Shift+,", "⇧⌘,"],

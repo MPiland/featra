@@ -19,6 +19,34 @@
   cursor: default;
 }
 
+/* The sidebar's chat list (STORY-21): a group per provider, a row per chat, a dot on a chat waiting on the user. */
+.chat-group + .chat-group {
+  margin-top: 8px;
+}
+
+.chat-group-name {
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 0.8em;
+  font-weight: 600;
+  color: var(--tx3);
+}
+
+.chat-row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chat-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--acc);
+}
+
 .chat {
   flex: 1;
   min-height: 0;

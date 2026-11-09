@@ -1,4 +1,5 @@
 import type { EditCommand } from "./bridge.ts";
+import { CHAT_COPY } from "./chats.ts";
 import { PROJECT_LABELS } from "./projects.ts";
 import { shortcutLabel, type ShortcutId } from "./shortcuts.ts";
 import { viewDef, VIEWS, type ViewId } from "./views.ts";
@@ -12,6 +13,8 @@ export type MenuNode =
   | { kind: "separator"; id: string };
 
 export interface MenuActions {
+  /** Opens the role picker for a new chat in the current project. */
+  newChat: () => void;
   /** Opens the New Project dialog. */
   newProject: () => void;
   /** Asks for a folder and opens it as a project. */
@@ -61,8 +64,7 @@ const fileManager = (platform: string) =>
 
 /**
  * The title bar's Menu, modelled on Claude's desktop app: File, Edit, View, Go, Help, in Title Case. Items that
- * aren't built yet are left out, not greyed; later stories add theirs (New Chat, pane toggles, Find, Previous/Next
- * Chat). Only Back and Forward grey out, when there's nowhere to go.
+ * aren't built yet are left out, not greyed; later stories add theirs (pane toggles, Find, Previous/Next Chat). Only Back and Forward grey out, when there's nowhere to go.
  */
 export function buildAppMenu({
   platform,
@@ -81,9 +83,11 @@ export function buildAppMenu({
   const edit = (command: EditCommand, label: string): MenuNode =>
     item(`edit.${command}`, label, () => a.edit(command), command === "delete" ? undefined : command);
 
-  // A browser tab has no folders to open or create.
+  // A browser tab has no folders to open or create, so no chats either.
   const file: MenuNode[] = inWindow
     ? [
+        item("file.newChat", CHAT_COPY.newChatMenu, a.newChat, "newChat"),
+        sep("file.sepChat"),
         item("file.newProject", PROJECT_LABELS.newProject, a.newProject, "newProject"),
         item("file.openFolder", PROJECT_LABELS.openFolder, a.openFolder, "openFolder"),
         sep("file.sep0"),

@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { canGoBack, canGoForward, currentView, goBack, goForward, initialNav, navigate } from "../src/navigation.ts";
+import {
+  canGoBack,
+  canGoForward,
+  chatEntry,
+  currentView,
+  entryChat,
+  entryView,
+  goBack,
+  goForward,
+  initialNav,
+  navigate,
+} from "../src/navigation.ts";
 
 describe("view history", () => {
   it("starts on Work with nowhere to go", () => {
@@ -38,5 +49,21 @@ describe("view history", () => {
     const nav = initialNav();
     expect(goBack(nav)).toBe(nav);
     expect(goForward(nav)).toBe(nav);
+  });
+});
+
+describe("STORY-21: chats in the history", () => {
+  it("names a chat by its id and tells it from a view", () => {
+    expect(entryChat(chatEntry("c1"))).toBe("c1");
+    expect(entryView(chatEntry("c1"))).toBeNull();
+    expect(entryChat("work")).toBeNull();
+    expect(entryView("work")).toBe("work");
+  });
+
+  it("goes back from a chat to the view before it, and re-opening the same chat is a no-op", () => {
+    const nav = navigate(navigate(initialNav(), chatEntry("c1")), chatEntry("c2"));
+    expect(navigate(nav, chatEntry("c2"))).toBe(nav);
+    expect(currentView(goBack(nav))).toBe("chat:c1");
+    expect(currentView(goBack(goBack(nav)))).toBe("work");
   });
 });

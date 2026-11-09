@@ -131,7 +131,7 @@ describe("STORY-19 AC4: project shortcuts", () => {
   });
 
   it("keeps Ctrl+N for New chat and leaves Ctrl+Shift+O and Ctrl+Alt+O alone", () => {
-    expect(matchShortcut(ctrl("n", "KeyN"), "win32")).toBeNull();
+    expect(matchShortcut(ctrl("n", "KeyN"), "win32")).toBe("newChat");
     expect(matchShortcut(ctrl("O", "KeyO", { shiftKey: true }), "win32")).toBeNull();
     expect(matchShortcut(ctrl("o", "KeyO", { altKey: true }), "win32")).toBeNull();
   });

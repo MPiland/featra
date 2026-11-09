@@ -40,16 +40,16 @@ As a builder, I see all my chats in the sidebar grouped by provider and start a 
 
 ## Tasks
 
-- [ ] work-format: a chat's summary and status folded from its log (`chat-list.ts`), with a waiting-reason seam
+- [x] work-format: a chat's summary and status folded from its log (`chat-list.ts`), with a waiting-reason seam
       that STORY-45 (approvals) and STORY-46 (questions) extend; the list grouped by provider
-- [ ] Server: provider adapters report a name and whether they are installed; the session manager keeps each chat's
+- [x] Server: provider adapters report a name and whether they are installed; the session manager keeps each chat's
       summary and fans list changes out; `chat.list` watch per project (seam for STORY-44's restored chats)
-- [ ] Client: `ChatBridge.list`, the sidebar's chat list grouped by provider with a waiting dot; selecting a chat opens
+- [x] Client: `ChatBridge.list`, the sidebar's chat list grouped by provider with a waiting dot; selecting a chat opens
       it, and chats join Back/Forward history
-- [ ] File > New Chat (Ctrl+N, ⌘N), from the menu and the keyboard; left out in a browser tab
-- [ ] Tests: unit (fold, grouping, shortcut, menu), server integration (manager + `chat.list` over the socket with
+- [x] File > New Chat (Ctrl+N, ⌘N), from the menu and the keyboard; left out in a browser tab
+- [x] Tests: unit (fold, grouping, shortcut, menu), server integration (manager + `chat.list` over the socket with
       a fake `query`), client component tests, one Electron journey
-- [ ] ADR 0018 and decisions.md updated
+- [x] ADR 0018 and decisions.md updated
 
 ## Notes
 
