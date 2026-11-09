@@ -2,7 +2,7 @@
 id: STORY-45
 type: story
 title: Inline tool approvals
-status: In Progress
+status: Done
 parent: FEAT-3
 order: 4
 origin: planned
@@ -34,6 +34,21 @@ history:
     field: status
     from: In Review
     to: In Progress
+    by: session:story-45
+  - at: 2026-11-09T17:17:36Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-45
+  - at: 2026-11-09T17:17:36Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-09T17:17:36Z
+    field: status
+    from: In Review
+    to: Done
     by: session:story-45
 ---
 
