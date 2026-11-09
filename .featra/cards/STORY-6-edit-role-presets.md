@@ -43,7 +43,8 @@ Codex, so every chat starts with the right prompt, model and effort.
 - [ ] A role starts in the permission mode the provider's own settings already use (Claude's
   `permissions.defaultMode`; Codex's `approval_policy` and `sandbox_mode`, and its trusted-project entry), project or
   user level, read live and never written; with no setting it starts on Ask. A full-access mode is honoured and shows
-  a warning mark in the composer
+  a warning mark in the composer. The composer's mode picker uses the provider's own mode names and shows where the
+  mode came from ("auto · from Claude settings")
 
 ## Tasks
 
@@ -62,4 +63,6 @@ Codex, so every chat starts with the right prompt, model and effort.
   and never writes them. Full-access modes (Claude `bypassPermissions`; Codex `never` with `danger-full-access`) are
   honoured with a warning mark; built-in roles never start in one on their own. STORY-45's built-in default of Ask
   stands when no setting is found.
-- Open: how the composer names the modes (the Dev Lead brings the user's answer).
+- Decision 2026-11-09: the composer's mode picker uses each provider's own mode names: Claude's `default`,
+  `acceptEdits`, `plan`, `auto` and `bypassPermissions`; Codex's approval policy plus sandbox. It shows where the mode
+  came from ("auto · from Claude settings"). There is no Featra-wide common set of modes.

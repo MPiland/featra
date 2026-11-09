@@ -689,4 +689,8 @@ Recorded for STORY-6, which builds it; STORY-45's AC3 (the five built-in roles d
   (`~/.claude/.credentials.json`, `~/.codex/auth.json`).
 - Full-access modes (Claude `bypassPermissions`; Codex `never` with `danger-full-access`) are honoured, with a warning
   mark in the composer. Built-in roles never start in one on their own.
-- Open: how the composer names the modes.
+- Mode names (decided by the user, 2026-11-09): the composer's mode picker uses each provider's own mode names:
+  Claude's `default`, `acceptEdits`, `plan`, `auto` and `bypassPermissions`; Codex's approval policy plus sandbox. It
+  shows where the mode came from ("auto · from Claude settings"). There is no Featra-wide common set of modes. Why:
+  the names match what the user already sees and sets in each provider, and a common set would hide differences
+  between them.
