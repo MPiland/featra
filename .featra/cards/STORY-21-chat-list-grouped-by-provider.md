@@ -4,7 +4,7 @@ type: story
 title: Chat list grouped by provider
 status: New
 parent: FEAT-3
-order: 4
+order: 2
 origin: planned
 role: developer
 agent: claude
@@ -38,3 +38,5 @@ As a builder, I see all my chats in the sidebar grouped by provider and start a 
 - [ ] Break down when picked up
 
 ## Notes
+
+- Depends on: STORY-5.

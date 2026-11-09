@@ -372,3 +372,34 @@ timed soak came during a stall of the whole machine: for 4.4 s no git returned i
 a git round would not have saved it, and the 2 s wait is what STORY-3 promises. So the user moved AC2's 50 runs to CI's
 Windows runner, the same as the e2e soaks, with the 2 s wait and every assertion unchanged. `soak.yml` now repeats
 the whole unit suite too (`soak/windows/unit/50`), stops at the first failing run and keeps every run's output.
+
+## 2026-11-08 — FEAT-3 shaped: sessions, roles, approvals and decision logging
+
+- STORY-5 is split into three stories: start and stream a chat (STORY-5), inline tool approvals (STORY-45) and agent
+  questions as cards (STORY-46). Moving waiting items to the Inbox is STORY-7. Why: each one is a separate behavior the
+  user can accept on its own, and the original card was too big for one PR.
+- Chats survive a restart (STORY-44). Featra keeps a small index (session id, title, project, role) in app data,
+  reads the transcript from Claude's own session file and resumes through the SDK. Rejected: chats that last only
+  until quit.
+- A role's prompt is appended to Claude Code's system prompt, so CLAUDE.md, skills and hooks still apply.
+- Permission mode is per role. All five built-in roles start at Ask. Rejected: one global Ask with no role field.
+- Agents decide what to log, through the Featra MCP's `log_decision` and `defer_question` (STORY-47). Each entry
+  records the decision, why it was made, the alternatives rejected, and the session and card. The chat shows
+  "Logged to decisions.md" with Undo. Why: the user wants a later agent to understand why a choice was made, and
+  logging every answer would bury the real decisions under trivia. Rejected: a "Save as decision" box on each
+  question card, and logging every answer. The rule taught in the tool descriptions is modelled on the escalation
+  list in artificer-toolkit's AGENTS.md.
+- The Featra MCP server (`packages/mcp`) is built in FEAT-3 (STORY-47), and FEAT-4 adds `draft_cards` to it. Before
+  this, no card built it.
+- An approval or question moves to the Inbox after 10 minutes, set in Settings › App. Why: by then the person is
+  away, not just busy elsewhere on the PC. Desktop notifications fire at once when Featra isn't focused, and can be
+  turned off. Rejected: a 2-minute wait.
+- Roles live in committed `.featra/roles/*.md`. The five built-in roles stay built in until edited, so they keep
+  getting Featra's prompt updates. Users can create, duplicate, rename and delete their own roles.
+- Provider agent definitions are read live as roles, one reader per provider: Claude's `.claude/agents/*.md` and
+  Codex's `.codex/agents/*.toml`, project and user level. Featra never writes to them. Customize copies one into
+  `.featra/roles/`. Both readers ship in M1; until Codex sessions exist, a Codex role starts a Claude session with
+  its prompt, and its model falls back to the Claude default. This amends the 2026-11-04 entry: Codex sessions are
+  still M2, but reading Codex roles is M1. Other providers get a reader when they document an agent format.
+- FEAT-3's tests fake the Agent SDK at the package boundary, and Featra's own session code runs for real.
+- FEAT-3 gets a feature branch, and each story gets its own worktree.

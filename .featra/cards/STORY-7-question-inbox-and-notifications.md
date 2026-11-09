@@ -1,10 +1,10 @@
 ---
 id: STORY-7
 type: story
-title: Question inbox and notifications
+title: Inbox and notifications
 status: New
 parent: FEAT-3
-order: 3
+order: 8
 origin: planned
 role: developer
 agent: claude
@@ -24,16 +24,24 @@ history:
 
 ## Description
 
-As a builder, I find every question and approval waiting on me in one Inbox and get notified.
+As a builder, I find every approval and question waiting on me in one Inbox and get told when one arrives, so a
+blocked agent doesn't sit unnoticed while I'm away.
 
 ## Acceptance criteria
 
-- [ ] Unanswered agent questions appear in an inbox with their session and card
-- [ ] A desktop notification fires when a question arrives while the app is unfocused
-- [ ] Answered questions are appended to `decisions.md`; questions deferred by the user to `open-questions.md`
+- [ ] An approval or question unanswered for 10 minutes also appears in the Inbox with its chat and card; the wait is
+  set in Settings › App
+- [ ] Answering it in the Inbox or the chat answers it once and clears it from both
+- [ ] When Featra isn't focused, a desktop notification fires as soon as one arrives; clicking it opens the chat.
+  Notifications can be turned off in Settings › App
+- [ ] The sidebar's Inbox shows how many are waiting
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
+
+- Depends on: STORY-45, STORY-46.
+- Decisions 2026-11-08: the Inbox wait is 10 minutes (a sign the person is away); notifications fire at once and can
+  be turned off. Logging answers moved to STORY-47.

@@ -4,7 +4,7 @@ type: story
 title: Composer controls and context meter
 status: New
 parent: FEAT-3
-order: 5
+order: 9
 origin: planned
 role: developer
 agent: claude
@@ -37,3 +37,5 @@ As a builder, I change the agent's role, model, effort and permission mode from 
 - [ ] Break down when picked up
 
 ## Notes
+
+- Depends on: STORY-5, STORY-6.
