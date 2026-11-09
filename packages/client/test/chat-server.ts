@@ -3,6 +3,7 @@
 import { act } from "react";
 import {
   BUILT_IN_ROLES,
+  chatName,
   foldChat,
   newSummary,
   reduceRow,
@@ -14,6 +15,7 @@ import {
 } from "@featra/work-format";
 import type { ModeInfo } from "@featra/work-format/modes";
 import type { ChatBridge, ChatListUpdate, ChatUpdate } from "../src/chats.ts";
+import { fakeInboxServer } from "./inbox-server.ts";
 
 /** Claude, installed: what the server reports on a machine with `claude` on the PATH. */
 export const CLAUDE_INSTALLED: ProviderInfo = { id: "claude", name: "Claude Code", installed: true };
@@ -39,6 +41,8 @@ export interface ChatHost {
   chatMode?: ModeInfo;
   /** The one-line note the server reports a chat started with. Default: none. */
   chatNote?: string;
+  /** The card each chat the fake server starts is for, by role id (STORY-7). Default: none. */
+  chatCards?: Record<string, string>;
   /** The clock a chat's start is stamped with. Default: one second per chat from 2026-11-09T10:00:00Z. */
   now?: () => string;
 }
@@ -51,6 +55,7 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   const listWatchers = new Set<{ dir: string; listener: (u: ChatListUpdate) => void }>();
   const providers = host.providers ?? [CLAUDE_INSTALLED];
   const now = host.now ?? (() => new Date(Date.UTC(2026, 10, 9, 10, 0, rows.size)).toISOString());
+  const inbox = fakeInboxServer();
   let listsSent = 0;
   const listOf = (dir: string): ChatListUpdate => ({
     list: { providers, chats: [...rows.values()].filter((r) => r.dir === dir).map((r) => r.summary) },
@@ -76,19 +81,24 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     if (!row) return;
     const next = reduceRow(row, event);
     row.asks = next.asks;
+    inbox.heard(
+      { id, dir: row.dir, chatName: chatName(next.summary), ...(row.summary.card ? { card: row.summary.card } : {}) },
+      event,
+      next.asks,
+    );
     if (next.summary === row.summary) return;
     row.summary = next.summary;
     listChanged(row.dir);
   };
   const bridge: ChatBridge = {
     roles: async () => host.roles ?? [...BUILT_IN_ROLES],
-    start: async (dir, role) => {
+    start: async (dir, role, card = host.chatCards?.[role]) => {
       calls.push(`chat.start:${dir}:${role}`);
       if (host.startError) return { ok: false, error: host.startError };
       const id = `chat-${logs.size + 1}`;
       logs.set(id, []);
       const found = (host.roles ?? BUILT_IN_ROLES).find((r) => r.id === role);
-      if (found) rows.set(id, { dir, summary: newSummary(id, found.provider, found, now()), asks: [] });
+      if (found) rows.set(id, { dir, summary: newSummary(id, found.provider, found, now(), card), asks: [] });
       listChanged(dir);
       return { ok: true, id };
     },
@@ -131,6 +141,8 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   };
   return {
     bridge,
+    /** The Inbox side: the clock the test moves, and what is watching. */
+    inbox,
     /** The agent says something: the server pushes each event to the chat's watchers. */
     emit: (id: string, ...events: ChatEvent[]) =>
       act(() => {

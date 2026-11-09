@@ -11,6 +11,7 @@ import {
   normalizeUiState,
   normalizeWindowState,
   serverChats,
+  serverInbox,
   serverRoles,
   serverSetup,
   serverWork,
@@ -69,6 +70,15 @@ const bridge: FeatraBridge = {
   work: serverWork(server),
   chats: serverChats(server),
   roles: serverRoles(server),
+  inbox: serverInbox(server),
+  notifications: {
+    asked: (item) => ipcRenderer.send(IPC.notificationsAsked, item),
+    onOpenChat: (listener) => {
+      const handler = (_e: unknown, chat: unknown) => typeof chat === "string" && listener(chat);
+      ipcRenderer.on(IPC.notificationsOpenChat, handler);
+      return () => void ipcRenderer.removeListener(IPC.notificationsOpenChat, handler);
+    },
+  },
   edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {
     info: () => ipcRenderer.invoke(IPC.appInfo),

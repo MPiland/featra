@@ -152,4 +152,12 @@ describe("chat.list on the wire", () => {
       { ...CLAUDE, installed: false },
     ]);
   });
+
+  it("keeps the card a chat was started on (STORY-7), and leaves it off when there is none", () => {
+    const withCard = newSummary("c", "claude", DEVELOPER, "2026-11-09T10:00:00Z", "STORY-9");
+    expect(withCard.card).toBe("STORY-9");
+    expect(row("d", "2026-11-09T10:00:00Z")).not.toHaveProperty("card");
+    expect(normalizeChatList({ providers: [CLAUDE], chats: [withCard] }).chats).toEqual([withCard]);
+    expect(normalizeChatList({ providers: [], chats: [{ ...withCard, card: 7 }] }).chats[0]).not.toHaveProperty("card");
+  });
 });

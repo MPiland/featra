@@ -13,6 +13,8 @@ import { CHAT_COPY, type ChatRoleRef } from "./chats.ts";
 import { ChatList, useChats } from "./components/chat/ChatList.tsx";
 import { ChatPane } from "./components/chat/ChatView.tsx";
 import { NewChatDialog } from "./components/chat/NewChatDialog.tsx";
+import { InboxView } from "./components/inbox/InboxView.tsx";
+import { useInbox, useNotifications } from "./components/inbox/useInbox.ts";
 import { Dialog } from "./components/Dialog.tsx";
 import { ProjectSwitcher } from "./components/ProjectSwitcher.tsx";
 import { SettingsView } from "./components/settings/SettingsView.tsx";
@@ -23,6 +25,7 @@ import { useProjectSetup } from "./components/useProjectSetup.tsx";
 import { useShortcuts } from "./components/useShortcuts.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
+import { waitMs } from "@featra/work-format/inbox";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import {
   canGoBack,
@@ -100,6 +103,9 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   const projectDir = projects.current?.dir ?? null;
   const { setupPage, openSetup } = useProjectSetup(bridge, projectDir, settings.app.work);
   const { list: chatList, chat, remember } = useChats(bridge.chats, projectDir, chatId, () => setNav(leaveChats));
+  // Requests that have waited past the Inbox wait (STORY-7), and a notification for each as it arrives.
+  const inbox = useInbox(bridge.inbox, projectDir, waitMs(settings.app.inboxWaitMinutes));
+  useNotifications(bridge.inbox, bridge.notifications, projectDir, openChat);
   const startedChat = (id: string, role: ChatRoleRef) => {
     setDialog(null);
     remember(id, role);
@@ -224,6 +230,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
             project={projects.current}
             onNewChat={() => setDialog("newChat")}
             chats={<ChatList list={chatList} current={chatId} onOpen={openChat} />}
+            counts={{ inbox: inbox.items.length }}
             switcher={<ProjectSwitcher projects={projects} platform={bridge.platform} actions={projectActions} />}
           />
           <main aria-labelledby="view-title">
@@ -250,6 +257,8 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
                 setupPage={setupPage}
               />
+            ) : view.id === "inbox" ? (
+              <InboxView items={inbox.items} chats={bridge.chats} onOpenChat={openChat} />
             ) : (
               <ViewPlaceholder view={view} />
             )}

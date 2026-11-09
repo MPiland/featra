@@ -37,7 +37,14 @@ export interface ServerClient {
 }
 
 /** The methods that start a watch: its pushes go on until `work.unwatch`. */
-export type WatchMethod = "work.watch" | "card.watch" | "chat.watch" | "chat.list" | "roles.watch";
+export type WatchMethod =
+  | "work.watch"
+  | "card.watch"
+  | "chat.watch"
+  | "chat.list"
+  | "roles.watch"
+  | "inbox.watch"
+  | "inbox.asked";
 
 /** How long a dropped watch waits before it tries again. */
 export const REWATCH_MS = 1000;

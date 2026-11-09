@@ -1,8 +1,10 @@
 import { join } from "node:path";
+import { IPC } from "@featra/client/bridge";
 import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
 import { allowedDirs, registerIpc } from "./ipc.ts";
 import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog } from "./log.ts";
+import { createNotifier } from "./notifier.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
 import { createServerProcess } from "./server-process.ts";
@@ -90,7 +92,32 @@ if (!app.requestSingleInstanceLock()) {
         tray = undefined;
       }
     };
+    // Desktop notifications for the requests that arrive (STORY-7). Held until closed, so none is collected early.
+    const shown = new Set<Notification>();
+    const inFront = () => !!win && !win.isDestroyed() && win.isVisible() && win.isFocused();
+    const notifier = createNotifier({
+      enabled: () => appSettings.notifications,
+      focused: () => (e2e ? (testHooks.focused ?? inFront()) : inFront()),
+      show: ({ title, body, click }) => {
+        if (e2e) {
+          testHooks.notifications.push({ title, body, click });
+          return;
+        }
+        if (!Notification.isSupported()) return;
+        const n = new Notification({ title, body });
+        shown.add(n);
+        n.on("click", click);
+        n.on("close", () => shown.delete(n));
+        n.show();
+      },
+      open: (chat) => {
+        if (!win || win.isDestroyed()) return;
+        lifecycle.reveal(win);
+        win.webContents.send(IPC.notificationsOpenChat, chat);
+      },
+    });
     registerIpc({
+      notifier,
       store,
       lifecycle,
       log,

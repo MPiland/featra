@@ -12,6 +12,7 @@ import {
   chatStartParams,
   copyParams,
   dirParams,
+  inboxParams,
   roleEditParams,
   setupParams,
   unwatchParams,
@@ -168,8 +169,8 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles, 
         return roles.list(project(params));
       case "chat.start": {
         const p = chatStartParams(params);
-        if (!p) throw new ApiError("Expected { dir, role }.");
-        return { id: await chats.start(allow(p.dir), p.role) };
+        if (!p) throw new ApiError("Expected { dir, role, card? }.");
+        return { id: await chats.start(allow(p.dir), p.role, p.card) };
       }
       case "chat.watch": {
         const chatId = chat(params);
@@ -231,6 +232,27 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles, 
           stop();
         });
         return { providers, chats: now };
+      }
+      case "inbox.watch": {
+        const p = inboxParams(params);
+        if (!p) throw new ApiError("Expected { dir, waitMs }.");
+        const dir = allow(p.dir);
+        await chats.ready();
+        const { inbox, stop } = chats.watchInbox(dir, p.waitMs, (next) => {
+          if (allowed.has(dir)) connection.push("inbox.list", id, next);
+        });
+        connection.keep(id, stop);
+        return inbox;
+      }
+      case "inbox.asked": {
+        const dir = project(params);
+        connection.keep(
+          id,
+          chats.watchAsked(dir, (item) => {
+            if (allowed.has(dir)) connection.push("inbox.asked", id, item);
+          }),
+        );
+        return null;
       }
       default:
         return assertNever(method);

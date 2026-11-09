@@ -1,0 +1,56 @@
+/* The Inbox view (STORY-7) and the count beside the sidebar entry. */
+.nav-count {
+  margin-left: auto;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--accbg);
+  color: #ffffff;
+  font-size: 0.8em;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.inbox {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.inbox-empty {
+  color: var(--tx3);
+}
+
+.inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.inbox-item {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.inbox-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.inbox-kind {
+  font-weight: 600;
+}
+
+.inbox-tool,
+.inbox-card {
+  color: var(--tx3);
+}

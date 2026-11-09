@@ -6,6 +6,7 @@
 import { randomUUID } from "node:crypto";
 import {
   CHAT_MESSAGES,
+  chatName,
   idleSummary,
   newSummary,
   reduceRow,
@@ -23,6 +24,7 @@ import { ChatError } from "./chat-error.ts";
 import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
 import { chatSaver, memoryChatStore, savedHistory } from "./chat-store.ts";
+import { createInbox } from "./inbox.ts";
 import type { ProviderAdapter, ProviderSession } from "./provider.ts";
 
 export { ChatError };
@@ -81,6 +83,7 @@ export function createChatManager({
   roles,
   approve,
   mcp,
+  timers,
   newId = randomUUID,
   now = () => new Date(),
   log = () => {},
@@ -94,6 +97,18 @@ export function createChatManager({
     if (c && c.events !== null && !c.closed) record(c, event);
   });
   const decide = approve ?? desk.approve;
+  // The Inbox (STORY-7) hears each request open and close, and answers nothing: the desk does, in the chat or here.
+  const inbox = createInbox({
+    now: () => now().getTime(),
+    ...(timers ? { timers } : {}),
+    chat: (id) => {
+      const c = chats.get(id);
+      if (!c || c.closed) return null;
+      return { dir: c.dir, chatName: chatName(c.summary), ...(c.summary.card ? { card: c.summary.card } : {}) };
+    },
+    same: (a, b) => projectKey(a, platform) === projectKey(b, platform),
+    log,
+  });
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
 
   const chat = (id: string): Chat => {
@@ -139,7 +154,10 @@ export function createChatManager({
     const session = answered && c.pending ? c.pending : c.session;
     if (answered) c.pending = null;
     const { summary, asks } = reduceRow(c, event);
+    const asksChanged = asks !== c.asks;
     c.asks = asks;
+    if (event.type === "approval" || event.type === "question") inbox.opened(c.id, event);
+    if (asksChanged) inbox.keep(c.id, asks);
     if (summary === c.summary && session === c.session) return;
     const rowChanged = summary !== c.summary;
     c.session = session;
@@ -190,6 +208,7 @@ export function createChatManager({
     c.listeners.clear();
     mcp?.release(c.id);
     desk.forget(c.id);
+    inbox.ended(c.id);
     c.agent?.close();
     c.agent = null;
     c.events = null;
@@ -200,13 +219,13 @@ export function createChatManager({
   }
 
   return {
-    async start(dir, roleId) {
+    async start(dir, roleId, card) {
       const role = await roles.get(dir, roleId);
       if (!role) throw new ChatError(CHAT_MESSAGES.unknownRole);
       const adapter = provider(role.provider);
       if (!adapter) throw new ChatError(CHAT_MESSAGES.noProvider);
       const id = newId();
-      const c = restored(id, dir, newSummary(id, role.provider, role, now().toISOString()), null);
+      const c = restored(id, dir, newSummary(id, role.provider, role, now().toISOString(), card), null);
       c.events = [];
       c.agent = agentFor(c, adapter, role);
       chats.set(id, c);
@@ -260,6 +279,8 @@ export function createChatManager({
     },
     list,
     watchList: (dir, listener) => lists.watch(dir, listener),
+    watchInbox: inbox.watch,
+    watchAsked: inbox.watchAsked,
     providers: () =>
       Promise.all(
         providers.map(async (p) => ({ id: p.id, name: p.name, installed: await p.installed().catch(() => false) })),
@@ -280,6 +301,7 @@ export function createChatManager({
     close() {
       for (const c of chats.values()) end(c);
       lists.clear();
+      inbox.close();
     },
     flush: () => saver.flush(),
     ready: () => saver.loaded,

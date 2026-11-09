@@ -19,6 +19,7 @@ import { isOneOf, toText } from "@featra/work-format";
 import { pickFolder } from "./folder-dialog.ts";
 import { closeToTraySupport, type Lifecycle } from "./lifecycle.ts";
 import type { Log } from "./log.ts";
+import type { Notifier } from "./notifier.ts";
 import type { ProjectRegistry } from "./project-registry.ts";
 import type { ServerProcess } from "./server-process.ts";
 import { readProjectSettings, writeProjectValue, type SettingsStore } from "./settings-store.ts";
@@ -34,6 +35,7 @@ export interface MainDeps {
   troubleshoot: TroubleshootDeps;
   projects: ProjectRegistry;
   server: ServerProcess;
+  notifier: Notifier;
   settings: {
     store: SettingsStore;
     current: () => AppSettings;
@@ -54,7 +56,7 @@ const notOpen = (dir: unknown): ProjectSettings => ({
 });
 
 /** Answers the page's calls (see `IPC` in the client's bridge). Every payload is checked: the page is not trusted. */
-export function registerIpc({ store, lifecycle, log, troubleshoot, projects, server, settings }: MainDeps) {
+export function registerIpc({ store, lifecycle, log, troubleshoot, projects, server, notifier, settings }: MainDeps) {
   ipcMain.handle(IPC.uiStateLoad, () => store.load());
   ipcMain.handle(IPC.uiStateSave, (_e, state: unknown) => store.save(normalizeUiState(state)));
   ipcMain.on(IPC.windowMinimize, (e) => fromOurWindow(e)?.minimize());
@@ -122,6 +124,7 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
     projects.create(location, name).then(logged("New project")),
   );
   ipcMain.handle(IPC.serverEndpoint, () => server.endpoint());
+  ipcMain.on(IPC.notificationsAsked, (_e, item: unknown) => notifier.asked(item));
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());
   ipcMain.on(IPC.appToggleDevTools, (e) => e.sender.toggleDevTools());

@@ -43,6 +43,8 @@ export interface ChatSummary {
   running: boolean;
   /** What the chat waits on the user for, or null: the row's status dot. */
   waiting: WaitReason | null;
+  /** The card the chat was started to work on (STORY-7), when there is one. */
+  card?: string;
 }
 
 /** A provider the list can group by: its name, and whether the user has its agent installed. */
@@ -143,7 +145,13 @@ function foldSummary(summary: ChatSummary, event: ChatEvent, asks: readonly Ask[
 }
 
 /** A new chat's row, before any event. */
-export function newSummary(id: string, provider: ProviderId, role: ChatRoleRef, startedAt: string): ChatSummary {
+export function newSummary(
+  id: string,
+  provider: ProviderId,
+  role: ChatRoleRef,
+  startedAt: string,
+  card?: string,
+): ChatSummary {
   return {
     id,
     provider,
@@ -152,6 +160,7 @@ export function newSummary(id: string, provider: ProviderId, role: ChatRoleRef, 
     startedAt,
     running: false,
     waiting: null,
+    ...(card ? { card } : {}),
   };
 }
 
@@ -196,6 +205,7 @@ export function normalizeSummary(raw: unknown): ChatSummary | null {
     startedAt,
     running: raw.running === true,
     waiting: isOneOf(WAIT_REASONS, raw.waiting) ? raw.waiting : null,
+    ...(str(raw.card) ? { card: raw.card } : {}),
   };
 }
 

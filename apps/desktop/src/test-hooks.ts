@@ -14,11 +14,29 @@ export interface TestHooks {
   folderPicks: string[];
   /** Titles of the folder dialogs Featra opened. */
   folderDialogs: string[];
+  /** The desktop notifications Featra showed (STORY-7), each with the click a user would make. */
+  notifications: ShownNotification[];
+  /** Whether Featra counts as focused, for the test to set; null leaves it to the window. */
+  focused: boolean | null;
   tray?: Tray;
   trayMenu?: Menu;
 }
 
-export const testHooks: TestHooks = { notices: [], shownInFolder: [], folderPicks: [], folderDialogs: [] };
+/** A notification as the test sees it: what it said, and a way to click it. */
+export interface ShownNotification {
+  title: string;
+  body: string;
+  click: () => void;
+}
+
+export const testHooks: TestHooks = {
+  notices: [],
+  shownInFolder: [],
+  folderPicks: [],
+  folderDialogs: [],
+  notifications: [],
+  focused: null,
+};
 
 declare global {
   /** Set only in E2E runs, for the test to read through Playwright's main-process evaluate. */

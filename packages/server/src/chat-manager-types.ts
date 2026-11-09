@@ -1,6 +1,16 @@
 /** The session manager's interface and its dependencies (ADR 0018); `chat-manager.ts` builds it. */
-import type { Answers, ApprovalAnswer, ChatEvent, ChatSummary, ModeInfo, ProviderInfo } from "@featra/work-format";
+import type {
+  Answers,
+  ApprovalAnswer,
+  ChatEvent,
+  ChatSummary,
+  Inbox,
+  InboxItem,
+  ModeInfo,
+  ProviderInfo,
+} from "@featra/work-format";
 import type { ChatStore } from "./chat-store.ts";
+import type { Timers } from "./inbox.ts";
 import type { ApprovalHandler, McpServerSpec, ProviderAdapter } from "./provider.ts";
 import type { RoleRegistry } from "./role-registry.ts";
 
@@ -12,8 +22,8 @@ export interface McpAttach {
 }
 
 export interface ChatManager {
-  /** Starts a chat from a role in the project folder; its agent starts with the first message. */
-  start: (dir: string, roleId: string) => Promise<string>;
+  /** Starts a chat from a role in the project folder, on a card when it is for one; its agent starts with the first message. */
+  start: (dir: string, roleId: string, card?: string) => Promise<string>;
   /** Readies a chat to watch and send to: a restored chat reads its transcript from its provider, running no agent. */
   open: (id: string) => Promise<void>;
   /**
@@ -44,6 +54,13 @@ export interface ChatManager {
    * until `stop`. A streamed reply doesn't change a row, so it doesn't call it.
    */
   watchList: (dir: string, listener: (chats: ChatSummary[]) => void) => { chats: ChatSummary[]; stop: () => void };
+  /**
+   * The project's approvals and questions that have waited at least `wait` ms on the server's clock (STORY-7), and the
+   * whole Inbox again to `listener` each time that changes, until `stop`.
+   */
+  watchInbox: (dir: string, wait: number, listener: (inbox: Inbox) => void) => { inbox: Inbox; stop: () => void };
+  /** Calls `listener` with each request a chat of the project asks, as it is asked, whatever the wait; returns the stop. */
+  watchAsked: (dir: string, listener: (item: InboxItem) => void) => () => void;
   /** Every provider the manager runs, and whether its agent is installed. */
   providers: () => Promise<ProviderInfo[]>;
   /**
@@ -71,6 +88,8 @@ export interface ChatManagerDeps {
   mcp?: McpAttach;
   /** Where chats are saved; nowhere by default. */
   store?: ChatStore;
+  /** The timers the Inbox waits on; the real ones by default. */
+  timers?: Timers;
   /** Whose rule project folders compare by (`projectKey`); this machine's by default. */
   platform?: string;
 }

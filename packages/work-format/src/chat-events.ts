@@ -183,10 +183,10 @@ export function chatParams(params: unknown): { id: string } | null {
   return isRecord(params) && nonEmpty(params.id) ? { id: params.id } : null;
 }
 
-/** The `{ dir, role }` params of `chat.start`, or null. */
-export function chatStartParams(params: unknown): { dir: string; role: string } | null {
+/** The `{ dir, role, card? }` params of `chat.start` (the card the chat works on), or null. */
+export function chatStartParams(params: unknown): { dir: string; role: string; card?: string } | null {
   return isRecord(params) && nonEmpty(params.dir) && nonEmpty(params.role)
-    ? { dir: params.dir, role: params.role }
+    ? { dir: params.dir, role: params.role, ...(nonEmpty(params.card) ? { card: params.card } : {}) }
     : null;
 }
 
