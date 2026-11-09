@@ -38,7 +38,7 @@ describe("AC1: App and Project scopes; the project picker starts on the current 
       within(scopes[1]!)
         .getAllByRole("button")
         .map((b) => b.textContent),
-    ).toEqual([WORK]);
+    ).toEqual([WORK, "Roles"]);
     expect(pageTitle()).toBe("General");
   });
 
@@ -124,14 +124,15 @@ describe("AC4: every setting is reachable and changeable by keyboard", () => {
     const { user } = renderApp({ projectFiles: { [PROJECT.dir]: { worktrees: false } } });
     await openSettings(user);
     const buttons = within(pageNav()).getAllByRole("button");
-    expect(buttons.length).toBe(5);
+    expect(buttons.length).toBe(6);
     for (const [i, button] of buttons.entries()) {
       const name = `${i + 1}. ${button.textContent}`;
       await user.click(button);
       await screen.findAllByRole("heading", { level: 2, name: button.textContent });
-      if (i === buttons.length - 1) await projectLoaded();
+      // The last two pages are the project's: Workflow, then Roles.
+      if (i >= buttons.length - 2) await projectLoaded();
       // Only the project page has an override, and its Reset button is a stop too.
-      expect(within(main()).queryAllByText("Overridden"), name).toHaveLength(i === buttons.length - 1 ? 1 : 0);
+      expect(within(main()).queryAllByText("Overridden"), name).toHaveLength(i === buttons.length - 2 ? 1 : 0);
       const page = main().querySelector<HTMLElement>(".settings-page")!;
       within(pageNav()).getAllByRole("button").at(-1)!.focus(); // the page follows the page list in tab order
       const stops = await tabStops(user, page);

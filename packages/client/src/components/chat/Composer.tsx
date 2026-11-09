@@ -1,15 +1,18 @@
 import { useState, type KeyboardEvent } from "react";
+import { FULL_ACCESS_WARNING } from "@featra/work-format/modes";
 import { CHAT_COPY } from "../../chats.ts";
 
 interface ComposerProps {
   running: boolean;
+  /** A mode that lets the agent do anything without asking: marked beside the box, not only named in the header. */
+  fullAccess?: boolean;
   /** Sends the message; resolves with why it wasn't sent, or null. */
   onSend: (text: string) => Promise<string | null>;
   onStop: () => void;
 }
 
 /** Enter sends, Shift+Enter adds a line; while a turn runs, Stop interrupts it. */
-export function Composer({ running, onSend, onStop }: ComposerProps) {
+export function Composer({ running, fullAccess, onSend, onStop }: ComposerProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const blank = !text.trim();
@@ -45,6 +48,11 @@ export function Composer({ running, onSend, onStop }: ComposerProps) {
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKeyDown}
       />
+      {fullAccess && (
+        <p className="chat-warning" role="status">
+          <span aria-hidden="true">⚠</span> {FULL_ACCESS_WARNING}
+        </p>
+      )}
       {error && (
         <p className="chat-error" role="alert">
           {error}

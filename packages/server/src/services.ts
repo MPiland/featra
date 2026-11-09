@@ -9,7 +9,11 @@ import { loadAgentQuery } from "./claude-sdk.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createRepoGit, type RepoGit } from "./repo-git.ts";
+import { createClaudeReader } from "./claude-reader.ts";
+import { createCodexReader } from "./codex-reader.ts";
 import { createRoleRegistry } from "./role-registry.ts";
+import { nodeRoleFs, type RoleFs } from "./role-fs.ts";
+import { createRoleWatches } from "./role-watch.ts";
 import { createWorkWatches } from "./work-watch.ts";
 import { createScanner } from "./work-scan.ts";
 
@@ -28,6 +32,8 @@ export interface ServiceOptions {
   dataDir?: string;
   /** Where chats are kept, in place of `chats.json` in `dataDir`: tests give a slow or failing store. */
   chatStore?: ChatStore;
+  /** The disk the roles and the providers' settings are read from; none by default (no home), so a test never reads the real one: `main.ts` gives it this machine's. */
+  roleFs?: RoleFs;
 }
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
@@ -40,6 +46,7 @@ export function createServices({
   claude = { loadQuery: () => loadAgentQuery(), locate: () => locateClaude() },
   dataDir,
   chatStore,
+  roleFs = nodeRoleFs({}, null),
 }: ServiceOptions): {
   api: Api;
   close: () => Promise<void>;
@@ -48,12 +55,17 @@ export function createServices({
   const watches = createWorkWatches(scanner, log);
   const copies = createCopyActions({ git: repoGit, scan: watches.scan, now });
   const cards = createCardActions({ scan: watches.scan, now });
-  const roles = createRoleRegistry();
+  const roles = createRoleRegistry({
+    fs: roleFs,
+    readers: [createClaudeReader(roleFs), createCodexReader(roleFs)],
+    log,
+  });
+  const roleWatches = createRoleWatches(roles, log);
   const store = chatStore ?? (dataDir ? fileChatStore(dataDir) : memoryChatStore());
   const chats = createChatManager({ providers: [createClaudeProvider(claude)], roles, log, store });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => chats.closeProjects(allowed.has));
-  const api = createApi({ git: createGit(gitCommand), allowed, watches, copies, cards, chats, roles });
+  const api = createApi({ git: createGit(gitCommand), allowed, watches, copies, cards, chats, roles, roleWatches });
   return {
     api,
     async close() {

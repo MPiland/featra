@@ -6,7 +6,7 @@ import type { ChoiceDef, CloseButton, CloseToTraySupport, SettingsSnapshot, Work
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 
 /** Settings' pages. App pages hold the user's own settings; the Project page holds one project's overrides. */
-export type SettingsPage = "general" | "appearance" | "workDefaults" | "shortcuts" | "project";
+export type SettingsPage = "general" | "appearance" | "workDefaults" | "shortcuts" | "project" | "roles";
 export type SettingsScope = "app" | "project";
 
 export interface PageDef {
@@ -26,6 +26,7 @@ const PAGES: readonly PageDef[] = [
   { id: "workDefaults", title: WORK_PAGE_TITLE, scope: "app" },
   { id: "shortcuts", title: "Keyboard shortcuts", scope: "app" },
   { id: "project", title: WORK_PAGE_TITLE, scope: "project" },
+  { id: "roles", title: "Roles", scope: "project" },
 ];
 
 /** General holds only the close button, which a browser tab doesn't have: there the page is left out. */

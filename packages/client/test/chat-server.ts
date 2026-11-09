@@ -12,6 +12,7 @@ import {
   type ProviderInfo,
   type Role,
 } from "@featra/work-format";
+import type { ModeInfo } from "@featra/work-format/modes";
 import type { ChatBridge, ChatListUpdate, ChatUpdate } from "../src/chats.ts";
 
 /** Claude, installed: what the server reports on a machine with `claude` on the PATH. */
@@ -32,6 +33,10 @@ export interface ChatHost {
   answerError?: string;
   /** The providers `chat.list` reports. Default: Claude, installed. */
   providers?: ProviderInfo[];
+  /** The mode the server reports a chat started in, from the provider's settings. Default: none (Ask). */
+  chatMode?: ModeInfo;
+  /** The one-line note the server reports a chat started with. Default: none. */
+  chatNote?: string;
   /** The clock a chat's start is stamped with. Default: one second per chat from 2026-11-09T10:00:00Z. */
   now?: () => string;
 }
@@ -56,7 +61,12 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   const listChanged = (dir: string) => {
     for (const w of listWatchers) if (w.dir === dir) sendList(w);
   };
-  const update = (id: string): ChatUpdate => ({ chat: foldChat(logs.get(id) ?? []), error: null });
+  const update = (id: string): ChatUpdate => ({
+    chat: foldChat(logs.get(id) ?? []),
+    error: null,
+    ...(host.chatMode ? { mode: host.chatMode } : {}),
+    ...(host.chatNote ? { note: host.chatNote } : {}),
+  });
   const record = (id: string, event: ChatEvent) => {
     logs.get(id)?.push(event);
     for (const l of watchers.get(id) ?? []) l(update(id));

@@ -45,6 +45,20 @@ export function agentEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
  */
 export const SDK_PERMISSION_MODES: Record<PermissionMode, NonNullable<Options["permissionMode"]>> = { ask: "default" };
 
+/**
+ * The SDK mode a role's chat starts in: the one Claude's own settings name (STORY-6), else Ask's. Bypass needs the SDK's
+ * second opt-in; Featra only passes on what the user's own settings already allow.
+ */
+function startMode(role: Role): Pick<Options, "permissionMode" | "allowDangerouslySkipPermissions"> {
+  const { mode } = role;
+  const named = mode?.provider === "claude" && mode.level !== null ? mode.name : null;
+  if (named === "bypassPermissions")
+    return { permissionMode: "bypassPermissions", allowDangerouslySkipPermissions: true };
+  if (named === "acceptEdits" || named === "plan" || named === "auto" || named === "dontAsk")
+    return { permissionMode: named };
+  return { permissionMode: SDK_PERMISSION_MODES[role.permission] };
+}
+
 /** The query options for a role's chat. */
 export function claudeOptions(
   role: Role,
@@ -60,7 +74,7 @@ export function claudeOptions(
     effort: role.effort,
     systemPrompt: { type: "preset", preset: "claude_code", append: role.prompt },
     pathToClaudeCodeExecutable: claude,
-    permissionMode: SDK_PERMISSION_MODES[role.permission],
+    ...startMode(role),
     includePartialMessages: true,
     canUseTool,
     env,

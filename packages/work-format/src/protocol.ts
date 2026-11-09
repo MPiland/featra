@@ -9,6 +9,7 @@ import type { Answers } from "./questions.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
 import type { Role } from "./roles.ts";
+import type { RoleEdit, RoleEditResult, RoleList } from "./role-edit.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 import type { WorkList } from "./work-list-types.ts";
@@ -64,6 +65,13 @@ export interface ServerMethods {
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
   /** The roles a chat in this project can start from (ADR 0018). */
   "chat.roles": { params: { dir: string }; result: Role[] };
+  /**
+   * The project's roles with the files that couldn't be read (STORY-6); then, until `work.unwatch`, a `roles.list`
+   * push each time a role file or a provider's agent file or settings change. The request's id names the watch.
+   */
+  "roles.watch": { params: { dir: string }; result: RoleList };
+  /** Applies one edit to the project's roles, writing only `.featra/roles/`; answers with the role it made or why not. */
+  "roles.edit": { params: { dir: string; edit: RoleEdit }; result: RoleEditResult };
   /** Starts a chat from a role in the project folder; answers with its id. Its agent starts with the first message. */
   "chat.start": { params: { dir: string; role: string }; result: { id: string } };
   /**
@@ -103,12 +111,14 @@ export interface ServerPushes {
   "card.view": CardView | null;
   /** A watched chat has a new event. */
   "chat.event": ChatEvent;
+  /** A role file or a provider's agent file or settings changed: the whole new list. */
+  "roles.list": RoleList;
   /** A row of the watched chat list changed, or a chat came or went: the whole new list. */
   "chat.list": ChatList;
 }
 
 export type PushEvent = keyof ServerPushes;
-const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view", "chat.event", "chat.list"];
+const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view", "chat.event", "chat.list", "roles.list"];
 
 /**
  * A pushed frame: `{ event, watch, data }`. It never has an `id`, so neither end can take it for an answer, and a
@@ -134,6 +144,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "card.watch",
   "card.update",
   "chat.roles",
+  "roles.watch",
+  "roles.edit",
   "chat.start",
   "chat.watch",
   "chat.send",

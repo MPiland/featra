@@ -738,3 +738,51 @@ Recorded for STORY-6, which builds it; STORY-45's AC3 (the five built-in roles d
   plain row, which would otherwise show only the tool's name.
 - `packages/server/test/chat-stop.test.ts`: its hand-built `SessionOptions` gained the new required `ask`. No assertion
   changed.
+
+## 2026-11-09 — STORY-6: built-in, custom and provider roles
+
+Roles come from three places, listed by the server's role registry and edited only in `.featra/roles/`.
+
+- **Every role runs on Claude in M1, so Claude's settings name the mode, even for a Codex-origin role.** Why: ADR 0018
+  has no Codex adapter yet, so the permission mode that matters is the one the SDK is given. The Codex reader exists
+  and is tested but its mode is not used until a Codex adapter does.
+- **A role file has no permission field.** Why: the mode is the provider's own setting, read live; a copy in the file
+  would drift from it.
+- **Rename keeps the role's id and file name.** Why: a chat and the card's `role:` refer to the id, so renaming must not
+  orphan them.
+- **A role's name must be unique among every listed role, provider roles included.** Why: the picker shows names, and
+  two with one name cannot be told apart.
+- **Claude's six modes pass through by name: `default`, `acceptEdits`, `plan`, `auto`, `dontAsk` and
+  `bypassPermissions`.** `dontAsk` is a normal Claude mode, shown as "dontAsk · from Claude settings", with no warning
+  mark. Only `bypassPermissions` is full access, and it also sets the SDK's second opt-in. A value that is none of them
+  is skipped with a problem and the next file is read. Why: the user decided each provider's own mode names are used
+  (2026-11-09); the Dev Lead decided `dontAsk` is supported, not ignored.
+- **No setting means Ask, and the role carries no mode.** Why: an absent mode reads as Ask, and STORY-5's built-in role
+  list stays exactly the five roles it asserted.
+- **Codex: a project's `config.toml` counts only for a project the user's `config.toml` trusts, and wins per key. A
+  trusted project with neither key set starts as Codex's own trusted default (`on-request`, `workspace-write`); with
+  nothing set and no trust there is no mode, so Ask.** The trusted default is an assumption, logged in
+  open-questions.md.
+- **A model Claude doesn't have falls back to `default`, with a one-line note on the role and on the chat.** An agent's
+  missing model or `inherit` is `default` without a note. Why: AC5; silent substitution would hide it.
+- **An agent with no effort runs on `medium`.** Why: the SDK needs one, and it is the built-in default.
+- **The composer's mode is a read-only label until STORY-22 adds the picker.** Why: STORY-22 is not part of this story.
+- **The note is not kept across a restart.** Why: it comes from reading the role at start, and a restored chat reads the
+  role again.
+- **A project's roles are read for the chat's own folder.** Why: the same folder the chat runs in.
+- **The server's default file access reads no home folder; only `main.ts` wires the real one.** Why: tests must never
+  read the developer's `~/.claude` or `~/.codex`. Credential files are never read.
+- **A prompt-only save writes the fitted model.** Why: the file always holds a model Claude can run.
+- Files and seams: `role-registry.ts` (list, read, edit, watched), `claude-reader.ts` and `codex-reader.ts` (one reader
+  per provider behind `provider-reader.ts`), `role-actions.ts` (the only writer, `.featra/roles/` only),
+  `role-watch.ts` (live list, folders made after the watch began included). No new ADR: ADR 0018 gets a short note.
+
+### STORY-20 and STORY-5 checks changed (decided by the Dev Lead)
+
+Reason for all three: AC1 adds Settings › Project › Roles.
+
+- `packages/client/test/settings-pages.test.ts` (page list): "project:Roles" is appended after "project:Workflow".
+- `packages/client/test/components/settings/SettingsView.test.tsx`: the Project nav buttons were `[WORK]`, now
+  `[WORK, "Roles"]`; the page count was 5, now 6. The keyboard test's "project page" index is now the second to last
+  button, since Roles follows it, and Roles is waited for like Workflow. Nothing was removed or relaxed.
+- `packages/server/test/ws-chat.test.ts` and the other STORY-5 checks are unchanged.
