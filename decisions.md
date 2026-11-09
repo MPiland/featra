@@ -948,3 +948,7 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   new list.
 - **Item 1 of the review (the General page showing only when `closeToTray` is known) is not changed.** Existing
   assertions require the page hidden in that case; changing it means changing them. Left for the Dev Lead.
+- **Dev Lead ruling on item 1: no change.** The desktop app always reports `closeToTray` (`closeToTraySupport` returns
+  an object on every platform), so General, with Inbox wait and Notifications, is always reachable there. It is hidden
+  only in a plain browser tab, which has no desktop notifications. When remote control (M2) brings the client to a
+  browser, the Inbox wait must get a page of its own there.

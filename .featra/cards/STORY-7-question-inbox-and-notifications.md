@@ -2,7 +2,7 @@
 id: STORY-7
 type: story
 title: Inbox and notifications
-status: In Review
+status: Acceptance
 parent: FEAT-3
 order: 8
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-7
+  - at: 2026-11-09T22:54:08Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
