@@ -2,6 +2,9 @@ import {
   assertNever,
   cardParams,
   cardUpdateParams,
+  chatParams,
+  chatSendParams,
+  chatStartParams,
   copyParams,
   dirParams,
   setupParams,
@@ -13,8 +16,10 @@ import {
 } from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { cardViewIn, type CardActions } from "./card-actions.ts";
+import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
 import type { Git } from "./git.ts";
+import type { RoleRegistry } from "./role-registry.ts";
 import { initFeatra, initGit, setupStatus } from "./project-setup.ts";
 import { setUpProject, setupPlan } from "./project-setup-plan.ts";
 import type { WorkWatches } from "./work-watch.ts";
@@ -28,6 +33,8 @@ export interface ApiDeps {
   watches: WorkWatches;
   copies: CopyActions;
   cards: CardActions;
+  chats: ChatManager;
+  roles: RoleRegistry;
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -50,7 +57,7 @@ export type Api = (
   connection: Connection,
 ) => Promise<ServerMethods[ServerMethod]["result"]>;
 
-export function createApi({ git, allowed, watches, copies, cards }: ApiDeps): Api {
+export function createApi({ git, allowed, watches, copies, cards, chats, roles }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
     return dir;
@@ -66,8 +73,17 @@ export function createApi({ git, allowed, watches, copies, cards }: ApiDeps): Ap
     allow(p.dir);
     return p;
   };
+  /** A chat in an open project, by the `{ id }` its method was sent. */
+  const chat = (params: unknown): string => {
+    const p = chatParams(params);
+    if (!p) throw new ApiError("Expected { id }.");
+    const dir = chats.dirOf(p.id);
+    if (dir === null) throw new ApiError("No such chat.");
+    allow(dir);
+    return p.id;
+  };
 
-  return async (method, params, id, connection) => {
+  const answer: Api = async (method, params, id, connection) => {
     switch (method) {
       case "project.setupStatus":
         return setupStatus(project(params), git);
@@ -124,8 +140,35 @@ export function createApi({ git, allowed, watches, copies, cards }: ApiDeps): Ap
         if (!p) throw new ApiError("Expected { dir, id, edit }.");
         return cards.update(allow(p.dir), p.id, p.edit);
       }
+      case "chat.roles":
+        return roles.list(project(params));
+      case "chat.start": {
+        const p = chatStartParams(params);
+        if (!p) throw new ApiError("Expected { dir, role }.");
+        return { id: await chats.start(allow(p.dir), p.role) };
+      }
+      case "chat.watch": {
+        const chatId = chat(params);
+        const { events, stop } = chats.watch(chatId, (event) => connection.push("chat.event", id, event));
+        connection.keep(id, stop);
+        return { events };
+      }
+      case "chat.send": {
+        const p = chatSendParams(params);
+        if (!p) throw new ApiError("Expected { id, text }.");
+        chats.send(chat(params), p.text);
+        return null;
+      }
+      case "chat.stop":
+        await chats.stop(chat(params));
+        return null;
       default:
         return assertNever(method);
     }
   };
+  // The session manager's refusals are the user's to read, like the API's own.
+  return (method, params, id, connection) =>
+    answer(method, params, id, connection).catch((err: unknown) => {
+      throw err instanceof ChatError ? new ApiError(err.message) : err;
+    });
 }
