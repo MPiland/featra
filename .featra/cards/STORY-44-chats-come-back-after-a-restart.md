@@ -2,7 +2,7 @@
 id: STORY-44
 type: story
 title: Chats come back after a restart
-status: In Review
+status: Done
 parent: FEAT-3
 order: 3
 origin: planned
@@ -29,6 +29,16 @@ history:
     field: status
     from: In Progress
     to: In Review
+    by: session:story-44
+  - at: 2026-11-09T15:45:26Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-09T15:45:26Z
+    field: status
+    from: In Review
+    to: Done
     by: session:story-44
 ---
 
