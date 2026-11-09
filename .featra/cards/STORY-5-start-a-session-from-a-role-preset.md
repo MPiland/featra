@@ -2,7 +2,7 @@
 id: STORY-5
 type: story
 title: Start a chat from a role and stream it
-status: In Progress
+status: In Review
 parent: FEAT-3
 order: 1
 origin: planned
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: session:story-5
+  - at: 2026-11-09T13:18:56Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-5
 ---
 
 ## Description
@@ -42,17 +47,11 @@ inside Featra instead of a terminal.
 
 ## Tasks
 
-- [x] work-format: built-in roles (`roles.ts`), the chat event model and its reducer (`chat.ts`), tool-row summaries
-  (`tool-summary.ts`); `chat.roles`, `chat.start`, `chat.watch`, `chat.send`, `chat.stop` and the `chat.event` push in
-  `ServerMethods`
-- [x] Server: the provider adapter seam (`provider.ts`), the Claude adapter on the Agent SDK (`claude-provider.ts`,
-  `claude-messages.ts`, `claude-locate.ts`), the role registry seam, the session manager (`chat-manager.ts`) with a
-  pluggable approval handler that denies until STORY-45, and the API cases
+- [x] work-format: built-in roles (`roles.ts`), the chat event model and its reducer (`chat.ts`), tool-row summaries (`tool-summary.ts`); `chat.roles`, `chat.start`, `chat.watch`, `chat.send`, `chat.stop` and the `chat.event` push in `ServerMethods`
+- [x] Server: the provider adapter seam (`provider.ts`), the Claude adapter on the Agent SDK (`claude-provider.ts`, `claude-messages.ts`, `claude-locate.ts`), the role registry seam, the session manager (`chat-manager.ts`) with a pluggable approval handler that denies until STORY-45, and the API cases
 - [x] Desktop: the SDK loaded lazily and kept out of the bundle; an E2E-only fake of the SDK's `query`
-- [x] Client: the chat bridge, New chat with a role picker in the sidebar, the chat view (transcript, tool rows,
-  notices, composer with Enter, Shift+Enter and Stop)
-- [x] Tests: work-format unit tests, Claude adapter tests over a fake `query`, session manager and socket tests,
-  client component tests, the e2e journey `apps/desktop/e2e/chat.spec.ts`
+- [x] Client: the chat bridge, New chat with a role picker in the sidebar, the chat view (transcript, tool rows, notices, composer with Enter, Shift+Enter and Stop)
+- [x] Tests: work-format unit tests, Claude adapter tests over a fake `query`, session manager and socket tests, client component tests, the e2e journey `apps/desktop/e2e/chat.spec.ts`
 - [x] Docs: an ADR for sessions and providers, ADR 0015 method table, architecture.md, CONTEXT.md, decisions.md
 
 ## Notes
@@ -67,3 +66,5 @@ inside Featra instead of a terminal.
   reply that only mentions logging in now shows as itself (a failed result shows its message), not as logged out.
 - User decision 2026-11-09 ("Add New chat to list"): New chat stays in the sidebar above Work. STORY-18's shell
   journey (`e2e/shell.spec.ts`, both sidebar checks) and `app.test.tsx` now expect it; every other check is unchanged.
+- Verified: CI green on 5c9c977 (Gate, E2E (Windows), E2E (Ubuntu)),
+  https://github.com/MPiland/featra/actions/runs/42623964860
