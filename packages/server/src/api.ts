@@ -170,10 +170,20 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
       case "chat.list": {
         const dir = project(params);
         const providers = await chats.providers();
+        // Each push looks for the providers again, so one installed or removed while the app runs shows. Only the
+        // newest push is sent: a slower lookup for an older one must not overwrite it.
+        let latest = 0;
         const { chats: now, stop } = chats.watchList(dir, (next) => {
-          if (allowed.has(dir)) connection.push("chat.list", id, { providers, chats: next });
+          const mine = ++latest;
+          void chats.providers().then((found) => {
+            if (mine === latest && allowed.has(dir))
+              connection.push("chat.list", id, { providers: found, chats: next });
+          });
         });
-        connection.keep(id, stop);
+        connection.keep(id, () => {
+          latest = -1; // a lookup still running when the watch ends sends nothing
+          stop();
+        });
         return { providers, chats: now };
       }
       default:

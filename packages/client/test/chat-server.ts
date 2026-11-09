@@ -39,12 +39,17 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   const listWatchers = new Set<{ dir: string; listener: (u: ChatListUpdate) => void }>();
   const providers = host.providers ?? [CLAUDE_INSTALLED];
   const now = host.now ?? (() => new Date(Date.UTC(2026, 10, 9, 10, 0, rows.size)).toISOString());
+  let listsSent = 0;
   const listOf = (dir: string): ChatListUpdate => ({
     list: { providers, chats: [...rows.values()].filter((r) => r.dir === dir).map((r) => r.summary) },
     error: null,
   });
+  const sendList = (w: { dir: string; listener: (u: ChatListUpdate) => void }) => {
+    listsSent += 1;
+    w.listener(listOf(w.dir));
+  };
   const listChanged = (dir: string) => {
-    for (const w of listWatchers) if (w.dir === dir) w.listener(listOf(dir));
+    for (const w of listWatchers) if (w.dir === dir) sendList(w);
   };
   const update = (id: string): ChatUpdate => ({ chat: foldChat(logs.get(id) ?? []), error: null });
   const record = (id: string, event: ChatEvent) => {
@@ -89,7 +94,7 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     list: (dir, listener) => {
       const watcher = { dir, listener };
       listWatchers.add(watcher);
-      queueMicrotask(() => listWatchers.has(watcher) && listener(listOf(dir)));
+      queueMicrotask(() => listWatchers.has(watcher) && sendList(watcher));
       return () => void listWatchers.delete(watcher);
     },
   };
@@ -101,5 +106,7 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
         for (const e of events) record(id, e);
       }),
     watching: (id: string) => watchers.get(id)?.size ?? 0,
+    /** How many chat lists the server has sent, so a test can wait until the list has arrived. */
+    listsSent: () => listsSent,
   };
 }

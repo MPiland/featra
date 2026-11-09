@@ -16,11 +16,18 @@ function useChatList(chats: ChatBridge, dir: string | null): Chats {
 
 /**
  * The project's chats, and the one `id` names (null when there is no such chat), from the list or, until the list
- * has it, from `started`: the list's push can come after the start's answer.
+ * has it, from `started`: the list's push can come after the start's answer. When the project changes, the chats
+ * started in the old one are forgotten and `onProjectChange` runs, before anything of the new project is drawn.
  */
-export function useChats(chats: ChatBridge, dir: string | null, id: string | null) {
+export function useChats(chats: ChatBridge, dir: string | null, id: string | null, onProjectChange: () => void) {
   const list = useChatList(chats, dir);
   const [started, setStarted] = useState<Readonly<Record<string, OpenChat>>>({});
+  const [shownDir, setShownDir] = useState(dir);
+  if (shownDir !== dir) {
+    setShownDir(dir);
+    setStarted({});
+    onProjectChange();
+  }
   const listed = list.chats.find((c) => c.id === id);
   const chat: OpenChat | null = listed ? { id: listed.id, role: listed.role } : id ? (started[id] ?? null) : null;
   const remember = (newId: string, role: ChatRoleRef) => setStarted((s) => ({ ...s, [newId]: { id: newId, role } }));

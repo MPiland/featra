@@ -482,5 +482,19 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   is one navigation, like a sidebar view.
 - The list holds this run's chats; STORY-44 saves and loads the manager's chat map and rows.
 - The e2e chat journeys share the stand-in `claude` setup (`e2e/agent.ts`). Why: two specs copying it would drift.
+
+### Review fixes (PR #8)
+
+- `chat.list` looks for the providers again on each push, not once per watch, and sends only the newest push. Why:
+  a `claude` installed after launch never showed its group. The lookup is one PATH search per list change (a chat
+  starting, a message, a turn ending), which is cheap; sending only the newest keeps a slow lookup from sending an
+  older list last.
+- Switching project leaves the old project's chats: a chat in front gives way to Work, and the history drops the
+  old project's chat entries (`leaveChats`). Why: a bug. The chat stayed in front over the new project and Back
+  reopened a chat the new project doesn't have. Regression test in `chat-list.test.tsx`.
+- The "no group for a provider that isn't installed" test waits until the list has arrived. Why: it could pass
+  before the list loaded; it now fails when the filter on `installed` is taken out.
 - Seen while building, not caused by this story: `ws-work.test.ts` (card.watch, "No matching frame in 2000 ms") and
   `card-pane.test.tsx` ("opens beside the list…") each failed once under a full parallel run and passed on retry.
+  On the PR's first CI run, E2E (Ubuntu) failed once in `settings.spec.ts` (keyboard theme change): `settings.json`
+  was read before it was first written (ENOENT inside `expect.poll`).

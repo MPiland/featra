@@ -2,11 +2,11 @@
  * STORY-21: the sidebar's chat list, New Chat from the File menu and Ctrl+N, through the real App. The host's server
  * is faked (chat-server.ts): it keeps each chat's row with work-format's real rules and pushes the list.
  */
-import { cleanup, screen, within } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { CHAT_COPY } from "../../src/chats.ts";
 import { CLAUDE_INSTALLED } from "../chat-server.ts";
-import { renderApp, viewTitle } from "../harness.tsx";
+import { PROJECT, renderApp, viewTitle } from "../harness.tsx";
 import { item, labels, menuAt, openPath } from "../menu-harness.ts";
 
 afterEach(cleanup);
@@ -55,8 +55,9 @@ describe("AC2: chats grouped by the providers the user has installed", () => {
   });
 
   it("shows no group for a provider that isn't installed", async () => {
-    renderApp({ providers: [{ ...CLAUDE_INSTALLED, installed: false }] });
-    await Promise.resolve();
+    const app = renderApp({ providers: [{ ...CLAUDE_INSTALLED, installed: false }] });
+    // The list has arrived and been drawn: an empty sidebar before it would prove nothing.
+    await waitFor(() => expect(app.chats.listsSent()).toBe(1));
     expect(within(chatsSection()).queryByRole("group")).toBeNull();
   });
 
@@ -117,6 +118,23 @@ describe("selecting a chat opens it", () => {
     expect(screen.getByRole("region", { name: "QA" })).toBeTruthy();
     await app.user.click(screen.getByRole("button", { name: "Forward" }));
     expect(viewTitle().textContent).toBe("Work");
+  });
+});
+
+describe("switching project with a chat open", () => {
+  const WEBSITE = { dir: "/home/me/website", name: "website" };
+
+  it("shows the new project's Work, not a chat it doesn't have, and Back doesn't reopen the old project's chat", async () => {
+    const app = renderApp({ projects: [PROJECT, WEBSITE] });
+    await startFromKeys(app, "Developer");
+    await app.user.click(screen.getByRole("button", { name: /^Switch project: / }));
+    await app.user.click(screen.getByRole("menuitemradio", { name: "website" }));
+    await waitFor(() => expect(chatsSection().getAttribute("data-project")).toBe(WEBSITE.dir));
+    expect(viewTitle().textContent).toBe("Work");
+    expect(screen.queryByRole("alert")).toBeNull();
+    await app.user.click(screen.getByRole("button", { name: "Back" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Developer" })).toBeNull();
   });
 });
 

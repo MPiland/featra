@@ -44,7 +44,11 @@ export function ChatView({ chats, chat }: { chats: ChatBridge; chat: OpenChat })
   );
 }
 
-/** The chat history points at: its view, or a line saying it is gone (its project was closed). */
+/**
+ * The chat history points at: its view, or a line saying the server no longer has it (the server keeps chats only
+ * until it exits, until STORY-44). Switching project leaves the old project's chats (`leaveChats`), so it never
+ * shows one of them.
+ */
 export function ChatPane({ chats, chat }: { chats: ChatBridge; chat: OpenChat | null }) {
   return chat ? (
     <ChatView key={chat.id} chats={chats} chat={chat} />

@@ -15,8 +15,14 @@ import { openFrames } from "./ws-frames.ts";
 const TOKEN = "test-token-0123456789";
 const allowed = createAllowedProjects();
 const logged: string[] = [];
-const claude = fakeClaude("/usr/local/bin/claude");
-const services = createServices({ allowed, log: (m) => logged.push(m), claude: claude.deps });
+const claude = fakeClaude();
+// Where `claude` is found on the PATH: the user can install or remove it while the app runs.
+let found: string | null = "/usr/local/bin/claude";
+const services = createServices({
+  allowed,
+  log: (m) => logged.push(m),
+  claude: { ...claude.deps, locate: async () => found },
+});
 let server: RunningServer;
 let project: { dir: string; dispose: () => Promise<void> };
 const open = () => openFrames<ChatList>(`${server.url}?token=${TOKEN}`);
@@ -72,6 +78,22 @@ describe("STORY-21: chat.list", () => {
       socket.close();
     }
     expect(logged).toEqual([]);
+  });
+
+  it("finds a provider installed or removed while the app runs, on the list's next push", async () => {
+    found = null;
+    const socket = await open();
+    try {
+      socket.send({ id: 7, method: "chat.list", params: { dir: project.dir } });
+      const answer = (await socket.next((f) => f.id === 7)).result as ChatList;
+      expect(answer.providers).toEqual([{ ...CLAUDE, installed: false }]);
+      found = "/usr/local/bin/claude";
+      socket.send({ id: 8, method: "chat.start", params: { dir: project.dir, role: "qa" } });
+      expect((await socket.next((f) => f.event === "chat.list")).data?.providers).toEqual([CLAUDE]);
+    } finally {
+      found = "/usr/local/bin/claude";
+      socket.close();
+    }
   });
 
   it("refuses a folder that isn't open", async () => {

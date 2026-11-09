@@ -9,6 +9,7 @@ import {
   goBack,
   goForward,
   initialNav,
+  leaveChats,
   navigate,
 } from "../src/navigation.ts";
 
@@ -65,5 +66,19 @@ describe("STORY-21: chats in the history", () => {
     expect(navigate(nav, chatEntry("c2"))).toBe(nav);
     expect(currentView(goBack(nav))).toBe("chat:c1");
     expect(currentView(goBack(goBack(nav)))).toBe("work");
+  });
+
+  it("leaves the old project's chats when the project changes: a chat in front gives way to Work", () => {
+    const onChat = navigate(navigate(navigate(initialNav(), "inbox"), chatEntry("c1")), "settings");
+    const back = goBack(onChat);
+    expect(leaveChats(back)).toEqual({ entries: ["work", "inbox", "work"], index: 2 });
+    expect(leaveChats(onChat)).toEqual({ entries: ["work", "inbox", "settings"], index: 2 });
+  });
+
+  it("keeps the place in a history that has no chats, and drops repeats the chats left behind", () => {
+    const views = navigate(initialNav(), "inbox");
+    expect(leaveChats(views)).toBe(views);
+    const between = navigate(navigate(navigate(initialNav(), "inbox"), chatEntry("c1")), "inbox");
+    expect(leaveChats(goBack(goBack(between)))).toEqual({ entries: ["work", "inbox"], index: 1 });
   });
 });

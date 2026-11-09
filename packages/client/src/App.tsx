@@ -34,6 +34,7 @@ import {
   goBack,
   goForward,
   initialNav,
+  leaveChats,
   navigate,
 } from "./navigation.ts";
 import { firstSettingsPage, type SettingsPage } from "./settings-pages.ts";
@@ -96,8 +97,9 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     actions: projectActions,
     dialog: projectDialog,
   } = useProjects(bridge, initialProjects, projectSettings);
-  const { setupPage, openSetup } = useProjectSetup(bridge, projects.current?.dir ?? null, settings.app.work);
-  const { list: chatList, chat, remember } = useChats(bridge.chats, projects.current?.dir ?? null, chatId);
+  const projectDir = projects.current?.dir ?? null;
+  const { setupPage, openSetup } = useProjectSetup(bridge, projectDir, settings.app.work);
+  const { list: chatList, chat, remember } = useChats(bridge.chats, projectDir, chatId, () => setNav(leaveChats));
   const title = chatId === null ? view.title : (chat?.role.name ?? CHAT_COPY.transcript);
   const hasProject = projects.current !== null;
   // Project settings > Set up project: the page shows in Work, on that project.

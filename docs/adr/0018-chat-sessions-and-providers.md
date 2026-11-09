@@ -21,7 +21,8 @@ stop it.").
 - **Provider adapter** (`provider.ts`): `ProviderAdapter.start(options)` returns a `ProviderSession` with `send`,
   `interrupt` and `close`, and reports `ChatEvent`s. Claude (`claude-provider.ts`) is the only adapter in M1.
   Each adapter also has a display `name` and `installed()` (for Claude, `claude` is on the PATH); the chat list groups
-  by them, so no part of the list names a provider itself (STORY-21).
+  by them, so no part of the list names a provider itself (STORY-21). `chat.list` looks again on each push, so a
+  provider installed while the app runs shows with the next change to the list.
 - **Chat list** (STORY-21): the manager keeps a row per chat (`ChatSummary` in `work-format/chat-list`), folded from
   the same events as the log, and pushes the project's list when a row changes (not for each streamed delta). A chat
   waits on the user (`waiting`) when its turn ended done or failed, not stopped; a message clears it. `WaitReason` is

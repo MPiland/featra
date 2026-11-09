@@ -35,6 +35,24 @@ export function navigate(nav: NavState, entry: NavEntry): NavState {
   return { entries, index: entries.length - 1 };
 }
 
+/**
+ * The history once the project changes: its chats belong to the old project, so they leave it. A chat in front
+ * gives way to Work, and the entries after it go, as when the user opens a view.
+ */
+export function leaveChats(nav: NavState): NavState {
+  if (!nav.entries.some(isChatEntry)) return nav;
+  const onChat = isChatEntry(currentView(nav));
+  const entries: NavEntry[] = [];
+  let index = 0;
+  nav.entries.forEach((e, i) => {
+    if (onChat && i > nav.index) return;
+    const entry: NavEntry = i === nav.index && onChat ? "work" : e;
+    if (!isChatEntry(entry) && entries.at(-1) !== entry) entries.push(entry);
+    if (i === nav.index) index = entries.length - 1;
+  });
+  return { entries, index };
+}
+
 export const canGoBack = (nav: NavState): boolean => nav.index > 0;
 export const canGoForward = (nav: NavState): boolean => nav.index < nav.entries.length - 1;
 
