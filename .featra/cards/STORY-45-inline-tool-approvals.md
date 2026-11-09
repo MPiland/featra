@@ -2,7 +2,7 @@
 id: STORY-45
 type: story
 title: Inline tool approvals
-status: In Review
+status: In Progress
 parent: FEAT-3
 order: 4
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-45
+  - at: 2026-11-09T17:10:50Z
+    field: status
+    from: In Review
+    to: In Progress
+    by: session:story-45
 ---
 
 ## Description
@@ -39,7 +44,7 @@ asked it to ask.
 
 ## Acceptance criteria
 
-- [x] In Ask mode, a tool call that needs permission shows inline with the tool and its input, and Allow, Allow for this chat and Deny; Deny takes an optional reason that is sent to the agent (test: packages/client/test/components/chat-approvals.test.tsx > AC1 (shows the tool, its input, the choices; sends Allow, Allow for this chat, Deny with the reason; Enter denies; no Allow for this chat for a once-only call; keyboard order); packages/server/test/chat-approvals.test.ts > AC1, AC2 sends Deny's reason to the agent through canUseTool; Allow for this chat (once-only calls, per chat, an answer before its tool row); packages/server/test/chat-approvals-suggested.test.ts (Allow for this chat applies Claude's suggested rule for the session; Featra's own rule without one); packages/server/test/chat-approvals-review.test.ts (shell rules key on the sandbox fields; a stopped turn allows nothing); packages/server/test/claude-rules.test.ts; packages/work-format/test/chat-rules.test.ts (Featra's rule: shell, paths inside the folder, .git, .claude, .. traversal, domains, MCP); packages/server/test/ws-chat-approve.test.ts; packages/work-format/test/approvals.test.ts; apps/desktop/e2e/chat-approvals.spec.ts journey)
+- [x] In Ask mode, a tool call that needs permission shows inline with the tool and its input, and Allow, Allow for this chat and Deny; Deny takes an optional reason that is sent to the agent (test: packages/client/test/components/chat-approvals.test.tsx > AC1 (shows the tool, its input, the choices; sends Allow, Allow for this chat, Deny with the reason; Enter denies; no Allow for this chat for a once-only call; keyboard order); packages/server/test/chat-approvals.test.ts > AC1, AC2 sends Deny's reason to the agent through canUseTool; Allow for this chat (once-only calls, per chat, an answer before its tool row); packages/server/test/chat-approvals-suggested.test.ts (Allow for this chat applies Claude's suggested rule for the session; Featra's own rule without one); packages/server/test/chat-approvals-review.test.ts (shell rules key on the sandbox fields; a stopped turn allows nothing); packages/server/test/claude-rules.test.ts; packages/work-format/test/chat-rules.test.ts (Featra's rule: shell, paths inside the folder, .git, .claude, .. traversal, real paths, domains, MCP); packages/server/test/chat-approvals-symlink.test.ts (a link to outside the folder is asked about, also after Allow for this chat; a link inside it is still covered, with a new file under it); packages/server/test/ws-chat-approve.test.ts; packages/work-format/test/approvals.test.ts; apps/desktop/e2e/chat-approvals.spec.ts journey)
 - [x] The session waits until answered, and the answer goes back through `canUseTool` (test: packages/server/test/chat-approvals.test.ts > AC1, AC2 holds canUseTool until answered; refuses an answer to a request that isn't waiting; a pending approval when the request ends unanswered (Stop, the agent cancelling it, the chat closing); packages/server/test/chat-approvals-review.test.ts (interrupt on Stop and close; a repeated request; the agent failing); packages/server/test/chat-approvals-restart.test.ts (restart shows it cancelled, not denied; Allow for this chat is forgotten with the chat); packages/server/test/chat-session.test.ts > AC5; apps/desktop/e2e/chat-approvals.spec.ts journey)
 - [x] Each role has a default permission mode; the five built-in roles default to Ask (test: packages/server/test/chat-approvals.test.ts > AC3 starts every built-in role in Ask; packages/work-format/test/approvals.test.ts > AC3)
 - [x] A chat waiting on an approval is marked waiting (the dot from STORY-21) (test: packages/server/test/chat-approvals.test.ts > AC4; packages/work-format/test/approvals.test.ts > AC4; packages/client/test/components/chat-approvals.test.tsx > AC4; apps/desktop/e2e/chat-approvals.spec.ts journey)
@@ -58,6 +63,5 @@ asked it to ask.
 - Depends on: STORY-5, STORY-21.
 - Decision 2026-11-08: the permission mode is per role, and shipped roles start at Ask.
 - Showing it in the Inbox is STORY-7.
-- Known limit: Featra's own Write and Edit rule checks the path as written. A symlink inside the working folder can
-  point outside it, and the check doesn't resolve links (decisions.md, "Allow for this chat: the provider's rule
-  first").
+- Featra's own Write and Edit rule decides on real paths, so a link inside the working folder that points outside it
+  is asked about (decisions.md, "Allow for this chat: Write and Edit decide on real paths").

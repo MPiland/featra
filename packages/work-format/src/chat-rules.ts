@@ -55,18 +55,46 @@ function segments(p: string): string[] | null {
 }
 
 /**
- * True when `file` is inside `cwd` and outside its guarded folders. Paths on Windows compare without case, and
- * anything the tool might expand (`~`) or a drive-relative path is treated as outside.
+ * A path's real path with links resolved, or null when it can't be found. Work-format never reads the disk, so the
+ * caller that can supplies it.
  */
-export function insideFolder(file: string, cwd: string): boolean {
-  if (file.startsWith("~") || /^[a-zA-Z]:(?![\\/])/.test(file) || !isAbsolute(cwd)) return false;
-  const windows = /^[a-zA-Z]:/.test(cwd) || /^[a-zA-Z]:/.test(file);
+export type RealPath = (path: string) => string | null;
+
+/** `file` as an absolute path; null for one the tool might expand (`~`), a drive-relative one, or a relative `cwd`. */
+function absolutePath(file: string, cwd: string): string | null {
+  if (file.startsWith("~") || /^[a-zA-Z]:(?![\\/])/.test(file) || !isAbsolute(cwd)) return null;
+  return isAbsolute(file) ? file : `${cwd}/${file}`;
+}
+
+/** Where an absolute path is, as written: inside `cwd`, inside one of its guarded folders, or outside it. */
+function placeOf(path: string, cwd: string): "inside" | "guarded" | "outside" {
+  const windows = /^[a-zA-Z]:/.test(cwd) || /^[a-zA-Z]:/.test(path);
   const fold = (s: string) => (windows ? s.toLowerCase() : s);
   const root = segments(cwd);
-  const path = segments(isAbsolute(file) ? file : `${cwd}/${file}`);
-  if (!root || !path || path.length <= root.length) return false;
-  if (!root.every((part, i) => fold(part) === fold(path[i] ?? ""))) return false;
-  return path.slice(root.length).every((part) => !GUARDED_FOLDERS.includes(part.toLowerCase()));
+  const parts = segments(path);
+  if (!root || !parts || parts.length <= root.length) return "outside";
+  if (!root.every((part, i) => fold(part) === fold(parts[i] ?? ""))) return "outside";
+  const guarded = parts.slice(root.length).some((part) => GUARDED_FOLDERS.includes(part.toLowerCase()));
+  return guarded ? "guarded" : "inside";
+}
+
+/**
+ * True when `file` is inside `cwd` and outside its guarded folders. Paths on Windows compare without case, and
+ * anything the tool might expand (`~`) or a drive-relative path is treated as outside.
+ *
+ * With `realPath`, links decide: the file's real path must be inside the folder's real path and outside its guarded
+ * folders, and the path as written must not name a guarded folder either. A path that can't be resolved, or one with
+ * `..` (which the OS and the tool may resolve differently around a link), is treated as outside.
+ */
+export function insideFolder(file: string, cwd: string, realPath?: RealPath): boolean {
+  const path = absolutePath(file, cwd);
+  if (path === null) return false;
+  const written = placeOf(path, cwd);
+  if (!realPath) return written === "inside";
+  if (written === "guarded" || file.split(/[\\/]+/).includes("..")) return false;
+  const realFile = realPath(path);
+  const realCwd = realPath(cwd);
+  return realFile !== null && realCwd !== null && placeOf(realFile, realCwd) === "inside";
 }
 
 const hostOf = (url: string): string | null => {
@@ -81,11 +109,12 @@ const hostOf = (url: string): string | null => {
 /**
  * Featra's rule for a call, or null when it has none:
  * - a shell tool: the exact command, run the same way (every field but `SHELL_FIELDS_IGNORED`);
- * - Write and Edit: any path inside the chat's working folder, outside `.git` and `.claude`;
+ * - Write and Edit: any path inside the chat's working folder, outside `.git` and `.claude` (real paths, given
+ *   `realPath`);
  * - WebFetch: the URL's domain;
  * - an MCP tool (`mcp__…`): the tool.
  */
-export function chatRule(name: string, input: unknown, cwd: string): ChatRule | null {
+export function chatRule(name: string, input: unknown, cwd: string, realPath?: RealPath): ChatRule | null {
   if (SHELL_TOOLS.includes(name)) {
     const command = text(input, "command");
     if (command === null || !isRecord(input)) return null;
@@ -93,7 +122,7 @@ export function chatRule(name: string, input: unknown, cwd: string): ChatRule | 
   }
   if (FILE_TOOLS.includes(name)) {
     const file = text(input, "file_path");
-    if (file === null || !insideFolder(file, cwd)) return null;
+    if (file === null || !insideFolder(file, cwd, realPath)) return null;
     return { key: `${name}\u0000folder`, covers: name === "Write" ? "Writes in this folder" : "Edits in this folder" };
   }
   if (name === "WebFetch") {

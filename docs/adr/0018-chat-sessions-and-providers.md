@@ -72,7 +72,9 @@ allow; the adapter passes it to the handler with the SDK's abort signal and `for
 - Without a suggestion, Featra's own rule (`chatRule` in `work-format/chat-rules`), kept in the server's memory per
   chat: a shell tool (Bash, PowerShell) by its whole input except `description`, `timeout` and `run_in_background`,
   so a field that changes how it runs (`dangerouslyDisableSandbox`, or one the SDK adds later) asks again; Write and
-  Edit for paths inside the chat's working folder, outside `.git` and `.claude`, with `..` resolved; WebFetch by
+  Edit for paths whose real path (links resolved by the server, through a resolver work-format takes) is inside the
+  chat's working folder's and outside `.git` and `.claude`, with a path that can't be resolved or has `..` treated as
+  outside; WebFetch by
   domain; an MCP tool by name. Any other call has no rule and isn't offered Allow for this chat. A later matching
   call is allowed without asking and shows "Allowed for this chat" (scope `chat`).
 - The `approval` event says what Allow for this chat covers in a short line built from the rule (`covers`: "npm test

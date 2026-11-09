@@ -69,6 +69,34 @@ describe("Write and Edit: only paths inside the chat's working folder, outside .
   });
 });
 
+/** A fake disk: `${CWD}/out` links to /elsewhere, `${CWD}/g` to the folder's .git, and /home/link to the folder. */
+const real = (p: string): string | null => {
+  if (p.includes("missing")) return null;
+  return p.replace(`${CWD}/out`, "/elsewhere").replace(`${CWD}/g/`, `${CWD}/.git/`).replace("/home/link", CWD);
+};
+
+describe("Write and Edit with a real path resolver: links decide", () => {
+  it("covers a path whose real path is inside the folder's real path", () => {
+    expect(insideFolder(`${CWD}/src/a.ts`, CWD, real)).toBe(true);
+    expect(insideFolder("src/a.ts", CWD, real)).toBe(true);
+    expect(insideFolder(`${CWD}/src/a.ts`, "/home/link", real)).toBe(true);
+    expect(chatRule("Write", { file_path: `${CWD}/a.ts` }, CWD, real)?.covers).toBe("Writes in this folder");
+  });
+
+  it("has no rule when the real path is outside, guarded, or can't be found", () => {
+    expect(insideFolder(`${CWD}/out/a.ts`, CWD, real)).toBe(false);
+    expect(insideFolder(`${CWD}/g/config`, CWD, real)).toBe(false);
+    expect(insideFolder(`${CWD}/missing/a.ts`, CWD, real)).toBe(false);
+    expect(chatRule("Edit", { file_path: `${CWD}/out/a.ts` }, CWD, real)).toBeNull();
+  });
+
+  it("has no rule for a path that names a guarded folder or has .., whatever it resolves to", () => {
+    expect(insideFolder(`${CWD}/.claude/settings.json`, CWD, (p) => p.replace("/.claude", "/conf"))).toBe(false);
+    expect(insideFolder(`${CWD}/src/../a.ts`, CWD, real)).toBe(false);
+    expect(insideFolder("~/a.ts", CWD, real)).toBe(false);
+  });
+});
+
 describe("WebFetch: per domain", () => {
   it("keys by the URL's host, and has no rule for a URL it can't read", () => {
     expect(fetch("https://example.com/a")).toBe(fetch("http://EXAMPLE.com/b?c"));

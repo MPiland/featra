@@ -14,6 +14,7 @@ import {
 } from "@featra/work-format";
 import { ChatError } from "./chat-error.ts";
 import type { ApprovalHandler, SuggestedRule, ToolDecision, ToolRequest } from "./provider.ts";
+import { realPath } from "./real-path.ts";
 
 /** A request that ended unanswered because the turn or the chat did: the agent stops rather than try another step. */
 const CANCELLED: ToolDecision = { allow: false, message: APPROVAL_CANCELLED, interrupt: true };
@@ -21,14 +22,17 @@ const CANCELLED: ToolDecision = { allow: false, message: APPROVAL_CANCELLED, int
 /** Allow for this chat on a request: the provider's rule, which it applies, or Featra's own, kept here. */
 type Offer = { suggested: SuggestedRule } | { own: ChatRule };
 
+/** Featra's own rule for a request, deciding Write and Edit on real paths; none unless it may be allowed for the chat. */
+const ownRule = (request: ToolRequest): ChatRule | null =>
+  request.forChat === true ? chatRule(request.name, request.input, request.cwd, realPath) : null;
+
 /**
- * What Allow for this chat would remember for a request: the provider's suggestion first, else Featra's rule. None
- * when the request doesn't say it may be allowed for the chat (or says it may only be allowed once).
+ * What Allow for this chat would remember for a request: the provider's suggestion first, else Featra's rule `own`.
+ * None when the request doesn't say it may be allowed for the chat (or says it may only be allowed once).
  */
-function offerFor(request: ToolRequest): Offer | null {
+function offerFor(request: ToolRequest, own: ChatRule | null): Offer | null {
   if (request.forChat !== true) return null;
   if (request.suggested) return { suggested: request.suggested };
-  const own = chatRule(request.name, request.input, request.cwd);
   return own ? { own } : null;
 }
 
@@ -65,9 +69,9 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
       const { chat, id, name, input } = request;
       // A stopped turn allows nothing, not even what a rule covers.
       if (signal.aborted) return Promise.resolve(CANCELLED);
-      const offer = offerFor(request);
       // Featra's own rules; a provider's rule is matched by the provider, so its calls don't reach here.
-      const own = request.forChat === true ? chatRule(name, input, request.cwd) : null;
+      const own = ownRule(request);
+      const offer = offerFor(request, own);
       if (own && rules.get(chat)?.has(own.key)) {
         tell(chat, { type: "tool-allowed", id, name, input, scope: "chat" });
         return Promise.resolve({ allow: true, input });

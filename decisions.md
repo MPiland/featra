@@ -637,8 +637,8 @@ The user decided the scope of Allow for this chat after the PR #10 review; it re
   under `.git` or `.claude` at any depth, with `..` resolved first, `~` and drive-relative paths treated as outside,
   and Windows paths compared without case; WebFetch per domain (http and https only); MCP tools per tool. Any other
   tool has no rule, so Allow for this chat isn't offered and it is always asked about. Why: the user's list; anything
-  Featra can't place fails closed. Symlinks inside the folder aren't resolved: the server doesn't read the disk to
-  decide, and Claude's own sandbox and settings still apply.
+  Featra can't place fails closed. Links are resolved first (superseded below: "Allow for this chat: Write and Edit
+  decide on real paths").
 - Copy: the `approval` event carries `covers`, a short line built from the rule ("npm test commands", "This command:
   npm test", "Edits in this folder", "Fetches from example.com"), shown as the Allow for this chat button's
   description. It replaces the client's `chatRuleText`. Why: the user's copy decision; the server knows which rule
@@ -651,3 +651,42 @@ The user decided the scope of Allow for this chat after the PR #10 review; it re
   domains, MCP, unknown tools), `server/test/claude-rules.test.ts`, and `server/test/chat-approvals-suggested.test.ts`
   (Claude's suggestion passed back as a session rule; a later matching call never reaches Featra's prompt, since the
   fake SDK applies session rules as Claude does).
+
+### Allow for this chat: Write and Edit decide on real paths (decided by the user, 2026-11-09)
+
+The user sent STORY-45 back over the symlink limit: a link inside the working folder that points outside it was
+covered by Featra's own Write and Edit rule, which checked the path as written.
+
+- The rule now decides on real paths. The server resolves the target's real path (for a new file, its nearest existing
+  folder's, with the rest appended) and the working folder's. Covered only when the real path is inside the folder's
+  real path and outside its `.git` and `.claude`, and the path as written doesn't name `.git` or `.claude` either (a
+  `.claude` that is itself a link still holds Claude's settings). Why: the user's decision; the rule must cover where
+  the write lands, not what the path reads as.
+- Work-format stays pure: `insideFolder` and `chatRule` take an optional `RealPath` resolver, and the server's
+  `real-path.ts` supplies it (`realpathSync.native`). The approval desk passes it both when it offers the rule and when
+  it matches a later call. Why: an injected resolver keeps the rule in one place and testable with a fake disk, rather
+  than moving the check server-side and splitting it in two.
+- Fails closed: a path that can't be resolved, a link whose target is gone (a write through it would create the target
+  wherever it points), or a path with `..` (the OS and the tool may resolve `..` around a link differently) gets no
+  rule, so the call is asked about.
+- Known gap: the check runs when the call is asked about, so a link swapped between the check and the write
+  (time-of-check to time-of-use) isn't caught. Claude's own sandbox and settings still apply.
+- Tests: `server/test/chat-approvals-symlink.test.ts`, with real links in temp folders through the real desk (a folder
+  link to outside, also after Allow for this chat on the folder; a file link to outside; a link into `.git`; a link
+  whose target is gone; `..`; a link to a folder inside the project and a new file under it; a working folder reached
+  through a link). Folder links are junctions on Windows, which need no privileges; the file link case is skipped where
+  the system needs privileges to make one. `work-format/test/chat-rules.test.ts` covers the rule with a fake resolver.
+
+### Role permission modes start from the provider's own settings (decided by the user, 2026-11-09)
+
+Recorded for STORY-6, which builds it; STORY-45's AC3 (the five built-in roles default to Ask) is unchanged.
+
+- A role starts in the permission mode the provider's own settings already use: Claude's `permissions.defaultMode`, or
+  Codex's `approval_policy` and `sandbox_mode` (and its trusted-project entry). Project-level and user-level settings
+  both count. With no setting, the role starts on Ask. Why: the user has already chosen how much the agent may do in
+  that tool; Featra follows it rather than asking again.
+- Featra reads those settings live and never writes them. It never reads credential files
+  (`~/.claude/.credentials.json`, `~/.codex/auth.json`).
+- Full-access modes (Claude `bypassPermissions`; Codex `never` with `danger-full-access`) are honoured, with a warning
+  mark in the composer. Built-in roles never start in one on their own.
+- Open: how the composer names the modes.
