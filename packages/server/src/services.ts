@@ -10,7 +10,7 @@ import { loadAgentQuery } from "./claude-sdk.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createLogWriter, type LogWriterDeps } from "./log-writer.ts";
-import { readMcpEnabled } from "./mcp-enabled.ts";
+import { readKnowledge, readMcpEnabled } from "./mcp-enabled.ts";
 import { createRepoGit, type RepoGit } from "./repo-git.ts";
 import { createClaudeReader } from "./claude-reader.ts";
 import { createCodexReader } from "./codex-reader.ts";
@@ -91,6 +91,8 @@ export function createServices({
     entry: mcpEntry ?? null,
     execPath: mcpExecPath,
     enabled: readMcpEnabled(dataDir),
+    knowledge: readKnowledge(dataDir),
+    log,
     chats,
     writer: createLogWriter({ now, ...logs }),
   });

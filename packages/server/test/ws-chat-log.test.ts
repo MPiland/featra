@@ -28,12 +28,14 @@ beforeAll(async () => {
   project = await tempFolder();
   data = await tempFolder();
   allowed.set([project.dir]);
+  // The bundled MCP, which the bridge checks is there before it offers it.
+  await writeFile(join(data.dir, "mcp.cjs"), "");
   services = createServices({
     allowed,
     log: () => {},
     claude: claude.deps,
     dataDir: data.dir,
-    mcpEntry: "/app/dist/mcp.cjs",
+    mcpEntry: join(data.dir, "mcp.cjs"),
   });
   server = await startServer({ token: TOKEN, api: services.api, agents: services.agents, log: () => {} });
   services.agents.setPort(server.port);

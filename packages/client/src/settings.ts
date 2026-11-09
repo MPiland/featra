@@ -67,7 +67,7 @@ export const WORK_SETTINGS: readonly WorkSettingDef[] = [
     key: "mcp",
     kind: "toggle",
     label: "Featra MCP",
-    help: "Lets agents log decisions and open questions. Applies to new chats.",
+    help: "Lets agents log decisions and open questions. Turning it off also stops running chats.",
   },
   {
     key: "knowledge",

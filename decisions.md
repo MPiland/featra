@@ -841,9 +841,11 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   and `decisions.md` may not exist yet in a project that skipped init.
 - **Entries are written in the chat's working folder** (`decisions.md` and `open-questions.md` at its root). Why: the
   card's note, so they are committed with that branch's work.
-- **The setting is read by the server each time an agent starts: the project's `.featra/config.yaml` `mcp`, else the
-  app default in `settings.json` (read only), else on.** Why: Settings › Project already has the toggle and its
-  override logic; a change applies to the next chat, and the server never writes the user's settings.
+- **The setting is read by the server when an agent starts and again at every log: the project's
+  `.featra/config.yaml` `mcp`, else the app default in `settings.json` (read only), else on.** Why: Settings › Project
+  already has the toggle and its override logic, and the server never writes the user's settings. Turning it off must
+  reach chats that are already running, so a chat that is no longer offered the MCP loses its secret and a log from
+  one that is off is refused with "Featra MCP is off for this project."; the Settings help says so.
 - **The tool descriptions are the only instruction agents get.** Why: Featra injects no system prompt (ADR 0006), so
   each description names what to log (a choice that changes behavior or scope, a public contract, stored data or
   security, or one that picks between real trade-offs) and what not to (trivia). A tool takes more tools later:
@@ -856,4 +858,36 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   and Undo works while the server runs.** Why: the ledger of entries is in memory and the saved transcript is the
   agent's own. The entry stays in the file for the user to edit.
 - **The Featra MCP toggle joins the Agents group in Settings.** It uses the existing work-setting machinery (app
-  default and project override), so no earlier assertion changed.
+  default and project override).
+- **Changed assertion: `apps/desktop/test/settings-store.test.ts` > "an override is written to config.yaml, keeping the
+  file's other keys and comments" now expects `{ mcp: true, progress: "tasks" }`, where it expected
+  `{ progress: "tasks" }`.** Why: the fixture's config had `mcp: true # tools for agents`, written when `mcp` was a key
+  Featra didn't expose. `mcp` is now a project setting (the toggle above), so a project that sets it has an override,
+  and showing it is the behavior the story adds. The fixture is as it was; only the expected overrides changed. The
+  Dev Lead approved this change.
+- **`knowledge: read-only` turns logging off; under `edit` and `propose` logging goes straight in.** Why: `read-only`
+  is the user saying agents must not change the project's knowledge files, and `decisions.md` and `open-questions.md`
+  are two of them, so under it the MCP offers no tools and a call that gets through is refused ("Logging is off: this
+  project's knowledge setting is read-only."). Under `propose` the chat's Undo is the review: the entry is shown at
+  once with Undo, which is a lighter check than approving first, and a decision logged only after approval would
+  mostly not be logged. Whether `propose` should ask first is in open-questions.md. It replaces the earlier choice that
+  logging ignores `knowledge`. The setting is the project's (and app default's) `knowledge`, as it has no per-role form.
+- **A marker-looking comment in an agent's text is removed again until none is left.** Why: removing one can join the
+  text around it into another, and a forged `<!-- featra:ID -->` would let one entry's Undo find another's lines.
+- **A file keeps its own line endings: an entry is added in the ending of the file's last line break, and Undo removes
+  lines without rewriting any other line's ending.** Why: a CRLF or mixed file would otherwise show a whole-file diff
+  after one log or one Undo.
+- **A write never replaces a file the user changed since it was read: the file is read again just before the rename,
+  and the write starts over (up to five times) when it differs.** Why: the user may save `decisions.md` while an agent
+  logs, and an atomic replace would silently drop their save. A small window between that read and the rename remains,
+  which only a lock could close. The temporary file has a name of its own, and a rename that fails with EPERM or EBUSY
+  (a scanner or editor holding the file on Windows) is tried again a few times before a clear error.
+- **Undo also takes back the blank line `addEntry` put before the entry, when nothing follows the entry; a line added
+  under the entry at any depth counts as an edit and refuses; ids are 8 random bytes and the ledger is keyed by chat
+  and id.** Why: Undo should leave the file as it found it, never discard what the user wrote under an entry, and one
+  chat must not be able to take back (or collide with) another's entries.
+- **The server checks `dist/mcp.cjs` exists before it offers the MCP, and logs one clear error when it doesn't.** Why:
+  an agent given a stdio server that can't start sees a broken tool, not a missing build. A test builds the bundle and
+  runs it over stdio, so a bundle that doesn't run fails the unit tests.
+- **An agent's secret is compared with the same constant-time `sameSecret` as the window's token.** Why: a guess must
+  not learn anything from how long the lookup took.

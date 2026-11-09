@@ -38,6 +38,8 @@ export interface Harness {
   server: RunningServer;
   disk: ReturnType<typeof memoryDisk>;
   events: ChatEvent[];
+  /** The project's setting, which Settings can turn off while a chat runs. */
+  settings: { enabled: boolean };
   bridge: ReturnType<typeof createAgentBridge>;
   /** The environment the MCP process is given: the server's address and the chat's secret. */
   env: () => Promise<Record<string, string>>;
@@ -50,9 +52,10 @@ export async function startHarness(): Promise<Harness> {
   const disk = memoryDisk();
   const events: ChatEvent[] = [];
   let ids = 0;
+  const settings = { enabled: true };
   const bridge = createAgentBridge({
     entry: MAIN,
-    enabled: () => Promise.resolve(true),
+    enabled: () => Promise.resolve(settings.enabled),
     chats: {
       info: (id) => (id === CHAT ? { dir: DIR, session: "Developer chat 1a2b3c4d" } : null),
       report: (_id, event) => void events.push(event),
@@ -78,6 +81,7 @@ export async function startHarness(): Promise<Harness> {
     server,
     disk,
     events,
+    settings,
     bridge,
     env,
     async connect(override) {

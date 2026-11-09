@@ -178,3 +178,115 @@ describe("Undo", () => {
     expect(w.disk.get(at("decisions.md"))).toBe("# Decisions\r\n\r\n- 2026-01-01 — Old\r\n");
   });
 });
+
+describe("what Undo takes back", () => {
+  it("removes the blank line the entry came after, so the file is as it was", async () => {
+    const w = world({ [at("decisions.md")]: "# Decisions\nMine\n" });
+    const { entry } = await log(w, "c1", decision("One"));
+    expect(w.disk.get(at("decisions.md"))).toContain("\n\n- 2026-11-09 — One");
+    await w.writer.undo("c1", entry);
+    expect(w.disk.get(at("decisions.md"))).toBe("# Decisions\nMine\n");
+  });
+
+  it("refuses an entry the user has put a note under, at any depth", async () => {
+    for (const note of ["    - my note", "  - Extra: mine", "\tnote"]) {
+      const w = world();
+      const { entry } = await log(w, "c1", decision("One"));
+      const file = at("decisions.md");
+      const edited = `${w.disk.get(file)}${note}\n`;
+      w.disk.set(file, edited);
+      await expect(w.writer.undo("c1", entry)).rejects.toThrow(CHAT_MESSAGES.editedEntry);
+      expect(w.disk.get(file)).toBe(edited);
+    }
+  });
+
+  it("keeps each line's own ending in a file with mixed line endings", async () => {
+    const before = "# Decisions\nlf line\r\ncrlf line\n";
+    const w = world({ [at("decisions.md")]: before });
+    const { entry } = await log(w, "c1", decision("One"));
+    await w.writer.undo("c1", entry);
+    expect(w.disk.get(at("decisions.md"))).toBe(before);
+  });
+
+  it("is per chat, so two chats whose entries share an id each take back their own", async () => {
+    const disk = new Map<string, string>();
+    const writer = createLogWriter({
+      fs: { read: async (f) => disk.get(f) ?? null, write: async (f, t) => void disk.set(f, t) },
+      newId: () => "same",
+      platform: "linux",
+    });
+    await writer.append(DIR, "a", decision("From a"), SESSION);
+    await writer.append(DIR, "b", question("From b?"), SESSION);
+    await writer.undo("a", "same");
+    expect(disk.get(at("decisions.md"))).not.toContain("From a");
+    await writer.undo("b", "same");
+    expect(disk.get(at("open-questions.md"))).not.toContain("From b?");
+  });
+
+  it("gives each entry an id of at least 8 random bytes", async () => {
+    const disk = new Map<string, string>();
+    const writer = createLogWriter({
+      fs: { read: async (f) => disk.get(f) ?? null, write: async (f, t) => void disk.set(f, t) },
+    });
+    const ids = await Promise.all([1, 2, 3, 4].map(() => writer.append(DIR, "c", decision("x"), SESSION)));
+    for (const { entry } of ids) expect(entry).toMatch(/^[0-9a-f]{16,}$/);
+    expect(new Set(ids.map((i) => i.entry)).size).toBe(4);
+  });
+});
+
+/** A disk that keeps `write`'s promise: nothing is written when the file isn't what the caller read. */
+function carefulDisk(files: Map<string, string>) {
+  const disk = {
+    writes: 0,
+    afterFirstRead: (_file: string) => {},
+    read: async (file: string) => {
+      const text = files.get(file) ?? null;
+      const hook = disk.afterFirstRead;
+      disk.afterFirstRead = () => {};
+      hook(file);
+      return text;
+    },
+    write: async (file: string, text: string, base: string | null) => {
+      disk.writes++;
+      if ((files.get(file) ?? null) !== base) return "changed" as const;
+      files.set(file, text);
+      return undefined;
+    },
+  };
+  return disk;
+}
+
+describe("a file the user saves while an entry is being written", () => {
+  it("keeps the user's change: the write starts again from what is there now", async () => {
+    const file = at("decisions.md");
+    const files = new Map([[file, "# Decisions\n"]]);
+    const disk = carefulDisk(files);
+    // Right after the entry's first read, the user saves a line of their own.
+    disk.afterFirstRead = () => files.set(file, "# Decisions\nMy own line\n");
+    const writer = createLogWriter({ fs: disk, newId: () => "id1", platform: "linux" });
+    await writer.append(DIR, "c1", decision("One"), SESSION);
+    expect(files.get(file)).toContain("My own line");
+    expect(files.get(file)).toContain("- 2026-");
+    expect(disk.writes).toBe(2);
+  });
+
+  it("does the same for Undo", async () => {
+    const file = at("decisions.md");
+    const files = new Map<string, string>();
+    const disk = carefulDisk(files);
+    const writer = createLogWriter({ fs: disk, platform: "linux" });
+    const { entry } = await writer.append(DIR, "c1", decision("One"), SESSION);
+    disk.afterFirstRead = () => files.set(file, `${files.get(file)}My own line\n`);
+    await writer.undo("c1", entry);
+    expect(files.get(file)).toContain("My own line");
+    expect(files.get(file)).not.toContain("One");
+  });
+
+  it("gives up with a clear error when the file never settles", async () => {
+    const writer = createLogWriter({
+      fs: { read: async () => "x", write: async () => "changed" },
+      platform: "linux",
+    });
+    await expect(writer.append(DIR, "c1", decision("One"), SESSION)).rejects.toThrow("decisions.md keeps changing");
+  });
+});

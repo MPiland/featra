@@ -97,6 +97,22 @@ describe("the Featra MCP over stdio", () => {
     expect(refused).toBe(true);
   });
 
+  it("refuses a log once Settings has turned the MCP off, saying why, and writes nothing", async () => {
+    const client = await h.connect();
+    const before = h.disk.files.get(join(DIR, "decisions.md"));
+    h.settings.enabled = false;
+    try {
+      const off = await client.callTool({ name: "log_decision", arguments: { decision: "Late", why: "Too late." } });
+      expect(off.isError).toBe(true);
+      expect(text(off)).toContain("Featra MCP is off for this project.");
+      expect(h.disk.files.get(join(DIR, "decisions.md"))).toBe(before);
+    } finally {
+      h.settings.enabled = true;
+    }
+    const on = await client.callTool({ name: "log_decision", arguments: { decision: "Back on", why: "Settings." } });
+    expect(on.isError).toBeFalsy();
+  });
+
   it("exits when it has no address to reach Featra at", async () => {
     await expect(h.connect({ FEATRA_AGENT_URL: "", FEATRA_AGENT_TOKEN: "" })).rejects.toThrow("Connection closed");
   });

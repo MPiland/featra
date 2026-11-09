@@ -17,10 +17,8 @@
 - No chat knows its card yet, so `log_decision` and `defer_question` take the card as an optional input the agent fills
   when it knows it. Recommendation: have the session record its card when a chat starts from one (FEAT-3), and fill
   `Card:` from that. Non-blocking (STORY-47).
-- Logging ignores a role's `knowledge: read-only`: an agent may log even where it may not write files. Recommendation:
-  keep it, since the entries are the user's to undo, and revisit when `knowledge` is enforced. Non-blocking (STORY-47).
+- Under `knowledge: propose` an agent's log goes straight in, with the chat's Undo as the review. Should propose mode
+  ask before logging? Recommendation: keep it as it is; asking would stop most decisions being logged at all.
+  Non-blocking (STORY-47).
 - Undo is unavailable for an entry after the server restarts, and a logged row is not restored into a restored chat's
   history. Recommendation: keep a small ledger beside the chats' store if users ask. Non-blocking (STORY-47).
-- `mcp` is now a project setting, and `apps/desktop/test/settings-store.test.ts` used `mcp: true` as its example of a
-  non-work key, so its first AC2 test saw it as an override. Only the fixture's key changed (to `autoMerge`); every
-  assertion is as before. Recommendation: accept the fixture change. Non-blocking (STORY-47).

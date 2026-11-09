@@ -1,9 +1,10 @@
 import { defineConfig } from "vitest/config";
 
 /**
- * Bundles Electron main (`vite build`), preload (`vite build --mode preload`) and the local server
- * (`vite build --mode server`) and the Featra MCP agents are given (`vite build --mode mcp`) into CommonJS, one self-contained file each: a sandboxed preload can only require
- * "electron", so it must not share chunks with main; the server runs as its own process (ADR 0015).
+ * Bundles Electron main (`vite build`), preload (`vite build --mode preload`), the local server
+ * (`vite build --mode server`) and the Featra MCP agents are given (`vite build --mode mcp`) into CommonJS, one
+ * self-contained file each: a sandboxed preload can only require "electron", so it must not share chunks with main;
+ * the server runs as its own process (ADR 0015).
  */
 const ENTRIES = {
   main: "src/main.ts",

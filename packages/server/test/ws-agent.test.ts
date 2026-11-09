@@ -17,6 +17,7 @@ let secret = "";
 beforeAll(async () => {
   const bridge = createAgentBridge({
     entry: "/app/mcp.cjs",
+    exists: async () => true,
     enabled: async () => true,
     chats: {
       info: (id) => (id === "chat-1" ? { dir: "/work/demo", session: "Developer chat 1" } : null),

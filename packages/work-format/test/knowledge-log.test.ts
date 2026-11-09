@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addEntry,
+  appendEntry,
   chatUndoParams,
   entryMarker,
   foldChat,
@@ -216,5 +217,106 @@ describe("whether a project's agents get the MCP", () => {
   it("falls back to the default when the config can't be read", () => {
     expect(mcpEnabled("stages: []\n", true)).toBe(true);
     expect(mcpEnabled("{{{", false)).toBe(false);
+  });
+});
+
+describe("a marker an agent forges", () => {
+  it.each([
+    ["nested in another", "Hide <!-- featra:<!-- featra:x -->abc12345 --> this"],
+    ["split by another", "Keep <!<!-- featra:a -->-- featra:abc12345 --> this"],
+    ["nested several deep", "Keep <!-- featra:<!-- featra:<!-- featra:a -->b -->c -->abc12345 --> this"],
+  ])("does not survive when it is %s", (_, forged) => {
+    const parsed = parseDecision({ decision: forged, why: `Why ${forged}`, rejected: [forged] });
+    expect(parsed.ok).toBe(true);
+    expect(JSON.stringify(parsed)).not.toMatch(/featra:/);
+  });
+});
+
+describe("a file with Windows or mixed line endings", () => {
+  const one = formatEntry(decision({ decision: "One" }), { ...CTX, id: "one" });
+  const two = formatEntry(decision({ decision: "Two" }), { ...CTX, id: "two" });
+
+  it("adds an entry in CRLF to a CRLF file, with nothing in LF", () => {
+    const file = addEntry(addEntry("# Decisions\r\n", one), two);
+    expect(file).not.toMatch(/[^\r]\n/);
+    expect(file.startsWith("# Decisions\r\n\r\n- 2026-11-09")).toBe(true);
+  });
+
+  it("adds to a file whose last line break is LF in LF, and leaves the lines before it as they are", () => {
+    const before = "# Decisions\r\nMine\r\nMore\n";
+    const after = addEntry(before, one);
+    expect(after.startsWith(before)).toBe(true);
+    expect(after.slice(before.length)).not.toContain("\r");
+  });
+
+  it("adds to a mixed file whose last line break is CRLF in CRLF", () => {
+    const before = "# Decisions\nMine\r\n";
+    const after = addEntry(before, one);
+    expect(after.startsWith(before)).toBe(true);
+    expect(after.slice(before.length)).not.toMatch(/[^\r]\n/);
+  });
+
+  it("removes an entry without changing any other line's ending", () => {
+    const head = "# Decisions\nlf line\r\ncrlf line\n";
+    const file = `${head}${addEntry("", one).replaceAll("\n", "\r\n")}tail\r\n`;
+    const result = removeEntry(file, "one", one);
+    expect(result).toEqual({ ok: true, text: `${head}tail\r\n` });
+  });
+
+  it("removes an entry from a file with no line break at its end", () => {
+    const file = `# Decisions\n\n${one.replaceAll("\n", "\r\n")}`;
+    expect(removeEntry(file, "one", one)).toEqual({ ok: true, text: "# Decisions\n\n" });
+  });
+
+  it("takes the entry back out of what it was added to, byte for byte, in each ending", () => {
+    for (const base of ["# Notes\nMine\n", "# Notes\r\nMine\r\n", "# Notes\nMine\r\n", "# Notes\r\nMine"]) {
+      const added = appendEntry(base, one);
+      const removed = removeEntry(added.text, "one", one, added.gap);
+      expect(removed.ok && removed.text).toBe(base.endsWith("\n") ? base : `${base}${eolAfter(base)}`);
+    }
+  });
+});
+
+/** The line break `appendEntry` adds to a file that has none at its end: its last one's. */
+const eolAfter = (file: string) => (/\r\n[^\n]*$/.test(file) ? "\r\n" : "\n");
+
+describe("taking an entry back out", () => {
+  const one = formatEntry(decision({ decision: "One" }), { ...CTX, id: "one" });
+  const two = formatEntry(decision({ decision: "Two" }), { ...CTX, id: "two" });
+
+  it("says whether it put a blank line before the entry", () => {
+    expect(appendEntry("# Decisions\n", one).gap).toBe(true);
+    expect(appendEntry("# Decisions\n\n", one).gap).toBe(false);
+    expect(appendEntry(addEntry("# Decisions\n", one), two).gap).toBe(false);
+  });
+
+  it("removes that blank line too when nothing follows the entry", () => {
+    const added = appendEntry("# Decisions\nMine\n", one);
+    expect(removeEntry(added.text, "one", one, added.gap)).toEqual({ ok: true, text: "# Decisions\nMine\n" });
+  });
+
+  it("keeps a blank line that was already there", () => {
+    const added = appendEntry("# Decisions\n\n", one);
+    expect(removeEntry(added.text, "one", one, added.gap)).toEqual({ ok: true, text: "# Decisions\n\n" });
+  });
+
+  it("keeps the blank line when an entry logged after it still needs it", () => {
+    const first = appendEntry("# Decisions\n", one);
+    const file = addEntry(first.text, two);
+    expect(removeEntry(file, "one", one, first.gap)).toEqual({ ok: true, text: `# Decisions\n\n${two}\n` });
+  });
+
+  it.each([
+    ["a bullet under it", "\n    - a note of mine"],
+    ["a line indented one level", "\n  - Extra: mine"],
+    ["a line indented deeper", "\n        deep"],
+    ["a tab-indented line", "\n\tnote"],
+  ])("refuses an entry with %s", (_, extra) => {
+    const file = `# Decisions\n\n${one}${extra}\n`;
+    expect(removeEntry(file, "one", one, true)).toEqual({ ok: false, reason: "edited" });
+  });
+
+  it("is not stopped by an unindented line after it", () => {
+    expect(removeEntry(`${one}\nMy own paragraph\n`, "one", one)).toEqual({ ok: true, text: "My own paragraph\n" });
   });
 });

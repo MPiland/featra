@@ -38,8 +38,18 @@ export type Parsed<T> = { ok: true; value: T } | { ok: false; error: string };
 export const entryMarker = (id: string) => `<!-- featra:${id} -->`;
 const MARKER_TEXT = /<!--\s*featra:[\w-]*\s*-->/g;
 
+/** Removes every marker-looking comment, again until none is left: removing one can join the text around it into one. */
+function withoutMarkers(line: string): string {
+  let current = line;
+  for (let before = ""; before !== current;) {
+    before = current;
+    current = current.replace(MARKER_TEXT, "");
+  }
+  return current;
+}
+
 /** Text on one line: line breaks and runs of spaces collapse, and nothing in it can pass for a marker. */
-const oneLine = (line: string) => line.replace(MARKER_TEXT, "").replace(/\s+/g, " ").trim();
+const oneLine = (line: string) => withoutMarkers(line).replace(/\s+/g, " ").trim();
 
 function text(raw: unknown, name: string, max: number): Parsed<string> {
   if (typeof raw !== "string" || !oneLine(raw)) return { ok: false, error: `"${name}" is required: give it as text.` };
@@ -134,8 +144,16 @@ export function formatEntry(input: LogInput, { date, session, id }: EntryContext
   return [`- ${date} — ${head} ${entryMarker(id)}`, ...rest.map((line) => `  - ${line}`)].join("\n");
 }
 
-const eolOf = (file: string) => (file.includes("\r\n") ? "\r\n" : "\n");
-const linesOf = (file: string) => file.split(/\r?\n/);
+/** A file's line ending: the one its last line break uses, so new lines match the lines they follow. */
+const eolOf = (file: string) => (/\r\n[^\n]*$/.test(file) ? "\r\n" : "\n");
+
+/** A file's lines, each with the line break that ended it (empty for a last line without one). */
+const linesOf = (file: string) => {
+  const parts = file.split(/(\r?\n)/);
+  const lines: { text: string; end: string }[] = [];
+  for (let i = 0; i < parts.length; i += 2) lines.push({ text: parts[i] ?? "", end: parts[i + 1] ?? "" });
+  return lines;
+};
 
 /** A missing file's start: the header Featra init writes for it. */
 export function newLogFile(file: LogFile): string {
@@ -143,33 +161,46 @@ export function newLogFile(file: LogFile): string {
   return entry?.kind === "file" ? entry.content : "";
 }
 
-/** The file with the entry added at its end, in the file's own line endings. Existing text is kept as it is. */
-export function addEntry(file: string, entry: string): string {
+/**
+ * The file with the entry added at its end, in the file's own line endings (existing text is kept as it is), and
+ * whether a blank line was put before it, which `removeEntry` takes back.
+ */
+export function appendEntry(file: string, entry: string): { text: string; gap: boolean } {
   const eol = eolOf(file);
-  const last = linesOf(file.trimEnd()).at(-1) ?? "";
+  const last = linesOf(file.trimEnd()).at(-1)?.text ?? "";
   // A list item or its details follow on directly; after anything else the list starts after a blank line.
   const endsBlank = /\n[ \t]*\r?\n$/.test(file);
-  const gap = file.trim() === "" || endsBlank || /^(- |\s)/.test(last) ? "" : eol;
+  const gap = !(file.trim() === "" || endsBlank || /^(- |\s)/.test(last));
   const base = file === "" || file.endsWith("\n") ? file : file + eol;
-  return base + gap + entry.replaceAll("\n", eol) + eol;
+  return { text: base + (gap ? eol : "") + entry.replaceAll("\n", eol) + eol, gap };
 }
+
+/** The file with the entry added at its end. */
+export const addEntry = (file: string, entry: string): string => appendEntry(file, entry).text;
 
 /** Why an entry couldn't be taken out: it was changed by hand, or it is no longer there. */
 export type RemoveResult = { ok: true; text: string } | { ok: false; reason: "edited" | "gone" };
 
 /**
  * The file without the entry `written` (the text `addEntry` was given), found by its marker. Only that entry's lines
- * go: entries logged after it, and everything else in the file, stay. An entry the user has since edited is left as
- * it is (`edited`), so Undo never throws their words away.
+ * go, with the blank line `appendEntry` put before it (`gap`) when nothing follows it: entries logged after it, and
+ * everything else in the file, stay, each line keeping its own line break. An entry the user has since edited, or
+ * added a line under, is left as it is (`edited`), so Undo never throws their words away.
  */
-export function removeEntry(file: string, id: string, written: string): RemoveResult {
-  const eol = eolOf(file);
+export function removeEntry(file: string, id: string, written: string, gap = false): RemoveResult {
   const all = linesOf(file);
-  const at = all.findIndex((line) => line.includes(entryMarker(id)));
+  const at = all.findIndex((line) => line.text.includes(entryMarker(id)));
   if (at < 0) return { ok: false, reason: "gone" };
   let end = at + 1;
-  while (end < all.length && /^ {2}\S/.test(all[end] ?? "")) end++;
-  if (all.slice(at, end).join("\n") !== written) return { ok: false, reason: "edited" };
-  all.splice(at, end - at);
-  return { ok: true, text: all.join(eol) };
+  // Anything indented under the entry is part of it, however deep: one the entry didn't have is the user's.
+  while (end < all.length && /^\s+\S/.test(all[end]?.text ?? "")) end++;
+  const found = all
+    .slice(at, end)
+    .map((line) => line.text)
+    .join("\n");
+  if (found !== written) return { ok: false, reason: "edited" };
+  const last = all.slice(end).every((line) => line.text.trim() === "");
+  const from = gap && last && at > 0 && all[at - 1]?.text.trim() === "" ? at - 1 : at;
+  all.splice(from, end - from);
+  return { ok: true, text: all.map((line) => line.text + line.end).join("") };
 }

@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import {
@@ -12,6 +11,7 @@ import {
   type ServerResponse,
 } from "@featra/work-format";
 import { ApiError, type Api, type Connection } from "./api.ts";
+import { sameSecret } from "./secret.ts";
 
 /** The agent socket (ADR 0019): which chat a secret opens, and what a chat's MCP process may ask. */
 export interface AgentSockets {
@@ -39,12 +39,6 @@ export interface RunningServer {
 }
 
 const MAX_FRAME_BYTES = 1024 * 1024;
-
-const sameSecret = (given: string, token: string) => {
-  const a = Buffer.from(given);
-  const b = Buffer.from(token);
-  return a.length === b.length && timingSafeEqual(a, b);
-};
 
 function authorised(req: IncomingMessage, token: string, agents?: AgentSockets): boolean {
   return agentChat(req, agents) !== null || windowConnection(req, token);
@@ -96,6 +90,18 @@ function connect(socket: WebSocket): { connection: Connection; closeAll: () => v
   };
 }
 
+/** Answers request `id` on its socket with what `work` gives, or why it failed (`failed` hears the error first). */
+async function respond(socket: WebSocket, id: number, work: () => Promise<unknown>, failed?: (err: unknown) => void) {
+  let response: ServerResponse;
+  try {
+    response = { id, ok: true, result: await work() };
+  } catch (err) {
+    failed?.(err);
+    response = { id, ok: false, error: errorMessage(err) };
+  }
+  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(response));
+}
+
 /** An agent's request, answered on its socket: the chat is the connection's, and the method one it may call. */
 async function answerAgent(socket: WebSocket, chat: string, agent: AgentSockets, text: string) {
   const request = parseAgentRequest(text);
@@ -103,11 +109,7 @@ async function answerAgent(socket: WebSocket, chat: string, agent: AgentSockets,
     if (request.id !== null) socket.send(JSON.stringify({ id: request.id, ok: false, error: request.error }));
     return;
   }
-  const response: ServerResponse = await agent.call(chat, request.method, request.params).then(
-    (result) => ({ id: request.id, ok: true, result }),
-    (err: unknown) => ({ id: request.id, ok: false, error: errorMessage(err) }),
-  );
-  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(response));
+  await respond(socket, request.id, () => agent.call(chat, request.method, request.params));
 }
 
 /**
@@ -125,23 +127,18 @@ export function startServer({ token, api, agents, log, port = 0 }: ServerOptions
 
   const answer = async (socket: WebSocket, connection: Connection, text: string) => {
     const request = parseRequest(text);
-    let response: ServerResponse;
     if ("error" in request) {
-      if (request.id === null) return; // nothing to answer to
-      response = { id: request.id, ok: false, error: request.error };
-    } else {
-      try {
-        response = {
-          id: request.id,
-          ok: true,
-          result: await api(request.method, request.params, request.id, connection),
-        };
-      } catch (err) {
-        if (!(err instanceof ApiError)) log(`${request.method} failed: ${errorMessage(err)}`);
-        response = { id: request.id, ok: false, error: errorMessage(err) };
-      }
+      if (request.id !== null) socket.send(JSON.stringify({ id: request.id, ok: false, error: request.error }));
+      return; // with no id there is nothing to answer to
     }
-    if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(response));
+    await respond(
+      socket,
+      request.id,
+      () => api(request.method, request.params, request.id, connection),
+      (err) => {
+        if (!(err instanceof ApiError)) log(`${request.method} failed: ${errorMessage(err)}`);
+      },
+    );
   };
 
   wss.on("connection", (socket, req) => {

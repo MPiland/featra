@@ -72,10 +72,10 @@ describe("AC8: the theme survives a restart", () => {
 describe("AC2: project settings are stored in the project's .featra/config.yaml", () => {
   it("an override is written to config.yaml, keeping the file's other keys and comments", async () => {
     const before =
-      "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nbaseBranch: main\nautoMerge: true # merge when green\n";
+      "# Featra project settings\nversion: 1\nhierarchy: epic-feature-story-task\nbaseBranch: main\nmcp: true # tools for agents\n";
     await writeFile(join(project, ".featra", "config.yaml"), before);
     const result = await writeProjectValue(project, "progress", "tasks");
-    expect(result).toEqual({ dir: project, overrides: { progress: "tasks" }, error: null });
+    expect(result).toEqual({ dir: project, overrides: { mcp: true, progress: "tasks" }, error: null });
     expect(await configText()).toBe(`${before}progress: tasks\n`);
     expect(parseConfig(await configText()).progress).toBe("tasks");
   });
