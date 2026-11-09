@@ -2,7 +2,7 @@
 id: STORY-45
 type: story
 title: Inline tool approvals
-status: In Progress
+status: In Review
 parent: FEAT-3
 order: 4
 origin: planned
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:story-45
+  - at: 2026-11-09T16:56:58Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:story-45
 ---
 
@@ -53,3 +58,6 @@ asked it to ask.
 - Depends on: STORY-5, STORY-21.
 - Decision 2026-11-08: the permission mode is per role, and shipped roles start at Ask.
 - Showing it in the Inbox is STORY-7.
+- Known limit: Featra's own Write and Edit rule checks the path as written. A symlink inside the working folder can
+  point outside it, and the check doesn't resolve links (decisions.md, "Allow for this chat: the provider's rule
+  first").
