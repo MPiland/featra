@@ -10,6 +10,7 @@ import {
   normalizeSettingsSnapshot,
   normalizeUiState,
   normalizeWindowState,
+  serverChats,
   serverSetup,
   serverWork,
   type FeatraBridge,
@@ -65,6 +66,7 @@ const bridge: FeatraBridge = {
   },
   setup: serverSetup(server),
   work: serverWork(server),
+  chats: serverChats(server),
   edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {
     info: () => ipcRenderer.invoke(IPC.appInfo),

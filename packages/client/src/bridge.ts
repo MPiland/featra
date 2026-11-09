@@ -14,6 +14,7 @@ import {
   type WorkSettingKey,
   type WorkSettings,
 } from "./settings.ts";
+import { noChats, type ChatBridge } from "./chats.ts";
 import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
 import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./projects.ts";
 import { noWork, type WorkBridge } from "./work-list.ts";
@@ -22,6 +23,7 @@ import { normalizePaneWidth } from "./pane-width.ts";
 import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
+export * from "./chats.ts";
 export * from "./project-setup.ts";
 export * from "./projects.ts";
 export * from "./server-client.ts";
@@ -137,6 +139,8 @@ export interface FeatraBridge {
   readonly setup: ProjectSetupBridge;
   /** The project's live Work list and the stale-copy actions, from the local server (ADR 0016). */
   readonly work: WorkBridge;
+  /** Chats started from roles, run by the local server (ADR 0018). */
+  readonly chats: ChatBridge;
   edit: (command: EditCommand) => void;
   readonly app: {
     info: () => Promise<AppInfo>;
@@ -252,6 +256,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
     },
     setup: noSetup(NO_FOLDERS),
     work: noWork(NO_FOLDERS),
+    chats: noChats(NO_FOLDERS),
     edit: (command) => {
       document.execCommand(command);
     },

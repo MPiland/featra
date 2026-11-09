@@ -3,6 +3,7 @@ import { createAllowedProjects } from "../src/allowed-projects.ts";
 import { createServices } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { card, cardPath, cardRepo, type CardRepo } from "./card-repo.ts";
+import { openFrames, type SocketFrame } from "./ws-frames.ts";
 
 /** The work methods over the real socket, on a real repository: answers, pushes, unwatch (ADR 0016). */
 const TOKEN = "test-token-0123456789";
@@ -12,57 +13,12 @@ const services = createServices({ allowed, log: (m) => logged.push(m), now: () =
 let server: RunningServer;
 let repo: CardRepo;
 
-interface Frame {
-  id?: number;
-  event?: string;
-  watch?: number;
-  ok?: boolean;
-  result?: unknown;
-  error?: string;
-  data?: { epics: { features: { stories: { id: string; title: string }[] }[] }[]; stale: unknown[] };
+interface WorkData {
+  epics: { features: { stories: { id: string; title: string }[] }[] }[];
+  stale: unknown[];
 }
-
-/** A socket that keeps every frame, so a test can wait for the one it wants. */
-function open(): Promise<{
-  send: (f: object) => void;
-  next: (match: (f: Frame) => boolean, ms?: number) => Promise<Frame>;
-  frames: Frame[];
-  close: () => void;
-}> {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`${server.url}?token=${TOKEN}`);
-    const frames: Frame[] = [];
-    const waiting = new Set<() => void>();
-    ws.addEventListener("message", (e) => {
-      frames.push(JSON.parse(String(e.data)) as Frame);
-      for (const w of waiting) w();
-    });
-    ws.addEventListener("error", () => reject(new Error("Can't connect")), { once: true });
-    ws.addEventListener("open", () =>
-      resolve({
-        frames,
-        send: (f) => ws.send(JSON.stringify(f)),
-        next: (match, ms = 2000) =>
-          new Promise((done, fail) => {
-            const check = () => {
-              const i = frames.findIndex(match);
-              if (i < 0) return;
-              waiting.delete(check);
-              clearTimeout(timer);
-              done(frames.splice(i, 1)[0] as Frame);
-            };
-            const timer = setTimeout(() => {
-              waiting.delete(check);
-              fail(new Error(`No matching frame in ${ms} ms`));
-            }, ms);
-            waiting.add(check);
-            check();
-          }),
-        close: () => ws.close(),
-      }),
-    );
-  });
-}
+type Frame = SocketFrame<WorkData>;
+const open = () => openFrames<WorkData>(`${server.url}?token=${TOKEN}`);
 
 const titles = (f: Frame) => f.data?.epics.flatMap((e) => e.features.flatMap((x) => x.stories.map((s) => s.title)));
 

@@ -25,13 +25,14 @@ import {
 import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
 import type { Card } from "@featra/work-format";
 import { fakeCardServer } from "./card-server.ts";
+import { fakeChatServer, type ChatHost } from "./chat-server.ts";
 import type { CopyActionResult } from "@featra/work-format/protocol";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
 /** Where New Project… suggests a folder by default. */
 export const LOCATION = "/home/me";
 
-export interface HostOptions {
+export interface HostOptions extends ChatHost {
   closeToTray?: CloseToTraySupport;
   /** The current project, or null for none. Default: PROJECT. */
   project?: ProjectRef | null;
@@ -110,6 +111,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   const cards = fakeCardServer(host.cards ?? {}, calls, (dir, next) => {
     for (const l of watchers.get(dir) ?? []) l({ list: next, error: null });
   });
+  const chats = fakeChatServer(calls, host);
   const listOf = (dir: string) => cards.listOf(dir) ?? workLists.get(dir) ?? EMPTY_WORK_LIST;
   const bridge: FeatraBridge = {
     platform,
@@ -207,6 +209,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       ...cards.bridge,
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.
+    chats: chats.bridge,
     edit: (command) => void calls.push(`edit:${command}:${(document.activeElement as HTMLElement | null)?.id ?? ""}`),
     app: {
       info: async () => ({ name: "Featra", version: "1.2.3" }),
@@ -237,6 +240,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     bridge,
     pushWork,
     pushCard,
+    chats,
     cardsIn: cards.cardsIn,
     watchingCards: cards.watching,
     /** How many watches are open on `dir`. */
