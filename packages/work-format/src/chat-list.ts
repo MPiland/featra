@@ -125,7 +125,8 @@ export function groupChats(list: ChatList): ChatGroup[] {
 
 const str = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 
-function normalizeSummary(raw: unknown): ChatSummary | null {
+/** A chat row read from the socket or a saved file, or null when it isn't one. */
+export function normalizeSummary(raw: unknown): ChatSummary | null {
   if (!isRecord(raw) || !isRecord(raw.role)) return null;
   const { id, provider, title, startedAt, role } = raw;
   if (!str(id) || !isOneOf(PROVIDERS, provider) || !str(startedAt)) return null;

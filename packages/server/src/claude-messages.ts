@@ -46,8 +46,8 @@ function toolResults(message: Record<string, unknown>): ChatEvent[] {
   );
 }
 
-export function createClaudeTranslator(): ClaudeTranslator {
-  let session: string | null = null;
+/** `session` is the session a resumed chat goes on with, until the agent reports its own. */
+export function createClaudeTranslator(session: string | null = null): ClaudeTranslator {
   let stopping = false;
   let loggedOut = false;
   /** Assistant messages whose text came as deltas, so their full copy adds no text. */

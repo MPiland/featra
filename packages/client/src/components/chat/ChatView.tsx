@@ -11,13 +11,28 @@ export interface OpenChat {
   role: ChatRoleRef;
 }
 
-/** One chat: the role it runs as, its transcript, and the composer. */
-export function ChatView({ chats, chat }: { chats: ChatBridge; chat: OpenChat }) {
+interface ChatViewProps {
+  chats: ChatBridge;
+  chat: OpenChat;
+  /** The project folder, where a new chat with the same role starts. */
+  dir: string;
+  /** A new chat started from this one's role. */
+  onStarted: (id: string, role: ChatRoleRef) => void;
+}
+
+/** One chat: the role it runs as, its transcript, and the composer. A chat whose history is gone offers a new one. */
+export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
   const [update, setUpdate] = useState<ChatUpdate>({ chat: EMPTY_CHAT, error: null });
-  const [stopError, setStopError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => chats.watch(chat.id, setUpdate), [chats, chat.id]);
   const { items, running, model } = update.chat;
-  const error = update.error ?? stopError;
+  const error = update.error ?? actionError;
+  const gone = items.some((item) => item.kind === "notice" && item.notice.type === "gone");
+  const newChat = async () => {
+    const started = await chats.start(dir, chat.role.id);
+    if (started.ok) onStarted(started.id, chat.role);
+    else setActionError(started.error);
+  };
   return (
     <section className="chat" aria-label={chat.role.name} data-chat={chat.id}>
       <header className="chat-head">
@@ -31,27 +46,28 @@ export function ChatView({ chats, chat }: { chats: ChatBridge; chat: OpenChat })
           {error}
         </p>
       )}
-      <Transcript items={items} running={running} />
-      <Composer
-        running={running}
-        onSend={(text) => chats.send(chat.id, text)}
-        onStop={() => {
-          setStopError(null);
-          void chats.stop(chat.id).then(setStopError);
-        }}
-      />
+      <Transcript items={items} running={running} actions={{ onNewChat: () => void newChat() }} />
+      {!gone && (
+        <Composer
+          running={running}
+          onSend={(text) => chats.send(chat.id, text)}
+          onStop={() => {
+            setActionError(null);
+            void chats.stop(chat.id).then(setActionError);
+          }}
+        />
+      )}
     </section>
   );
 }
 
 /**
- * The chat history points at: its view, or a line saying the server no longer has it (the server keeps chats only
- * until it exits, until STORY-44). Switching project leaves the old project's chats (`leaveChats`), so it never
- * shows one of them.
+ * The chat history points at: its view, or a line saying the server doesn't have it. Switching project leaves the old
+ * project's chats (`leaveChats`), so it never shows one of them.
  */
-export function ChatPane({ chats, chat }: { chats: ChatBridge; chat: OpenChat | null }) {
+export function ChatPane({ chat, ...props }: Omit<ChatViewProps, "chat"> & { chat: OpenChat | null }) {
   return chat ? (
-    <ChatView key={chat.id} chats={chats} chat={chat} />
+    <ChatView key={chat.id} chat={chat} {...props} />
   ) : (
     <p className="chat-error" role="alert">
       {CHAT_MESSAGES.noChat}

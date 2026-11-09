@@ -66,7 +66,9 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Role** — what a chat starts from: a prompt appended to the agent's own, a model, an effort and a permission mode.
   The five built-in roles are the role presets; all start in Ask.
 - **Chat** — a conversation with one agent, started from a role in a project. Its transcript is an event log; a
-  **tool row** is one tool call in it, collapsed to the tool and a short summary.
+  **tool row** is one tool call in it, collapsed to the tool and a short summary. Featra keeps a chat's row and its
+  provider **session** id in the app's data; the transcript stays in the provider's own session, so a **restored**
+  chat reads it back when opened and goes on in the same session. A chat whose session is gone says so.
 - **Ask** — the permission mode where every tool that needs approval asks first. Until approvals exist (STORY-45), such
   a tool is denied and the row says so.
 - **Orchestrator** — a session using the Dev Lead role. Shapes features with the user, drafts cards, spawns story

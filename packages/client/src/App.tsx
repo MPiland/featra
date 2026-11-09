@@ -9,7 +9,7 @@ import {
   type UiState,
   type WindowState,
 } from "./bridge.ts";
-import { CHAT_COPY } from "./chats.ts";
+import { CHAT_COPY, type ChatRoleRef } from "./chats.ts";
 import { ChatList, useChats } from "./components/chat/ChatList.tsx";
 import { ChatPane } from "./components/chat/ChatView.tsx";
 import { NewChatDialog } from "./components/chat/NewChatDialog.tsx";
@@ -100,6 +100,11 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   const projectDir = projects.current?.dir ?? null;
   const { setupPage, openSetup } = useProjectSetup(bridge, projectDir, settings.app.work);
   const { list: chatList, chat, remember } = useChats(bridge.chats, projectDir, chatId, () => setNav(leaveChats));
+  const startedChat = (id: string, role: ChatRoleRef) => {
+    setDialog(null);
+    remember(id, role);
+    openChat(id);
+  };
   const title = chatId === null ? view.title : (chat?.role.name ?? CHAT_COPY.transcript);
   const hasProject = projects.current !== null;
   // Project settings > Set up project: the page shows in Work, on that project.
@@ -223,7 +228,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
           />
           <main aria-labelledby="view-title">
             {chatId !== null ? (
-              <ChatPane chats={bridge.chats} chat={chat} />
+              <ChatPane chats={bridge.chats} chat={chat} dir={projectDir ?? ""} onStarted={startedChat} />
             ) : view.id === "settings" ? (
               <SettingsView
                 bridge={bridge}
@@ -257,11 +262,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
           chats={bridge.chats}
           dir={projects.current.dir}
           onClose={() => setDialog(null)}
-          onStarted={(id, role) => {
-            setDialog(null);
-            remember(id, role);
-            openChat(id);
-          }}
+          onStarted={startedChat}
         />
       )}
       {dialog === "about" && (

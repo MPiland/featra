@@ -27,6 +27,8 @@ export interface ServerProcessDeps {
   /** The runtime: Electron's executable in the app, Node in tests. */
   execPath: string;
   log: (message: string) => void;
+  /** The app's data folder, where the server saves chats (STORY-44). */
+  dataDir?: string;
 }
 
 const START_TIMEOUT_MS = 15_000;
@@ -41,7 +43,7 @@ interface Running {
   silence: () => void;
 }
 
-export function createServerProcess({ script, execPath, log }: ServerProcessDeps): ServerProcess {
+export function createServerProcess({ script, execPath, log, dataDir }: ServerProcessDeps): ServerProcess {
   let running: Running | null = null;
   let dirs: string[] = [];
   let seq = 0;
@@ -51,7 +53,7 @@ export function createServerProcess({ script, execPath, log }: ServerProcessDeps
     const token = randomBytes(32).toString("base64url");
     const child = fork(script, [], {
       execPath,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", ...(dataDir ? { FEATRA_DATA_DIR: dataDir } : {}) },
       stdio: ["ignore", "ignore", "pipe", "ipc"],
       serialization: "json",
     });

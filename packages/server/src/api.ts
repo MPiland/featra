@@ -150,6 +150,7 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
       }
       case "chat.watch": {
         const chatId = chat(params);
+        await chats.open(chatId);
         const dir = chats.dirOf(chatId) ?? "";
         const { events, stop } = chats.watch(chatId, (event) => {
           // A project closed since: say nothing more about it (its chats end with it, in services).
@@ -161,7 +162,9 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
       case "chat.send": {
         const p = chatSendParams(params);
         if (!p) throw new ApiError("Expected { id, text }.");
-        chats.send(chat(params), p.text);
+        const chatId = chat(params);
+        await chats.open(chatId);
+        chats.send(chatId, p.text);
         return null;
       }
       case "chat.stop":

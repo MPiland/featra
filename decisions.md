@@ -498,3 +498,28 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   `card-pane.test.tsx` ("opens beside the list…") each failed once under a full parallel run and passed on retry.
   On the PR's first CI run, E2E (Ubuntu) failed once in `settings.spec.ts` (keyboard theme change): `settings.json`
   was read before it was first written (ENOENT inside `expect.poll`).
+
+## 2026-11-09 — STORY-44: chats come back after a restart
+
+- The transcript is read with the Agent SDK's own session reader (`getSessionInfo`, `getSessionMessages`), not by
+  parsing Claude's `.jsonl` files. Why: the format and location are Claude's; the SDK keeps up with them, skips corrupt
+  lines, and reading runs no agent, so it costs no tokens. It sits behind `ProviderAdapter.history`, so the manager and
+  the protocol name no provider.
+- `chats.json` in the app's data folder holds each chat's project, session id and row. The desktop passes the folder
+  to the server as `FEATRA_DATA_DIR`. Why: AC1, and the server owns the chats. `json-store` moved from the desktop to
+  `@featra/server/json-store` so both use one atomic writer.
+- Reset App Data keeps the chats. Why: it resets settings and window state; chats are the user's work, and their
+  transcripts live in Claude's own files, which Featra never deletes.
+- A restored chat is listed at once but read only when opened. Why: a long chat list shouldn't read every session file
+  at start-up. Turns read back from history end as done; a stopped or failed turn isn't recorded in the file.
+- A chat whose session file is gone stays listed, shows "This chat's history is gone." with a New chat button (same
+  role, same project), and hides the composer; the server refuses a message to it. Why: AC4; the user sees why, and
+  the chat doesn't silently start a new session under the old title.
+- A closed project's chats are kept (saved, out of the list) and come back when it is opened again. Why: closing a
+  project isn't deleting its chats.
+- A new session id is saved but pushes no list. Why: the row doesn't show it, and STORY-21 says a push is a row change.
+- Tests fake only `query`, the clock and Claude's folder: `CLAUDE_CONFIG_DIR` points the real reader at a temp folder,
+  and test helpers (`claude-sessions.ts`) and the E2E fake SDK write session files there as Claude does. The fake SDK
+  only writes when `CLAUDE_CONFIG_DIR` is set and logs `resume` only when it is set, so other journeys are unchanged.
+- `chat-manager.ts` is 312 lines after moving the store and the history read into `chat-store.ts`; splitting further
+  would cut the chat lifecycle in two.

@@ -31,6 +31,8 @@ export interface SessionOptions {
   approve: (request: Omit<ToolRequest, "chat">, signal: AbortSignal) => Promise<ToolDecision>;
   /** Hears each event of the agent's stream, in order. */
   emit: (event: ChatEvent) => void;
+  /** The provider's session to go on with (a restored chat, STORY-44); a new conversation without it. */
+  resume?: string | null;
 }
 
 /** One agent conversation. The agent starts with the first message. */
@@ -52,4 +54,9 @@ export interface ProviderAdapter {
   /** Whether the user has the provider's agent installed: the chat list shows a group for each one that is. */
   installed: () => Promise<boolean>;
   start: (options: SessionOptions) => ProviderSession;
+  /**
+   * A session's transcript as chat events, read from the provider's own record of it without running the agent (no
+   * tokens), or null when the provider no longer has the session (STORY-44).
+   */
+  history: (session: string, cwd: string) => Promise<ChatEvent[] | null>;
 }

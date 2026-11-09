@@ -234,3 +234,7 @@
   color: var(--tx3);
   font-size: 12px;
 }
+
+.chat-notice .btn {
+  margin-left: 8px;
+}

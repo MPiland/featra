@@ -32,8 +32,13 @@ stop it.").
 - **Approval handler**: every tool the agent must ask about goes to an `ApprovalHandler`. Until STORY-45 it is
   `denyUntilApprovals`, which denies with a message the agent and the user both see, and the chat marks the row Denied.
   The handler gets an abort signal; a request it answers after Stop or close is not marked Denied.
-- **Session id**: the adapter keeps the SDK's session id and resumes with it when the agent is started again.
-  The manager doesn't store or expose it yet; STORY-44 does.
+- **Session id**: the adapter reports the SDK's session id on `started`, and the manager saves it with the chat.
+  `start({ resume })` goes on in that session (the SDK's `resume` option), so a restored chat keeps its context.
+- **History** (STORY-44): `ProviderAdapter.history(session, cwd)` gives a session's transcript as chat events, or
+  null when the provider no longer has it. Claude's adapter reads it with the SDK's own reader (`getSessionInfo`,
+  `getSessionMessages`, `claude-transcript.ts`), so Featra never parses Claude's file format or locates its files;
+  reading runs no agent and costs no tokens. Each prompt opens a turn, closed as done before the next one; subagent
+  messages stay out, as they do live. Nothing Claude-specific is in the manager.
 
 **The Claude adapter.** The agent starts on the chat's first message, with `pathToClaudeCodeExecutable` set to the
 `claude` found on the PATH (`claude-locate.ts`; on Windows the `.exe`, or an npm shim's script), `cwd` the project,
@@ -50,6 +55,16 @@ lists, no permission prompt tool and no settings of its own, so it never bypasse
 **Stop.** Stop only marks a turn that is running. Before the agent has started, Stop ends the turn as stopped and the
 next message starts afresh; after the turn has ended, Stop does nothing. A tool request that Stop or closing cut short
 shows as stopped, not Denied. A project the user closes ends its chats, and their events are no longer pushed.
+
+**Chats survive a restart (STORY-44).** The manager saves each chat's project, session id and row (title, role,
+provider, start, waiting) to `chats.json` in the app's data folder (Electron's userData, passed to the server as
+`FEATRA_DATA_DIR`), never in the repo; `work-format/chat-saved` reads it defensively. It saves on each row or session
+change, through the atomic `json-store`, and the first save waits for the file to be read, so it never drops a chat
+not yet loaded. Restored chats are listed at once but loaded lazily: `open(id)` reads the transcript through the
+adapter and makes the agent session with `resume`; the agent itself starts with the next message. A chat whose
+session the provider no longer has gets a `gone` problem ("This chat's history is gone."), refuses messages, and the
+client offers a new chat with the same role. A closed project's chats are kept and saved, out of the list, and come
+back when the project opens again. Without a data folder (tests), chats last until the server exits.
 
 **The SDK stays out of the bundle.** It is loaded with a dynamic `import()` when the first agent starts, and the
 desktop build marks it external, so it is resolved from the app's own dependencies. E2E runs point
@@ -70,14 +85,17 @@ shows. The server keeps the log; the client folds it, so a reconnect gets the wh
 | `chat.stop`  | `{ id }`        | `null`: interrupts the running turn                                        |
 | `chat.list`  | `{ dir }`       | `{ providers, chats }`; then a `chat.list` push each time the list changes |
 
+`chat.watch` and `chat.send` open the chat first, so a restored chat's transcript is read on its first watch.
 `chat.watch` and `chat.list` stop on `work.unwatch` or when the socket closes, like `work.watch`. A push can arrive
 before the watch's answer; the client keeps it and applies it after the log.
 
 ## Consequences
 
 - The renderer never touches the SDK or a process; a crashed server ends its chats, and the client shows the failure.
-- Chats last until the server exits. STORY-44 makes them survive a restart: the manager's chat map and its rows are
-  what it saves and loads.
+- Chats survive a restart (STORY-44). The transcript stays in the provider's own session: Featra keeps only what it
+  needs to list a chat and go on with it, and a chat whose session was deleted says so rather than failing.
+- The session reader is the SDK's, not a fake, in every test; tests and E2E point `CLAUDE_CONFIG_DIR` at a folder of
+  their own and write session files there as Claude does.
 - A new provider is one adapter: the manager, protocol and view stay as they are.
 - **Licence.** The Agent SDK is not MIT; ADR 0007 accepted it as a dependency.
 - **Limit.** Until STORY-45, a tool that needs approval is always denied.

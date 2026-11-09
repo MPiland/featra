@@ -6,6 +6,8 @@
 import type { CanUseTool, Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { errorMessage, type ChatEvent, type Role } from "@featra/work-format";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
+import { loadSessionReader } from "./claude-sdk.ts";
+import { claudeHistory, type SessionReader } from "./claude-transcript.ts";
 import { createInputQueue, type InputQueue } from "./input-queue.ts";
 import type { ProviderAdapter, ProviderSession, SessionOptions } from "./provider.ts";
 
@@ -22,6 +24,8 @@ export interface ClaudeDeps {
   locate: () => Promise<string | null>;
   /** The agent's environment. */
   env?: NodeJS.ProcessEnv;
+  /** Loads the reader of Claude's session files; the SDK's own by default. */
+  loadSessions?: () => Promise<SessionReader>;
 }
 
 /** The Claude provider's name in the chat list, as the chat's problems name it too. */
@@ -64,20 +68,27 @@ const userMessage = (text: string, session: string | null): SDKUserMessage => ({
   session_id: session ?? "",
 });
 
-export function createClaudeProvider({ loadQuery, locate, env = process.env }: ClaudeDeps): ProviderAdapter {
+export function createClaudeProvider({
+  loadQuery,
+  locate,
+  env = process.env,
+  loadSessions = loadSessionReader,
+}: ClaudeDeps): ProviderAdapter {
   return {
     id: "claude",
     name: CLAUDE_NAME,
     installed: async () => (await locate()) !== null,
     start: (options) => startSession(options, { loadQuery, locate, env }),
+    history: async (session, cwd) => claudeHistory(await loadSessions(), session, cwd),
   };
 }
 
 function startSession(
-  { cwd, role, approve, emit }: SessionOptions,
-  { loadQuery, locate, env }: Required<ClaudeDeps>,
+  { cwd, role, approve, emit, resume }: SessionOptions,
+  { loadQuery, locate, env }: Omit<Required<ClaudeDeps>, "loadSessions">,
 ): ProviderSession {
-  const translator = createClaudeTranslator();
+  // A restored chat resumes its session; the agent's own report of its session id takes over once it starts.
+  const translator = createClaudeTranslator(resume ?? null);
   let input: InputQueue<SDKUserMessage> | null = null;
   let query: ClaudeQuery | null = null;
   let closed = false;

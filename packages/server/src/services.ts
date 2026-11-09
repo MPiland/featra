@@ -1,12 +1,15 @@
+import { normalizeSavedChats } from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { createApi, type Api } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
 import { createChatManager } from "./chat-manager.ts";
+import { memoryChatStore } from "./chat-store.ts";
 import { locateClaude } from "./claude-locate.ts";
 import { createClaudeProvider, type ClaudeDeps } from "./claude-provider.ts";
 import { loadAgentQuery } from "./claude-sdk.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
+import { createJsonStore } from "./json-store.ts";
 import { createRepoGit, type RepoGit } from "./repo-git.ts";
 import { createRoleRegistry } from "./role-registry.ts";
 import { createWorkWatches } from "./work-watch.ts";
@@ -23,7 +26,12 @@ export interface ServiceOptions {
   repoGit?: RepoGit;
   /** How the Claude adapter loads the Agent SDK and finds `claude`; the real ones by default. */
   claude?: ClaudeDeps;
+  /** The app's data folder, where chats are saved (`chats.json`, STORY-44); without it they last until exit. */
+  dataDir?: string;
 }
+
+/** The file in the app's data folder that keeps the chats. */
+export const CHATS_FILE = "chats.json";
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
 export function createServices({
@@ -33,6 +41,7 @@ export function createServices({
   gitCommand,
   repoGit = createRepoGit(gitCommand),
   claude = { loadQuery: () => loadAgentQuery(), locate: () => locateClaude() },
+  dataDir,
 }: ServiceOptions): {
   api: Api;
   close: () => Promise<void>;
@@ -42,7 +51,8 @@ export function createServices({
   const copies = createCopyActions({ git: repoGit, scan: watches.scan, now });
   const cards = createCardActions({ scan: watches.scan, now });
   const roles = createRoleRegistry();
-  const chats = createChatManager({ providers: [createClaudeProvider(claude)], roles, log });
+  const store = dataDir ? createJsonStore(dataDir, CHATS_FILE, normalizeSavedChats) : memoryChatStore();
+  const chats = createChatManager({ providers: [createClaudeProvider(claude)], roles, log, store });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => chats.closeProjects(allowed.has));
   const api = createApi({ git: createGit(gitCommand), allowed, watches, copies, cards, chats, roles });
@@ -51,6 +61,7 @@ export function createServices({
     async close() {
       stopClosing();
       chats.close();
+      await chats.flush();
       watches.close();
       await scanner.close();
     },
