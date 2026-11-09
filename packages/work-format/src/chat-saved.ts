@@ -3,7 +3,7 @@
  * its provider's session id, and its row in the chat list. The transcript isn't kept here: the provider's own session
  * holds it, and the provider adapter reads it back.
  */
-import { normalizeSummary, type ChatSummary } from "./chat-list.ts";
+import { idleSummary, normalizeSummary, type ChatSummary } from "./chat-list.ts";
 import { isRecord } from "./utils/guards.ts";
 
 export interface SavedChat {
@@ -21,11 +21,14 @@ export interface SavedChats {
   chats: SavedChat[];
 }
 
-/** A chat as it is saved. A saved chat never runs: a turn doesn't outlive the server. */
+/**
+ * A chat as it is saved. A saved chat never runs and waits on no request: a turn doesn't outlive the server, so a
+ * chat that was waiting on an approval comes back waiting for the user's reply.
+ */
 export const savedChat = (dir: string, session: string | null, summary: ChatSummary): SavedChat => ({
   dir,
   session,
-  summary: { ...summary, running: false },
+  summary: idleSummary(summary),
 });
 
 const nonEmpty = (v: unknown): v is string => typeof v === "string" && v.length > 0;

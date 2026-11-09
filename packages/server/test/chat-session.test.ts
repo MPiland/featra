@@ -3,7 +3,7 @@
  * the PATH lookup are faked (fake-query.ts).
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { BUILT_IN_ROLES, CHAT_MESSAGES } from "@featra/work-format";
+import { BUILT_IN_ROLES, CHAT_MESSAGES, denyMessage, type ChatEvent } from "@featra/work-format";
 import { createChatManager, type ChatManager } from "../src/chat-manager.ts";
 import { createClaudeProvider } from "../src/claude-provider.ts";
 import { FAILED } from "../src/claude-messages.ts";
@@ -262,22 +262,25 @@ describe("AC4: a missing or logged-out claude shows one line", () => {
   });
 });
 
-describe("AC5: until approvals exist, a tool that needs one is denied and shows as denied", () => {
-  it("answers canUseTool with a deny the agent can act on, and marks the row", async () => {
+describe("AC5: a tool that needs approval, denied by the user, shows as denied (STORY-45 AC1-2)", () => {
+  it("answers canUseTool with the user's deny, which the agent can act on, and marks the row", async () => {
     const c = await chat();
     c.send("test it");
     const run = await c.run();
     run.say(sdk.init(), sdk.assistant("m1", [sdk.toolUse("t1", "Bash", { command: "npm test" })]));
-    const decision = await run.ask("Bash", { command: "npm test" }, "t1");
-    expect(decision).toEqual({ behavior: "deny", message: CHAT_MESSAGES.denied });
-    run.say(sdk.toolResult("t1", CHAT_MESSAGES.denied, true), sdk.success());
+    const asked = run.ask("Bash", { command: "npm test" }, "t1");
+    await until(() => c.events.some((e: ChatEvent) => e.type === "approval"));
+    c.manager.approve(c.id, "t1", { choice: "deny" });
+    const decision = await asked;
+    expect(decision).toEqual({ behavior: "deny", message: denyMessage() });
+    run.say(sdk.toolResult("t1", denyMessage(), true), sdk.success());
     await until(() => !c.view().running);
     expect(c.view().items.filter((i) => i.kind === "tool")).toEqual([
       expect.objectContaining({
         name: "Bash",
         summary: "npm test",
         denied: true,
-        result: { output: CHAT_MESSAGES.denied, isError: true },
+        result: { output: denyMessage(), isError: true },
       }),
     ]);
   });

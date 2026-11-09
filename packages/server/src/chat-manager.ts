@@ -6,32 +6,34 @@
 import { randomUUID } from "node:crypto";
 import {
   CHAT_MESSAGES,
+  idleSummary,
   newSummary,
-  reduceSummary,
+  reduceRow,
   savedChat,
+  type Ask,
   type ChatEvent,
   type ChatSummary,
   type ProviderId,
-  type ProviderInfo,
   type Role,
 } from "@featra/work-format";
 import { projectKey } from "./allowed-projects.ts";
+import { createApprovalDesk } from "./approval-desk.ts";
+import { ChatError } from "./chat-error.ts";
+import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
-import { chatSaver, memoryChatStore, savedHistory, type ChatStore } from "./chat-store.ts";
-import type { ApprovalHandler, ProviderAdapter, ProviderSession } from "./provider.ts";
-import type { RoleRegistry } from "./role-registry.ts";
+import { chatSaver, memoryChatStore, savedHistory } from "./chat-store.ts";
+import type { ProviderAdapter, ProviderSession } from "./provider.ts";
 
-/** What the session manager refuses: the message is shown to the user. */
-export class ChatError extends Error {}
-
-/** Until STORY-45 asks the user, every tool that needs approval is denied, and the chat shows the denial. */
-export const denyUntilApprovals: ApprovalHandler = async () => ({ allow: false, message: CHAT_MESSAGES.denied });
+export { ChatError };
+export type { ChatManager, ChatManagerDeps };
 
 interface Chat {
   id: string;
   dir: string;
   /** Its row in the chat list. */
   summary: ChatSummary;
+  /** The requests it waits on the user to answer (STORY-45). */
+  asks: readonly Ask[];
   /** The provider's session it goes on with: the one the agent reported, or the one it was saved with. */
   session: string | null;
   /** A new session the agent reported, saved once the agent answers: before then Claude may not have written it. */
@@ -49,58 +51,12 @@ interface Chat {
   closed: boolean;
 }
 
-export interface ChatManager {
-  /** Starts a chat from a role in the project folder; its agent starts with the first message. */
-  start: (dir: string, roleId: string) => Promise<string>;
-  /** Readies a chat to watch and send to: a restored chat reads its transcript from its provider, running no agent. */
-  open: (id: string) => Promise<void>;
-  /** The chat's log so far, and every later event to `listener` until `stop`. */
-  watch: (id: string, listener: (event: ChatEvent) => void) => { events: ChatEvent[]; stop: () => void };
-  send: (id: string, text: string) => void;
-  /** Interrupts the running turn, if any. */
-  stop: (id: string) => Promise<void>;
-  /** The chat's project folder, or null when there is no such chat. */
-  dirOf: (id: string) => string | null;
-  /** The project's chats as the list shows them, oldest first. */
-  list: (dir: string) => ChatSummary[];
-  /**
-   * The project's chats now, and the whole list again to `listener` each time a row changes or a chat comes or goes,
-   * until `stop`. A streamed reply doesn't change a row, so it doesn't call it.
-   */
-  watchList: (dir: string, listener: (chats: ChatSummary[]) => void) => { chats: ChatSummary[]; stop: () => void };
-  /** Every provider the manager runs, and whether its agent is installed. */
-  providers: () => Promise<ProviderInfo[]>;
-  /**
-   * Ends the chats of every project `keep` turns down (a project the user closed): no more events, no more turns.
-   * They stay saved, and come back when `keep` takes their project again.
-   */
-  closeProjects: (keep: (dir: string) => boolean) => void;
-  close: () => void;
-  /** Resolves once every change so far is saved. */
-  flush: () => Promise<void>;
-  /** Resolves once the saved chats are read, so a list holds them. */
-  ready: () => Promise<void>;
-}
-
-export interface ChatManagerDeps {
-  providers: readonly ProviderAdapter[];
-  roles: RoleRegistry;
-  approve?: ApprovalHandler;
-  newId?: () => string;
-  /** The clock a chat's start is stamped with. */
-  now?: () => Date;
-  log?: (message: string) => void;
-  /** Where chats are saved; nowhere by default. */
-  store?: ChatStore;
-  /** Whose rule project folders compare by (`projectKey`); this machine's by default. */
-  platform?: string;
-}
-
 /** A chat not yet opened: a saved one, or a new one before its log and agent are made. */
 const restored = (id: string, dir: string, summary: ChatSummary, session: string | null): Chat => ({
   id,
   dir,
-  summary: { ...summary, running: false },
+  summary: idleSummary(summary),
+  asks: [],
   session,
   pending: null,
   events: null,
@@ -117,7 +73,7 @@ const oldestFirst = (a: ChatSummary, b: ChatSummary) => a.startedAt.localeCompar
 export function createChatManager({
   providers,
   roles,
-  approve = denyUntilApprovals,
+  approve,
   newId = randomUUID,
   now = () => new Date(),
   log = () => {},
@@ -125,6 +81,12 @@ export function createChatManager({
   platform = process.platform,
 }: ChatManagerDeps): ChatManager {
   const chats = new Map<string, Chat>();
+  // The desk tells only a chat that is open: one ended or closed has no requests left.
+  const desk = createApprovalDesk((id, event) => {
+    const c = chats.get(id);
+    if (c && c.events !== null && !c.closed) record(c, event);
+  });
+  const decide = approve ?? desk.approve;
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
 
   const chat = (id: string): Chat => {
@@ -169,7 +131,8 @@ export function createChatManager({
     const answered = event.type === "text" || event.type === "tool" || event.type === "tool-result";
     const session = answered && c.pending ? c.pending : c.session;
     if (answered) c.pending = null;
-    const summary = reduceSummary(c.summary, event);
+    const { summary, asks } = reduceRow(c, event);
+    c.asks = asks;
     if (summary === c.summary && session === c.session) return;
     const rowChanged = summary !== c.summary;
     c.session = session;
@@ -189,13 +152,7 @@ export function createChatManager({
       role,
       emit,
       resume: c.session,
-      approve: async (request, signal) => {
-        const decision = await approve({ ...request, chat: c.id }, signal);
-        // A request Stop or close cut short wasn't denied: the turn's end marks the row stopped.
-        if (!decision.allow && !signal.aborted)
-          emit({ type: "tool-denied", id: request.id, name: request.name, input: request.input });
-        return decision;
-      },
+      approve: (request, signal) => decide({ ...request, chat: c.id }, signal),
     });
   }
 
@@ -220,12 +177,14 @@ export function createChatManager({
   /** Ends the chat's agent and forgets its log; the chat itself is kept, to open again. */
   function end(c: Chat) {
     c.listeners.clear();
+    desk.forget(c.id);
     c.agent?.close();
     c.agent = null;
     c.events = null;
     c.opening = null;
     c.running = false;
-    c.summary = { ...c.summary, running: false };
+    c.asks = [];
+    c.summary = idleSummary(c.summary);
   }
 
   return {
@@ -267,6 +226,7 @@ export function createChatManager({
       const c = chat(id);
       if (c.running) await c.agent?.interrupt();
     },
+    approve: (id, tool, answer) => desk.answer(chat(id).id, tool, answer),
     dirOf: (id) => {
       const c = chats.get(id);
       return c && !c.closed ? c.dir : null;

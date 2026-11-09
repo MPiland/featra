@@ -69,8 +69,11 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   **tool row** is one tool call in it, collapsed to the tool and a short summary. Featra keeps a chat's row and its
   provider **session** id in the app's data; the transcript stays in the provider's own session, so a **restored**
   chat reads it back when opened and goes on in the same session. A chat whose session is gone says so.
-- **Ask** — the permission mode where every tool that needs approval asks first. Until approvals exist (STORY-45), such
-  a tool is denied and the row says so.
+- **Ask** — the permission mode where every tool that needs approval asks first: the call waits in the chat until the
+  user answers **Allow**, **Allow for this chat** or **Deny** (with an optional reason the agent is sent). Allow for
+  this chat lasts while the chat's agent runs: a shell command by its exact command, any other tool by its name.
+- **Approval** — a tool request the chat waits on; the chat shows the waiting dot. One left unanswered (Stop, the chat
+  closing, a restart) is cancelled, never denied.
 - **Orchestrator** — a session using the Dev Lead role. Shapes features with the user, drafts cards, spawns story
   sessions, reviews and merges.
 - **Agent instructions** — the user's own `CLAUDE.md` / `AGENTS.md`. Featra never edits them. Not the same as project

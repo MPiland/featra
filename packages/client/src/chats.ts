@@ -3,7 +3,15 @@
  * The session itself runs in the local server; this module holds the bridge's shape, its wording, and how the client
  * calls the server.
  */
-import { foldChat, reduceChat, EMPTY_CHAT, type ChatNotice, type ChatState } from "@featra/work-format/chat";
+import type { ApprovalAnswer } from "@featra/work-format/approvals";
+import {
+  foldChat,
+  reduceChat,
+  EMPTY_CHAT,
+  type ChatItem,
+  type ChatNotice,
+  type ChatState,
+} from "@featra/work-format/chat";
 import { normalizeChatEvent, normalizeChatSnapshot, type ChatEvent } from "@featra/work-format/chat-events";
 import { EMPTY_CHAT_LIST, normalizeChatList, type ChatList, type ChatRoleRef } from "@featra/work-format/chat-list";
 import { assertNever, errorMessage, isRecord } from "@featra/work-format/guards";
@@ -36,6 +44,8 @@ export interface ChatBridge {
   send: (id: string, text: string) => Promise<string | null>;
   /** Interrupts the running turn; resolves with why it couldn't, or null. */
   stop: (id: string) => Promise<string | null>;
+  /** Answers a tool request the chat waits on; resolves with why it wasn't taken, or null. */
+  approve: (id: string, tool: string, answer: ApprovalAnswer) => Promise<string | null>;
   /** Calls back with the project's chat list now and on every change; returns the stop. */
   list: (dir: string, listener: (update: ChatListUpdate) => void) => () => void;
 }
@@ -57,6 +67,16 @@ export const CHAT_COPY = {
   working: "Working…",
   denied: "Denied",
   toolStopped: "Stopped",
+  cancelled: "Cancelled",
+  needsApproval: "Needs approval",
+  allowed: "Allowed",
+  allowedForChat: "Allowed for this chat",
+  approve: "Approve",
+  allow: "Allow",
+  allowForChat: "Allow for this chat",
+  deny: "Deny",
+  denyReason: "Reason",
+  denyReasonHint: "Reason (optional)",
   input: "Input",
   result: "Result",
   noResult: "No result yet.",
@@ -82,6 +102,17 @@ export function noticeText(notice: ChatNotice): string {
     default:
       return assertNever(notice);
   }
+}
+
+/** The mark a tool row's head shows: where its approval stands, or how it ended unanswered; null for none. */
+export function toolMark(item: Extract<ChatItem, { kind: "tool" }>): string | null {
+  if (item.denied) return CHAT_COPY.denied;
+  if (item.stopped) return CHAT_COPY.toolStopped;
+  if (item.cancelled) return CHAT_COPY.cancelled;
+  if (item.approval?.status === "pending") return CHAT_COPY.needsApproval;
+  if (item.approval?.status === "allowed")
+    return item.approval.scope === "chat" ? CHAT_COPY.allowedForChat : CHAT_COPY.allowed;
+  return null;
 }
 
 /** The bridge's chat methods over the server client. */
@@ -127,6 +158,7 @@ export function serverChats(server: ServerClient): ChatBridge {
     },
     send: (id, text) => server.call("chat.send", { id, text }).then(() => null, errorMessage),
     stop: (id) => server.call("chat.stop", { id }).then(() => null, errorMessage),
+    approve: (id, tool, answer) => server.call("chat.approve", { id, tool, ...answer }).then(() => null, errorMessage),
     list(dir, listener) {
       let list = EMPTY_CHAT_LIST;
       return server.watch(
@@ -155,6 +187,7 @@ export function noChats(error: string): ChatBridge {
     },
     send: async () => error,
     stop: async () => error,
+    approve: async () => error,
     // No chats is the whole truth here, not an out-of-date list.
     list(_dir, listener) {
       listener({ list: EMPTY_CHAT_LIST, error: null });

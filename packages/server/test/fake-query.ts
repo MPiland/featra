@@ -19,8 +19,16 @@ export interface FakeRun {
   interrupts: number;
   /** True once Featra has closed its input: the session is over. */
   closed: boolean;
-  /** Asks Featra whether a tool may run, as `claude` does before a tool that needs approval. */
-  ask: (name: string, input: Record<string, unknown>, id: string) => ReturnType<CanUseTool>;
+  /**
+   * Asks Featra whether a tool may run, as `claude` does before a tool that needs approval. `extra` adds the SDK's
+   * other request options (its own abort signal, `suppressAlwaysAllowRule`).
+   */
+  ask: (
+    name: string,
+    input: Record<string, unknown>,
+    id: string,
+    extra?: Partial<Parameters<CanUseTool>[2]>,
+  ) => ReturnType<CanUseTool>;
 }
 
 export function fakeQuery() {
@@ -35,13 +43,14 @@ export function fakeQuery() {
       crash: (error) => out.push({ error }),
       interrupts: 0,
       closed: false,
-      ask: (name, input, id) => {
+      ask: (name, input, id, extra = {}) => {
         const canUseTool: CanUseTool | undefined = options.canUseTool;
         if (!canUseTool) throw new Error("No canUseTool");
         return canUseTool(name, input, {
           signal: new AbortController().signal,
           toolUseID: id,
           requestId: `request-${id}`,
+          ...extra,
         });
       },
     };

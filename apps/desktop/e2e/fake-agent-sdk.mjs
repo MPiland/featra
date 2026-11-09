@@ -3,7 +3,8 @@
  * `claude` login). The server loads it through FEATRA_E2E_AGENT_SDK. Each user message picks a scripted reply by its
  * text; FEATRA_E2E_AGENT_LOG, when set, gets one JSON line per query with the options Featra passed.
  *
- * - "tool": a Read that runs, then a Bash that needs approval, so it goes to canUseTool.
+ * - "tool": a Read that runs, then a Bash `npm test` that needs approval, so it goes to canUseTool and waits on the
+ *   user's answer. "twice" in the text asks for a second, identical Bash call after it.
  * - "slow": starts a reply and waits for interrupt().
  * - anything else: streams "You said: <text>".
  *
@@ -40,21 +41,24 @@ function* say(...parts) {
   yield assistant(id, [{ type: "text", text: parts.join("") }]);
 }
 
-async function* toolTurn(options) {
+/** A Bash `npm test` call, asked about through canUseTool as the SDK asks; its result is what the answer allowed. */
+async function* bash(options, signal) {
+  const id = `toolu_bash_${++seq}`;
+  const input = { command: "npm test" };
+  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "Bash", input }]);
+  const decision = await options.canUseTool("Bash", input, { signal, toolUseID: id, requestId: `request_${seq}` });
+  const allowed = decision.behavior === "allow";
+  yield toolResult(id, allowed ? "ok" : decision.message, !allowed);
+}
+
+async function* toolTurn(options, signal, twice) {
   yield* say("Let me look.");
   yield assistant(`msg_${++seq}`, [
-    { type: "tool_use", id: "toolu_read", name: "Read", input: { file_path: "README.md" } },
+    { type: "tool_use", id: `toolu_read_${++seq}`, name: "Read", input: { file_path: "README.md" } },
   ]);
-  yield toolResult("toolu_read", "# Demo project", false);
-  const input = { command: "npm test" };
-  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id: "toolu_bash", name: "Bash", input }]);
-  const decision = await options.canUseTool("Bash", input, {
-    signal: new AbortController().signal,
-    toolUseID: "toolu_bash",
-    requestId: "request_bash",
-  });
-  const allowed = decision.behavior === "allow";
-  yield toolResult("toolu_bash", allowed ? "ok" : decision.message, !allowed);
+  yield toolResult(`toolu_read_${seq}`, "# Demo project", false);
+  yield* bash(options, signal);
+  if (twice) yield* bash(options, signal);
   yield* say("Done.");
   yield success("Done.");
 }
@@ -121,6 +125,8 @@ export function query({ prompt, options }) {
   }
   let release = null;
   const stopped = () => new Promise((resolve) => (release = resolve));
+  // Aborted on interrupt(), as the SDK aborts a permission request when its turn is interrupted.
+  let turn = new AbortController();
 
   const session = sessionLog(options);
 
@@ -128,8 +134,9 @@ export function query({ prompt, options }) {
     for await (const message of prompt) {
       const text = String(message.message.content);
       yield { ...MAIN, type: "system", subtype: "init", session_id: session.id, model: options.model };
+      turn = new AbortController();
       if (text.includes("tool")) {
-        yield* toolTurn(options);
+        yield* toolTurn(options, turn.signal, text.includes("twice"));
       } else if (text.includes("slow")) {
         const id = `msg_${++seq}`;
         const waiting = stopped();
@@ -148,5 +155,10 @@ export function query({ prompt, options }) {
     }
   }
 
-  return Object.assign(run(), { interrupt: async () => release?.() });
+  return Object.assign(run(), {
+    interrupt: async () => {
+      turn.abort();
+      release?.();
+    },
+  });
 }

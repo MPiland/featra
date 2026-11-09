@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { BUILT_IN_ROLES, CHAT_MESSAGES } from "@featra/work-format";
+import { BUILT_IN_ROLES, denyMessage } from "@featra/work-format";
 import { FAKE_SDK, PATH_KEY, pathWithoutClaude, standInClaude } from "./agent.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
 
@@ -24,7 +24,7 @@ async function newChat(page: Page, role: string) {
   await expect(page.getByRole("region", { name: role })).toBeVisible();
 }
 
-test("a Developer chat streams replies, shows tool rows, denies what needs approval, and stops", async () => {
+test("a Developer chat streams replies, shows tool rows, asks before a tool that needs approval, and stops", async () => {
   const userData = await tempUserData();
   const project = await tempProject("version: 1\n");
   const bin = await standInClaude();
@@ -51,9 +51,10 @@ test("a Developer chat streams replies, shows tool rows, denies what needs appro
     await expect(composer(page)).toHaveValue("");
     await expect(log(page)).toContainText("You said: hello\nthere");
 
-    // AC3 and AC5: each tool is one collapsed row; the one that needs approval is denied, visibly.
+    // AC3 and AC5: each tool is one collapsed row; the one that needs approval asks, and the user denies it.
     await composer(page).fill("use a tool");
     await composer(page).press("Enter");
+    await log(page).getByRole("group", { name: "Approve Bash" }).getByRole("button", { name: "Deny" }).click();
     await expect(log(page)).toContainText("Done.");
     const read = log(page).getByRole("button", { name: /^Read/ });
     await expect(read).toHaveText("ReadREADME.md");
@@ -63,7 +64,7 @@ test("a Developer chat streams replies, shows tool rows, denies what needs appro
     const bash = log(page).getByRole("button", { name: /^Bash/ });
     await expect(bash).toHaveText("Bashnpm testDenied");
     await bash.click();
-    await expect(log(page)).toContainText(CHAT_MESSAGES.denied);
+    await expect(log(page)).toContainText(denyMessage());
 
     // AC2: Stop interrupts the running turn.
     await composer(page).fill("slow");

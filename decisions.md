@@ -544,3 +544,48 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   the new one's is.
 - Known limits, not changed here: restored chats load before their project is opened (the API still gates them with
   `allow`), and the session file is read whole, with no size cap.
+
+## 2026-11-09 — STORY-45: inline tool approvals
+
+- Allow for this chat is kept in the server's memory only, per chat, and ends with the chat's agent (Stop leaves it;
+  closing the chat or its project, or a restart, forgets it). Featra doesn't pass the SDK's `updatedPermissions`. Why:
+  the brief; nothing Featra does should write to the user's own Claude settings, and a rule outliving the chat would
+  allow calls the user never saw.
+- Allow for this chat matches a shell tool (Bash, PowerShell) by its exact command, and any other tool by its name.
+  Why: allowing `npm test` must not allow `rm -rf .`; for the file and web tools the name is the permission the user
+  is thinking of, and a per-path rule would ask again on every file.
+- A call the SDK marks `suppressAlwaysAllowRule` is never covered by a rule and offers no Allow for this chat; the
+  server refuses one (`onceOnly`). A request that doesn't say (`forChat` missing on the wire) offers none either. Why:
+  the SDK says those calls may only be allowed once; the safe default is to ask.
+- `defaultToNo` is ignored: no button is focused for the user. Why: focusing Allow or Deny would make Enter answer for
+  them.
+- An unanswered request: Stop cancels it through the SDK's abort signal (`approval-cancelled`) and the row shows
+  Stopped; the SDK cancelling it on its own shows Cancelled; closing the chat ends it quietly; after a restart, a call
+  with no result in a finished turn shows Cancelled. Never Denied, since the user didn't deny it. The agent is told
+  "The request was cancelled before the user answered." Why: the brief.
+- The waiting reason stays in work-format: `AskReason` (`"approval"`, STORY-46 adds a question) and `ChatRow.asks`
+  beside the row. The oldest open request sets `waiting`; a saved or restored row waits on a reply, never a request.
+  Why: the STORY-21 seam, extended so STORY-46 adds one reason and one event, nothing in the list or saving.
+- `tool-allowed` carries the tool's name and input, like `tool-denied`. Why: a bug found in testing. The SDK's
+  permission callback can run before its assistant message reaches the chat, and an Allow for this chat that arrived
+  first was dropped, so the row showed no mark. Regression test in `chat-approvals.test.ts`.
+- A denied call shows the user's reason on its row. Why: the user sees what the agent was told.
+- STORY-7 seam: `SDK_PERMISSION_MODES` maps each role's `PermissionMode` to the SDK's; only `ask` exists until STORY-7
+  adds more. STORY-46 seam: `AskReason` and `nextAsks`.
+- `chat-manager.ts` stays under 300 lines: the approval desk is `approval-desk.ts`, `ChatError` is `chat-error.ts`,
+  and the manager's interfaces are `chat-manager-types.ts`.
+
+### STORY-5 checks changed (follows STORY-45 AC1–2, decided by the Dev Lead)
+
+STORY-5's auto-deny existed only until this story; STORY-45 AC1–2 replace it with the user's answer.
+
+- `packages/server/test/chat-session.test.ts` (AC5). Old: "until approvals exist, a tool that needs one is denied";
+  `canUseTool` answered with no user action, `{ behavior: "deny", message: CHAT_MESSAGES.denied }`, and the row
+  `denied: true` with result `CHAT_MESSAGES.denied`. New: "a tool that needs approval, denied by the user, shows as
+  denied"; the user denies through `manager.approve`, `{ behavior: "deny", message: denyMessage() }`, and the row
+  `denied: true` with result `denyMessage()`.
+- `apps/desktop/e2e/chat.spec.ts`. Old: title "…denies what needs approval…"; the Bash row read `Bashnpm testDenied`
+  with no user action and the log showed `CHAT_MESSAGES.denied`. New: title "…asks before a tool that needs
+  approval…"; the user clicks Deny in the inline prompt, then the row reads `Bashnpm testDenied` and the log shows
+  `denyMessage()`.
+- `CHAT_MESSAGES.denied` ("Featra can't ask for approval yet…") is removed; grep found no other use.

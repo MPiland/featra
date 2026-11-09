@@ -22,6 +22,7 @@ export * from "./card-view-types.ts";
 export * from "./card-edit.ts";
 export * from "./card-view.ts";
 export * from "./roles.ts";
+export * from "./approvals.ts";
 export * from "./chat-events.ts";
 export * from "./chat-state.ts";
 export * from "./chat-list.ts";

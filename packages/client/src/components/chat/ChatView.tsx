@@ -46,7 +46,11 @@ export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
           {error}
         </p>
       )}
-      <Transcript items={items} running={running} actions={{ onNewChat: () => void newChat() }} />
+      <Transcript
+        items={items}
+        running={running}
+        actions={{ onNewChat: () => void newChat(), onAnswer: (tool, answer) => chats.approve(chat.id, tool, answer) }}
+      />
       {!gone && (
         <Composer
           running={running}

@@ -3,6 +3,7 @@
  * without React: deltas join into one reply, each tool call is one row that its result and a denial update, and a
  * turn is running from the user's message until it ends.
  */
+import type { AllowScope } from "./approvals.ts";
 import type { ChatEvent, ChatProblem } from "./chat-events.ts";
 import { assertNever } from "./utils/guards.ts";
 import { toolSummary } from "./tool-summary.ts";
@@ -14,6 +15,9 @@ export interface ToolResult {
   output: string;
   isError: boolean;
 }
+
+/** Where a tool row's approval stands: waiting on the user, or allowed (by the user, or by an earlier Allow for this chat). */
+export type ToolApproval = { status: "pending"; forChat: boolean } | { status: "allowed"; scope: AllowScope };
 
 export type ChatItem =
   | { kind: "user"; key: string; text: string }
@@ -27,8 +31,14 @@ export type ChatItem =
       input: unknown;
       result: ToolResult | null;
       denied: boolean;
+      /** Why the user denied it, when they said. */
+      reason: string | null;
+      /** The approval the call asked for, if it asked. */
+      approval: ToolApproval | null;
       /** The user stopped the turn before the call had a result. */
       stopped: boolean;
+      /** The call ended unanswered some other way: its request was cancelled, or its turn ended without a result. */
+      cancelled: boolean;
     }
   | { kind: "notice"; key: string; notice: ChatNotice };
 
@@ -54,14 +64,23 @@ function replace(state: ChatState, index: number, item: ChatItem): ChatState {
 const toolIndex = (state: ChatState, id: string) =>
   state.items.findIndex((item) => item.kind === "tool" && item.id === id);
 
-/** A tool row: new, or the one already there for this call (a denial can come before the call itself). */
-function upsertTool(state: ChatState, id: string, name: string, input: unknown, denied: boolean): ChatState {
+type ToolItem = Extract<ChatItem, { kind: "tool" }>;
+
+/**
+ * A tool row, new or the one already there for this call, with `change` applied. An approval or a denial can come
+ * before the call itself.
+ */
+function upsertTool(
+  state: ChatState,
+  id: string,
+  name: string,
+  input: unknown,
+  change: (row: ToolItem) => Partial<ToolItem> = () => ({}),
+): ChatState {
   const at = toolIndex(state, id);
   const existing = state.items[at];
-  if (existing?.kind === "tool") {
-    return replace(state, at, { ...existing, denied: existing.denied || denied });
-  }
-  return push(state, {
+  if (existing?.kind === "tool") return replace(state, at, { ...existing, ...change(existing) });
+  const row: ToolItem = {
     kind: "tool",
     key: key(state),
     id,
@@ -69,10 +88,23 @@ function upsertTool(state: ChatState, id: string, name: string, input: unknown, 
     summary: toolSummary(name, input),
     input,
     result: null,
-    denied,
+    denied: false,
+    reason: null,
+    approval: null,
     stopped: false,
-  });
+    cancelled: false,
+  };
+  return push(state, { ...row, ...change(row) });
 }
+
+/** Changes the row of a call already shown; an answer for a call that has no row changes nothing. */
+function updateTool(state: ChatState, id: string, change: (row: ToolItem) => Partial<ToolItem>): ChatState {
+  const at = toolIndex(state, id);
+  const row = state.items[at];
+  return row?.kind === "tool" ? replace(state, at, { ...row, ...change(row) }) : state;
+}
+
+const pending = (row: ToolItem) => row.approval?.status === "pending";
 
 function appendText(state: ChatState, block: string, delta: string): ChatState {
   const last = state.items.at(-1);
@@ -82,12 +114,18 @@ function appendText(state: ChatState, block: string, delta: string): ChatState {
   return push(state, { kind: "assistant", key: key(state), block, text: delta });
 }
 
-/** A stopped turn leaves its unanswered calls stopped, never waiting for a result that won't come. */
-const stopTools = (state: ChatState): ChatState => ({
+/**
+ * An ended turn leaves no call waiting for a result that won't come: a stopped turn marks its unanswered calls
+ * stopped; one that ended otherwise marks them cancelled (a request still waiting when the app closed is gone, so a
+ * restored chat shows it cancelled, never denied). Either way no approval is left waiting.
+ */
+const endTools = (state: ChatState, stopped: boolean): ChatState => ({
   ...state,
-  items: state.items.map((item) =>
-    item.kind === "tool" && item.result === null && !item.denied ? { ...item, stopped: true } : item,
-  ),
+  items: state.items.map((item) => {
+    if (item.kind !== "tool" || item.result !== null || item.denied) return item;
+    const approval = pending(item) ? null : item.approval;
+    return stopped ? { ...item, approval, stopped: true } : { ...item, approval, cancelled: !item.stopped };
+  }),
 });
 
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
@@ -99,9 +137,23 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "text":
       return event.delta ? appendText(state, event.block, event.delta) : state;
     case "tool":
-      return upsertTool(state, event.id, event.name, event.input, false);
+      return upsertTool(state, event.id, event.name, event.input);
+    case "approval":
+      return upsertTool(state, event.id, event.name, event.input, () => ({
+        approval: { status: "pending", forChat: event.forChat },
+      }));
+    case "tool-allowed":
+      return upsertTool(state, event.id, event.name, event.input, () => ({
+        approval: { status: "allowed", scope: event.scope },
+      }));
     case "tool-denied":
-      return upsertTool(state, event.id, event.name, event.input, true);
+      return upsertTool(state, event.id, event.name, event.input, () => ({
+        denied: true,
+        reason: event.reason ?? null,
+        approval: null,
+      }));
+    case "approval-cancelled":
+      return updateTool(state, event.id, (row) => (pending(row) ? { approval: null, cancelled: true } : {}));
     case "tool-result": {
       const at = toolIndex(state, event.id);
       const row = state.items[at];
@@ -110,12 +162,12 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     }
     case "turn-end":
       return event.outcome === "stopped"
-        ? push(stopTools({ ...state, running: false }), {
+        ? push(endTools({ ...state, running: false }, true), {
             kind: "notice",
             key: key(state),
             notice: { type: "stopped" },
           })
-        : { ...state, running: false };
+        : endTools({ ...state, running: false }, false);
     case "problem":
       return { ...push(state, { kind: "notice", key: key(state), notice: event.problem }), running: false };
     default:

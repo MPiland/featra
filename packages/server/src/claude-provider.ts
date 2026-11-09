@@ -4,7 +4,7 @@
  * role's model and effort. `settingSources` keeps the SDK default, so CLAUDE.md, skills and hooks load as usual.
  */
 import type { CanUseTool, Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { errorMessage, type ChatEvent, type Role } from "@featra/work-format";
+import { errorMessage, type ChatEvent, type PermissionMode, type Role } from "@featra/work-format";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
 import { loadSessionReader } from "./claude-sdk.ts";
 import { claudeHistory, type SessionReader } from "./claude-transcript.ts";
@@ -37,6 +37,12 @@ export function agentEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return rest;
 }
 
+/**
+ * The SDK's permission mode for each of a role's modes. Ask is the SDK's default: the user's own Claude rules apply,
+ * and every other tool that needs approval goes to `canUseTool` (ADR 0018). STORY-22 adds the other modes.
+ */
+export const SDK_PERMISSION_MODES: Record<PermissionMode, NonNullable<Options["permissionMode"]>> = { ask: "default" };
+
 /** The query options for a role's chat. */
 export function claudeOptions(
   role: Role,
@@ -52,8 +58,7 @@ export function claudeOptions(
     effort: role.effort,
     systemPrompt: { type: "preset", preset: "claude_code", append: role.prompt },
     pathToClaudeCodeExecutable: claude,
-    // Ask: every tool that needs approval goes to canUseTool. STORY-22 adds the other modes.
-    permissionMode: "default",
+    permissionMode: SDK_PERMISSION_MODES[role.permission],
     includePartialMessages: true,
     canUseTool,
     env,
@@ -96,8 +101,9 @@ function startSession(
   /** A turn is open from its message until its turn-end. */
   let open = false;
 
-  const canUseTool: CanUseTool = async (name, toolInput, { signal, toolUseID }) => {
-    const decision = await approve({ id: toolUseID, name, input: toolInput }, AbortSignal.any([signal, turn.signal]));
+  const canUseTool: CanUseTool = async (name, toolInput, { signal, toolUseID, suppressAlwaysAllowRule }) => {
+    const request = { id: toolUseID, name, input: toolInput, forChat: suppressAlwaysAllowRule !== true };
+    const decision = await approve(request, AbortSignal.any([signal, turn.signal]));
     return decision.allow
       ? { behavior: "allow", updatedInput: decision.input }
       : { behavior: "deny", message: decision.message };

@@ -12,13 +12,15 @@ export interface ToolRequest {
   id: string;
   name: string;
   input: Record<string, unknown>;
+  /** False when the agent says the call may only be allowed once: no Allow for this chat covers or comes from it. */
+  forChat?: boolean;
 }
 
 export type ToolDecision = { allow: true; input: Record<string, unknown> } | { allow: false; message: string };
 
 /**
- * Decides a tool call that needs approval. Pluggable: until STORY-45 the server denies every one; STORY-45 asks the
- * user in the chat. `signal` aborts when the turn is stopped.
+ * Decides a tool call that needs approval: by default the approval desk asks the user in the chat (STORY-45). `signal`
+ * aborts when the turn is stopped or the chat's agent ends, and the request ends unanswered.
  */
 export type ApprovalHandler = (request: ToolRequest, signal: AbortSignal) => Promise<ToolDecision>;
 

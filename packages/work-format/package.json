@@ -16,6 +16,7 @@
     "./chat": "./src/chat-state.ts",
     "./chat-events": "./src/chat-events.ts",
     "./chat-list": "./src/chat-list.ts",
+    "./approvals": "./src/approvals.ts",
     "./tool-summary": "./src/tool-summary.ts"
   },
   "scripts": {
