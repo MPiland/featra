@@ -2,7 +2,7 @@
 id: BUG-4
 type: bug
 title: Intermittent WSLg e2e failures
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: user
+  - at: 2026-11-09T02:37:47Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:bug-4
 ---
 
 ## Description
@@ -36,13 +41,13 @@ Two e2e tests have each failed once on WSLg (Ubuntu), with nothing else running.
 
 ## Acceptance criteria
 
-- [ ] Each failure is reproduced, with its error and trace kept, and its cause is recorded in Notes. If the cause is a product bug, a regression test fails before the fix.
-- [ ] All four tests in Notes and Description (contrast dark, menu Edit/Paste, tray.spec:75 Show Featra, tray.spec:220 launch again) pass in 20 full Linux runs in a row (Ubuntu, Xvfb with a window manager, on CI), and the tray tests pass 150 Windows runs on CI, with their assertions unchanged.
+- [x] tray.spec:75 (Show Featra) is reproduced, with its cause recorded in Notes, and its product bug has a regression test that fails before the fix. menu Edit/Paste, contrast dark and tray.spec:220 (launch again) are each closed as not reproducible: none failed in the CI soaks (Windows tray 1350/1350, run 42509370525; Ubuntu 720/720, run 42509375532) or in any local run. If one recurs, CI keeps its trace and it gets its own bug card.
+- [x] All four tests in Notes and Description (contrast dark, menu Edit/Paste, tray.spec:75 Show Featra, tray.spec:220 launch again) pass in 20 full Linux runs in a row (Ubuntu, Xvfb with a window manager, on CI), and the tray tests pass 150 Windows runs on CI, with their assertions unchanged.
 
 ## Tasks
 
 - [x] Run the full WSLg suite repeatedly, including right after a fresh install and build, keeping traces of failures
-- [ ] Fix the cause, in the product or in the test's isolation, without weakening any assertion
+- [x] Fix the cause, in the product or in the test's isolation, without weakening any assertion
 
 ## Notes
 
@@ -98,3 +103,16 @@ Two e2e tests have each failed once on WSLg (Ubuntu), with nothing else running.
 - 2026-11-07 (session:bug-4): **Blocked by STORY-43 "Every PR runs CI on Windows and Ubuntu" (FEAT-18).** The user
   decided (decisions.md, 18013d9) that WSLg was only a test stand-in, not a supported platform: Linux runs move to
   Ubuntu under Xvfb with a window manager, and the soak runs move to GitHub Actions. AC2 now asks for those CI runs.
+- 2026-11-08 (session:bug-4): **AC2 proven on CI at 10aff67** (the branch with main merged in), assertions unchanged,
+  `--max-failures 1`:
+  - Windows, `soak/windows/tray/150`, run 42509370525: tray.spec `--repeat-each 150`, **1350 of 1350 passed** (9 tests
+    × 150) in 24.6 min on windows-2025.
+  - Ubuntu, `soak/ubuntu/all/20`, run 42509375532: the full suite under Xvfb `--repeat-each 20`, **720 of 720 passed**
+    (36 tests × 20, all four tests included) in 15.7 min on ubuntu-24.04.
+  - PR MPiland/featra#5 (run 42509394777): Gate, E2E (Windows) and E2E (Ubuntu) passed. The new global setup's
+    desktop check passed on the Windows runner.
+  - **AC1 isn't met:** tray:75 was reproduced and fixed, but menu Paste, contrast dark and the earlier tray:220
+    failures never came back, here or on CI, so their causes aren't known. The card stays In Progress until the user
+    decides whether to close them as not reproducible or to change AC1.
+- 2026-11-08 (user changed AC1; card history has no field for an AC change, so it is recorded here): menu Paste, contrast dark and tray.spec:220 close as not reproducible; AC1 is reworded to say so.
+  BUG-6 was fixed first (merged to main at f2de028, merged here at ce54529). BUG-4 moves to In Review.
