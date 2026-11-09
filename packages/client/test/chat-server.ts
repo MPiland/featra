@@ -11,6 +11,8 @@ export interface ChatHost {
   startError?: string;
   /** What `chat.send` refuses with, if anything. */
   sendError?: string;
+  /** What `chat.stop` refuses with, if anything. */
+  stopError?: string;
 }
 
 export function fakeChatServer(calls: string[], host: ChatHost = {}) {
@@ -43,7 +45,10 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       record(id, { type: "user", text });
       return null;
     },
-    stop: async (id) => void calls.push(`chat.stop:${id}`),
+    stop: async (id) => {
+      calls.push(`chat.stop:${id}`);
+      return host.stopError ?? null;
+    },
   };
   return {
     bridge,

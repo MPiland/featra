@@ -4,8 +4,7 @@ import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Page } from "@playwright/test";
-import { CHAT_COPY as SERVER_COPY } from "@featra/server";
-import { BUILT_IN_ROLES } from "@featra/work-format";
+import { BUILT_IN_ROLES, CHAT_MESSAGES } from "@featra/work-format";
 import { launch, tempProject, tempUserData } from "./app.ts";
 
 /**
@@ -80,7 +79,7 @@ test("a Developer chat streams replies, shows tool rows, denies what needs appro
     const bash = log(page).getByRole("button", { name: /^Bash/ });
     await expect(bash).toHaveText("Bashnpm testDenied");
     await bash.click();
-    await expect(log(page)).toContainText(SERVER_COPY.denied);
+    await expect(log(page)).toContainText(CHAT_MESSAGES.denied);
 
     // AC2: Stop interrupts the running turn.
     await composer(page).fill("slow");
@@ -126,9 +125,7 @@ test("without claude on the PATH, a chat says so in one line and offers no login
     await newChat(page, "QA");
     await composer(page).fill("hello");
     await composer(page).press("Enter");
-    await expect(log(page).getByRole("status")).toHaveText(
-      "Claude Code isn't installed. Install it, then start a new chat.",
-    );
+    await expect(log(page).getByRole("status")).toHaveText("Claude Code isn't installed.");
     await expect(page.getByRole("button", { name: /log ?in|sign ?in/i })).toHaveCount(0);
   } finally {
     await app.close();

@@ -16,6 +16,7 @@ export function ToolRow({ item }: { item: ToolItem }) {
         <span className="chat-tool-name">{item.name}</span>
         <span className="chat-tool-summary">{item.summary}</span>
         {item.denied && <span className="chat-tool-mark">{CHAT_COPY.denied}</span>}
+        {item.stopped && <span className="chat-tool-mark">{CHAT_COPY.toolStopped}</span>}
       </button>
       {open && (
         <div className="chat-tool-body">

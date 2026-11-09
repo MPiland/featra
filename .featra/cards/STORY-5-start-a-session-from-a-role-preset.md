@@ -35,7 +35,7 @@ inside Featra instead of a terminal.
 ## Acceptance criteria
 
 - [x] New chat with a role starts a Claude session through the Agent SDK with the user's own `claude`, in the project folder, with the role's prompt appended to Claude Code's system prompt and the role's model and effort (test: packages/server/test/chat-session.test.ts AC1, packages/server/test/claude-locate.test.ts AC1, packages/server/test/ws-chat.test.ts, apps/desktop/e2e/chat.spec.ts journey)
-- [x] The agent's reply streams into the chat as it arrives; Enter sends, Shift+Enter adds a line, and Stop ends the running turn (test: packages/server/test/chat-session.test.ts AC2, packages/client/test/components/chat.test.tsx AC2, packages/client/test/chat-bridge.test.ts, packages/work-format/test/chat.test.ts AC2, apps/desktop/e2e/chat.spec.ts journey)
+- [x] The agent's reply streams into the chat as it arrives; Enter sends, Shift+Enter adds a line, and Stop ends the running turn (test: packages/server/test/chat-session.test.ts AC2, packages/server/test/chat-stop.test.ts, packages/client/test/components/chat.test.tsx AC2, packages/client/test/chat-bridge.test.ts, packages/work-format/test/chat.test.ts AC2, apps/desktop/e2e/chat.spec.ts journey)
 - [x] Each tool call shows as one collapsed row (tool and a short summary) that expands to its input and result (test: packages/work-format/test/chat.test.ts AC3, packages/server/test/chat-session.test.ts AC3, packages/server/test/claude-messages.test.ts AC3, packages/client/test/components/chat.test.tsx AC3, apps/desktop/e2e/chat.spec.ts journey)
 - [x] If `claude` isn't installed or isn't logged in, the chat says which in one line. Featra offers no login and reads no credential file (test: packages/server/test/chat-session.test.ts AC4, packages/server/test/chat-credentials.test.ts AC4, packages/server/test/claude-messages.test.ts AC4, packages/client/test/components/chat.test.tsx AC4, apps/desktop/e2e/chat.spec.ts without claude)
 - [x] The five built-in roles (Researcher, Analyst/Refiner, Dev Lead, Developer, QA) can be picked; each starts in Ask permission mode (test: packages/work-format/test/chat.test.ts AC5, packages/server/test/ws-chat.test.ts AC5, packages/server/test/chat-session.test.ts AC5, packages/client/test/components/chat.test.tsx AC5, apps/desktop/e2e/chat.spec.ts journey)
@@ -63,3 +63,5 @@ inside Featra instead of a terminal.
 - Until STORY-45 lands, a tool that needs approval is denied with a visible row. That exists only on the feature
   branch.
 - The roles here are fixed definitions. STORY-6 adds editing, custom roles and provider roles.
+- Behaviour change (review): logged out is read only from the SDK's `error: "authentication_failed"`. A result or
+  reply that only mentions logging in now shows as itself (a failed result shows its message), not as logged out.

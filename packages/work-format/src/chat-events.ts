@@ -95,3 +95,13 @@ export function chatSendParams(params: unknown): { id: string; text: string } | 
   const chat = chatParams(params);
   return chat && isRecord(params) && str(params.text) && params.text.trim() ? { ...chat, text: params.text } : null;
 }
+
+/** What the server says about a chat: its refusals, shown to the user, and the denial the agent is told. */
+export const CHAT_MESSAGES = {
+  unknownRole: "No such role.",
+  noProvider: "This role's agent isn't available.",
+  noChat: "No such chat.",
+  busy: "Wait for the reply, or stop it.",
+  /** Told to the agent when a tool is denied until approvals exist (STORY-45). */
+  denied: "Featra can't ask for approval yet, so it denied this tool. Carry on without it.",
+} as const;

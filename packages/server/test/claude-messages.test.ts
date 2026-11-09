@@ -67,11 +67,17 @@ describe("AC4: how a turn ends", () => {
     ]);
   });
 
-  it("reads a logged-out result as logged out", () => {
+  it("reads a failed result that mentions logging in as a failure with that message, not as logged out", () => {
     expect(translate(sdk.failure({ result: "Invalid API key · Please run /login" }))[0]).toEqual({
       type: "problem",
-      problem: { type: "logged-out" },
+      problem: { type: "failed", message: "Invalid API key · Please run /login" },
     });
+  });
+
+  it("keeps assistant text that mentions logging in", () => {
+    expect(translate(sdk.assistant("m1", [sdk.text("Not logged in · Please run /login")]))).toEqual([
+      { type: "text", block: "m1:0", delta: "Not logged in · Please run /login" },
+    ]);
   });
 
   it("says logged out once a turn, and again on the next turn", () => {

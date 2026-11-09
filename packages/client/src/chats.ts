@@ -27,8 +27,8 @@ export interface ChatBridge {
   watch: (id: string, listener: (update: ChatUpdate) => void) => () => void;
   /** Sends a message; resolves with why it wasn't sent, or null. */
   send: (id: string, text: string) => Promise<string | null>;
-  /** Interrupts the running turn. */
-  stop: (id: string) => Promise<void>;
+  /** Interrupts the running turn; resolves with why it couldn't, or null. */
+  stop: (id: string) => Promise<string | null>;
 }
 
 export const CHAT_COPY = {
@@ -43,11 +43,12 @@ export const CHAT_COPY = {
   transcript: "Chat",
   working: "Working…",
   denied: "Denied",
+  toolStopped: "Stopped",
   input: "Input",
   result: "Result",
   noResult: "No result yet.",
-  notInstalled: "Claude Code isn't installed. Install it, then start a new chat.",
-  loggedOut: "Claude Code isn't logged in. Log in from a terminal with claude, then try again.",
+  notInstalled: "Claude Code isn't installed.",
+  loggedOut: "Claude Code isn't logged in. Run claude in a terminal to log in.",
   stopped: "Stopped.",
 } as const;
 
@@ -108,12 +109,8 @@ export function serverChats(server: ServerClient): ChatBridge {
         },
       );
     },
-    send: (id, text) =>
-      server.call("chat.send", { id, text }).then(
-        () => null,
-        (err: unknown) => errorMessage(err),
-      ),
-    stop: (id) => server.call("chat.stop", { id }).then(() => undefined),
+    send: (id, text) => server.call("chat.send", { id, text }).then(() => null, errorMessage),
+    stop: (id) => server.call("chat.stop", { id }).then(() => null, errorMessage),
   };
 }
 
@@ -127,6 +124,6 @@ export function noChats(error: string): ChatBridge {
       return () => {};
     },
     send: async () => error,
-    stop: async () => {},
+    stop: async () => error,
   };
 }

@@ -108,6 +108,13 @@ describe("AC2: the composer, the streamed reply and Stop", () => {
     expect(within(log()).getByRole("status").textContent).toBe(CHAT_COPY.stopped);
   });
 
+  it("shows why Stop failed", async () => {
+    const { user } = await startChat("Developer", { stopError: "The server isn't running." });
+    await user.type(composer(), "slow{Enter}");
+    await user.click(screen.getByRole("button", { name: CHAT_COPY.stop }));
+    expect((await screen.findByRole("alert")).textContent).toBe("The server isn't running.");
+  });
+
   it("keeps a message the server refused, with why", async () => {
     const { user } = await startChat("Developer", { sendError: "Wait for the reply, or stop it." });
     await user.type(composer(), "hello{Enter}");
@@ -147,6 +154,20 @@ describe("AC3: a tool call is one collapsed row that opens to its input and resu
     );
     const row = within(log()).getByRole("button", { name: /Bash/ });
     expect(row.textContent).toBe(`Bashnpm test${CHAT_COPY.denied}`);
+  });
+});
+
+describe("AC2, AC3: a call the user stopped", () => {
+  it("is marked stopped on its row, not denied", async () => {
+    const { user, chats } = await startChat();
+    await user.type(composer(), "test it{Enter}");
+    chats.emit(
+      "chat-1",
+      { type: "tool", id: "t1", name: "Bash", input: { command: "npm test" } },
+      { type: "turn-end", outcome: "stopped" },
+    );
+    const row = within(log()).getByRole("button", { name: /Bash/ });
+    expect(row.textContent).toBe(`Bashnpm test${CHAT_COPY.toolStopped}`);
   });
 });
 

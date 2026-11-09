@@ -24,8 +24,9 @@ stop it.").
   own roles behind the same `list`/`get`.
 - **Approval handler**: every tool the agent must ask about goes to an `ApprovalHandler`. Until STORY-45 it is
   `denyUntilApprovals`, which denies with a message the agent and the user both see, and the chat marks the row Denied.
+  The handler gets an abort signal; a request it answers after Stop or close is not marked Denied.
 - **Session id**: the adapter keeps the SDK's session id and resumes with it when the agent is started again.
-  STORY-44 stores it.
+  The manager doesn't store or expose it yet; STORY-44 does.
 
 **The Claude adapter.** The agent starts on the chat's first message, with `pathToClaudeCodeExecutable` set to the
 `claude` found on the PATH (`claude-locate.ts`; on Windows the `.exe`, or an npm shim's script), `cwd` the project,
@@ -33,7 +34,15 @@ the role's model and effort, the role prompt appended to the `claude_code` prese
 and partial messages on. `settingSources` is left at the SDK's default, so the user's CLAUDE.md, skills and hooks still
 apply. The environment is Featra's minus `ELECTRON_RUN_AS_NODE`. `claude-messages.ts` translates the SDK's messages
 into chat events; subagent messages are left out. A missing `claude` is reported before the SDK is loaded; logged out
-is read from the stream (an `authentication_failed` message or a login prompt in the result), never from a file.
+is read only from the SDK's `error: "authentication_failed"`, never from a file or from what the agent's text says.
+
+**What Ask means.** The user's own Claude permission rules (allow and deny, and a settings `defaultMode`) apply before
+`canUseTool`, so Ask means "ask for anything your Claude settings don't already allow". Featra passes no allow or deny
+lists, no permission prompt tool and no settings of its own, so it never bypasses `canUseTool`.
+
+**Stop.** Stop only marks a turn that is running. Before the agent has started, Stop ends the turn as stopped and the
+next message starts afresh; after the turn has ended, Stop does nothing. A tool request that Stop or closing cut short
+shows as stopped, not Denied. A project the user closes ends its chats, and their events are no longer pushed.
 
 **The SDK stays out of the bundle.** It is loaded with a dynamic `import()` when the first agent starts, and the
 desktop build marks it external, so it is resolved from the app's own dependencies. E2E runs point

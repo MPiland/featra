@@ -3,39 +3,21 @@
  * the PATH lookup are faked (fake-query.ts).
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { BUILT_IN_ROLES, foldChat, type ChatEvent } from "@featra/work-format";
-import { CHAT_COPY, createChatManager, type ChatManager } from "../src/chat-manager.ts";
+import { BUILT_IN_ROLES, CHAT_MESSAGES } from "@featra/work-format";
+import { createChatManager, type ChatManager } from "../src/chat-manager.ts";
 import { createClaudeProvider } from "../src/claude-provider.ts";
 import { FAILED } from "../src/claude-messages.ts";
 import { createRoleRegistry } from "../src/role-registry.ts";
+import { chat, closeChats, DIR } from "./chat-fixture.ts";
 import { fakeClaude, sdk } from "./fake-query.ts";
 import { until } from "./until.ts";
 
-const DIR = "/home/me/demo";
 const role = (id: string) => BUILT_IN_ROLES.find((r) => r.id === id)!;
 let manager: ChatManager | null = null;
-afterEach(() => manager?.close());
-
-/** A chat started from `roleId`, with every event it records. */
-async function chat(roleId = "developer", claude = fakeClaude()) {
-  manager = createChatManager({ providers: [createClaudeProvider(claude.deps)], roles: createRoleRegistry() });
-  const id = await manager.start(DIR, roleId);
-  const events: ChatEvent[] = [];
-  manager.watch(id, (e) => events.push(e));
-  const m = manager;
-  return {
-    ...claude,
-    id,
-    events,
-    manager: m,
-    send: (text: string) => m.send(id, text),
-    run: async (n = 0) => {
-      await until(() => claude.runs.length > n && (claude.runs[n]?.heard.length ?? 0) > 0);
-      return claude.runs[n]!;
-    },
-    view: () => foldChat(events),
-  };
-}
+afterEach(() => {
+  manager?.close();
+  closeChats();
+});
 
 describe("AC1: a new chat starts the user's claude with the role's settings", () => {
   it("runs in the project folder with the role prompt appended, the role's model and effort, and Ask", async () => {
@@ -50,6 +32,24 @@ describe("AC1: a new chat starts the user's claude with the role's settings", ()
     expect(options.effort).toBe(role("dev-lead").effort);
     expect(options.permissionMode).toBe("default");
     expect(typeof options.canUseTool).toBe("function");
+  });
+
+  it("leaves every tool that needs approval to canUseTool: Featra allows, denies and bypasses nothing itself", async () => {
+    // The user's own Claude permission rules and default mode still apply first, as in their CLI (ADR 0018).
+    const c = await chat();
+    c.send("hello");
+    const { options } = await c.run();
+    expect(options.permissionMode).toBe("default");
+    expect(typeof options.canUseTool).toBe("function");
+    for (const bypass of [
+      "allowedTools",
+      "disallowedTools",
+      "permissionPromptToolName",
+      "allowDangerouslySkipPermissions",
+      "settings",
+    ]) {
+      expect(options).not.toHaveProperty(bypass);
+    }
   });
 
   it("leaves settingSources to the SDK, so CLAUDE.md, skills and hooks load as usual", async () => {
@@ -73,7 +73,7 @@ describe("AC1: a new chat starts the user's claude with the role's settings", ()
 
   it("refuses a role the project doesn't have", async () => {
     manager = createChatManager({ providers: [createClaudeProvider(fakeClaude().deps)], roles: createRoleRegistry() });
-    await expect(manager.start(DIR, "nobody")).rejects.toThrow(CHAT_COPY.unknownRole);
+    await expect(manager.start(DIR, "nobody")).rejects.toThrow(CHAT_MESSAGES.unknownRole);
   });
 });
 
@@ -118,7 +118,7 @@ describe("AC2: the reply streams, and Stop interrupts the turn", () => {
     const c = await chat();
     c.send("one");
     const run = await c.run();
-    expect(() => c.send("two")).toThrow(CHAT_COPY.busy);
+    expect(() => c.send("two")).toThrow(CHAT_MESSAGES.busy);
     run.say(sdk.init(), sdk.success());
     await until(() => !c.view().running);
     c.send("two");
@@ -236,14 +236,14 @@ describe("AC4: a missing or logged-out claude shows one line", () => {
     ]);
   });
 
-  it("reads the login message as logged out when it comes as plain text", async () => {
+  it("shows a reply that only mentions logging in as a reply: logged out comes from the SDK's error alone", async () => {
     const c = await chat();
-    c.send("hello");
+    c.send("how do I log in?");
     const run = await c.run();
-    run.say(sdk.init(), sdk.assistant("m1", [sdk.text("Not logged in · Please run /login")]), sdk.success());
+    run.say(sdk.init(), sdk.assistant("m1", [sdk.text("Not logged in? Please run /login.")]), sdk.success());
     await until(() => !c.view().running);
     expect(c.view().items.filter((i) => i.kind !== "user")).toEqual([
-      expect.objectContaining({ kind: "notice", notice: { type: "logged-out" } }),
+      expect.objectContaining({ kind: "assistant", text: "Not logged in? Please run /login." }),
     ]);
   });
 
@@ -269,15 +269,15 @@ describe("AC5: until approvals exist, a tool that needs one is denied and shows 
     const run = await c.run();
     run.say(sdk.init(), sdk.assistant("m1", [sdk.toolUse("t1", "Bash", { command: "npm test" })]));
     const decision = await run.ask("Bash", { command: "npm test" }, "t1");
-    expect(decision).toEqual({ behavior: "deny", message: CHAT_COPY.denied });
-    run.say(sdk.toolResult("t1", CHAT_COPY.denied, true), sdk.success());
+    expect(decision).toEqual({ behavior: "deny", message: CHAT_MESSAGES.denied });
+    run.say(sdk.toolResult("t1", CHAT_MESSAGES.denied, true), sdk.success());
     await until(() => !c.view().running);
     expect(c.view().items.filter((i) => i.kind === "tool")).toEqual([
       expect.objectContaining({
         name: "Bash",
         summary: "npm test",
         denied: true,
-        result: { output: CHAT_COPY.denied, isError: true },
+        result: { output: CHAT_MESSAGES.denied, isError: true },
       }),
     ]);
   });

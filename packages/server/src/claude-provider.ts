@@ -77,6 +77,8 @@ function startSession(
   let query: ClaudeQuery | null = null;
   let closed = false;
   let turn = new AbortController();
+  /** A turn is open from its message until its turn-end. */
+  let open = false;
 
   const canUseTool: CanUseTool = async (name, toolInput, { signal, toolUseID }) => {
     const decision = await approve({ id: toolUseID, name, input: toolInput }, AbortSignal.any([signal, turn.signal]));
@@ -85,25 +87,39 @@ function startSession(
       : { behavior: "deny", message: decision.message };
   };
 
+  const relay = (e: ChatEvent) => {
+    if (e.type === "turn-end") open = false;
+    emit(e);
+  };
+
   const fail = (events: ChatEvent[]) => {
     input?.close();
     input = null;
     query = null;
-    for (const e of events) emit(e);
+    for (const e of events) relay(e);
+  };
+
+  /** Before the agent is running, Stop ends the turn here: nothing was sent, so the next message starts afresh. */
+  const stoppedEarly = () => {
+    if (!turn.signal.aborted) return false;
+    fail([END_STOPPED]);
+    return true;
   };
 
   /** Starts the agent, then relays its stream until it ends. A later message starts it again, resuming. */
   async function run(queue: InputQueue<SDKUserMessage>) {
     const claude = await locate();
+    if (closed || stoppedEarly()) return;
     if (!claude) return fail([{ type: "problem", problem: { type: "not-installed" } }, END_FAILED]);
     let running: ClaudeQuery;
     try {
       const options = claudeOptions(role, cwd, claude, canUseTool, agentEnv(env), translator.sessionId());
-      running = (await loadQuery())({ prompt: queue.iterable, options });
+      const queryFn = await loadQuery();
+      if (closed || stoppedEarly()) return;
+      running = queryFn({ prompt: queue.iterable, options });
     } catch (err) {
       return fail([failed(errorMessage(err)), END_FAILED]);
     }
-    if (closed) return;
     query = running;
     let mid = false;
     try {
@@ -111,11 +127,13 @@ function startSession(
         for (const e of translator.translate(message)) {
           if (e.type === "turn-end") mid = false;
           else if (e.type !== "started") mid = true;
-          emit(e);
+          relay(e);
         }
       }
     } catch (err) {
-      if (!closed) return fail([failed(errorMessage(err)), END_FAILED]);
+      // Only this query's own failure: a newer one may have taken over.
+      if (!closed && query === running) fail([failed(errorMessage(err)), END_FAILED]);
+      return;
     }
     // The agent ended on its own: a turn it left open fails, and the next message starts it again.
     if (!closed && query === running) fail(mid ? [failed(FAILED), END_FAILED] : []);
@@ -125,16 +143,24 @@ function startSession(
     send(text) {
       if (closed) return;
       turn = new AbortController();
+      open = true;
+      translator.newTurn();
       const queue = input ?? createInputQueue<SDKUserMessage>();
       queue.push(userMessage(text, translator.sessionId()));
       if (input) return;
       input = queue;
-      void run(queue);
+      run(queue).catch((err: unknown) => {
+        // Finding `claude` failed, or telling the chat did: end the turn, never leave the rejection loose.
+        if (!closed && input === queue) fail([failed(errorMessage(err)), END_FAILED]);
+      });
     },
     async interrupt() {
+      if (!open) return;
       turn.abort();
+      // Only a turn the agent is running reads its result as stopped; before that, run() ends it (stoppedEarly).
+      if (!query) return;
       translator.interrupted();
-      await query?.interrupt();
+      await query.interrupt();
     },
     close() {
       closed = true;
@@ -148,4 +174,5 @@ function startSession(
 }
 
 const END_FAILED: ChatEvent = { type: "turn-end", outcome: "failed" };
+const END_STOPPED: ChatEvent = { type: "turn-end", outcome: "stopped" };
 const failed = (message: string): ChatEvent => ({ type: "problem", problem: { type: "failed", message } });

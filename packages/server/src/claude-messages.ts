@@ -5,16 +5,15 @@
  */
 import { isRecord, type ChatEvent } from "@featra/work-format";
 
-/** What `claude` says when it has no login. Featra reads no credential file, so the stream is the only way to know. */
-const LOGGED_OUT = /not logged in|please run \/login|invalid api key/i;
-
 /** A failed turn that said nothing about why. */
 export const FAILED = "The agent stopped with an error.";
 
 export interface ClaudeTranslator {
   /** The events one SDK message adds. */
   translate: (message: unknown) => ChatEvent[];
-  /** The user pressed Stop: the turn's result reads as stopped, not failed. */
+  /** A new turn begins: nothing from the last one carries over. */
+  newTurn: () => void;
+  /** The user pressed Stop during the running turn: its result reads as stopped, not failed. */
   interrupted: () => void;
   /** The session id the agent reported, once it has. */
   sessionId: () => string | null;
@@ -73,13 +72,16 @@ export function createClaudeTranslator(): ClaudeTranslator {
     return delta ? [{ type: "text", block: `${current}:${String(event.index)}`, delta }] : [];
   }
 
+  /**
+   * Logged out is known only from the SDK's own signal: Featra reads no credential file, and a reply that merely
+   * mentions logging in is still a reply.
+   */
   function assistant(message: Record<string, unknown>, error: unknown): ChatEvent[] {
     if (error === "authentication_failed") return logout();
     const id = text(message.id);
     return records(message.content).flatMap((block, i): ChatEvent[] => {
       if (block.type === "text" && !streamed.has(id)) {
         const t = text(block.text);
-        if (LOGGED_OUT.test(t)) return logout();
         return t ? [{ type: "text", block: `${id}:${i}`, delta: t }] : [];
       }
       if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
@@ -99,10 +101,10 @@ export function createClaudeTranslator(): ClaudeTranslator {
     if (message.is_error !== true && message.subtype === "success") return [{ type: "turn-end", outcome: "done" }];
     const errors = Array.isArray(message.errors) ? message.errors.filter((e) => typeof e === "string") : [];
     const why = text(message.result) || errors.join(" ") || FAILED;
-    const problem: ChatEvent = LOGGED_OUT.test(why)
-      ? { type: "problem", problem: { type: "logged-out" } }
-      : { type: "problem", problem: { type: "failed", message: why } };
-    return [problem, { type: "turn-end", outcome: "failed" }];
+    return [
+      { type: "problem", problem: { type: "failed", message: why } },
+      { type: "turn-end", outcome: "failed" },
+    ];
   }
 
   return {
@@ -125,6 +127,10 @@ export function createClaudeTranslator(): ClaudeTranslator {
         default:
           return [];
       }
+    },
+    newTurn: () => {
+      stopping = false;
+      loggedOut = false;
     },
     interrupted: () => {
       stopping = true;

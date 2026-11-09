@@ -105,6 +105,27 @@ describe("AC2, AC3: what the chat view shows", () => {
     }
   });
 
+  it("marks the calls a stopped turn left unanswered as stopped, and leaves answered and denied ones", () => {
+    const view = foldChat([
+      { type: "user", text: "x" },
+      { type: "tool", id: "t1", name: "Read", input: { file_path: "a.ts" } },
+      { type: "tool-result", id: "t1", output: "x", isError: false },
+      { type: "tool-denied", id: "t2", name: "Bash", input: { command: "ls" } },
+      { type: "tool", id: "t3", name: "Bash", input: { command: "npm test" } },
+      { type: "turn-end", outcome: "stopped" },
+    ]);
+    expect(view.items.filter((i) => i.kind === "tool").map((i) => i.kind === "tool" && [i.id, i.stopped])).toEqual([
+      ["t1", false],
+      ["t2", false],
+      ["t3", true],
+    ]);
+    const failed = foldChat([
+      { type: "tool", id: "t1", name: "Bash", input: { command: "ls" } },
+      { type: "turn-end", outcome: "failed" },
+    ]);
+    expect(failed.items[0]).toMatchObject({ stopped: false });
+  });
+
   it("ends a turn: a stopped one leaves a notice, a problem shows as one", () => {
     expect(
       foldChat([

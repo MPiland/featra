@@ -411,8 +411,7 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   model; research, building and checking run longest, so they use the faster one. STORY-6 makes them editable.
 - The agent gets Featra's environment minus `ELECTRON_RUN_AS_NODE`. Why: the user's `claude` must see their own PATH,
   proxy and config variables, and that one variable would make an Electron-launched `claude` act as plain Node.
-- Logged out is read from the agent's stream (`authentication_failed`, or a login prompt in the result), never from a
-  credential file. The copy points to `claude` in a terminal and offers no login. Why: Featra never handles a vendor
+- Logged out is read only from the SDK's `error: "authentication_failed"`, never from a credential file. The copy points to `claude` in a terminal and offers no login. Why: Featra never handles a vendor
   login (ADR 0007).
 - The agent starts on the chat's first message, not on New chat. Why: an empty chat costs nothing and a missing or
   logged-out `claude` is reported where the user is looking, under their message.
@@ -427,3 +426,24 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
 - The client keeps a `chat.event` push that arrives before the `chat.watch` answer and applies it after the log, and
   drops a malformed push. Both were bugs found by tests: the push was lost, and a malformed one wiped the chat.
 - The installed SDK's `canUseTool` also takes a `requestId`; the test fakes pass one.
+
+### Review fixes (PR #7)
+
+- Logged out no longer matches login phrases in the result or the reply; only `authentication_failed` counts. Why: a
+  reply that mentions logging in (or a failure that does) was hidden behind the logged-out line. A failed result now
+  shows its own message.
+- The copy is one short sentence each: "Claude Code isn't installed." and "Claude Code isn't logged in. Run claude in a
+  terminal to log in." Why: short standard UI copy.
+- The server's chat copy (`CHAT_MESSAGES`) lives in `work-format/chat-events`; the client's own labels stay in
+  `chats.ts`. Why: the server, the tests and the e2e journey share the refusals, so one place keeps them from drifting.
+- Stop only marks a turn that is running: before the agent starts it ends the turn as stopped and the next message
+  starts afresh; after the turn ended it does nothing. Why: a Stop during the lookup or at a turn's end left a flag
+  set, and the next turn ended "Stopped".
+- A failure outside the stream (the `claude` lookup throwing) ends the turn as failed. Why: the rejection was left
+  unhandled and the turn never ended.
+- A watcher that throws is logged and the chat carries on. Why: one broken socket shouldn't end a chat for every view.
+- A tool request cut short by Stop or close shows as stopped on its row, not Denied. Why: the user stopped it; nothing
+  denied it.
+- A project the user closes ends its chats, and `chat.event` pushes check the project is still open. Why: like
+  `work.watch` and `card.view`, a page may only act on open projects.
+- A failed Stop shows its error in the chat view. Why: it was swallowed, so the user didn't know Stop hadn't happened.

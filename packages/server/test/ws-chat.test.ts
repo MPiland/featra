@@ -3,9 +3,8 @@
  * `query` and the PATH lookup are faked.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { BUILT_IN_ROLES, type ChatEvent } from "@featra/work-format";
+import { BUILT_IN_ROLES, CHAT_MESSAGES, type ChatEvent } from "@featra/work-format";
 import { createAllowedProjects } from "../src/allowed-projects.ts";
-import { CHAT_COPY } from "../src/chat-manager.ts";
 import { createServices } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { fakeClaude, sdk } from "./fake-query.ts";
@@ -78,7 +77,7 @@ describe("STORY-5: chat.roles, chat.start, chat.watch, chat.send and chat.stop",
       });
 
       socket.send({ id: 5, method: "chat.send", params: { id, text: "and more" } });
-      expect(await socket.next((f) => f.id === 5)).toEqual({ id: 5, ok: false, error: CHAT_COPY.busy });
+      expect(await socket.next((f) => f.id === 5)).toEqual({ id: 5, ok: false, error: CHAT_MESSAGES.busy });
 
       socket.send({ id: 6, method: "chat.stop", params: { id } });
       expect(await socket.next((f) => f.id === 6)).toEqual({ id: 6, ok: true, result: null });
@@ -110,14 +109,41 @@ describe("STORY-5: chat.roles, chat.start, chat.watch, chat.send and chat.stop",
       socket.send({ id: 8, method: "chat.start", params: { dir: "/not/open", role: "qa" } });
       expect(await socket.next((f) => f.id === 8)).toEqual({ id: 8, ok: false, error: "Not an open project." });
       socket.send({ id: 9, method: "chat.start", params: { dir: project.dir, role: "nobody" } });
-      expect(await socket.next((f) => f.id === 9)).toEqual({ id: 9, ok: false, error: CHAT_COPY.unknownRole });
+      expect(await socket.next((f) => f.id === 9)).toEqual({ id: 9, ok: false, error: CHAT_MESSAGES.unknownRole });
       socket.send({ id: 10, method: "chat.watch", params: { id: "nope" } });
-      expect(await socket.next((f) => f.id === 10)).toEqual({ id: 10, ok: false, error: CHAT_COPY.noChat });
+      expect(await socket.next((f) => f.id === 10)).toEqual({ id: 10, ok: false, error: CHAT_MESSAGES.noChat });
       socket.send({ id: 11, method: "chat.start", params: { dir: project.dir, role: "qa" } });
       const { id } = (await socket.next((f) => f.id === 11)).result as { id: string };
       socket.send({ id: 12, method: "chat.send", params: { id, text: "  " } });
       expect(await socket.next((f) => f.id === 12)).toMatchObject({ id: 12, ok: false });
     } finally {
+      socket.close();
+    }
+    expect(logged).toEqual([]);
+  });
+
+  it("ends a project's chats when the project is closed, and pushes no more of their events", async () => {
+    const socket = await open();
+    const n = claude.runs.length;
+    try {
+      socket.send({ id: 13, method: "chat.start", params: { dir: project.dir, role: "developer" } });
+      const { id } = (await socket.next((f) => f.id === 13)).result as { id: string };
+      socket.send({ id: 14, method: "chat.watch", params: { id } });
+      await socket.next((f) => f.id === 14);
+      socket.send({ id: 15, method: "chat.send", params: { id, text: "hi" } });
+      await until(() => claude.runs[n]?.heard.length === 1);
+      const run = claude.runs[n]!;
+      run.say(sdk.init(), sdk.start("m1"), sdk.delta("Before"));
+      await socket.next((f) => f.data?.type === "text");
+
+      allowed.set([]);
+      await until(() => run.closed);
+      run.say(sdk.delta("After"));
+      socket.send({ id: 16, method: "chat.send", params: { id, text: "more" } });
+      expect(await socket.next((f) => f.id === 16)).toEqual({ id: 16, ok: false, error: CHAT_MESSAGES.noChat });
+      expect(socket.frames.filter((f) => f.event === "chat.event" && f.data?.type === "text")).toEqual([]);
+    } finally {
+      allowed.set([project.dir]);
       socket.close();
     }
     expect(logged).toEqual([]);

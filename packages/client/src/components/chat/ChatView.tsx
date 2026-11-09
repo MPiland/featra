@@ -13,8 +13,10 @@ export interface OpenChat {
 /** One chat: the role it runs as, its transcript, and the composer. */
 export function ChatView({ chats, chat }: { chats: ChatBridge; chat: OpenChat }) {
   const [update, setUpdate] = useState<ChatUpdate>({ chat: EMPTY_CHAT, error: null });
+  const [stopError, setStopError] = useState<string | null>(null);
   useEffect(() => chats.watch(chat.id, setUpdate), [chats, chat.id]);
   const { items, running, model } = update.chat;
+  const error = update.error ?? stopError;
   return (
     <section className="chat" aria-label={chat.role.name} data-chat={chat.id}>
       <header className="chat-head">
@@ -23,16 +25,19 @@ export function ChatView({ chats, chat }: { chats: ChatBridge; chat: OpenChat })
         <span className="chat-meta">{chat.role.effort}</span>
         <span className="chat-mode">{CHAT_COPY.ask}</span>
       </header>
-      {update.error && (
+      {error && (
         <p className="chat-error" role="alert">
-          {update.error}
+          {error}
         </p>
       )}
       <Transcript items={items} running={running} />
       <Composer
         running={running}
         onSend={(text) => chats.send(chat.id, text)}
-        onStop={() => void chats.stop(chat.id)}
+        onStop={() => {
+          setStopError(null);
+          void chats.stop(chat.id).then(setStopError);
+        }}
       />
     </section>
   );

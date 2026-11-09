@@ -42,11 +42,14 @@ export function createServices({
   const copies = createCopyActions({ git: repoGit, scan: watches.scan, now });
   const cards = createCardActions({ scan: watches.scan, now });
   const roles = createRoleRegistry();
-  const chats = createChatManager({ providers: [createClaudeProvider(claude)], roles });
+  const chats = createChatManager({ providers: [createClaudeProvider(claude)], roles, log });
+  // A project the user closed takes its chats with it.
+  const stopClosing = allowed.onChange(() => chats.closeProjects(allowed.has));
   const api = createApi({ git: createGit(gitCommand), allowed, watches, copies, cards, chats, roles });
   return {
     api,
     async close() {
+      stopClosing();
       chats.close();
       watches.close();
       await scanner.close();

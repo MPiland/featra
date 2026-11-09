@@ -27,6 +27,8 @@ export type ChatItem =
       input: unknown;
       result: ToolResult | null;
       denied: boolean;
+      /** The user stopped the turn before the call had a result. */
+      stopped: boolean;
     }
   | { kind: "notice"; key: string; notice: ChatNotice };
 
@@ -68,6 +70,7 @@ function upsertTool(state: ChatState, id: string, name: string, input: unknown, 
     input,
     result: null,
     denied,
+    stopped: false,
   });
 }
 
@@ -78,6 +81,14 @@ function appendText(state: ChatState, block: string, delta: string): ChatState {
   }
   return push(state, { kind: "assistant", key: key(state), block, text: delta });
 }
+
+/** A stopped turn leaves its unanswered calls stopped, never waiting for a result that won't come. */
+const stopTools = (state: ChatState): ChatState => ({
+  ...state,
+  items: state.items.map((item) =>
+    item.kind === "tool" && item.result === null && !item.denied ? { ...item, stopped: true } : item,
+  ),
+});
 
 export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
   switch (event.type) {
@@ -97,12 +108,14 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       if (row?.kind !== "tool") return state;
       return replace(state, at, { ...row, result: { output: event.output, isError: event.isError } });
     }
-    case "turn-end": {
-      const ended = { ...state, running: false };
+    case "turn-end":
       return event.outcome === "stopped"
-        ? push(ended, { kind: "notice", key: key(state), notice: { type: "stopped" } })
-        : ended;
-    }
+        ? push(stopTools({ ...state, running: false }), {
+            kind: "notice",
+            key: key(state),
+            notice: { type: "stopped" },
+          })
+        : { ...state, running: false };
     case "problem":
       return { ...push(state, { kind: "notice", key: key(state), notice: event.problem }), running: false };
     default:

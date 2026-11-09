@@ -2,6 +2,7 @@ import {
   assertNever,
   cardParams,
   cardUpdateParams,
+  CHAT_MESSAGES,
   chatParams,
   chatSendParams,
   chatStartParams,
@@ -78,7 +79,7 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
     const p = chatParams(params);
     if (!p) throw new ApiError("Expected { id }.");
     const dir = chats.dirOf(p.id);
-    if (dir === null) throw new ApiError("No such chat.");
+    if (dir === null) throw new ApiError(CHAT_MESSAGES.noChat);
     allow(dir);
     return p.id;
   };
@@ -149,7 +150,11 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
       }
       case "chat.watch": {
         const chatId = chat(params);
-        const { events, stop } = chats.watch(chatId, (event) => connection.push("chat.event", id, event));
+        const dir = chats.dirOf(chatId) ?? "";
+        const { events, stop } = chats.watch(chatId, (event) => {
+          // A project closed since: say nothing more about it (its chats end with it, in services).
+          if (allowed.has(dir)) connection.push("chat.event", id, event);
+        });
         connection.keep(id, stop);
         return { events };
       }

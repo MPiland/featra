@@ -17,6 +17,8 @@ export interface FakeRun {
   /** Throws from the stream, as when `claude` crashes. */
   crash: (error: Error) => void;
   interrupts: number;
+  /** True once Featra has closed its input: the session is over. */
+  closed: boolean;
   /** Asks Featra whether a tool may run, as `claude` does before a tool that needs approval. */
   ask: (name: string, input: Record<string, unknown>, id: string) => ReturnType<CanUseTool>;
 }
@@ -32,6 +34,7 @@ export function fakeQuery() {
       end: () => out.close(),
       crash: (error) => out.push({ error }),
       interrupts: 0,
+      closed: false,
       ask: (name, input, id) => {
         const canUseTool: CanUseTool | undefined = options.canUseTool;
         if (!canUseTool) throw new Error("No canUseTool");
@@ -48,6 +51,7 @@ export function fakeQuery() {
         const content = message.message.content;
         run.heard.push(typeof content === "string" ? content : JSON.stringify(content));
       }
+      run.closed = true;
     })();
     async function* stream() {
       for await (const item of out.iterable) {
