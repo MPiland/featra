@@ -8,10 +8,11 @@ import { isOneOf, isRecord } from "./utils/guards.ts";
 import { EFFORTS, PROVIDERS, type ProviderId, type Role } from "./roles.ts";
 
 /**
- * A request the agent waits on the user to answer in the middle of a turn. An approval: a tool call in Ask mode
- * (STORY-45). STORY-46 adds a question: a new reason here, opened and closed by its own events in `nextAsks`.
+ * A request the agent waits on the user to answer in the middle of a turn: an approval, a tool call in Ask mode
+ * (STORY-45), or a question the agent asks the user to choose (STORY-46). Each is opened and closed by its own events
+ * in `nextAsks`.
  */
-export type AskReason = "approval";
+export type AskReason = "approval" | "question";
 export interface Ask {
   /** The request's id: the tool call it is about. */
   id: string;
@@ -23,7 +24,7 @@ export interface Ask {
  * the turn can't go on without (`Ask`).
  */
 export type WaitReason = "reply" | AskReason;
-export const WAIT_REASONS: readonly WaitReason[] = ["reply", "approval"];
+export const WAIT_REASONS: readonly WaitReason[] = ["reply", "approval", "question"];
 const isAsk = (w: WaitReason | null): w is AskReason => w !== null && w !== "reply";
 
 /** What a chat row shows of the role it started from. */
@@ -73,16 +74,16 @@ export function chatTitle(text: string): string | null {
 }
 
 /** The events that answer a request. */
-const ANSWERS = new Set<ChatEvent["type"]>(["tool-allowed", "tool-denied", "approval-cancelled"]);
+const ANSWERS = new Set<ChatEvent["type"]>(["tool-allowed", "tool-denied", "question-answered", "approval-cancelled"]);
 const isAnswer = (
   event: ChatEvent,
-): event is Extract<ChatEvent, { type: "tool-allowed" | "tool-denied" | "approval-cancelled" }> =>
+): event is Extract<ChatEvent, { type: "tool-allowed" | "tool-denied" | "question-answered" | "approval-cancelled" }> =>
   ANSWERS.has(event.type);
 
 /** The requests still open after `event`. A turn's end, or a new message, leaves none: no request outlives its turn. */
 export function nextAsks(asks: readonly Ask[], event: ChatEvent): readonly Ask[] {
-  if (event.type === "approval") {
-    return asks.some((a) => a.id === event.id) ? asks : [...asks, { id: event.id, reason: "approval" }];
+  if (event.type === "approval" || event.type === "question") {
+    return asks.some((a) => a.id === event.id) ? asks : [...asks, { id: event.id, reason: event.type }];
   }
   // An answer closes its request.
   if (isAnswer(event)) return asks.some((a) => a.id === event.id) ? asks.filter((a) => a.id !== event.id) : asks;

@@ -5,6 +5,7 @@
  */
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
 import type { ApprovalChoice } from "./approvals.ts";
+import type { Answers } from "./questions.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
 import type { Role } from "./roles.ts";
@@ -83,6 +84,11 @@ export interface ServerMethods {
     result: null;
   };
   /**
+   * Answers the question the chat waits on (STORY-46): for each question's text, what the user chose. Refused when the
+   * question isn't waiting, or the answers don't answer each question as it asks.
+   */
+  "chat.answer": { params: { id: string; tool: string; answers: Answers }; result: null };
+  /**
    * The project's chats and the providers they group under (STORY-21); then, until `work.unwatch`, a `chat.list` push
    * each time a row changes. The request's id names the watch.
    */
@@ -133,6 +139,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "chat.send",
   "chat.stop",
   "chat.approve",
+  "chat.answer",
   "chat.list",
 ];
 

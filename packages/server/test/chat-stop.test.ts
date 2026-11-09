@@ -67,6 +67,7 @@ describe("Stop marks only the turn that is running", () => {
       role: BUILT_IN_ROLES[0]!,
       emit: (e) => events.push(e),
       approve: async () => ({ allow: false, message: "No." }),
+      ask: async () => ({ allow: false, message: "No." }),
     });
     session.send("one");
     await until(() => claude.runs[0]?.heard.length === 1);

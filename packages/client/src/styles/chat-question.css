@@ -1,0 +1,71 @@
+/* An agent's question as a card (STORY-46): its questions with the options to pick, then the chosen answers. */
+.chat-question .chat-tool-head {
+  cursor: default;
+}
+
+.chat-question .chat-tool-mark {
+  margin-left: auto;
+  color: var(--tx2);
+}
+
+.chat-question-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 10px 10px;
+}
+
+.chat-question-set {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.chat-question-set legend {
+  margin-bottom: 4px;
+  padding: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.chat-question-header {
+  margin-right: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--row);
+  color: var(--tx2);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chat-question-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 8px;
+  align-items: baseline;
+}
+
+.chat-question-desc {
+  grid-column: 2;
+  color: var(--tx2);
+  font-size: 12px;
+}
+
+.chat-question-answers {
+  margin: 0;
+  padding: 0 10px 8px;
+}
+
+.chat-question-answers dt {
+  color: var(--tx3);
+  font-size: 12px;
+}
+
+.chat-question-answers dd {
+  margin: 0 0 6px;
+  overflow-wrap: anywhere;
+}

@@ -4,6 +4,7 @@
  * calls the server.
  */
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
+import type { Answers } from "@featra/work-format/questions";
 import {
   foldChat,
   reduceChat,
@@ -46,6 +47,8 @@ export interface ChatBridge {
   stop: (id: string) => Promise<string | null>;
   /** Answers a tool request the chat waits on; resolves with why it wasn't taken, or null. */
   approve: (id: string, tool: string, answer: ApprovalAnswer) => Promise<string | null>;
+  /** Answers a question the chat waits on (STORY-46); resolves with why it wasn't taken, or null. */
+  answer: (id: string, tool: string, answers: Answers) => Promise<string | null>;
   /** Calls back with the project's chat list now and on every change; returns the stop. */
   list: (dir: string, listener: (update: ChatListUpdate) => void) => () => void;
 }
@@ -77,6 +80,11 @@ export const CHAT_COPY = {
   deny: "Deny",
   denyReason: "Reason",
   denyReasonHint: "Reason (optional)",
+  question: "Question",
+  needsAnswer: "Needs answer",
+  answered: "Answered",
+  submit: "Submit",
+  other: "Other",
   input: "Input",
   result: "Result",
   noResult: "No result yet.",
@@ -159,6 +167,7 @@ export function serverChats(server: ServerClient): ChatBridge {
     send: (id, text) => server.call("chat.send", { id, text }).then(() => null, errorMessage),
     stop: (id) => server.call("chat.stop", { id }).then(() => null, errorMessage),
     approve: (id, tool, answer) => server.call("chat.approve", { id, tool, ...answer }).then(() => null, errorMessage),
+    answer: (id, tool, answers) => server.call("chat.answer", { id, tool, answers }).then(() => null, errorMessage),
     list(dir, listener) {
       let list = EMPTY_CHAT_LIST;
       return server.watch(
@@ -188,6 +197,7 @@ export function noChats(error: string): ChatBridge {
     send: async () => error,
     stop: async () => error,
     approve: async () => error,
+    answer: async () => error,
     // No chats is the whole truth here, not an out-of-date list.
     list(_dir, listener) {
       listener({ list: EMPTY_CHAT_LIST, error: null });

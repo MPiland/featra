@@ -1,23 +1,38 @@
 /**
- * The approval desk (STORY-45, ADR 0018): holds each tool request until the user answers it in the chat, and
- * remembers each chat's Allow for this chat in memory only, so it ends with the chat's agent and never outlives the
- * server. Every outcome is a chat event, so the log, the row's waiting dot and the view follow from one place.
+ * The approval desk (STORY-45, ADR 0018): holds each tool request, and each question the agent asks (STORY-46), until
+ * the user answers it in the chat, and remembers each chat's Allow for this chat in memory only, so it ends with the
+ * chat's agent and never outlives the server. Every outcome is a chat event, so the log, the row's waiting dot and the
+ * view follow from one place.
  */
 import {
   APPROVAL_CANCELLED,
   CHAT_MESSAGES,
   chatRule,
   denyMessage,
+  validAnswers,
+  type Answers,
   type ApprovalAnswer,
   type ChatRule,
   type ChatEvent,
 } from "@featra/work-format";
 import { ChatError } from "./chat-error.ts";
-import type { ApprovalHandler, SuggestedRule, ToolDecision, ToolRequest } from "./provider.ts";
+import type {
+  ApprovalHandler,
+  QuestionDecision,
+  QuestionHandler,
+  QuestionRequest,
+  Refusal,
+  SuggestedRule,
+  ToolDecision,
+  ToolRequest,
+} from "./provider.ts";
 import { realPath } from "./real-path.ts";
 
 /** A request that ended unanswered because the turn or the chat did: the agent stops rather than try another step. */
-const CANCELLED: ToolDecision = { allow: false, message: APPROVAL_CANCELLED, interrupt: true };
+const CANCELLED: Refusal = { allow: false, message: APPROVAL_CANCELLED, interrupt: true };
+
+/** A request asked again for the same call: the first ends so its caller isn't left waiting, and the turn goes on. */
+const REPLACED: Refusal = { allow: false, message: APPROVAL_CANCELLED };
 
 /** Allow for this chat on a request: the provider's rule, which it applies, or Featra's own, kept here. */
 type Offer = { suggested: SuggestedRule } | { own: ChatRule };
@@ -36,19 +51,28 @@ function offerFor(request: ToolRequest, own: ChatRule | null): Offer | null {
   return own ? { own } : null;
 }
 
-interface Waiting {
-  request: ToolRequest;
-  /** What Allow for this chat would remember, or null when it isn't offered. */
-  offer: Offer | null;
-  /** Ends the request with `decision`, telling the chat `event` (none when the chat itself ended). */
-  settle: (decision: ToolDecision, event: ChatEvent | null) => void;
-}
+/** Ends a request with `decision`, telling the chat `event` (none when the chat itself ended). */
+type Settle<D> = (decision: D | Refusal, event: ChatEvent | null) => void;
+
+type Waiting =
+  | {
+      kind: "tool";
+      request: ToolRequest;
+      /** What Allow for this chat would remember, or null when it isn't offered. */
+      offer: Offer | null;
+      settle: Settle<ToolDecision>;
+    }
+  | { kind: "question"; request: QuestionRequest; settle: Settle<QuestionDecision> };
 
 export interface ApprovalDesk {
   /** Asks the user about a call, unless the chat's Allow for this chat already covers it. */
   approve: ApprovalHandler;
+  /** Shows the agent's questions in the chat and holds them until the user answers. */
+  ask: QuestionHandler;
   /** The user's answer to a request the chat waits on; refused when it isn't waiting. */
   answer: (chat: string, tool: string, answer: ApprovalAnswer) => void;
+  /** The user's answers to a question the chat waits on; refused when it isn't waiting, or isn't fully answered. */
+  reply: (chat: string, tool: string, answers: Answers) => void;
   /** The chat's agent ended: its requests end unanswered, quietly, and its Allow for this chat is forgotten. */
   forget: (chat: string) => void;
 }
@@ -64,6 +88,32 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
     return found;
   };
 
+  /** The request `id` of `chat`, held until it settles; `opening` tells the chat it waits. A stopped turn cancels it. */
+  function hold<D>(
+    chat: string,
+    id: string,
+    signal: AbortSignal,
+    opening: ChatEvent,
+    make: (settle: Settle<D>) => Waiting,
+  ): Promise<D | Refusal> {
+    return new Promise((resolve) => {
+      const requests = requestsOf(chat);
+      requests.get(id)?.settle(REPLACED, null);
+      const cancel = () => settle(CANCELLED, { type: "approval-cancelled", id });
+      function settle(decision: D | Refusal, event: ChatEvent | null) {
+        if (requests.get(id) !== entry) return;
+        requests.delete(id);
+        signal.removeEventListener("abort", cancel);
+        if (event) tell(chat, event);
+        resolve(decision);
+      }
+      const entry = make(settle);
+      requests.set(id, entry);
+      signal.addEventListener("abort", cancel, { once: true });
+      tell(chat, opening);
+    });
+  }
+
   return {
     approve(request, signal) {
       const { chat, id, name, input } = request;
@@ -76,28 +126,29 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         tell(chat, { type: "tool-allowed", id, name, input, scope: "chat" });
         return Promise.resolve({ allow: true, input });
       }
-      return new Promise<ToolDecision>((resolve) => {
-        const requests = requestsOf(chat);
-        // The same call asked again replaces the first request, which ends so its caller isn't left waiting.
-        requests.get(id)?.settle({ allow: false, message: APPROVAL_CANCELLED }, null);
-        const cancel = () => settle(CANCELLED, { type: "approval-cancelled", id });
-        function settle(decision: ToolDecision, event: ChatEvent | null) {
-          if (requests.get(id)?.settle !== entry.settle) return;
-          requests.delete(id);
-          signal.removeEventListener("abort", cancel);
-          if (event) tell(chat, event);
-          resolve(decision);
-        }
-        const entry: Waiting = { request, offer, settle };
-        requests.set(id, entry);
-        signal.addEventListener("abort", cancel, { once: true });
-        const covers = offer ? ("own" in offer ? offer.own.covers : offer.suggested.covers) : null;
-        tell(chat, { type: "approval", id, name, input, forChat: covers !== null, ...(covers ? { covers } : {}) });
-      });
+      const covers = offer ? ("own" in offer ? offer.own.covers : offer.suggested.covers) : null;
+      const opening: ChatEvent = {
+        type: "approval",
+        id,
+        name,
+        input,
+        forChat: covers !== null,
+        ...(covers ? { covers } : {}),
+      };
+      return hold<ToolDecision>(chat, id, signal, opening, (settle) => ({ kind: "tool", request, offer, settle }));
+    },
+    ask(request, signal) {
+      const { chat, id, name, questions } = request;
+      if (signal.aborted) return Promise.resolve(CANCELLED);
+      return hold<QuestionDecision>(chat, id, signal, { type: "question", id, name, questions }, (settle) => ({
+        kind: "question",
+        request,
+        settle,
+      }));
     },
     answer(chat, tool, { choice, reason }) {
       const entry = waiting.get(chat)?.get(tool);
-      if (!entry) throw new ChatError(CHAT_MESSAGES.noRequest);
+      if (entry?.kind !== "tool") throw new ChatError(CHAT_MESSAGES.noRequest);
       const { id, name, input } = entry.request;
       if (choice === "deny") {
         const event: ChatEvent = { type: "tool-denied", id, name, input, ...(reason ? { reason } : {}) };
@@ -120,6 +171,14 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         input,
         scope: choice === "allow" ? "once" : "chat",
       });
+    },
+    reply(chat, tool, given) {
+      const entry = waiting.get(chat)?.get(tool);
+      if (entry?.kind !== "question") throw new ChatError(CHAT_MESSAGES.noRequest);
+      // Only an answer that answers each question as it asks is taken; the question stays waiting otherwise.
+      const answers = validAnswers(entry.request.questions, given);
+      if (!answers) throw new ChatError(CHAT_MESSAGES.badAnswer);
+      entry.settle({ allow: true, answers }, { type: "question-answered", id: entry.request.id, answers });
     },
     forget(chat) {
       rules.delete(chat);

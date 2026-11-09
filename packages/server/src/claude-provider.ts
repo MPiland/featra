@@ -6,6 +6,7 @@
 import type { CanUseTool, Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { errorMessage, type ChatEvent, type PermissionMode, type Role } from "@featra/work-format";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
+import { claudeQuestions, questionResult } from "./claude-question.ts";
 import { sessionRules, suggestedRule } from "./claude-rules.ts";
 import { loadSessionReader } from "./claude-sdk.ts";
 import { claudeHistory, type SessionReader } from "./claude-transcript.ts";
@@ -90,7 +91,7 @@ export function createClaudeProvider({
 }
 
 function startSession(
-  { cwd, role, approve, emit, resume }: SessionOptions,
+  { cwd, role, approve, ask, emit, resume }: SessionOptions,
   { loadQuery, locate, env }: Omit<Required<ClaudeDeps>, "loadSessions">,
 ): ProviderSession {
   // A restored chat resumes its session; the agent's own report of its session id takes over once it starts.
@@ -104,6 +105,12 @@ function startSession(
 
   const canUseTool: CanUseTool = async (name, toolInput, options) => {
     const { signal, toolUseID, suppressAlwaysAllowRule, suggestions } = options;
+    // The agent asks the user to choose: a card, not an approval.
+    const questions = claudeQuestions(name, toolInput);
+    if (questions) {
+      const request = { id: toolUseID, name, questions };
+      return questionResult(toolInput, await ask(request, AbortSignal.any([signal, turn.signal])));
+    }
     // Claude says not to offer an always-allow for this call: Allow for this chat isn't offered either.
     const forChat = suppressAlwaysAllowRule !== true;
     const rules = forChat ? sessionRules(suggestions) : [];

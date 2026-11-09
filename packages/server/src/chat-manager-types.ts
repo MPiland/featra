@@ -1,5 +1,5 @@
 /** The session manager's interface and its dependencies (ADR 0018); `chat-manager.ts` builds it. */
-import type { ApprovalAnswer, ChatEvent, ChatSummary, ProviderInfo } from "@featra/work-format";
+import type { Answers, ApprovalAnswer, ChatEvent, ChatSummary, ProviderInfo } from "@featra/work-format";
 import type { ChatStore } from "./chat-store.ts";
 import type { ApprovalHandler, ProviderAdapter } from "./provider.ts";
 import type { RoleRegistry } from "./role-registry.ts";
@@ -16,6 +16,8 @@ export interface ChatManager {
   stop: (id: string) => Promise<void>;
   /** The user's answer to a tool request the chat waits on (STORY-45); refused when it isn't waiting. */
   approve: (id: string, tool: string, answer: ApprovalAnswer) => void;
+  /** The user's answers to a question the chat waits on (STORY-46); refused when it isn't waiting or isn't answered. */
+  answer: (id: string, tool: string, answers: Answers) => void;
   /** The chat's project folder, or null when there is no such chat. */
   dirOf: (id: string) => string | null;
   /** The project's chats as the list shows them, oldest first. */

@@ -5,6 +5,8 @@
  *
  * - "tool": a Read that runs, then a Bash `npm test` that needs approval, so it goes to canUseTool and waits on the
  *   user's answer. "twice" in the text asks for a second, identical Bash call after it.
+ * - "question": an AskUserQuestion call (a choice of one and a choice of several), asked through canUseTool; its result
+ *   is the answers the user gave, as Claude hands them to the agent, and the reply says them back.
  * - "slow": starts a reply and waits for interrupt().
  * - anything else: streams "You said: <text>".
  *
@@ -60,6 +62,48 @@ async function* toolTurn(options, signal, twice) {
   yield* bash(options, signal);
   if (twice) yield* bash(options, signal);
   yield* say("Done.");
+  yield success("Done.");
+}
+
+const QUESTIONS = [
+  {
+    question: "Which colour do you prefer?",
+    header: "Colour",
+    options: [
+      { label: "Blue", description: "Calm" },
+      { label: "Red", description: "Loud" },
+    ],
+    multiSelect: false,
+  },
+  {
+    question: "Which features?",
+    header: "Features",
+    options: [
+      { label: "Search", description: "Find things" },
+      { label: "Export", description: "Get data out" },
+    ],
+    multiSelect: true,
+  },
+];
+
+/** An AskUserQuestion call, asked through canUseTool as the SDK asks; the tool's result says what the user chose. */
+async function* questionTurn(options, signal) {
+  const id = `toolu_ask_${++seq}`;
+  const input = { questions: QUESTIONS };
+  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "AskUserQuestion", input }]);
+  const decision = await options.canUseTool("AskUserQuestion", input, {
+    signal,
+    toolUseID: id,
+    requestId: `request_${seq}`,
+  });
+  const allowed = decision.behavior === "allow";
+  const given = allowed
+    ? Object.entries(decision.updatedInput.answers)
+        .map(([q, a]) => `"${q}"="${a}"`)
+        .join(", ")
+    : "";
+  yield toolResult(id, allowed ? given : decision.message, !allowed);
+  yield* say(allowed ? `Got: ${given}` : "No answer.");
   yield success("Done.");
 }
 
@@ -137,6 +181,8 @@ export function query({ prompt, options }) {
       turn = new AbortController();
       if (text.includes("tool")) {
         yield* toolTurn(options, turn.signal, text.includes("twice"));
+      } else if (text.includes("question")) {
+        yield* questionTurn(options, turn.signal);
       } else if (text.includes("slow")) {
         const id = `msg_${++seq}`;
         const waiting = stopped();

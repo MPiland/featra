@@ -74,6 +74,10 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   this chat lasts while the chat's agent runs: a shell command by its exact command, any other tool by its name.
 - **Approval** — a tool request the chat waits on; the chat shows the waiting dot. One left unanswered (Stop, the chat
   closing, a restart) is cancelled, never denied.
+- **Question** — the agent asks the user to choose in the middle of a turn (Claude's AskUserQuestion): a card on the
+  call's row with each question's options (several at once where the agent allows it) and an **Other** field. The chat
+  shows the waiting dot until it is answered; the answers go back as the tool's result and the same turn goes on. An
+  answered card collapses to the chosen answers.
 - **Orchestrator** — a session using the Dev Lead role. Shapes features with the user, drafts cards, spawns story
   sessions, reviews and merges.
 - **Agent instructions** — the user's own `CLAUDE.md` / `AGENTS.md`. Featra never edits them. Not the same as project
