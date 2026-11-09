@@ -7,7 +7,7 @@ import { launch, tempProject, tempUserData } from "./app.ts";
 
 /**
  * STORY-6: roles in the real app with its real local server. Faked: a stand-in `claude` on the PATH, the Agent SDK's
- * `query` (fake-agent-sdk.mjs, which logs the options Featra passed it), and the home folders, so the developer's own
+ * `query` (fake-agent-sdk.mjs, which logs the options Featra passed it), and the providers' folders (CLAUDE_CONFIG_DIR, CODEX_HOME), so the developer's own
  * ~/.claude and ~/.codex are never read. The project's and the provider's files are real files on disk.
  */
 const AGENT = "---\nname: reviewer\ndescription: Reviews code\nmodel: opus\n---\nYou review.";
@@ -45,10 +45,8 @@ test("Roles lists built-in, custom and provider roles, edits them as project fil
     FEATRA_PROJECT_DIR: project.dir,
     FEATRA_E2E_AGENT_SDK: FAKE_SDK,
     FEATRA_E2E_AGENT_LOG: agentLog,
-    HOME: home.dir,
-    USERPROFILE: home.dir,
     CLAUDE_CONFIG_DIR: claudeHome.dir,
-    CODEX_HOME: join(home.dir, ".codex"),
+    CODEX_HOME: home.dir,
     [PATH_KEY]: bin.path,
   });
   try {
@@ -151,10 +149,8 @@ test("a Claude agent with full access shows a warning in its chat, and an unknow
   const { app, page } = await launch(userData.dir, {
     FEATRA_PROJECT_DIR: project.dir,
     FEATRA_E2E_AGENT_SDK: FAKE_SDK,
-    HOME: home.dir,
-    USERPROFILE: home.dir,
     CLAUDE_CONFIG_DIR: claudeHome.dir,
-    CODEX_HOME: join(home.dir, ".codex"),
+    CODEX_HOME: home.dir,
     [PATH_KEY]: bin.path,
   });
   try {
