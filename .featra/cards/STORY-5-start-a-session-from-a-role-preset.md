@@ -2,7 +2,7 @@
 id: STORY-5
 type: story
 title: Start a chat from a role and stream it
-status: New
+status: In Progress
 parent: FEAT-3
 order: 1
 origin: planned
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-09T04:33:33Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:story-5
 ---
 
 ## Description
@@ -29,15 +34,11 @@ inside Featra instead of a terminal.
 
 ## Acceptance criteria
 
-- [ ] New chat with a role starts a Claude session through the Agent SDK with the user's own `claude`, in the project
-  folder, with the role's prompt appended to Claude Code's system prompt and the role's model and effort
-- [ ] The agent's reply streams into the chat as it arrives; Enter sends, Shift+Enter adds a line, and Stop ends the
-  running turn
+- [ ] New chat with a role starts a Claude session through the Agent SDK with the user's own `claude`, in the project folder, with the role's prompt appended to Claude Code's system prompt and the role's model and effort
+- [ ] The agent's reply streams into the chat as it arrives; Enter sends, Shift+Enter adds a line, and Stop ends the running turn
 - [ ] Each tool call shows as one collapsed row (tool and a short summary) that expands to its input and result
-- [ ] If `claude` isn't installed or isn't logged in, the chat says which in one line. Featra offers no login and
-  reads no credential file
-- [ ] The five built-in roles (Researcher, Analyst/Refiner, Dev Lead, Developer, QA) can be picked; each starts in
-  Ask permission mode
+- [ ] If `claude` isn't installed or isn't logged in, the chat says which in one line. Featra offers no login and reads no credential file
+- [ ] The five built-in roles (Researcher, Analyst/Refiner, Dev Lead, Developer, QA) can be picked; each starts in Ask permission mode
 
 ## Tasks
 
