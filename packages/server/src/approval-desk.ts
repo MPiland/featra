@@ -14,6 +14,9 @@ import {
 import { ChatError } from "./chat-error.ts";
 import type { ApprovalHandler, ToolDecision, ToolRequest } from "./provider.ts";
 
+/** A request that ended unanswered because the turn or the chat did: the agent stops rather than try another step. */
+const CANCELLED: ToolDecision = { allow: false, message: APPROVAL_CANCELLED, interrupt: true };
+
 interface Waiting {
   request: ToolRequest;
   /** Ends the request with `decision`, telling the chat `event` (none when the chat itself ended). */
@@ -43,15 +46,20 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
   return {
     approve(request, signal) {
       const { chat, id, name, input } = request;
-      // A call the agent says may only be allowed once is always asked about.
-      if (request.forChat !== false && rules.get(chat)?.has(chatRuleKey(name, input))) {
+      // A stopped turn allows nothing, not even what a rule covers.
+      if (signal.aborted) return Promise.resolve(CANCELLED);
+      // Allow for this chat only where the request says it may; one that says it may only be allowed once, or
+      // doesn't say, is always asked about.
+      const forChat = request.forChat === true;
+      if (forChat && rules.get(chat)?.has(chatRuleKey(name, input))) {
         tell(chat, { type: "tool-allowed", id, name, input, scope: "chat" });
         return Promise.resolve({ allow: true, input });
       }
-      if (signal.aborted) return Promise.resolve({ allow: false, message: APPROVAL_CANCELLED });
       return new Promise<ToolDecision>((resolve) => {
         const requests = requestsOf(chat);
-        const cancel = () => settle({ allow: false, message: APPROVAL_CANCELLED }, { type: "approval-cancelled", id });
+        // The same call asked again replaces the first request, which ends so its caller isn't left waiting.
+        requests.get(id)?.settle({ allow: false, message: APPROVAL_CANCELLED }, null);
+        const cancel = () => settle(CANCELLED, { type: "approval-cancelled", id });
         function settle(decision: ToolDecision, event: ChatEvent | null) {
           if (requests.get(id)?.settle !== entry.settle) return;
           requests.delete(id);
@@ -62,19 +70,19 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         const entry: Waiting = { request, settle };
         requests.set(id, entry);
         signal.addEventListener("abort", cancel, { once: true });
-        tell(chat, { type: "approval", id, name, input, forChat: request.forChat !== false });
+        tell(chat, { type: "approval", id, name, input, forChat });
       });
     },
     answer(chat, tool, { choice, reason }) {
       const entry = waiting.get(chat)?.get(tool);
       if (!entry) throw new ChatError(CHAT_MESSAGES.noRequest);
-      const { id, name, input, forChat } = entry.request;
+      const { id, name, input } = entry.request;
       if (choice === "deny") {
         const event: ChatEvent = { type: "tool-denied", id, name, input, ...(reason ? { reason } : {}) };
         return entry.settle({ allow: false, message: denyMessage(reason) }, event);
       }
       if (choice === "allow-chat") {
-        if (forChat === false) throw new ChatError(CHAT_MESSAGES.onceOnly);
+        if (entry.request.forChat !== true) throw new ChatError(CHAT_MESSAGES.onceOnly);
         let set = rules.get(chat);
         if (!set) rules.set(chat, (set = new Set()));
         set.add(chatRuleKey(name, input));
@@ -94,7 +102,7 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
       rules.delete(chat);
       const requests = waiting.get(chat);
       waiting.delete(chat);
-      for (const entry of requests?.values() ?? []) entry.settle({ allow: false, message: APPROVAL_CANCELLED }, null);
+      for (const entry of requests?.values() ?? []) entry.settle(CANCELLED, null);
     },
   };
 }

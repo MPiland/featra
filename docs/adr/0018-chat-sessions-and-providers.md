@@ -62,12 +62,16 @@ allow; the adapter passes it to the handler with the SDK's abort signal and `for
 - **Allow** allows this call (`tool-allowed`, scope `once`). **Deny** denies it with `denyMessage(reason)`, so the
   agent is told the user's optional reason (trimmed, at most 500 characters), and the row shows Denied with the reason.
 - **Allow for this chat** also remembers a rule for the chat, in the server's memory only. A shell tool (Bash,
-  PowerShell) matches by its exact command, any other tool by its name (`chatRuleKey`). A later matching call is
-  allowed without asking and shows "Allowed for this chat" (scope `chat`). It is not offered, refused, and never
-  applied for a call with `forChat: false`. Featra doesn't pass `updatedPermissions`, so nothing is written to the
+  PowerShell) matches by its whole input except `description`, `timeout` and `run_in_background`, so a field that
+  changes how it runs (`dangerouslyDisableSandbox`, or one the SDK adds later) is asked about again; any other tool
+  matches by its name (`chatRuleKey`). A later matching call is allowed without asking and shows "Allowed for this
+  chat" (scope `chat`). It is offered and applied only for a call with `forChat: true`, and never once the turn is
+  stopped: the desk checks the turn's signal before its rules. Featra doesn't pass `updatedPermissions`, so nothing is written to the
   user's Claude settings.
 - **Unanswered.** Stop aborts the turn; the SDK's signal cancels the request (`approval-cancelled`), the agent is
-  told `APPROVAL_CANCELLED`, and the row shows Stopped. The SDK cancelling a request on its own shows Cancelled.
+  told `APPROVAL_CANCELLED` with `interrupt: true` so it stops rather than try another step, and the row shows
+  Stopped. The agent failing aborts the turn first, so nothing is left waiting. The same call asked again replaces
+  the first request, which ends with `APPROVAL_CANCELLED`. The SDK cancelling a request on its own shows Cancelled.
   Closing the chat or its project ends its requests quietly and forgets its rules. After a restart a call with no
   result in a finished turn shows Cancelled, never Denied, and the chat waits on a reply.
 - `chat.approve` refuses an answer to a request that isn't waiting (`noRequest`) and Allow for this chat on a

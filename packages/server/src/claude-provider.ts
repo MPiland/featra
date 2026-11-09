@@ -106,7 +106,7 @@ function startSession(
     const decision = await approve(request, AbortSignal.any([signal, turn.signal]));
     return decision.allow
       ? { behavior: "allow", updatedInput: decision.input }
-      : { behavior: "deny", message: decision.message };
+      : { behavior: "deny", message: decision.message, ...(decision.interrupt ? { interrupt: true } : {}) };
   };
 
   const relay = (e: ChatEvent) => {
@@ -115,6 +115,8 @@ function startSession(
   };
 
   const fail = (events: ChatEvent[]) => {
+    // The agent is gone: a request it was waiting on ends before the turn does.
+    turn.abort();
     input?.close();
     input = null;
     query = null;

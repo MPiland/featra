@@ -54,6 +54,14 @@ describe("Allow for this chat matches a shell tool by its exact command, any oth
     expect(chatRuleKey("Bash", {})).not.toBe(chatRuleKey("Bash", { other: 1 }));
   });
 
+  it("keys a shell call on every field that changes how it runs, known or not", () => {
+    const same = { ...BASH, description: "Run tests", timeout: 60_000, run_in_background: true };
+    expect(chatRuleKey("Bash", same)).toBe(chatRuleKey("Bash", BASH));
+    expect(chatRuleKey("Bash", { ...BASH, dangerouslyDisableSandbox: true })).not.toBe(chatRuleKey("Bash", BASH));
+    expect(chatRuleKey("Bash", { ...BASH, later: "x" })).not.toBe(chatRuleKey("Bash", BASH));
+    expect(chatRuleKey("Bash", { a: 1, ...BASH })).toBe(chatRuleKey("Bash", { ...BASH, a: 1 }));
+  });
+
   it("says what it covers", () => {
     expect(chatRuleText("Bash", BASH)).toBe("Bash: npm test, in this chat");
     expect(chatRuleText("Write", { file_path: "a" })).toBe("Every Write call in this chat");

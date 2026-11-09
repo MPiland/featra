@@ -589,3 +589,22 @@ STORY-5's auto-deny existed only until this story; STORY-45 AC1–2 replace it w
   approval…"; the user clicks Deny in the inline prompt, then the row reads `Bashnpm testDenied` and the log shows
   `denyMessage()`.
 - `CHAT_MESSAGES.denied` ("Featra can't ask for approval yet…") is removed; grep found no other use.
+
+### Review fixes (PR #10)
+
+Each fix has a regression test in `packages/server/test/chat-approvals-review.test.ts` that failed before it.
+
+- Allow for this chat on a shell tool keys on the whole input except `description`, `timeout` and
+  `run_in_background` (`SHELL_FIELDS_IGNORED`), as sorted-key JSON. Why: a rule on `npm test` covered the same command
+  with `dangerouslyDisableSandbox: true`. Fail closed: any field not known to be harmless, including one the SDK adds
+  later, changes the key, so the user is asked again. The SDK's tool input types couldn't be read in this session, so
+  the ignored list is only the fields known not to change what runs.
+- The same tool call asked again (same id) ends the first request with `APPROVAL_CANCELLED` and no event, then waits
+  on the second. Why: the first caller hung forever.
+- The agent failing aborts the turn before its events are relayed. Why: a request it was waiting on stayed pending,
+  so the chat kept waiting on an approval nobody could answer.
+- A request ended by Stop, the SDK's signal or the chat closing denies with `interrupt: true`. Why: the agent was free
+  to try another step after the user stopped it. The earlier Stop, cancel and close checks in `chat-approvals.test.ts`
+  now also expect `interrupt: true` (strengthened, not weakened).
+- The desk checks a stopped turn before the chat's rules, and offers Allow for this chat only when the request says
+  `forChat: true`. Why: a rule allowed a call after Stop, and a request that didn't say defaulted to offering it.

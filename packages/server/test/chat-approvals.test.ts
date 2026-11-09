@@ -200,7 +200,7 @@ describe("a pending approval when the request ends unanswered", () => {
     const asked = run.ask("Bash", BASH, "t1");
     await until(() => row(c).waiting === "approval");
     await c.manager.stop(c.id);
-    expect(await asked).toEqual({ behavior: "deny", message: APPROVAL_CANCELLED });
+    expect(await asked).toEqual({ behavior: "deny", message: APPROVAL_CANCELLED, interrupt: true });
     expect(c.events).toContainEqual({ type: "approval-cancelled", id: "t1" });
     run.say(sdk.failure());
     await until(() => !c.view().running);
@@ -216,7 +216,7 @@ describe("a pending approval when the request ends unanswered", () => {
     const asked = run.ask("Bash", BASH, "t1", { signal: abort.signal });
     await until(() => row(c).waiting === "approval");
     abort.abort();
-    expect(await asked).toEqual({ behavior: "deny", message: APPROVAL_CANCELLED });
+    expect(await asked).toEqual({ behavior: "deny", message: APPROVAL_CANCELLED, interrupt: true });
     expect(tool(c)).toMatchObject({ denied: false, cancelled: true, approval: null });
     expect(row(c)).toMatchObject({ waiting: null, running: true });
   });
@@ -227,7 +227,7 @@ describe("a pending approval when the request ends unanswered", () => {
     await until(() => row(c).waiting === "approval");
     const before = c.events.length;
     c.manager.closeProjects(() => false);
-    expect(await asked).toEqual({ behavior: "deny", message: APPROVAL_CANCELLED });
+    expect(await asked).toEqual({ behavior: "deny", message: APPROVAL_CANCELLED, interrupt: true });
     expect(c.events).toHaveLength(before);
     c.manager.closeProjects(() => true);
     expect(row(c)).toMatchObject({ running: false, waiting: "reply" });

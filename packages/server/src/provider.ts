@@ -16,7 +16,10 @@ export interface ToolRequest {
   forChat?: boolean;
 }
 
-export type ToolDecision = { allow: true; input: Record<string, unknown> } | { allow: false; message: string };
+/** `interrupt` on a deny tells the agent to stop its turn rather than try another step (Stop, the chat ending). */
+export type ToolDecision =
+  | { allow: true; input: Record<string, unknown> }
+  | { allow: false; message: string; interrupt?: boolean };
 
 /**
  * Decides a tool call that needs approval: by default the approval desk asks the user in the chat (STORY-45). `signal`
