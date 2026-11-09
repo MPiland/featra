@@ -25,6 +25,11 @@ history:
     from: New
     to: Done
     by: session:bug-6
+  - at: 2026-11-09T02:30:23Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
 ---
 
 ## Description

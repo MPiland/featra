@@ -2,7 +2,7 @@
 id: BUG-6
 type: bug
 title: Stale-copy Apply misses its 2 s push under load
-status: In Review
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-6
+  - at: 2026-11-09T02:30:23Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-09T02:30:23Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
