@@ -11,6 +11,7 @@ import {
   normalizeUiState,
   normalizeWindowState,
   serverChats,
+  serverRoles,
   serverSetup,
   serverWork,
   type FeatraBridge,
@@ -67,6 +68,7 @@ const bridge: FeatraBridge = {
   setup: serverSetup(server),
   work: serverWork(server),
   chats: serverChats(server),
+  roles: serverRoles(server),
   edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {
     info: () => ipcRenderer.invoke(IPC.appInfo),

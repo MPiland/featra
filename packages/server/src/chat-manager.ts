@@ -13,6 +13,7 @@ import {
   type Ask,
   type ChatEvent,
   type ChatSummary,
+  type ModeInfo,
   type ProviderId,
   type Role,
 } from "@featra/work-format";
@@ -47,6 +48,9 @@ interface Chat {
   /** Why it can't take a message without an agent: its role or provider is missing. */
   refusal: string | null;
   running: boolean;
+  /** The mode and note its role gave it when its agent was made (STORY-6): what the composer shows. */
+  mode: ModeInfo | null;
+  note: string | null;
   /** Its project is closed: the chat is kept, out of the list, until the project opens again. */
   closed: boolean;
 }
@@ -65,6 +69,8 @@ const restored = (id: string, dir: string, summary: ChatSummary, session: string
   agent: null,
   refusal: null,
   running: false,
+  mode: null,
+  note: null,
   closed: false,
 });
 
@@ -146,6 +152,8 @@ export function createChatManager({
   function agentFor(c: Chat, adapter: ProviderAdapter, role: Role): ProviderSession {
     // The session reaches the chat only through `emit`, so the chat's own fields are current when it is called.
     const emit = (event: ChatEvent) => record(c, event);
+    c.mode = role.mode ?? null;
+    c.note = role.note ?? null;
     return adapter.start({
       chat: c.id,
       cwd: c.dir,
@@ -213,7 +221,12 @@ export function createChatManager({
     watch(id, listener) {
       const c = chat(id);
       c.listeners.add(listener);
-      return { events: [...(c.events ?? [])], stop: () => c.listeners.delete(listener) };
+      return {
+        events: [...(c.events ?? [])],
+        mode: c.mode,
+        note: c.note,
+        stop: () => c.listeners.delete(listener),
+      };
     },
     send(id, text) {
       const c = chat(id);

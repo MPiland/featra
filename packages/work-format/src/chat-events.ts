@@ -4,6 +4,7 @@
  * neutral, so a Codex or ACP adapter (M2) feeds the same view.
  */
 import type { AllowScope } from "./approvals.ts";
+import { normalizeMode, type ModeInfo } from "./modes.ts";
 import { isStrings, normalizeQuestions, type Answers, type Question } from "./questions.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
@@ -58,6 +59,15 @@ export type ChatEvent =
 /** What `chat.watch` answers: the chat's whole log so far. Each later event comes as a `chat.event` push. */
 export interface ChatSnapshot {
   events: ChatEvent[];
+  /** The mode the chat's agent starts in, when a provider setting named one (STORY-6); Ask when absent. */
+  mode?: ModeInfo;
+  /** One line on how the chat's role was adjusted to run, such as a model Claude doesn't have. */
+  note?: string;
+}
+
+/** A snapshot of `events`, with the chat's mode and note only when they aren't the defaults. */
+export function chatSnapshot(events: ChatEvent[], mode: ModeInfo | null, note: string | null): ChatSnapshot {
+  return { events, ...(mode && mode.level !== null ? { mode } : {}), ...(note ? { note } : {}) };
 }
 
 const str = (v: unknown): v is string => typeof v === "string";
@@ -147,7 +157,13 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
 
 export function normalizeChatSnapshot(raw: unknown): ChatSnapshot {
   const events = isRecord(raw) && Array.isArray(raw.events) ? raw.events : [];
-  return { events: events.map(normalizeChatEvent).filter((e): e is ChatEvent => e !== null) };
+  const mode = isRecord(raw) ? normalizeMode(raw.mode) : null;
+  const note = isRecord(raw) && nonEmpty(raw.note) ? raw.note : null;
+  return chatSnapshot(
+    events.map(normalizeChatEvent).filter((e): e is ChatEvent => e !== null),
+    mode,
+    note,
+  );
 }
 
 /** The `{ id }` params of the chat methods, or null. */

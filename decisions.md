@@ -738,3 +738,86 @@ Recorded for STORY-6, which builds it; STORY-45's AC3 (the five built-in roles d
   plain row, which would otherwise show only the tool's name.
 - `packages/server/test/chat-stop.test.ts`: its hand-built `SessionOptions` gained the new required `ask`. No assertion
   changed.
+
+## 2026-11-09 — STORY-6: built-in, custom and provider roles
+
+Roles come from three places, listed by the server's role registry and edited only in `.featra/roles/`.
+
+- **Every role runs on Claude in M1, so Claude's settings name the mode, even for a Codex-origin role.** Why: ADR 0018
+  has no Codex adapter yet, so the permission mode that matters is the one the SDK is given. The Codex reader exists
+  and is tested but its mode is not used until a Codex adapter does.
+- **A role file has no permission field.** Why: the mode is the provider's own setting, read live; a copy in the file
+  would drift from it.
+- **Rename keeps the role's id and file name.** Why: a chat and the card's `role:` refer to the id, so renaming must not
+  orphan them.
+- **A role's name must be unique among every listed role, provider roles included.** Why: the picker shows names, and
+  two with one name cannot be told apart.
+- **Claude's six modes pass through by name: `default`, `acceptEdits`, `plan`, `auto`, `dontAsk` and
+  `bypassPermissions`.** `dontAsk` is a normal Claude mode, shown as "dontAsk · from Claude settings", with no warning
+  mark. Only `bypassPermissions` is full access, and it also sets the SDK's second opt-in. A value that is none of them
+  starts the role on Ask with a problem and a note naming the file; the search stops there (changed in the review
+  fixes below). Why: the user decided each provider's own mode names are used
+  (2026-11-09); the Dev Lead decided `dontAsk` is supported, not ignored.
+- **No setting means Ask, and the role carries no mode.** Why: an absent mode reads as Ask, and STORY-5's built-in role
+  list stays exactly the five roles it asserted.
+- **Codex: a project's `config.toml` counts only for a project the user's `config.toml` trusts, and wins per key. A
+  trusted project with neither key set starts as Codex's own trusted default (`on-request`, `workspace-write`); with
+  nothing set and no trust there is no mode, so Ask.** The trusted default is an assumption, logged in
+  open-questions.md.
+- **A model Claude doesn't have falls back to `default`, with a one-line note on the role and on the chat.** An agent's
+  missing model or `inherit` is `default` without a note. Why: AC5; silent substitution would hide it.
+- **An agent with no effort runs on `medium`.** Why: the SDK needs one, and it is the built-in default.
+- **The composer's mode is a read-only label until STORY-22 adds the picker.** Why: STORY-22 is not part of this story.
+- **The note is not kept across a restart.** Why: it comes from reading the role at start, and a restored chat reads the
+  role again.
+- **A project's roles are read for the chat's own folder.** Why: the same folder the chat runs in.
+- **The server's default file access reads no home folder; only `main.ts` wires the real one.** Why: tests must never
+  read the developer's `~/.claude` or `~/.codex`. Credential files are never read.
+- **A save writes only the fields the user changed** (reverses the earlier "A prompt-only save writes the fitted
+  model"; see the review fixes below).
+- Files and seams: `role-registry.ts` (list, read, edit, watched), `claude-reader.ts` and `codex-reader.ts` (one reader
+  per provider behind `provider-reader.ts`), `role-actions.ts` (the only writer, `.featra/roles/` only),
+  `role-watch.ts` (live list, folders made after the watch began included). No new ADR: ADR 0018 gets a short note.
+
+### STORY-20 and STORY-5 checks changed (decided by the Dev Lead)
+
+Reason for all of them: AC1 adds Settings › Project › Roles.
+
+- `packages/client/test/settings-pages.test.ts` (page list): "project:Roles" is appended after "project:Workflow".
+- `packages/client/test/components/settings/SettingsView.test.tsx`: the Project nav buttons were `[WORK]`, now
+  `[WORK, "Roles"]`; the page count was 5, now 6. The keyboard test's "project page" index is now the second to last
+  button, since Roles follows it, and Roles is waited for like Workflow. Nothing was removed or relaxed.
+  Two more indexes in the same keyboard walk follow from the same page (approved by the Dev Lead after the fact,
+  2026-11-09): `projectLoaded()` is awaited for the last two pages (`i >= buttons.length - 2`, was the last one),
+  and "Overridden" shows on the second to last page (`i === buttons.length - 2`), Workflow, not the last.
+- `packages/server/test/ws-chat.test.ts` and the other STORY-5 checks are unchanged.
+
+## 2026-11-09 — STORY-6 review fixes
+
+- **Claude's managed settings are the highest layer** (Windows `C:\Program Files\ClaudeCode\managed-settings.json`,
+  macOS `/Library/Application Support/ClaudeCode/managed-settings.json`, Linux `/etc/claude-code/managed-settings.json`),
+  then local, project and user. Why: Claude applies them over every other file, so Featra must show the mode Claude
+  will run. The tests never read the machine's: `RoleFs` carries the path and each test gives its own.
+- **`disableBypassPermissionsMode: "disable"` in any layer (under `permissions` or at the top level) turns every
+  bypass into Ask with a note**, the settings' own and an agent's. Why: Claude refuses bypass then, so showing full
+  access would be wrong and unsafe.
+- **A Claude agent's `permissionMode` beats the settings files for that role**, shown as "from the agent", with the
+  same full-access warning. An unknown value starts the role on Ask with a problem and a note naming the file.
+  Codex-origin roles stay on Claude's settings (M1). A Codex agent's `sandbox_mode` is not read (open-questions.md).
+- **An unknown `defaultMode` in a higher layer no longer falls through to a lower layer** (changes the earlier
+  decision that skipped it and read the next file). The role starts on Ask with a problem note naming the file. Why:
+  safety: a typo must not unlock a lower layer's bypass. A file that isn't valid JSON is still skipped with a problem.
+  The two tests that asserted the fall-through (`role-modes.test.ts`, work-format and server) are split: the
+  malformed-file skip is unchanged and the unknown mode now asserts the stop. Both were written in this story.
+- **Codex trust matches the chat folder, every folder above it (the git root among them) and, in a git worktree, the
+  main checkout.** `\\?\UNC\srv\share` reads as `\\srv\share`, and UNC paths compare ignoring case. Why: Codex writes
+  the entry for the repo root, and a worktree lives elsewhere.
+- **New, duplicate and customized roles never overwrite a file.** The id is chosen against every file name in
+  `.featra/roles/`, parsed or not, ignoring case, and the target is checked again before the write. Why: a file that
+  failed to parse, or `Tester.md` beside `tester.md`, was silently replaced.
+- **A save writes only the fields the user changed.** A built-in's file holds just those, so the rest keeps following
+  Featra's updates; a custom role's file holds all. A blank body means no prompt, so a model-only override keeps the
+  built-in's prompt. The page's prompt-save test asserted the full form and now asserts the prompt alone (written in
+  this story).
+- **Role watchers end when their project is closed**, not only when the socket does. Why: the project's chats were
+  already closed there, and the watchers kept folders open.

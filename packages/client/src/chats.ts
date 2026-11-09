@@ -16,6 +16,7 @@ import {
 import { normalizeChatEvent, normalizeChatSnapshot, type ChatEvent } from "@featra/work-format/chat-events";
 import { EMPTY_CHAT_LIST, normalizeChatList, type ChatList, type ChatRoleRef } from "@featra/work-format/chat-list";
 import { assertNever, errorMessage, isRecord } from "@featra/work-format/guards";
+import type { ModeInfo } from "@featra/work-format/modes";
 import { normalizeRoles, type Role } from "@featra/work-format/roles";
 import type { ServerClient } from "./server-client.ts";
 
@@ -25,6 +26,10 @@ export type { ChatList, ChatRoleRef, ChatState, Role };
 export interface ChatUpdate {
   chat: ChatState;
   error: string | null;
+  /** The mode a provider setting started the chat in (STORY-6); absent means Ask. */
+  mode?: ModeInfo;
+  /** One line on how the chat's role was adjusted to run, such as a model Claude doesn't have. */
+  note?: string;
 }
 
 /** What a chat-list watch hears: the project's chats, and why the list is out of date when it is. */
@@ -138,6 +143,7 @@ export function serverChats(server: ServerClient): ChatBridge {
       // The answer is the whole log (again, after a reconnect); each push is one later event. A push can beat the
       // answer, so until the answer comes, pushes wait to go after the log.
       let early: ChatEvent[] | null = [];
+      let start: Pick<ChatUpdate, "mode" | "note"> = {};
       return server.watch(
         "chat.watch",
         { id },
@@ -149,17 +155,22 @@ export function serverChats(server: ServerClient): ChatBridge {
               if (event && early) early.push(event);
               else if (event) {
                 chat = reduceChat(chat, event);
-                listener({ chat, error: null });
+                listener({ chat, error: null, ...start });
               }
             } else {
-              chat = foldChat([...normalizeChatSnapshot(raw).events, ...(early ?? [])]);
+              const snapshot = normalizeChatSnapshot(raw);
+              start = {
+                ...(snapshot.mode ? { mode: snapshot.mode } : {}),
+                ...(snapshot.note ? { note: snapshot.note } : {}),
+              };
+              chat = foldChat([...snapshot.events, ...(early ?? [])]);
               early = null;
-              listener({ chat, error: null });
+              listener({ chat, error: null, ...start });
             }
           },
           error: (message) => {
             early = [];
-            listener({ chat, error: message });
+            listener({ chat, error: message, ...start });
           },
         },
       );

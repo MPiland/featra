@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { errorMessage } from "@featra/work-format/guards";
+import { ASK_MODE, modeLabel } from "@featra/work-format/modes";
 import { CHAT_COPY, type ChatBridge, type Role } from "../../chats.ts";
 import { Dialog } from "../Dialog.tsx";
 
@@ -10,7 +11,7 @@ interface NewChatDialogProps {
   onClose: () => void;
 }
 
-/** Picks the role a new chat starts from. Every role starts in Ask until STORY-22 adds the other modes. */
+/** Picks the role a new chat starts from, with the mode it starts in: the provider's own setting, or Ask. */
 export function NewChatDialog({ chats, dir, onStarted, onClose }: NewChatDialogProps) {
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +41,7 @@ export function NewChatDialog({ chats, dir, onStarted, onClose }: NewChatDialogP
             <button type="button" className="role-pick" onClick={() => void start(role)}>
               <span className="role-name">{role.name}</span>
               <span className="role-meta">
-                {role.model} · {role.effort} · {CHAT_COPY.ask}
+                {role.model} · {role.effort} · {modeLabel(role.mode ?? ASK_MODE)}
               </span>
             </button>
           </li>

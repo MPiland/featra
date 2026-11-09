@@ -15,6 +15,7 @@ import {
   type WorkSettings,
 } from "./settings.ts";
 import { noChats, type ChatBridge } from "./chats.ts";
+import { noRoles, type RolesBridge } from "./roles-bridge.ts";
 import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
 import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./projects.ts";
 import { noWork, type WorkBridge } from "./work-list.ts";
@@ -26,6 +27,7 @@ export { THEME_CHOICES, type ThemeChoice };
 export * from "./chats.ts";
 export * from "./project-setup.ts";
 export * from "./projects.ts";
+export * from "./roles-bridge.ts";
 export * from "./server-client.ts";
 export * from "./settings.ts";
 export * from "./work-list.ts";
@@ -141,6 +143,8 @@ export interface FeatraBridge {
   readonly work: WorkBridge;
   /** Chats started from roles, run by the local server (ADR 0018). */
   readonly chats: ChatBridge;
+  /** The project's roles and their edits, from the local server (STORY-6). */
+  readonly roles: RolesBridge;
   edit: (command: EditCommand) => void;
   readonly app: {
     info: () => Promise<AppInfo>;
@@ -257,6 +261,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
     setup: noSetup(NO_FOLDERS),
     work: noWork(NO_FOLDERS),
     chats: noChats(NO_FOLDERS),
+    roles: noRoles(NO_FOLDERS),
     edit: (command) => {
       document.execCommand(command);
     },

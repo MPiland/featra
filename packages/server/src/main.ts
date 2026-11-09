@@ -6,6 +6,7 @@
 import { errorMessage } from "@featra/work-format";
 import { createAllowedProjects } from "./allowed-projects.ts";
 import { parseHostMessage, type ServerMessage } from "./host-messages.ts";
+import { nodeRoleFs } from "./role-fs.ts";
 import { createServices } from "./services.ts";
 import { startServer, type RunningServer } from "./ws-server.ts";
 
@@ -14,7 +15,12 @@ const log = (message: string) => send({ type: "log", message });
 
 const allowed = createAllowedProjects();
 // The host names the app's data folder, where chats are saved (STORY-44).
-const services = createServices({ allowed, log, dataDir: process.env.FEATRA_DATA_DIR || undefined });
+const services = createServices({
+  allowed,
+  log,
+  dataDir: process.env.FEATRA_DATA_DIR || undefined,
+  roleFs: nodeRoleFs(),
+});
 const { api } = services;
 let server: RunningServer | undefined;
 

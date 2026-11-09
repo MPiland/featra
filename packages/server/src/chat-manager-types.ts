@@ -1,5 +1,5 @@
 /** The session manager's interface and its dependencies (ADR 0018); `chat-manager.ts` builds it. */
-import type { Answers, ApprovalAnswer, ChatEvent, ChatSummary, ProviderInfo } from "@featra/work-format";
+import type { Answers, ApprovalAnswer, ChatEvent, ChatSummary, ModeInfo, ProviderInfo } from "@featra/work-format";
 import type { ChatStore } from "./chat-store.ts";
 import type { ApprovalHandler, ProviderAdapter } from "./provider.ts";
 import type { RoleRegistry } from "./role-registry.ts";
@@ -9,8 +9,14 @@ export interface ChatManager {
   start: (dir: string, roleId: string) => Promise<string>;
   /** Readies a chat to watch and send to: a restored chat reads its transcript from its provider, running no agent. */
   open: (id: string) => Promise<void>;
-  /** The chat's log so far, and every later event to `listener` until `stop`. */
-  watch: (id: string, listener: (event: ChatEvent) => void) => { events: ChatEvent[]; stop: () => void };
+  /**
+   * The chat's log so far, the mode and note its role gave it (null before its agent is made), and every later event to
+   * `listener` until `stop`.
+   */
+  watch: (
+    id: string,
+    listener: (event: ChatEvent) => void,
+  ) => { events: ChatEvent[]; mode: ModeInfo | null; note: string | null; stop: () => void };
   send: (id: string, text: string) => void;
   /** Interrupts the running turn, if any. */
   stop: (id: string) => Promise<void>;

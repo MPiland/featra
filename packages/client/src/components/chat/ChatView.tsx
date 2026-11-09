@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { EMPTY_CHAT } from "@featra/work-format/chat";
 import { CHAT_MESSAGES } from "@featra/work-format/chat-events";
-import { CHAT_COPY, type ChatBridge, type ChatRoleRef, type ChatUpdate } from "../../chats.ts";
+import { ASK_MODE, modeLabel, modeWhere } from "@featra/work-format/modes";
+import { type ChatBridge, type ChatRoleRef, type ChatUpdate } from "../../chats.ts";
 import { Composer } from "./Composer.tsx";
 import { Transcript } from "./Transcript.tsx";
 
@@ -26,6 +27,7 @@ export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
   const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => chats.watch(chat.id, setUpdate), [chats, chat.id]);
   const { items, running, model } = update.chat;
+  const mode = update.mode ?? ASK_MODE;
   const error = update.error ?? actionError;
   const gone = items.some((item) => item.kind === "notice" && item.notice.type === "gone");
   const newChat = async () => {
@@ -38,9 +40,13 @@ export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
       <header className="chat-head">
         <span className="chat-role">{chat.role.name}</span>
         <span className="chat-meta">
-          {model ?? chat.role.model} · {chat.role.effort} · <span className="chat-mode">{CHAT_COPY.ask}</span>
+          {model ?? chat.role.model} · {chat.role.effort} ·{" "}
+          <span className="chat-mode" title={modeWhere(mode) ?? undefined}>
+            {modeLabel(mode)}
+          </span>
         </span>
       </header>
+      {update.note && <p className="chat-note">{update.note}</p>}
       {error && (
         <p className="chat-error" role="alert">
           {error}
@@ -58,6 +64,7 @@ export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
       {!gone && (
         <Composer
           running={running}
+          fullAccess={mode.fullAccess}
           onSend={(text) => chats.send(chat.id, text)}
           onStop={() => {
             setActionError(null);

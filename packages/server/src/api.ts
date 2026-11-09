@@ -6,10 +6,12 @@ import {
   chatParams,
   chatAnswerParams,
   chatApproveParams,
+  chatSnapshot,
   chatSendParams,
   chatStartParams,
   copyParams,
   dirParams,
+  roleEditParams,
   setupParams,
   unwatchParams,
   type PushEvent,
@@ -23,6 +25,7 @@ import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
 import type { Git } from "./git.ts";
 import type { RoleRegistry } from "./role-registry.ts";
+import type { RoleWatches } from "./role-watch.ts";
 import { initFeatra, initGit, setupStatus } from "./project-setup.ts";
 import { setUpProject, setupPlan } from "./project-setup-plan.ts";
 import type { WorkWatches } from "./work-watch.ts";
@@ -38,6 +41,7 @@ export interface ApiDeps {
   cards: CardActions;
   chats: ChatManager;
   roles: RoleRegistry;
+  roleWatches: RoleWatches;
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -60,7 +64,7 @@ export type Api = (
   connection: Connection,
 ) => Promise<ServerMethods[ServerMethod]["result"]>;
 
-export function createApi({ git, allowed, watches, copies, cards, chats, roles }: ApiDeps): Api {
+export function createApi({ git, allowed, watches, copies, cards, chats, roles, roleWatches }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
     return dir;
@@ -143,6 +147,19 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
         if (!p) throw new ApiError("Expected { dir, id, edit }.");
         return cards.update(allow(p.dir), p.id, p.edit);
       }
+      case "roles.watch": {
+        const dir = project(params);
+        const { list, stop } = await roleWatches.watch(dir, (next) => {
+          if (allowed.has(dir)) connection.push("roles.list", id, next);
+        });
+        connection.keep(id, stop);
+        return list;
+      }
+      case "roles.edit": {
+        const p = roleEditParams(params);
+        if (!p) throw new ApiError("Expected { dir, edit }.");
+        return roles.edit(allow(p.dir), p.edit);
+      }
       case "chat.roles":
         return roles.list(project(params));
       case "chat.start": {
@@ -154,12 +171,12 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
         const chatId = chat(params);
         await chats.open(chatId);
         const dir = chats.dirOf(chatId) ?? "";
-        const { events, stop } = chats.watch(chatId, (event) => {
+        const { events, mode, note, stop } = chats.watch(chatId, (event) => {
           // A project closed since: say nothing more about it (its chats end with it, in services).
           if (allowed.has(dir)) connection.push("chat.event", id, event);
         });
         connection.keep(id, stop);
-        return { events };
+        return chatSnapshot(events, mode, note);
       }
       case "chat.send": {
         const p = chatSendParams(params);

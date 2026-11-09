@@ -24,6 +24,7 @@ describe("settings pages", () => {
       "app:Workflow",
       "app:Keyboard shortcuts",
       "project:Workflow",
+      "project:Roles",
     ]);
     expect(firstSettingsPage(snapshot({ available: true, place: "tray" }))).toBe("general");
     expect(settingsPages(snapshot(null)).map((p) => p.id)).not.toContain("general");

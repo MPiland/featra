@@ -160,3 +160,10 @@ before the watch's answer; the client keeps it and applies it after the log.
   their own and write session files there as Claude does.
 - A new provider is one adapter: the manager, protocol and view stay as they are.
 - **Licence.** The Agent SDK is not MIT; ADR 0007 accepted it as a dependency.
+
+## STORY-6 note: roles from files
+
+Roles are listed by a registry over `.featra/roles/` and one reader per provider (`.claude/agents`, `.codex/agents`,
+project and user), read live. The registry hands the chat manager a role with the model Claude can run and the mode the
+provider's own settings name; the manager passes it to the provider adapter unchanged. A new provider adds a reader and
+an adapter, nothing else.
