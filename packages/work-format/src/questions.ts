@@ -24,7 +24,7 @@ export interface Question {
 /** The user's answers: for each question's text, what they chose (an option's label, or their own words for Other). */
 export type Answers = Record<string, string[]>;
 
-const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((c) => typeof c === "string");
+export const isStrings = (v: unknown): v is string[] => Array.isArray(v) && v.every((c) => typeof c === "string");
 const text = (v: unknown): v is string => typeof v === "string" && v.trim() !== "";
 
 function normalizeOption(raw: unknown): QuestionOption | null {
@@ -36,6 +36,8 @@ function normalizeQuestion(raw: unknown): Question | null {
   if (!isRecord(raw) || !text(raw.question) || !Array.isArray(raw.options)) return null;
   const options = raw.options.map(normalizeOption);
   if (options.length === 0 || options.some((o) => o === null)) return null;
+  // Two options with one label can't be told apart: picking one would pick both.
+  if (new Set(options.map((o) => o?.label)).size !== options.length) return null;
   return {
     question: raw.question,
     header: typeof raw.header === "string" ? raw.header : "",

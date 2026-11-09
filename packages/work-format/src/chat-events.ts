@@ -4,7 +4,7 @@
  * neutral, so a Codex or ACP adapter (M2) feeds the same view.
  */
 import type { AllowScope } from "./approvals.ts";
-import { normalizeQuestions, type Answers, type Question } from "./questions.ts";
+import { isStrings, normalizeQuestions, type Answers, type Question } from "./questions.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /**
@@ -70,10 +70,12 @@ function normalizeProblem(raw: unknown): ChatProblem | null {
   return null;
 }
 
-function normalizeAnswers(raw: Record<string, unknown>): Answers {
+/** The answers of a question-answered event, or null when any isn't a list of text. */
+function normalizeAnswers(raw: Record<string, unknown>): Answers | null {
   const answers: Answers = {};
   for (const [question, chosen] of Object.entries(raw)) {
-    if (Array.isArray(chosen)) answers[question] = chosen.filter(str);
+    if (!isStrings(chosen)) return null;
+    answers[question] = chosen;
   }
   return answers;
 }
@@ -118,10 +120,10 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
         ? { type: "question", id: raw.id, name: raw.name, questions }
         : null;
     }
-    case "question-answered":
-      return nonEmpty(raw.id) && isRecord(raw.answers)
-        ? { type: "question-answered", id: raw.id, answers: normalizeAnswers(raw.answers) }
-        : null;
+    case "question-answered": {
+      const answers = isRecord(raw.answers) ? normalizeAnswers(raw.answers) : null;
+      return nonEmpty(raw.id) && answers ? { type: "question-answered", id: raw.id, answers } : null;
+    }
     case "tool-allowed":
       return nonEmpty(raw.id) && nonEmpty(raw.name) && isOneOf(SCOPES, raw.scope)
         ? { type: "tool-allowed", id: raw.id, name: raw.name, input: raw.input ?? null, scope: raw.scope }

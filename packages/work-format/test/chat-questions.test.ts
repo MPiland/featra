@@ -84,6 +84,8 @@ describe("AC1: the questions the agent asks", () => {
     expect(normalizeQuestions([{ ...COLOUR, options: [{ label: "", description: "x" }] }])).toBeNull();
     expect(normalizeQuestions([COLOUR, COLOUR])).toBeNull();
     expect(normalizeQuestions([COLOUR, "nope"])).toBeNull();
+    const blue = { label: "Blue", description: "Calm" };
+    expect(normalizeQuestions([{ ...COLOUR, options: [blue, { ...blue, description: "Other" }] }])).toBeNull();
   });
 
   it("reads a question event, and drops one with no usable questions", () => {
@@ -139,12 +141,14 @@ describe("AC2: the answers sent back", () => {
     expect(SERVER_METHODS).toContain("chat.answer");
   });
 
-  it("reads an answered event, dropping answers that aren't lists of text", () => {
-    expect(normalizeChatEvent({ type: "question-answered", id: "q1", answers: { a: ["x", 1], b: "y" } })).toEqual({
+  it("reads an answered event, and rejects it whole when any answer isn't a list of text", () => {
+    expect(normalizeChatEvent({ type: "question-answered", id: "q1", answers: { a: ["x"], b: [] } })).toEqual({
       type: "question-answered",
       id: "q1",
-      answers: { a: ["x"] },
+      answers: { a: ["x"], b: [] },
     });
+    expect(normalizeChatEvent({ type: "question-answered", id: "q1", answers: { a: ["x"], b: "y" } })).toBeNull();
+    expect(normalizeChatEvent({ type: "question-answered", id: "q1", answers: { a: ["x", 1] } })).toBeNull();
     expect(normalizeChatEvent({ type: "question-answered", id: "q1" })).toBeNull();
   });
 });

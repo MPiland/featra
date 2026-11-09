@@ -4,6 +4,7 @@
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { APPROVAL_CANCELLED, CHAT_MESSAGES, type ChatEvent, type Question } from "@featra/work-format";
+import { MALFORMED_QUESTIONS } from "../src/claude-question.ts";
 import { chat, closeChats, DIR } from "./chat-fixture.ts";
 import { sdk } from "./fake-query.ts";
 import { until } from "./until.ts";
@@ -85,13 +86,21 @@ describe("AC1: AskUserQuestion shows as a card with each question and its option
     expect(await asked).toMatchObject({ behavior: "allow" });
   });
 
-  it("asks about a call whose questions it can't show as an ordinary approval", async () => {
-    const { c, run } = await asking();
-    void run.ask(ASK, { questions: [] }, "q1");
-    await until(() => of(c.events, "approval").length === 1);
-    expect(of(c.events, "question")).toEqual([]);
-    expect(row(c).waiting).toBe("approval");
-  });
+  it.each([
+    ["no options", [{ ...COLOUR, options: [] }]],
+    ["no questions", []],
+    ["two questions with one text", [COLOUR, COLOUR]],
+    ["two options with one label", [{ ...COLOUR, options: [COLOUR.options[0], COLOUR.options[0]] }]],
+  ])(
+    "denies a call with %s straight away, asking nobody, and tells the agent to ask again",
+    async (_name, questions) => {
+      const { c, run } = await asking();
+      expect(await run.ask(ASK, { questions }, "q1")).toEqual({ behavior: "deny", message: MALFORMED_QUESTIONS });
+      expect(of(c.events, "question")).toEqual([]);
+      expect(of(c.events, "approval")).toEqual([]);
+      expect(row(c).waiting).toBeNull();
+    },
+  );
 });
 
 describe("AC2: the answers go back as the tool's result and the agent continues the same turn", () => {

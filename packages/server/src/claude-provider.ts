@@ -106,9 +106,10 @@ function startSession(
   const canUseTool: CanUseTool = async (name, toolInput, options) => {
     const { signal, toolUseID, suppressAlwaysAllowRule, suggestions } = options;
     // The agent asks the user to choose: a card, not an approval.
-    const questions = claudeQuestions(name, toolInput);
-    if (questions) {
-      const request = { id: toolUseID, name, questions };
+    const asked = claudeQuestions(name, toolInput);
+    if (asked && "refusal" in asked) return asked.refusal;
+    if (asked) {
+      const request = { id: toolUseID, name, questions: asked.questions };
       return questionResult(toolInput, await ask(request, AbortSignal.any([signal, turn.signal])));
     }
     // Claude says not to offer an always-allow for this call: Allow for this chat isn't offered either.

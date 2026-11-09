@@ -136,6 +136,15 @@ describe("AC2: Submit sends the answers", () => {
     expect((await within(log()).findByRole("alert")).textContent).toBe("This request isn't waiting for an answer.");
     expect(submit().disabled).toBe(false);
   });
+
+  it("stays busy once the answer is taken, until the answered event arrives, so a second Enter sends nothing", async () => {
+    const { user, calls } = await asking([COLOUR]);
+    await user.type(other(COLOUR), "Green{Enter}");
+    expect(submit().disabled).toBe(true);
+    await user.type(other(COLOUR), "{Enter}");
+    await user.click(submit());
+    expect(calls.filter((c) => c.startsWith("chat.answer"))).toHaveLength(1);
+  });
 });
 
 describe("AC3: an answered card collapses to the chosen answers", () => {

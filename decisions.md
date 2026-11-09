@@ -719,8 +719,17 @@ Recorded for STORY-6, which builds it; STORY-45's AC3 (the five built-in roles d
   and picking an option clears it; for several, it adds to the ticked options. Why: one field is one gesture, and the
   user's own words win only when they wrote some.
 - A call AskUserQuestion makes with questions Featra can't show (none, a blank label or question, two questions with
-  one text) is asked as an ordinary approval, not refused. Why: the user still sees the call and decides; the agent
-  gets Claude's own result for it.
+  one text, two options of one question with one label) is denied at once, without asking the user, and the agent is
+  told to ask again with valid, distinct questions and options. Why: Allow ran the tool with no answers. Review fix;
+  the Dev Lead approved it.
+- Changed assertion: `packages/server/test/chat-questions.test.ts` (was line 88, "asks about a call whose questions it
+  can't show as an ordinary approval") now asserts the immediate deny, no approval or question event and no waiting
+  chat. Reason: Allow sent no answers.
+- A `question-answered` event whose answers aren't all lists of text is rejected whole, not trimmed. Why: dropping an
+  answer silently showed an answered card with less than the user chose.
+- The card stays busy after a taken answer until `question-answered` replaces it. Why: a second Enter could send twice.
+- Multi-select answers reach the agent joined with ", " (Claude's format), so a comma inside a label is ambiguous to
+  it; noted in ADR 0018.
 - There is no skip button. Stop is how the user declines to answer. Why: not in the story; a skip would need a
   product decision on what the agent is told.
 - The card has no keyboard shortcut of its own: native radios, checkboxes, text fields and a form, so Tab and Enter work

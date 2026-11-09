@@ -9,9 +9,22 @@ import type { QuestionDecision } from "./provider.ts";
 
 export const ASK_USER_QUESTION = "AskUserQuestion";
 
-/** The questions of an AskUserQuestion call, or null for any other call, or one with questions Featra can't show. */
-export function claudeQuestions(name: string, input: Record<string, unknown>): Question[] | null {
-  return name === ASK_USER_QUESTION ? normalizeQuestions(input.questions) : null;
+/** What the agent is told when it asks questions Featra can't show: it asks again, rightly. */
+export const MALFORMED_QUESTIONS =
+  "These questions can't be shown. Ask again with 1 to 4 questions, each with its own text and with distinct, non-empty options.";
+
+/**
+ * What an AskUserQuestion call asks: its questions, or a denial when they are malformed (none, a blank text or label,
+ * two questions with one text, two options with one label). The user is not asked, since allowing it would run the tool
+ * with no answers. Null for any other call.
+ */
+export function claudeQuestions(
+  name: string,
+  input: Record<string, unknown>,
+): { questions: Question[] } | { refusal: PermissionResult } | null {
+  if (name !== ASK_USER_QUESTION) return null;
+  const questions = normalizeQuestions(input.questions);
+  return questions ? { questions } : { refusal: { behavior: "deny", message: MALFORMED_QUESTIONS } };
 }
 
 /** Claude takes each answer as one string keyed by the question's text; several choices are joined with a comma. */

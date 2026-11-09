@@ -96,8 +96,10 @@ allow; the adapter passes it to the handler with the SDK's abort signal and `for
 **Agent questions (STORY-46).** Claude's AskUserQuestion reaches `canUseTool` like any tool that needs approval
 (docs/spike-claude-sdk.md#ask). `claude-question.ts` is the only Claude-specific part: it reads the call's questions,
 and turns the user's answers into `updatedInput.answers` (each question's text to the chosen labels joined with a
-comma), which Claude hands the agent as the tool's result, so the same turn goes on. A call whose questions Featra
-can't show (none, a blank option, two with one text) is asked as an ordinary approval. The provider seam is neutral: a
+comma and a space, Claude's format, so a comma inside a label is ambiguous to the agent), which Claude hands the agent
+as the tool's result, so the same turn goes on. A call whose questions Featra can't show (none, a blank option, two
+questions with one text, two options with one label) is denied at once, without asking the user, with a message telling
+the agent to ask again. Allowing it would run the tool with no answers. The provider seam is neutral: a
 `QuestionRequest` of `Question`s (`work-format/questions`: text, header, options, `multiSelect`), answered with
 `Answers` (question text to the chosen labels or the user's own words), or refused. The desk holds a question like an
 approval (one `hold` for both), tells the chat `question`, and `chat.answer` settles it with `question-answered`; it

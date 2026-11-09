@@ -54,8 +54,10 @@ function QuestionForm({ questions, onAnswer }: QuestionFormProps) {
   async function submit() {
     if (busy || !complete) return;
     setBusy(true);
-    setError(await onAnswer(answers));
-    setBusy(false);
+    const why = await onAnswer(answers);
+    setError(why);
+    // Taken: the card stays busy until the answered event replaces it, so a second Enter can't send twice.
+    if (why) setBusy(false);
   }
 
   return (
