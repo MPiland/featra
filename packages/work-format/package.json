@@ -11,7 +11,11 @@
     "./setup-plan": "./src/setup-plan.ts",
     "./setup-items": "./src/setup-items.ts",
     "./work-list": "./src/work-list-types.ts",
-    "./card-view": "./src/card-view-types.ts"
+    "./card-view": "./src/card-view-types.ts",
+    "./roles": "./src/roles.ts",
+    "./chat": "./src/chat-state.ts",
+    "./chat-events": "./src/chat-events.ts",
+    "./tool-summary": "./src/tool-summary.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

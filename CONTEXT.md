@@ -63,6 +63,12 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Session** — one running agent conversation inside Featra (e.g. a Claude Code session via the Agent SDK).
 - **Role preset** — an editable prompt template plus agent, model and reasoning choice: Researcher, Analyst/Refiner,
   Dev Lead, Developer, QA.
+- **Role** — what a chat starts from: a prompt appended to the agent's own, a model, an effort and a permission mode.
+  The five built-in roles are the role presets; all start in Ask.
+- **Chat** — a conversation with one agent, started from a role in a project. Its transcript is an event log; a
+  **tool row** is one tool call in it, collapsed to the tool and a short summary.
+- **Ask** — the permission mode where every tool that needs approval asks first. Until approvals exist (STORY-45), such
+  a tool is denied and the row says so.
 - **Orchestrator** — a session using the Dev Lead role. Shapes features with the user, drafts cards, spawns story
   sessions, reviews and merges.
 - **Agent instructions** — the user's own `CLAUDE.md` / `AGENTS.md`. Featra never edits them. Not the same as project

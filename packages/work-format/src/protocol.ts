@@ -4,6 +4,8 @@
  * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
  */
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
+import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
+import type { Role } from "./roles.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 import type { WorkList } from "./work-list-types.ts";
@@ -57,6 +59,19 @@ export interface ServerMethods {
   "card.watch": { params: { dir: string; id: string }; result: CardView | null };
   /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
+  /** The roles a chat in this project can start from (ADR 0018). */
+  "chat.roles": { params: { dir: string }; result: Role[] };
+  /** Starts a chat from a role in the project folder; answers with its id. Its agent starts with the first message. */
+  "chat.start": { params: { dir: string; role: string }; result: { id: string } };
+  /**
+   * The chat's event log so far; then, until `work.unwatch`, a `chat.event` push for each new event. The request's id
+   * names the watch.
+   */
+  "chat.watch": { params: { id: string }; result: ChatSnapshot };
+  /** Sends the user's message: starts a turn. */
+  "chat.send": { params: { id: string; text: string }; result: null };
+  /** Interrupts the running turn. */
+  "chat.stop": { params: { id: string }; result: null };
 }
 
 /** Frames the server sends unasked, and the data each carries. */
@@ -65,10 +80,12 @@ export interface ServerPushes {
   "work.list": WorkList;
   /** The watched card changed: the whole new view, or null when the card is gone. */
   "card.view": CardView | null;
+  /** A watched chat has a new event. */
+  "chat.event": ChatEvent;
 }
 
 export type PushEvent = keyof ServerPushes;
-const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view"];
+const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view", "chat.event"];
 
 /**
  * A pushed frame: `{ event, watch, data }`. It never has an `id`, so neither end can take it for an answer, and a
@@ -93,6 +110,11 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "work.discardCopy",
   "card.watch",
   "card.update",
+  "chat.roles",
+  "chat.start",
+  "chat.watch",
+  "chat.send",
+  "chat.stop",
 ];
 
 export interface ServerRequest {

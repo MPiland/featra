@@ -73,6 +73,11 @@ The methods so far are:
 | `work.discardCopy`    | `{ dir, key }`      | `{ ok: true }` or `{ ok: false, error }`                                 |
 | `card.watch`          | `{ dir, id }`       | The card pane's view of one card, then pushes (ADR 0017)                 |
 | `card.update`         | `{ dir, id, edit }` | `{ ok, view }` or `{ ok: false, error, view }`: one field, at the owner  |
+| `chat.roles`          | `{ dir }`           | The roles a chat can start from (ADR 0018)                               |
+| `chat.start`          | `{ dir, role }`     | `{ id }` of a new chat (ADR 0018)                                        |
+| `chat.watch`          | `{ id }`            | The chat's event log, then pushes (ADR 0018)                             |
+| `chat.send`           | `{ id, text }`      | `null`, or refused while a turn runs (ADR 0018)                          |
+| `chat.stop`           | `{ id }`            | `null`: interrupts the running turn (ADR 0018)                           |
 
 `project.setupPlan` and `project.setup` (STORY-42) serve the one-screen setup page; `items` are setup item ids
 (`work-format/setup-plan`), and the required ones are always set up. The client no longer calls `project.gitInit` or

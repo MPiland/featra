@@ -9,6 +9,8 @@ import {
   type UiState,
   type WindowState,
 } from "./bridge.ts";
+import { ChatView, type OpenChat } from "./components/chat/ChatView.tsx";
+import { NewChatDialog } from "./components/chat/NewChatDialog.tsx";
 import { Dialog } from "./components/Dialog.tsx";
 import { ProjectSwitcher } from "./components/ProjectSwitcher.tsx";
 import { SettingsView } from "./components/settings/SettingsView.tsx";
@@ -33,7 +35,7 @@ export interface AppProps {
   initialProjects: ProjectsSnapshot;
 }
 
-type OpenDialog = "about" | "resetAppData" | null;
+type OpenDialog = "about" | "resetAppData" | "newChat" | null;
 
 /** Shortcuts a plain browser tab keeps for itself: it has no window to close and no folders to open. */
 const WEB_KEEPS: ReadonlySet<AppShortcut> = new Set(["fullScreen", "closeWindow", "newProject", "openFolder"]);
@@ -49,8 +51,11 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   const [windowState, setWindowState] = useState<WindowState>(DEFAULT_WINDOW_STATE);
   const [settings, setSettings] = useState(initialSettings);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>(() => firstSettingsPage(initialSettings));
+  // The chat in front, until the user opens a view (STORY-21 lists chats in the sidebar).
+  const [chat, setChat] = useState<OpenChat | null>(null);
   const saved = useRef(initialUiState);
   const view = viewDef(currentView(nav));
+  const title = chat ? chat.role.name : view.title;
   const collapsed = ui.sidebarCollapsed;
 
   const toggleSidebar = useCallback(() => {
@@ -60,7 +65,10 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     }
     setUi((s) => ({ ...s, sidebarCollapsed: !s.sidebarCollapsed }));
   }, []);
-  const open = useCallback((v: ViewId) => setNav((n) => navigate(n, v)), []);
+  const open = useCallback((v: ViewId) => {
+    setChat(null);
+    setNav((n) => navigate(n, v));
+  }, []);
   const setZoom = useCallback((f: (z: number) => number) => setUi((s) => ({ ...s, zoomFactor: f(s.zoomFactor) })), []);
   const setPaneWidth = useCallback((w: number) => setUi((s) => ({ ...s, cardPaneWidth: w })), []);
   const back = useCallback(() => setNav(goBack), []);
@@ -196,15 +204,15 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   }, [bridge, actions]);
 
   useEffect(() => {
-    document.title = `Featra · ${view.title}`;
-  }, [view.title]);
+    document.title = `Featra · ${title}`;
+  }, [title]);
 
   return (
     <>
       <div className="shell" inert={dialog !== null || projectDialog !== null}>
         <TitleBar
           bridge={bridge}
-          title={view.title}
+          title={title}
           project={projects.current?.name}
           sidebarCollapsed={collapsed}
           onToggleSidebar={toggleSidebar}
@@ -218,13 +226,16 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
         <div className={collapsed ? "app collapsed" : "app"}>
           <Sidebar
             collapsed={collapsed}
-            current={view.id}
+            current={chat ? null : view.id}
             onOpen={open}
             project={projects.current}
+            onNewChat={() => setDialog("newChat")}
             switcher={<ProjectSwitcher projects={projects} platform={bridge.platform} actions={projectActions} />}
           />
           <main aria-labelledby="view-title">
-            {view.id === "settings" ? (
+            {chat ? (
+              <ChatView key={chat.id} chats={bridge.chats} chat={chat} />
+            ) : view.id === "settings" ? (
               <SettingsView
                 bridge={bridge}
                 snapshot={settings}
@@ -252,6 +263,17 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
         </div>
       </div>
       {projectDialog}
+      {dialog === "newChat" && projects.current && (
+        <NewChatDialog
+          chats={bridge.chats}
+          dir={projects.current.dir}
+          onClose={() => setDialog(null)}
+          onStarted={(id, role) => {
+            setDialog(null);
+            setChat({ id, role });
+          }}
+        />
+      )}
       {dialog === "about" && (
         <Dialog title="About Featra" onClose={() => setDialog(null)}>
           <p className="about-name">{info?.name ?? "Featra"}</p>

@@ -21,8 +21,9 @@ export default defineConfig(({ mode }) => {
       target: "node22",
       minify: false,
       rollupOptions: {
-        // ws loads these optional native speed-ups only if they are installed; Featra doesn't ship them.
-        external: ["electron", "bufferutil", "utf-8-validate"],
+        // ws loads these optional native speed-ups only if they are installed; Featra doesn't ship them. The Agent SDK
+        // is ESM and spawns its own files, so the server imports it from node_modules when a chat starts (ADR 0018).
+        external: ["electron", "bufferutil", "utf-8-validate", "@anthropic-ai/claude-agent-sdk"],
         output: { format: "cjs", entryFileNames: `${entry}.cjs` },
       },
     },

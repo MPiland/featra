@@ -27,7 +27,7 @@ export interface ServerClient {
   /** Sends one request; resolves with the raw result for the caller to check, or rejects with the server's error. */
   call: <M extends ServerMethod>(method: M, params: ServerMethods[M]["params"]) => Promise<unknown>;
   /**
-   * Starts a `work.watch` (ADR 0016) or a `card.watch` (ADR 0017): the listener hears the answer, then every push
+   * Starts a `work.watch` (ADR 0016), a `card.watch` (ADR 0017) or a `chat.watch` (ADR 0018): the listener hears the answer, then every push
    * for it. When the connection drops, the listener hears why, and the watch starts again on a new connection.
    * Returns the stop.
    */
@@ -36,7 +36,7 @@ export interface ServerClient {
 }
 
 /** The methods that start a watch: its pushes go on until `work.unwatch`. */
-export type WatchMethod = "work.watch" | "card.watch";
+export type WatchMethod = "work.watch" | "card.watch" | "chat.watch";
 
 /** How long a dropped watch waits before it tries again. */
 export const REWATCH_MS = 1000;
