@@ -21,9 +21,9 @@ export function ChatView({ chats, chat }: { chats: ChatBridge; chat: OpenChat })
     <section className="chat" aria-label={chat.role.name} data-chat={chat.id}>
       <header className="chat-head">
         <span className="chat-role">{chat.role.name}</span>
-        <span className="chat-meta">{model ?? chat.role.model}</span>
-        <span className="chat-meta">{chat.role.effort}</span>
-        <span className="chat-mode">{CHAT_COPY.ask}</span>
+        <span className="chat-meta">
+          {model ?? chat.role.model} · {chat.role.effort} · <span className="chat-mode">{CHAT_COPY.ask}</span>
+        </span>
       </header>
       {error && (
         <p className="chat-error" role="alert">

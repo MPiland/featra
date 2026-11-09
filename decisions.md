@@ -447,3 +447,6 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
 - A project the user closes ends its chats, and `chat.event` pushes check the project is still open. Why: like
   `work.watch` and `card.view`, a page may only act on open projects.
 - A failed Stop shows its error in the chat view. Why: it was swallowed, so the user didn't know Stop hadn't happened.
+- `claude-locate` reads a Windows lookup's paths with `path.win32` on every host. Why: on Linux the host `join` made
+  `C:\npm/node_modules/...`, so CI couldn't follow the npm shim (the same class of bug as `copyName`).
+- The chat header reads "model · effort · Ask", like the role picker. Why: the parts ran together as "sonnethighAsk".

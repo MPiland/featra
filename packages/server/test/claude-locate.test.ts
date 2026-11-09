@@ -1,5 +1,4 @@
 /** STORY-5 AC1: the user's own `claude`, found the way their shell would find it. The PATH lookup is faked. */
-import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { locateClaude, type Lookup } from "../src/claude-locate.ts";
 
@@ -29,7 +28,7 @@ describe("AC1: locating the user's claude", () => {
 
   it("follows an npm .cmd shim to the script the SDK can run", async () => {
     const { lookup } = answers("C:\\npm\\claude\r\nC:\\npm\\claude.cmd\r\n");
-    const script = join("C:\\npm", "node_modules", "@anthropic-ai", "claude-code", "cli.js");
+    const script = "C:\\npm\\node_modules\\@anthropic-ai\\claude-code\\cli.js";
     expect(await locateClaude(lookup, "win32", (p) => p === script)).toBe(script);
   });
 

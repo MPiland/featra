@@ -4,7 +4,7 @@
  */
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { win32 } from "node:path";
 
 /** Runs a lookup command and resolves with its output, or null when it fails (not found). */
 export type Lookup = (command: string, args: string[]) => Promise<string | null>;
@@ -18,8 +18,12 @@ export const runLookup: Lookup = (command, args) =>
     );
   });
 
-/** Where an npm-installed `claude.cmd` keeps the script it runs: the SDK can't spawn a `.cmd` without a shell. */
-const npmScript = (shim: string) => join(dirname(shim), "node_modules", "@anthropic-ai", "claude-code", "cli.js");
+/**
+ * Where an npm-installed `claude.cmd` keeps the script it runs: the SDK can't spawn a `.cmd` without a shell. The shim
+ * is a Windows path, so it is read with `path.win32` whatever the host (tests run Windows lookups on Linux too).
+ */
+const npmScript = (shim: string) =>
+  win32.join(win32.dirname(shim), "node_modules", "@anthropic-ai", "claude-code", "cli.js");
 
 /**
  * The path of the user's `claude`, or null when there is none. On Windows the native `.exe` is preferred; an npm

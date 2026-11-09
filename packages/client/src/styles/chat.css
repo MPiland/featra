@@ -44,7 +44,6 @@
 }
 
 .chat-mode {
-  margin-left: auto;
   padding: 1px 8px;
   border-radius: 10px;
   background: var(--row);

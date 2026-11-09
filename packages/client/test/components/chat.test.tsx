@@ -41,6 +41,8 @@ describe("AC5: New chat picks one of the five roles, each in Ask", () => {
     expect(calls).toContain(`chat.start:${PROJECT.dir}:dev-lead`);
     const chat = screen.getByRole("region", { name: "Dev Lead" });
     expect(within(chat).getByText(CHAT_COPY.ask)).toBeTruthy();
+    const lead = BUILT_IN_ROLES.find((r) => r.id === "dev-lead")!;
+    expect(chat.textContent).toContain(`Dev Lead${lead.model} · ${lead.effort} · ${CHAT_COPY.ask}`);
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Dev Lead");
     expect(screen.queryByRole("dialog")).toBeNull();
   });
