@@ -2,7 +2,7 @@
 id: BUG-6
 type: bug
 title: Stale-copy Apply misses its 2 s push under load
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-6-stale-copy-8622e4
-pr: null
+pr: https://github.com/MPiland/featra/pull/6
 created: 2026-11-08T16:00:00Z
 history:
   - at: 2026-11-08T16:00:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: session:bug-6
+  - at: 2026-11-09T01:43:22Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:bug-6
 ---
 
 ## Description
@@ -34,7 +39,7 @@ history:
 ## Acceptance criteria
 
 - [x] The failure is reproduced under the full parallel unit run, the slow step is measured, and the cause is recorded in Notes. If the cause is a product bug, a regression test fails before the fix.
-- [ ] The AC6 test passes 50 full `pnpm test:unit` runs in a row on CI's Windows runner, with its assertions and its 2 s wait unchanged.
+- [x] The AC6 test passes 50 full `pnpm test:unit` runs in a row on CI's Windows runner, with its assertions and its 2 s wait unchanged.
 - [x] The `card.watch` stale "Unwatched" answer is explained. Either it is shown to follow only from the AC6 test failing before Apply finishes, since the tests share one repo and run in order, or it is logged as its own bug card (BUG-7) with its cause.
 
 ## Tasks
@@ -64,3 +69,4 @@ history:
 - Worktree-removal tests, under load: "asks git again when a worktree goes" failed a hook run once with "Not seen in 5000 ms", like services-git's removal test in loop run 18. I traced 8 copies at once. The removal is heard and the rescan asks git again. But in the failing trace that rescan took 5.6 s, and in another round every `git rev-parse` took about 2.8 s at the same moment in all 8 processes: a stall of the whole PC. The three waits for git to be asked again now allow 20 s (`GIT_ASKED_MS` in `test/until.ts`, with the reason). These tests are new in this PR and no criterion promises a time. A missed event still fails them. Agreed with the Dev Lead.
 - Timing soak, at 84adbdc with temporary timing logs (since removed): 44 of 50 runs were green. AC6 failed once, in run 20, on the fresh watch's first answer (2010 ms). Its other waits never failed: apply 169–656 ms, push 0 ms. That run fell in a stall of the whole PC: for 4.4 s no git returned in any of the 8 test processes, then all of them returned within 0.3 s. A first scan in 2 git rounds saves about 0.2 s, so it would still have failed. `card.watch` failed in runs 3, 20, 24, 29, 44 and 49. Each time one git step in that process took 1.6–6.2 s while the others took under 1 s. Fewer rounds would have saved at most run 49.
 - 2026-11-08, the user changed AC2: its 50 runs move from this PC to CI's Windows runner, the same as the e2e soaks, with AC6's 2 s wait and assertions unchanged. The local soak failed only on a machine-wide git stall. Card history tracks only status, parent, evidence and accepted, so the change is logged here. decisions.md has an entry.
+- AC2, met: the Windows soak at a567a1e (https://github.com/MPiland/featra/actions/runs/42542436037) ran 50 full `pnpm test:unit` runs in a row on `windows-2025`, and all 50 passed 647 of 647 tests, AC6 included. Its assertions and 2 s wait are unchanged. `card.watch` passed all 50 too, so BUG-7 is closed as a stall of the local PC. `soak.yml` gained the unit suite for this (`soak/windows/unit/50`), and `docs/testing.md` documents it.
