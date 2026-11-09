@@ -26,12 +26,15 @@ stop it.").
 - **Chat list** (STORY-21): the manager keeps a row per chat (`ChatSummary` in `work-format/chat-list`), folded from
   the same events as the log, and pushes the project's list when a row changes (not for each streamed delta). A chat
   waits on the user (`waiting`) when its turn ended done or failed, not stopped; a message clears it. `WaitReason` is
-  `"reply"` today; STORY-45 adds a tool approval and STORY-46 a question, each set from its own event.
+  `"reply"` or `"approval"` (STORY-45); STORY-46 adds a question as another `AskReason`. The server keeps a row's open
+  requests beside it (`ChatRow.asks`, `reduceRow`): the oldest open request sets `waiting`, and once the last one is
+  answered the turn goes on and waits on nothing. Only the row is listed and saved; a saved or restored row never
+  waits on a request (`idleSummary`), since no request outlives its agent.
 - **Role registry** (`role-registry.ts`): the built-in roles come from `work-format/roles`; STORY-6 adds the project's
   own roles behind the same `list`/`get`.
-- **Approval handler**: every tool the agent must ask about goes to an `ApprovalHandler`. Until STORY-45 it is
-  `denyUntilApprovals`, which denies with a message the agent and the user both see, and the chat marks the row Denied.
-  The handler gets an abort signal; a request it answers after Stop or close is not marked Denied.
+- **Approval handler**: every tool the agent must ask about goes to an `ApprovalHandler`. By default it is the
+  approval desk (`approval-desk.ts`, STORY-45), which tells the chat `approval` and holds the request until the user
+  answers through `chat.approve`. See "Tool approvals" below.
 - **Session id**: the adapter reports the SDK's session id on `started`, and the manager saves it with the chat.
   `start({ resume })` goes on in that session (the SDK's `resume` option), so a restored chat keeps its context.
 - **History** (STORY-44): `ProviderAdapter.history(session, cwd)` gives a session's transcript as chat events, or
@@ -51,6 +54,42 @@ is read only from the SDK's `error: "authentication_failed"`, never from a file 
 **What Ask means.** The user's own Claude permission rules (allow and deny, and a settings `defaultMode`) apply before
 `canUseTool`, so Ask means "ask for anything your Claude settings don't already allow". Featra passes no allow or deny
 lists, no permission prompt tool and no settings of its own, so it never bypasses `canUseTool`.
+
+**Tool approvals (STORY-45).** In Ask, the SDK calls `canUseTool` for a tool the user's Claude settings don't already
+allow; the adapter passes it to the handler with the SDK's abort signal and `forChat` (false when the SDK sets
+`suppressAlwaysAllowRule`). The desk answers:
+
+- **Allow** allows this call (`tool-allowed`, scope `once`). **Deny** denies it with `denyMessage(reason)`, so the
+  agent is told the user's optional reason (trimmed, at most 500 characters), and the row shows Denied with the reason.
+- **Allow for this chat** (decided by the user, 2026-11-09) uses the provider's own rule first. A provider may
+  suggest a rule for a request, an optional adapter capability (`ToolRequest.suggested`: an opaque `rule` and a short
+  `covers` line). Allow for this chat then hands the rule back through the decision (`ToolDecision.rule`) and the
+  provider applies it for its session and matches later calls itself; they never reach the desk. Claude's adapter
+  (`claude-rules.ts`) keeps only the `addRules` allow updates among the SDK's `suggestions`, sends them back unchanged
+  as `updatedPermissions` but with `destination: "session"` (Bash suggestions name `localSettings`), and drops mode
+  and directory updates, so nothing is written to the user's Claude settings. Codex and later providers fill in
+  `suggested` when they come; nothing Claude-specific is in shared code.
+- Without a suggestion, Featra's own rule (`chatRule` in `work-format/chat-rules`), kept in the server's memory per
+  chat: a shell tool (Bash, PowerShell) by its whole input except `description`, `timeout` and `run_in_background`,
+  so a field that changes how it runs (`dangerouslyDisableSandbox`, or one the SDK adds later) asks again; Write and
+  Edit for paths whose real path (links resolved by the server, through a resolver work-format takes) is inside the
+  chat's working folder's and outside `.git` and `.claude`, with a path that can't be resolved or has `..` treated as
+  outside; WebFetch by
+  domain; an MCP tool by name. Any other call has no rule and isn't offered Allow for this chat. A later matching
+  call is allowed without asking and shows "Allowed for this chat" (scope `chat`).
+- The `approval` event says what Allow for this chat covers in a short line built from the rule (`covers`: "npm test
+  commands", "Edits in this folder"), shown as the button's description. It is offered only for a call with
+  `forChat: true` (false when the SDK sets `suppressAlwaysAllowRule`) and a rule, and never once the turn is stopped:
+  the desk checks the turn's signal before its rules.
+- **Unanswered.** Stop aborts the turn; the SDK's signal cancels the request (`approval-cancelled`), the agent is
+  told `APPROVAL_CANCELLED` with `interrupt: true` so it stops rather than try another step, and the row shows
+  Stopped. The agent failing aborts the turn first, so nothing is left waiting. The same call asked again replaces
+  the first request, which ends with `APPROVAL_CANCELLED`. The SDK cancelling a request on its own shows Cancelled.
+  Closing the chat or its project ends its requests quietly and forgets its rules. After a restart a call with no
+  result in a finished turn shows Cancelled, never Denied, and the chat waits on a reply.
+- `chat.approve` refuses an answer to a request that isn't waiting (`noRequest`) and Allow for this chat on a
+  once-only call (`onceOnly`). The rules and the answer's params are in `work-format/approvals`, shared by server and
+  client.
 
 **Stop.** Stop only marks a turn that is running. Before the agent has started, Stop ends the turn as stopped and the
 next message starts afresh; after the turn has ended, Stop does nothing. A tool request that Stop or closing cut short
@@ -75,19 +114,20 @@ desktop build marks it external, so it is resolved from the app's own dependenci
 `FEATRA_E2E_AGENT_SDK` at a module that fakes `query` (ADR 0013).
 
 **Events, not view state, on the wire.** `work-format/chat-events` defines the events (`user`, `started`, `text`,
-`tool`, `tool-denied`, `tool-result`, `problem`, `turn-end`) and `work-format/chat` folds them into what the view
-shows. The server keeps the log; the client folds it, so a reconnect gets the whole chat again.
+`tool`, `approval`, `tool-allowed`, `tool-denied`, `approval-cancelled`, `tool-result`, `problem`, `turn-end`) and
+`work-format/chat` folds them into what the view shows. The server keeps the log; the client folds it, so a reconnect gets the whole chat again.
 
 **Protocol additions (ADR 0015).**
 
-| Method       | Params          | Result                                                                     |
-| ------------ | --------------- | -------------------------------------------------------------------------- |
-| `chat.roles` | `{ dir }`       | The roles a chat in the project can start from                             |
-| `chat.start` | `{ dir, role }` | `{ id }`: the chat, not yet running                                        |
-| `chat.watch` | `{ id }`        | `{ events }`, the log so far; then a `chat.event` push for each new event  |
-| `chat.send`  | `{ id, text }`  | `null`, or refused while a turn runs                                       |
-| `chat.stop`  | `{ id }`        | `null`: interrupts the running turn                                        |
-| `chat.list`  | `{ dir }`       | `{ providers, chats }`; then a `chat.list` push each time the list changes |
+| Method         | Params                          | Result                                                                        |
+| -------------- | ------------------------------- | ----------------------------------------------------------------------------- |
+| `chat.roles`   | `{ dir }`                       | The roles a chat in the project can start from                                |
+| `chat.start`   | `{ dir, role }`                 | `{ id }`: the chat, not yet running                                           |
+| `chat.watch`   | `{ id }`                        | `{ events }`, the log so far; then a `chat.event` push for each new event     |
+| `chat.send`    | `{ id, text }`                  | `null`, or refused while a turn runs                                          |
+| `chat.stop`    | `{ id }`                        | `null`: interrupts the running turn                                           |
+| `chat.approve` | `{ id, tool, choice, reason? }` | `null`; `choice` is `allow`, `allow-chat` or `deny`; `reason` only for `deny` |
+| `chat.list`    | `{ dir }`                       | `{ providers, chats }`; then a `chat.list` push each time the list changes    |
 
 `chat.watch` and `chat.send` open the chat first, so a restored chat's transcript is read on its first watch.
 `chat.watch` and `chat.list` stop on `work.unwatch` or when the socket closes, like `work.watch`. A push can arrive
@@ -102,4 +142,3 @@ before the watch's answer; the client keeps it and applies it after the log.
   their own and write session files there as Claude does.
 - A new provider is one adapter: the manager, protocol and view stay as they are.
 - **Licence.** The Agent SDK is not MIT; ADR 0007 accepted it as a dependency.
-- **Limit.** Until STORY-45, a tool that needs approval is always denied.

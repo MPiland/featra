@@ -4,6 +4,7 @@
  * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
  */
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
+import type { ApprovalChoice } from "./approvals.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
 import type { Role } from "./roles.ts";
@@ -74,6 +75,14 @@ export interface ServerMethods {
   /** Interrupts the running turn. */
   "chat.stop": { params: { id: string }; result: null };
   /**
+   * Answers the tool request the chat waits on (STORY-45): Allow, Allow for this chat, or Deny with an optional
+   * reason the agent is sent. Refused when the request isn't waiting.
+   */
+  "chat.approve": {
+    params: { id: string; tool: string; choice: ApprovalChoice; reason?: string };
+    result: null;
+  };
+  /**
    * The project's chats and the providers they group under (STORY-21); then, until `work.unwatch`, a `chat.list` push
    * each time a row changes. The request's id names the watch.
    */
@@ -123,6 +132,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "chat.watch",
   "chat.send",
   "chat.stop",
+  "chat.approve",
   "chat.list",
 ];
 

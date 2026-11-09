@@ -3,6 +3,7 @@
  * session manager keeps the log, and the client folds it into what the chat view shows (`chat-state.ts`). Provider
  * neutral, so a Codex or ACP adapter (M2) feeds the same view.
  */
+import type { AllowScope } from "./approvals.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /**
@@ -18,6 +19,7 @@ export type ChatProblem =
 /** How a turn ended: the agent finished, the user stopped it, or it failed (a `problem` event says why). */
 export type TurnOutcome = "done" | "stopped" | "failed";
 const OUTCOMES: readonly TurnOutcome[] = ["done", "stopped", "failed"];
+const SCOPES: readonly AllowScope[] = ["once", "chat"];
 
 export type ChatEvent =
   /** The user sent a message: a turn starts. */
@@ -30,8 +32,18 @@ export type ChatEvent =
   | { type: "tool"; id: string; name: string; input: unknown }
   /** A tool call's result, as text. */
   | { type: "tool-result"; id: string; output: string; isError: boolean }
-  /** Featra denied a tool call that needed approval (until STORY-45 asks the user). */
-  | { type: "tool-denied"; id: string; name: string; input: unknown }
+  /**
+   * A tool call needs the user's approval (STORY-45): the chat waits until it is answered. `forChat` is false when
+   * Allow for this chat isn't offered (the agent says the call may only be allowed once, or there is no rule for it),
+   * so only Allow and Deny are. `covers` says what Allow for this chat would cover, when it is offered.
+   */
+  | { type: "approval"; id: string; name: string; input: unknown; forChat: boolean; covers?: string }
+  /** The call may run: the user allowed it, or an Allow for this chat already covers it (`scope: "chat"`). */
+  | { type: "tool-allowed"; id: string; name: string; input: unknown; scope: AllowScope }
+  /** The user denied a tool call, with the reason the agent was sent when there was one. */
+  | { type: "tool-denied"; id: string; name: string; input: unknown; reason?: string }
+  /** A request ended unanswered: Stop, the chat closing, or the agent no longer waiting for it. */
+  | { type: "approval-cancelled"; id: string }
   | { type: "turn-end"; outcome: TurnOutcome }
   | { type: "problem"; problem: ChatProblem };
 
@@ -61,10 +73,35 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
     case "text":
       return nonEmpty(raw.block) && str(raw.delta) ? { type: "text", block: raw.block, delta: raw.delta } : null;
     case "tool":
-    case "tool-denied":
       return nonEmpty(raw.id) && nonEmpty(raw.name)
-        ? { type: raw.type, id: raw.id, name: raw.name, input: raw.input ?? null }
+        ? { type: "tool", id: raw.id, name: raw.name, input: raw.input ?? null }
         : null;
+    case "tool-denied":
+      if (!nonEmpty(raw.id) || !nonEmpty(raw.name)) return null;
+      return {
+        type: "tool-denied",
+        id: raw.id,
+        name: raw.name,
+        input: raw.input ?? null,
+        ...(nonEmpty(raw.reason) ? { reason: raw.reason } : {}),
+      };
+    case "approval":
+      return nonEmpty(raw.id) && nonEmpty(raw.name)
+        ? {
+            type: "approval",
+            id: raw.id,
+            name: raw.name,
+            input: raw.input ?? null,
+            forChat: raw.forChat === true,
+            ...(raw.forChat === true && nonEmpty(raw.covers) ? { covers: raw.covers } : {}),
+          }
+        : null;
+    case "tool-allowed":
+      return nonEmpty(raw.id) && nonEmpty(raw.name) && isOneOf(SCOPES, raw.scope)
+        ? { type: "tool-allowed", id: raw.id, name: raw.name, input: raw.input ?? null, scope: raw.scope }
+        : null;
+    case "approval-cancelled":
+      return nonEmpty(raw.id) ? { type: "approval-cancelled", id: raw.id } : null;
     case "tool-result":
       return nonEmpty(raw.id) && str(raw.output)
         ? { type: "tool-result", id: raw.id, output: raw.output, isError: raw.isError === true }
@@ -111,6 +148,8 @@ export const CHAT_MESSAGES = {
   busy: "Wait for the reply, or stop it.",
   /** A restored chat whose session its provider no longer has: it can't go on. */
   gone: "This chat's history is gone. Start a new chat.",
-  /** Told to the agent when a tool is denied until approvals exist (STORY-45). */
-  denied: "Featra can't ask for approval yet, so it denied this tool. Carry on without it.",
+  /** An answer to a tool request that isn't waiting: already answered, cancelled, or never asked. */
+  noRequest: "This request isn't waiting for an answer.",
+  /** Allow for this chat, for a call the agent says may only be allowed once. */
+  onceOnly: "This call can only be allowed once.",
 } as const;

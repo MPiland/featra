@@ -2,7 +2,7 @@
  * The Agent SDK's `query`, faked at the package boundary (ADR 0013): it records each call's options and the user
  * messages it is fed, and the test plays the agent by pushing SDK messages. Everything Featra does with them is real.
  */
-import type { CanUseTool, Options } from "@anthropic-ai/claude-agent-sdk";
+import type { CanUseTool, Options, PermissionUpdate } from "@anthropic-ai/claude-agent-sdk";
 import type { ClaudeDeps, ClaudeQuery, QueryFn } from "../src/claude-provider.ts";
 import { createInputQueue } from "../src/input-queue.ts";
 
@@ -19,9 +19,26 @@ export interface FakeRun {
   interrupts: number;
   /** True once Featra has closed its input: the session is over. */
   closed: boolean;
-  /** Asks Featra whether a tool may run, as `claude` does before a tool that needs approval. */
-  ask: (name: string, input: Record<string, unknown>, id: string) => ReturnType<CanUseTool>;
+  /** The permission updates Featra returned with an allow, in order: Claude applies these. */
+  updates: PermissionUpdate[];
+  /**
+   * Asks Featra whether a tool may run, as `claude` does before a tool that needs approval. `extra` adds the SDK's
+   * other request options (its own abort signal, `suppressAlwaysAllowRule`, `suggestions`). As Claude does, a call a
+   * session allow rule covers is allowed without asking; the fake matches a rule by tool name and its `command`,
+   * exactly or by a `prefix:*` content, which is all the tests use.
+   */
+  ask: (
+    name: string,
+    input: Record<string, unknown>,
+    id: string,
+    extra?: Partial<Parameters<CanUseTool>[2]>,
+  ) => ReturnType<CanUseTool>;
 }
+
+const covers = (content: string | undefined, command: unknown) =>
+  content === undefined ||
+  (typeof command === "string" &&
+    (content.endsWith(":*") ? command.startsWith(content.slice(0, -2)) : command === content));
 
 export function fakeQuery() {
   const runs: FakeRun[] = [];
@@ -35,14 +52,26 @@ export function fakeQuery() {
       crash: (error) => out.push({ error }),
       interrupts: 0,
       closed: false,
-      ask: (name, input, id) => {
+      updates: [],
+      ask: async (name, input, id, extra = {}) => {
         const canUseTool: CanUseTool | undefined = options.canUseTool;
         if (!canUseTool) throw new Error("No canUseTool");
-        return canUseTool(name, input, {
+        const covered = run.updates.some(
+          (u) =>
+            u.type === "addRules" &&
+            u.behavior === "allow" &&
+            u.destination === "session" &&
+            u.rules.some((r) => r.toolName === name && covers(r.ruleContent, input.command)),
+        );
+        if (covered) return { behavior: "allow", updatedInput: input };
+        const result = await canUseTool(name, input, {
           signal: new AbortController().signal,
           toolUseID: id,
           requestId: `request-${id}`,
+          ...extra,
         });
+        if (result?.behavior === "allow") run.updates.push(...(result.updatedPermissions ?? []));
+        return result;
       },
     };
     runs.push(run);

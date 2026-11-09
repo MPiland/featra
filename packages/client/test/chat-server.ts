@@ -5,9 +5,10 @@ import {
   BUILT_IN_ROLES,
   foldChat,
   newSummary,
-  reduceSummary,
+  reduceRow,
+  type ApprovalAnswer,
   type ChatEvent,
-  type ChatSummary,
+  type ChatRow,
   type ProviderInfo,
   type Role,
 } from "@featra/work-format";
@@ -25,6 +26,8 @@ export interface ChatHost {
   sendError?: string;
   /** What `chat.stop` refuses with, if anything. */
   stopError?: string;
+  /** What `chat.approve` refuses with, if anything. */
+  approveError?: string;
   /** The providers `chat.list` reports. Default: Claude, installed. */
   providers?: ProviderInfo[];
   /** The clock a chat's start is stamped with. Default: one second per chat from 2026-11-09T10:00:00Z. */
@@ -35,7 +38,7 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   const logs = new Map<string, ChatEvent[]>();
   const watchers = new Map<string, Set<(u: ChatUpdate) => void>>();
   // Each chat's row and project, kept with work-format's real fold, as the server keeps them.
-  const rows = new Map<string, { dir: string; summary: ChatSummary }>();
+  const rows = new Map<string, ChatRow & { dir: string }>();
   const listWatchers = new Set<{ dir: string; listener: (u: ChatListUpdate) => void }>();
   const providers = host.providers ?? [CLAUDE_INSTALLED];
   const now = host.now ?? (() => new Date(Date.UTC(2026, 10, 9, 10, 0, rows.size)).toISOString());
@@ -57,9 +60,10 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     for (const l of watchers.get(id) ?? []) l(update(id));
     const row = rows.get(id);
     if (!row) return;
-    const summary = reduceSummary(row.summary, event);
-    if (summary === row.summary) return;
-    row.summary = summary;
+    const next = reduceRow(row, event);
+    row.asks = next.asks;
+    if (next.summary === row.summary) return;
+    row.summary = next.summary;
     listChanged(row.dir);
   };
   const bridge: ChatBridge = {
@@ -70,7 +74,7 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       const id = `chat-${logs.size + 1}`;
       logs.set(id, []);
       const found = (host.roles ?? BUILT_IN_ROLES).find((r) => r.id === role);
-      if (found) rows.set(id, { dir, summary: newSummary(id, found.provider, found, now()) });
+      if (found) rows.set(id, { dir, summary: newSummary(id, found.provider, found, now()), asks: [] });
       listChanged(dir);
       return { ok: true, id };
     },
@@ -90,6 +94,11 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     stop: async (id) => {
       calls.push(`chat.stop:${id}`);
       return host.stopError ?? null;
+    },
+    // The answer is recorded; what the server then tells the chat, the test emits as the agent would go on.
+    approve: async (id, tool, answer: ApprovalAnswer) => {
+      calls.push(`chat.approve:${id}:${tool}:${answer.choice}${answer.reason ? `:${answer.reason}` : ""}`);
+      return host.approveError ?? null;
     },
     list: (dir, listener) => {
       const watcher = { dir, listener };

@@ -238,3 +238,44 @@
 .chat-notice .btn {
   margin-left: 8px;
 }
+
+/* A tool call waiting on the user's approval (STORY-45): its input, then the choices. */
+.chat-approval {
+  padding: 0 10px 10px;
+}
+
+.chat-approval h3 {
+  margin: 0 0 4px;
+  color: var(--tx3);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chat-approval pre {
+  margin: 0 0 8px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.chat-approval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-approval-reason {
+  flex: 1;
+  min-width: 140px;
+}
+
+/* The reason a denied call was given, as the agent was sent it. */
+.chat-tool-reason {
+  margin: 0;
+  padding: 0 10px 8px;
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+}

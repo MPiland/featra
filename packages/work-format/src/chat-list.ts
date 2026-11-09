@@ -8,11 +8,23 @@ import { isOneOf, isRecord } from "./utils/guards.ts";
 import { EFFORTS, PROVIDERS, type ProviderId, type Role } from "./roles.ts";
 
 /**
- * Why a chat is waiting on the user. A reply: the agent's turn ended and it waits for the next message. STORY-45 adds
- * a tool approval and STORY-46 a question; each is a new reason here, set from its own event in `nextWait`.
+ * A request the agent waits on the user to answer in the middle of a turn. An approval: a tool call in Ask mode
+ * (STORY-45). STORY-46 adds a question: a new reason here, opened and closed by its own events in `nextAsks`.
  */
-export type WaitReason = "reply";
-export const WAIT_REASONS: readonly WaitReason[] = ["reply"];
+export type AskReason = "approval";
+export interface Ask {
+  /** The request's id: the tool call it is about. */
+  id: string;
+  reason: AskReason;
+}
+
+/**
+ * Why a chat is waiting on the user: a reply (the agent's turn ended and it waits for the next message), or a request
+ * the turn can't go on without (`Ask`).
+ */
+export type WaitReason = "reply" | AskReason;
+export const WAIT_REASONS: readonly WaitReason[] = ["reply", "approval"];
+const isAsk = (w: WaitReason | null): w is AskReason => w !== null && w !== "reply";
 
 /** What a chat row shows of the role it started from. */
 export type ChatRoleRef = Pick<Role, "id" | "name" | "model" | "effort">;
@@ -60,20 +72,63 @@ export function chatTitle(text: string): string | null {
   return line.length > CHAT_TITLE_MAX ? `${line.slice(0, CHAT_TITLE_MAX - 1).trimEnd()}…` : line;
 }
 
+/** The events that answer a request. */
+const ANSWERS = new Set<ChatEvent["type"]>(["tool-allowed", "tool-denied", "approval-cancelled"]);
+const isAnswer = (
+  event: ChatEvent,
+): event is Extract<ChatEvent, { type: "tool-allowed" | "tool-denied" | "approval-cancelled" }> =>
+  ANSWERS.has(event.type);
+
+/** The requests still open after `event`. A turn's end, or a new message, leaves none: no request outlives its turn. */
+export function nextAsks(asks: readonly Ask[], event: ChatEvent): readonly Ask[] {
+  if (event.type === "approval") {
+    return asks.some((a) => a.id === event.id) ? asks : [...asks, { id: event.id, reason: "approval" }];
+  }
+  // An answer closes its request.
+  if (isAnswer(event)) return asks.some((a) => a.id === event.id) ? asks.filter((a) => a.id !== event.id) : asks;
+  if (event.type === "user" || event.type === "turn-end") return asks.length > 0 ? [] : asks;
+  return asks;
+}
+
 /**
- * What the chat waits on after `event`. A message from the user answers whatever it waited on; a turn the agent
- * finished or that failed waits for the user's reply; a turn the user stopped doesn't, since the user is the one who
- * acted.
+ * What the chat waits on after `event`, given the requests open after it (`nextAsks`). An open request comes first,
+ * the oldest one. A message from the user answers whatever it waited on; a turn the agent finished or that failed
+ * waits for the user's reply; a turn the user stopped doesn't, since the user is the one who acted. Once its last
+ * request is answered, the turn goes on and waits on nothing.
  */
-export function nextWait(waiting: WaitReason | null, event: ChatEvent): WaitReason | null {
+export function nextWait(waiting: WaitReason | null, event: ChatEvent, asks: readonly Ask[] = []): WaitReason | null {
+  if (asks[0]) return asks[0].reason;
   if (event.type === "user") return null;
   if (event.type === "turn-end") return event.outcome === "stopped" ? null : "reply";
+  if (ANSWERS.has(event.type) && isAsk(waiting)) return null;
   return waiting;
 }
 
-/** The row after one more event. */
-export function reduceSummary(summary: ChatSummary, event: ChatEvent): ChatSummary {
-  const waiting = nextWait(summary.waiting, event);
+/** A chat's row and the requests it waits on, as the server keeps them. Only the row is listed and saved. */
+export interface ChatRow {
+  summary: ChatSummary;
+  asks: readonly Ask[];
+}
+
+/** The row and its open requests after one more event. */
+export function reduceRow(row: ChatRow, event: ChatEvent): ChatRow {
+  const asks = nextAsks(row.asks, event);
+  const summary = foldSummary(row.summary, event, asks);
+  return summary === row.summary && asks === row.asks ? row : { summary, asks };
+}
+
+/** A row out of a turn: not running, and waiting on no request, since none outlives the turn (its agent ended). */
+export function idleSummary(summary: ChatSummary): ChatSummary {
+  const waiting = isAsk(summary.waiting) ? "reply" : summary.waiting;
+  return summary.running || waiting !== summary.waiting ? { ...summary, running: false, waiting } : summary;
+}
+
+/** The row after one more event, without the open requests: right while at most one request is open at a time. */
+export const reduceSummary = (summary: ChatSummary, event: ChatEvent): ChatSummary =>
+  foldSummary(summary, event, nextAsks([], event));
+
+function foldSummary(summary: ChatSummary, event: ChatEvent, asks: readonly Ask[]): ChatSummary {
+  const waiting = nextWait(summary.waiting, event, asks);
   let { title, running } = summary;
   if (event.type === "user") {
     running = true;

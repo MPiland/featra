@@ -544,3 +544,153 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   the new one's is.
 - Known limits, not changed here: restored chats load before their project is opened (the API still gates them with
   `allow`), and the session file is read whole, with no size cap.
+
+## 2026-11-09 — STORY-45: inline tool approvals
+
+- Allow for this chat is kept in the server's memory only, per chat, and ends with the chat's agent (Stop leaves it;
+  closing the chat or its project, or a restart, forgets it). Featra doesn't pass the SDK's `updatedPermissions`
+  (superseded below: a provider's rule, for its session only). Why:
+  the brief; nothing Featra does should write to the user's own Claude settings, and a rule outliving the chat would
+  allow calls the user never saw.
+- (Superseded below.) Allow for this chat matches a shell tool (Bash, PowerShell) by its exact command, and any other
+  tool by its name.
+  Why: allowing `npm test` must not allow `rm -rf .`; for the file and web tools the name is the permission the user
+  is thinking of, and a per-path rule would ask again on every file.
+- A call the SDK marks `suppressAlwaysAllowRule` is never covered by a rule and offers no Allow for this chat; the
+  server refuses one (`onceOnly`). A request that doesn't say (`forChat` missing on the wire) offers none either. Why:
+  the SDK says those calls may only be allowed once; the safe default is to ask.
+- `defaultToNo` is ignored: no button is focused for the user. Why: focusing Allow or Deny would make Enter answer for
+  them.
+- An unanswered request: Stop cancels it through the SDK's abort signal (`approval-cancelled`) and the row shows
+  Stopped; the SDK cancelling it on its own shows Cancelled; closing the chat ends it quietly; after a restart, a call
+  with no result in a finished turn shows Cancelled. Never Denied, since the user didn't deny it. The agent is told
+  "The request was cancelled before the user answered." Why: the brief.
+- The waiting reason stays in work-format: `AskReason` (`"approval"`, STORY-46 adds a question) and `ChatRow.asks`
+  beside the row. The oldest open request sets `waiting`; a saved or restored row waits on a reply, never a request.
+  Why: the STORY-21 seam, extended so STORY-46 adds one reason and one event, nothing in the list or saving.
+- `tool-allowed` carries the tool's name and input, like `tool-denied`. Why: a bug found in testing. The SDK's
+  permission callback can run before its assistant message reaches the chat, and an Allow for this chat that arrived
+  first was dropped, so the row showed no mark. Regression test in `chat-approvals.test.ts`.
+- A denied call shows the user's reason on its row. Why: the user sees what the agent was told.
+- STORY-7 seam: `SDK_PERMISSION_MODES` maps each role's `PermissionMode` to the SDK's; only `ask` exists until STORY-7
+  adds more. STORY-46 seam: `AskReason` and `nextAsks`.
+- `chat-manager.ts` stays under 300 lines: the approval desk is `approval-desk.ts`, `ChatError` is `chat-error.ts`,
+  and the manager's interfaces are `chat-manager-types.ts`.
+
+### STORY-5 checks changed (follows STORY-45 AC1–2, decided by the Dev Lead)
+
+STORY-5's auto-deny existed only until this story; STORY-45 AC1–2 replace it with the user's answer.
+
+- `packages/server/test/chat-session.test.ts` (AC5). Old: "until approvals exist, a tool that needs one is denied";
+  `canUseTool` answered with no user action, `{ behavior: "deny", message: CHAT_MESSAGES.denied }`, and the row
+  `denied: true` with result `CHAT_MESSAGES.denied`. New: "a tool that needs approval, denied by the user, shows as
+  denied"; the user denies through `manager.approve`, `{ behavior: "deny", message: denyMessage() }`, and the row
+  `denied: true` with result `denyMessage()`.
+- `apps/desktop/e2e/chat.spec.ts`. Old: title "…denies what needs approval…"; the Bash row read `Bashnpm testDenied`
+  with no user action and the log showed `CHAT_MESSAGES.denied`. New: title "…asks before a tool that needs
+  approval…"; the user clicks Deny in the inline prompt, then the row reads `Bashnpm testDenied` and the log shows
+  `denyMessage()`.
+- `CHAT_MESSAGES.denied` ("Featra can't ask for approval yet…") is removed; grep found no other use.
+
+### Review fixes (PR #10)
+
+Each fix has a regression test in `packages/server/test/chat-approvals-review.test.ts` that failed before it.
+
+- Allow for this chat on a shell tool keys on the whole input except `description`, `timeout` and
+  `run_in_background` (`SHELL_FIELDS_IGNORED`), as sorted-key JSON. Why: a rule on `npm test` covered the same command
+  with `dangerouslyDisableSandbox: true`. Fail closed: any field not known to be harmless, including one the SDK adds
+  later, changes the key, so the user is asked again. The SDK's tool input types couldn't be read in this session, so
+  the ignored list is only the fields known not to change what runs.
+- The same tool call asked again (same id) ends the first request with `APPROVAL_CANCELLED` and no event, then waits
+  on the second. Why: the first caller hung forever.
+- The agent failing aborts the turn before its events are relayed. Why: a request it was waiting on stayed pending,
+  so the chat kept waiting on an approval nobody could answer.
+- A request ended by Stop, the SDK's signal or the chat closing denies with `interrupt: true`. Why: the agent was free
+  to try another step after the user stopped it. The earlier Stop, cancel and close checks in `chat-approvals.test.ts`
+  now also expect `interrupt: true` (strengthened, not weakened).
+- The desk checks a stopped turn before the chat's rules, and offers Allow for this chat only when the request says
+  `forChat: true`. Why: a rule allowed a call after Stop, and a request that didn't say defaulted to offering it.
+
+### Allow for this chat: the provider's rule first (decided by the user, 2026-11-09)
+
+The user decided the scope of Allow for this chat after the PR #10 review; it replaces "any other tool by its name".
+
+- The provider's own rule comes first. When the provider suggests a rule for a request, Allow for this chat applies
+  it for this session only, and the provider does the matching. Why: the provider knows its own tools' permission
+  shapes (prefixes like `npm test:*`, domains) better than Featra can, and its matching stays in step with it.
+- It is an optional capability of the adapter seam: `ToolRequest.suggested` (`rule`, opaque to shared code, and a
+  `covers` line), answered by `ToolDecision.rule`. Why: every provider must work; Codex (M2) fills it in later, and
+  nothing Claude-specific is in the desk, the manager or work-format.
+- Claude: the SDK's `canUseTool` `suggestions` are `PermissionUpdate`s (checked against the SDK's TypeScript reference
+  and permissions docs, and typechecked against the installed SDK's `PermissionUpdate`). Bash suggestions name the
+  `localSettings` destination, which writes `.claude/settings.local.json`. Featra keeps only `addRules` updates with
+  `behavior: "allow"`, sends them back as `updatedPermissions` with their rules unchanged but `destination: "session"`
+  ("Current session only"), and drops `setMode`, `addDirectories` and the rest. Why: never write the user's Claude
+  settings, and Allow for this chat never widens more than a rule (a mode change would allow every edit). The SDK
+  checks allow rules before `canUseTool`, so a later matching call is allowed without reaching Featra.
+- `suppressAlwaysAllowRule` still turns Allow for this chat off. The SDK documents it as "don't offer a persistent
+  always-allow choice for this request". A session rule isn't written anywhere, but for the user it is still an
+  always-allow for the rest of the chat, and the docs don't say the flag only concerns settings files. Fail closed:
+  such a call offers only Allow and Deny, and no rule (the provider's or Featra's) covers it.
+- Without a suggestion, Featra's own rule (`chatRule`, `work-format/chat-rules.ts`): a shell tool by the exact command
+  plus every field that changes how it runs; Write and Edit only for paths inside the chat's working folder, never
+  under `.git` or `.claude` at any depth, with `..` resolved first, `~` and drive-relative paths treated as outside,
+  and Windows paths compared without case; WebFetch per domain (http and https only); MCP tools per tool. Any other
+  tool has no rule, so Allow for this chat isn't offered and it is always asked about. Why: the user's list; anything
+  Featra can't place fails closed. Links are resolved first (superseded below: "Allow for this chat: Write and Edit
+  decide on real paths").
+- Copy: the `approval` event carries `covers`, a short line built from the rule ("npm test commands", "This command:
+  npm test", "Edits in this folder", "Fetches from example.com"), shown as the Allow for this chat button's
+  description. It replaces the client's `chatRuleText`. Why: the user's copy decision; the server knows which rule
+  applies, the client doesn't.
+- This PR's own earlier checks that changed with the decision: `work-format/test/approvals.test.ts` keyed any
+  non-shell tool by name (`chatRuleKey("Write", a)` equal to `chatRuleKey("Write", b)`) and said "Bash: npm test, in
+  this chat"; those moved to `chat-rules.test.ts` with the new rules. The client check of the button's description
+  and the server checks of the `approval` event now expect `covers`.
+- Tests: `work-format/test/chat-rules.test.ts` (inside, outside, `.git`, `.claude`, `..` traversal, Windows paths,
+  domains, MCP, unknown tools), `server/test/claude-rules.test.ts`, and `server/test/chat-approvals-suggested.test.ts`
+  (Claude's suggestion passed back as a session rule; a later matching call never reaches Featra's prompt, since the
+  fake SDK applies session rules as Claude does).
+
+### Allow for this chat: Write and Edit decide on real paths (decided by the user, 2026-11-09)
+
+The user sent STORY-45 back over the symlink limit: a link inside the working folder that points outside it was
+covered by Featra's own Write and Edit rule, which checked the path as written.
+
+- The rule now decides on real paths. The server resolves the target's real path (for a new file, its nearest existing
+  folder's, with the rest appended) and the working folder's. Covered only when the real path is inside the folder's
+  real path and outside its `.git` and `.claude`, and the path as written doesn't name `.git` or `.claude` either (a
+  `.claude` that is itself a link still holds Claude's settings). Why: the user's decision; the rule must cover where
+  the write lands, not what the path reads as.
+- Work-format stays pure: `insideFolder` and `chatRule` take an optional `RealPath` resolver, and the server's
+  `real-path.ts` supplies it (`realpathSync.native`). The approval desk passes it both when it offers the rule and when
+  it matches a later call. Why: an injected resolver keeps the rule in one place and testable with a fake disk, rather
+  than moving the check server-side and splitting it in two.
+- Fails closed: a path that can't be resolved, a link whose target is gone (a write through it would create the target
+  wherever it points), or a path with `..` (the OS and the tool may resolve `..` around a link differently) gets no
+  rule, so the call is asked about.
+- Known gap: the check runs when the call is asked about, so a link swapped between the check and the write
+  (time-of-check to time-of-use) isn't caught. Claude's own sandbox and settings still apply.
+- Tests: `server/test/chat-approvals-symlink.test.ts`, with real links in temp folders through the real desk (a folder
+  link to outside, also after Allow for this chat on the folder; a file link to outside; a link into `.git`; a link
+  whose target is gone; `..`; a link to a folder inside the project and a new file under it; a working folder reached
+  through a link). Folder links are junctions on Windows, which need no privileges; the file link case is skipped where
+  the system needs privileges to make one. `work-format/test/chat-rules.test.ts` covers the rule with a fake resolver.
+
+### Role permission modes start from the provider's own settings (decided by the user, 2026-11-09)
+
+Recorded for STORY-6, which builds it; STORY-45's AC3 (the five built-in roles default to Ask) is unchanged.
+
+- A role starts in the permission mode the provider's own settings already use: Claude's `permissions.defaultMode`, or
+  Codex's `approval_policy` and `sandbox_mode` (and its trusted-project entry). Project-level and user-level settings
+  both count. With no setting, the role starts on Ask. Why: the user has already chosen how much the agent may do in
+  that tool; Featra follows it rather than asking again.
+- Featra reads those settings live and never writes them. It never reads credential files
+  (`~/.claude/.credentials.json`, `~/.codex/auth.json`).
+- Full-access modes (Claude `bypassPermissions`; Codex `never` with `danger-full-access`) are honoured, with a warning
+  mark in the composer. Built-in roles never start in one on their own.
+- Mode names (decided by the user, 2026-11-09): the composer's mode picker uses each provider's own mode names:
+  Claude's `default`, `acceptEdits`, `plan`, `auto` and `bypassPermissions`; Codex's approval policy plus sandbox. It
+  shows where the mode came from ("auto · from Claude settings"). There is no Featra-wide common set of modes. Why:
+  the names match what the user already sees and sets in each provider, and a common set would hide differences
+  between them.
