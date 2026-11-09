@@ -52,3 +52,5 @@ and the Gate passed in the same run. STORY-21 doesn't change this test or the se
 ## Notes
 
 - Found by the Dev Lead while reviewing PR #8. Pre-existing; not caused by STORY-21.
+- Second sighting: E2E (Windows), CI run 42630439092 (PR #8 head 766f1a3, a card-only commit), the same test hit
+  the 60 s test timeout. Ubuntu passed in that run.
