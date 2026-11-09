@@ -2,7 +2,7 @@
 id: STORY-21
 type: story
 title: Chat list grouped by provider
-status: In Review
+status: Done
 parent: FEAT-3
 order: 2
 origin: planned
@@ -29,6 +29,16 @@ history:
     field: status
     from: In Progress
     to: In Review
+    by: session:story-21
+  - at: 2026-11-09T14:17:46Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-09T14:17:46Z
+    field: status
+    from: In Review
+    to: Done
     by: session:story-21
 ---
 
