@@ -5,7 +5,8 @@
 import { rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { CARDS_DIR } from "@featra/work-format";
-import { failed, runGit, runGitBytes } from "./git-run.ts";
+import { openBatch, treeEntries } from "./git-batch.ts";
+import { failed, runGit } from "./git-run.ts";
 
 export interface RepoPaths {
   /** The working tree the opened folder is in. */
@@ -28,26 +29,33 @@ export interface BranchInfo {
   inBase: boolean;
 }
 
-export interface TreeFile {
+/** A card file as a commit has it. */
+export interface CommittedFile {
   path: string;
-  sha: string;
+  text: string;
 }
+
+/** Keeps blob texts by SHA (the index): answers from what it has, and from `load` for the rest. */
+export type BlobCache = (
+  shas: readonly string[],
+  load: (missing: string[]) => Promise<Map<string, string>>,
+) => Promise<Map<string, string>>;
 
 export interface RepoGit {
   /** Null when `dir` isn't in a git work tree. */
   paths: (dir: string) => Promise<RepoPaths | null>;
   worktrees: (top: string) => Promise<WorktreeInfo[]>;
   branches: (top: string, base: string) => Promise<BranchInfo[]>;
-  /** The card files in `.featra/cards/` at commit or branch `rev`. */
-  cardFiles: (top: string, rev: string) => Promise<TreeFile[]>;
-  /** The texts of these blobs, by SHA. */
-  blobs: (top: string, shas: readonly string[]) => Promise<Map<string, string>>;
+  /**
+   * The card files in `.featra/cards/` at each commit or branch of `revs`, by rev. One `git cat-file --batch` reads
+   * the trees, then the blobs `cache` doesn't have (BUG-6).
+   */
+  committedCards: (top: string, revs: readonly string[], cache: BlobCache) => Promise<Map<string, CommittedFile[]>>;
   /** Puts `path` back as HEAD has it in the working tree at `root`, or removes it when HEAD has none. */
   restore: (root: string, path: string, inHead: boolean) => Promise<void>;
 }
 
 const NO_COMMIT = /^0+$/;
-const CARDS_PREFIX = `${CARDS_DIR}/`;
 
 function parseWorktrees(text: string): WorktreeInfo[] {
   const out: WorktreeInfo[] = [];
@@ -64,23 +72,6 @@ function parseWorktrees(text: string): WorktreeInfo[] {
     });
   }
   return out;
-}
-
-/** Reads `git cat-file --batch` output: `<sha> blob <size>\n<bytes>\n` per object, `<sha> missing\n` for none. */
-function parseBatch(out: Buffer): Map<string, string> {
-  const texts = new Map<string, string>();
-  let at = 0;
-  while (at < out.length) {
-    const eol = out.indexOf(10, at);
-    if (eol < 0) break;
-    const [sha = "", type, size] = out.subarray(at, eol).toString("utf8").split(" ");
-    at = eol + 1;
-    if (type === undefined || size === undefined) continue;
-    const n = Number(size);
-    if (type === "blob") texts.set(sha, out.subarray(at, at + n).toString("utf8"));
-    at += n + 1;
-  }
-  return texts;
 }
 
 export function createRepoGit(command = "git"): RepoGit {
@@ -115,20 +106,35 @@ export function createRepoGit(command = "git"): RepoGit {
       const inBase = new Set(merged.code === 0 ? merged.stdout.split("\n") : []);
       return all.filter(Boolean).map((name) => ({ name, inBase: inBase.has(name) }));
     },
-    async cardFiles(top, rev) {
-      const out = await ok(top, ["ls-tree", "-z", rev, "--", CARDS_PREFIX]);
-      const files: TreeFile[] = [];
-      for (const entry of out.split("\0")) {
-        const tab = entry.indexOf("\t");
-        const [, type, sha] = entry.slice(0, tab).split(" ");
-        const path = entry.slice(tab + 1);
-        if (type === "blob" && sha && path.startsWith(CARDS_PREFIX) && path.endsWith(".md")) files.push({ path, sha });
+    async committedCards(top, revs, cache) {
+      const byRev = new Map<string, CommittedFile[]>();
+      if (!revs.length) return byRev;
+      const batch = openBatch(command, top);
+      try {
+        const trees = await batch.get(revs.map((rev) => `${rev}:${CARDS_DIR}`));
+        const files = trees.map((tree) =>
+          treeEntries(tree)
+            .filter((e) => e.kind === "blob" && e.name.endsWith(".md"))
+            .map((e) => ({ path: `${CARDS_DIR}/${e.name}`, sha: e.sha })),
+        );
+        const texts = await cache([...new Set(files.flat().map((f) => f.sha))], async (missing) => {
+          const blobs = await batch.get(missing);
+          const found = new Map<string, string>();
+          blobs.forEach((b, i) => {
+            if (b?.type === "blob") found.set(missing[i] ?? "", b.data.toString("utf8"));
+          });
+          return found;
+        });
+        revs.forEach((rev, i) => {
+          byRev.set(
+            rev,
+            (files[i] ?? []).map((f) => ({ path: f.path, text: texts.get(f.sha) ?? "" })),
+          );
+        });
+        return byRev;
+      } finally {
+        await batch.close();
       }
-      return files;
-    },
-    async blobs(top, shas) {
-      if (!shas.length) return new Map();
-      return parseBatch(await runGitBytes(command, top, ["cat-file", "--batch"], `${shas.join("\n")}\n`));
     },
     async restore(root, path, inHead) {
       if (inHead) {

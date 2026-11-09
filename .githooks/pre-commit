@@ -1,4 +1,19 @@
 #!/bin/sh
 # The commit gate (STORY-41, ADR 0014): format check, lint, typecheck and unit tests must all pass.
 # `pnpm install` turns it on (the prepare script sets core.hooksPath to .githooks).
+
+# Git puts its exec-path first on PATH for hooks. On Windows the git.exe there has none of git's DLLs beside it and
+# starts far slower, which pushed the server's timed tests past their waits (BUG-6). Run the gate as a shell would.
+# `cd` and `pwd` spell the exec-path the way this sh spells PATH (`/mingw64/...` in Git Bash).
+exec_path=$(cd "$(git --exec-path)" && pwd)
+kept=
+old_ifs=$IFS
+IFS=:
+for dir in $PATH; do
+  [ "$dir" = "$exec_path" ] || kept="${kept:+$kept:}$dir"
+done
+IFS=$old_ifs
+PATH=$kept
+export PATH
+
 exec pnpm check

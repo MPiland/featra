@@ -18,16 +18,15 @@ import {
   type CardView,
 } from "@featra/work-format";
 import { locationKey } from "./collect.ts";
-import type { Scan, Scanner } from "./work-scan.ts";
+import type { Scan } from "./work-scan.ts";
 
 export interface CardActionDeps {
-  scanner: Scanner;
-  now: () => Date;
   /**
-   * Scans again after a write. The server passes the watches' refresh, so the one scan also pushes to every
-   * watcher; the scanner's own scan by default.
+   * Scans a folder, before the edit and again after the write. The server passes the watches' scan, so the scan
+   * after also pushes to every watcher, and neither runs git unless git changed (BUG-6).
    */
-  rescan?: (dir: string) => Promise<Scan | null>;
+  scan: (dir: string) => Promise<Scan | null>;
+  now: () => Date;
 }
 
 const contextOf = (scan: Scan): CardEditContext => ({
@@ -61,11 +60,11 @@ export async function writeAtomic(file: string, text: string): Promise<void> {
 
 const fileIn = (root: string, path: string) => join(root, ...path.split("/"));
 
-export function createCardActions({ scanner, now, rescan = scanner.scan }: CardActionDeps) {
+export function createCardActions({ scan: scanDir, now }: CardActionDeps) {
   return {
     /** Applies `edit` to the owner's copy of `id`, read fresh; answers with the view as it is after. */
     async update(dir: string, id: string, edit: CardEdit): Promise<CardUpdateResult> {
-      const scan = await scanner.scan(dir);
+      const scan = await scanDir(dir);
       const found = ownedIn(scan, id);
       const view = cardViewIn(scan, id);
       if (!scan || !found || !view) return { ok: false, error: "That card is gone.", view: null };
@@ -78,7 +77,7 @@ export function createCardActions({ scanner, now, rescan = scanner.scan }: CardA
       } catch (err) {
         return { ok: false, error: `Can't save the card: ${errorMessage(err)}`, view };
       }
-      const after = cardViewIn(await rescan(dir), id);
+      const after = cardViewIn(await scanDir(dir), id);
       return after ? { ok: true, view: after } : { ok: false, error: "That card is gone.", view: null };
     },
   };

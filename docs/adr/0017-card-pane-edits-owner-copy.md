@@ -24,11 +24,12 @@ import them; neither re-implements them.
 - Text that would not read back from the file as typed, such as a line starting `## `, is refused rather than saved.
   A title, AC or task is one line and can't be empty.
 
-**Server.** `card.update` scans the folder fresh, finds the owner copy and applies the edit there. When the owner has
-no copy, or isn't checked out in any worktree, the card is read-only and the refusal names why ("Check out feature/1 to
-edit it."). The write is atomic: a temporary file in the same folder, then a rename. The server then rescans through
-the watches, so every watcher gets the new card once; a watcher hears a card only when its JSON changed, so the events
-from the temporary file and the rename push nothing extra.
+**Server.** `card.update` scans the folder through its watch (from disk, reusing git's answers unless git changed; ADR
+0016), finds the owner copy and applies the edit there. When the owner has no copy, or isn't checked out in any
+worktree, the card is read-only and the refusal names why ("Check out feature/1 to edit it."). The write is atomic: a
+temporary file in the same folder, then a rename. The server then rescans through the watches, so every watcher gets the
+new card once; a watcher hears a card only when its JSON changed, so the events from the temporary file and the rename
+push nothing extra.
 
 **Protocol additions (ADR 0015).**
 
