@@ -1,17 +1,20 @@
 import { useEffect, useRef } from "react";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
+import type { Answers } from "@featra/work-format/questions";
 import type { ChatItem } from "@featra/work-format/chat";
 import { assertNever } from "@featra/work-format/guards";
 import { CHAT_COPY, noticeText } from "../../chats.ts";
+import { QuestionCard } from "./QuestionCard.tsx";
 import { ToolRow } from "./ToolRow.tsx";
 
 /**
- * What the transcript offers: a new chat with the same role, for a chat whose history is gone, and the answer to a
- * tool request.
+ * What the transcript offers: a new chat with the same role, for a chat whose history is gone, and the answers to a
+ * tool request and to a question.
  */
 export interface TranscriptActions {
   onNewChat: () => void;
   onAnswer: (tool: string, answer: ApprovalAnswer) => Promise<string | null>;
+  onAnswerQuestion: (tool: string, answers: Answers) => Promise<string | null>;
 }
 
 function Item({ item, actions }: { item: ChatItem; actions: TranscriptActions }) {
@@ -21,7 +24,11 @@ function Item({ item, actions }: { item: ChatItem; actions: TranscriptActions })
     case "assistant":
       return <div className="chat-msg agent">{item.text}</div>;
     case "tool":
-      return <ToolRow item={item} onAnswer={actions.onAnswer} />;
+      return item.question ? (
+        <QuestionCard item={item} onAnswer={actions.onAnswerQuestion} />
+      ) : (
+        <ToolRow item={item} onAnswer={actions.onAnswer} />
+      );
     case "notice":
       return (
         <p className={item.notice.type === "stopped" ? "chat-notice" : "chat-notice bad"} role="status">

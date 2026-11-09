@@ -2,7 +2,7 @@
  * The provider adapter seam (ADR 0018): how the session manager runs an agent without knowing which one. The Claude
  * adapter is the only one in M1; Codex and ACP agents (M2) implement the same interface.
  */
-import type { ChatEvent, ProviderId, Role } from "@featra/work-format";
+import type { Answers, ChatEvent, ProviderId, Question, Role } from "@featra/work-format";
 
 /**
  * A rule the provider suggests for Allow for this chat (ADR 0018): an optional adapter capability. The provider applies
@@ -30,12 +30,34 @@ export interface ToolRequest {
   suggested?: SuggestedRule;
 }
 
+/** A request the agent is told no to. `interrupt` tells it to stop its turn rather than try another step (Stop, the chat ending). */
+export interface Refusal {
+  allow: false;
+  message: string;
+  interrupt?: boolean;
+}
+
+/** `rule` on an allow is the provider's suggested rule the user chose Allow for this chat for: the provider applies it. */
+export type ToolDecision = { allow: true; input: Record<string, unknown>; rule?: unknown } | Refusal;
+
+/** Questions the agent asks the user to choose from (STORY-46), as the question handler sees them. */
+export interface QuestionRequest {
+  /** The chat it came from. */
+  chat: string;
+  /** The provider's id for this call: the row it belongs to. */
+  id: string;
+  name: string;
+  questions: Question[];
+}
+
+/** The user's answers, each question answered as it asks; or why the agent is told no (Stop, the chat ending). */
+export type QuestionDecision = { allow: true; answers: Answers } | Refusal;
+
 /**
- * `rule` on an allow is the provider's suggested rule the user chose Allow for this chat for: the provider applies it.
- * `interrupt` on a deny tells the agent to stop its turn rather than try another step (Stop, the chat ending). */
-export type ToolDecision =
-  | { allow: true; input: Record<string, unknown>; rule?: unknown }
-  | { allow: false; message: string; interrupt?: boolean };
+ * Asks the user the agent's questions: by default the approval desk shows them in the chat and holds them until
+ * answered. `signal` aborts as for an `ApprovalHandler`.
+ */
+export type QuestionHandler = (request: QuestionRequest, signal: AbortSignal) => Promise<QuestionDecision>;
 
 /**
  * Decides a tool call that needs approval: by default the approval desk asks the user in the chat (STORY-45). `signal`
@@ -50,6 +72,8 @@ export interface SessionOptions {
   role: Role;
   /** Asked before each tool that needs approval. */
   approve: (request: Omit<ToolRequest, "chat" | "cwd">, signal: AbortSignal) => Promise<ToolDecision>;
+  /** Asked when the agent asks the user to choose (STORY-46). */
+  ask: (request: Omit<QuestionRequest, "chat">, signal: AbortSignal) => Promise<QuestionDecision>;
   /** Hears each event of the agent's stream, in order. */
   emit: (event: ChatEvent) => void;
   /** The provider's session to go on with (a restored chat, STORY-44); a new conversation without it. */

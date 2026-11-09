@@ -28,9 +28,17 @@ function cut(text: string): string {
   return line.length > SUMMARY_MAX ? `${line.slice(0, SUMMARY_MAX - 1)}…` : line;
 }
 
+/** The text of the first question of an AskUserQuestion call, whose input holds its questions in a list. */
+function firstQuestion(input: Record<string, unknown>): string | undefined {
+  const first: unknown = Array.isArray(input.questions) ? input.questions[0] : undefined;
+  return isRecord(first) && typeof first.question === "string" ? first.question : undefined;
+}
+
 /** The tool's key input, or else its first text input; empty when it has none. */
 export function toolSummary(name: string, input: unknown): string {
   if (!isRecord(input)) return "";
+  const asked = name === "AskUserQuestion" ? firstQuestion(input) : undefined;
+  if (asked?.trim()) return cut(asked);
   const key = KEY_FIELD[name];
   const value = key === undefined ? undefined : input[key];
   if (typeof value === "string" && value.trim()) return cut(value);

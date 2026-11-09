@@ -26,7 +26,7 @@ stop it.").
 - **Chat list** (STORY-21): the manager keeps a row per chat (`ChatSummary` in `work-format/chat-list`), folded from
   the same events as the log, and pushes the project's list when a row changes (not for each streamed delta). A chat
   waits on the user (`waiting`) when its turn ended done or failed, not stopped; a message clears it. `WaitReason` is
-  `"reply"` or `"approval"` (STORY-45); STORY-46 adds a question as another `AskReason`. The server keeps a row's open
+  `"reply"`, `"approval"` (STORY-45) or `"question"` (STORY-46), the last two being the `AskReason`s. The server keeps a row's open
   requests beside it (`ChatRow.asks`, `reduceRow`): the oldest open request sets `waiting`, and once the last one is
   answered the turn goes on and waits on nothing. Only the row is listed and saved; a saved or restored row never
   waits on a request (`idleSummary`), since no request outlives its agent.
@@ -35,6 +35,8 @@ stop it.").
 - **Approval handler**: every tool the agent must ask about goes to an `ApprovalHandler`. By default it is the
   approval desk (`approval-desk.ts`, STORY-45), which tells the chat `approval` and holds the request until the user
   answers through `chat.approve`. See "Tool approvals" below.
+- **Question handler** (STORY-46): when the agent asks the user to choose, the adapter calls the session's `ask`
+  (a `QuestionHandler`), which the desk implements beside `approve`. See "Agent questions" below.
 - **Session id**: the adapter reports the SDK's session id on `started`, and the manager saves it with the chat.
   `start({ resume })` goes on in that session (the SDK's `resume` option), so a restored chat keeps its context.
 - **History** (STORY-44): `ProviderAdapter.history(session, cwd)` gives a session's transcript as chat events, or
@@ -91,6 +93,21 @@ allow; the adapter passes it to the handler with the SDK's abort signal and `for
   once-only call (`onceOnly`). The rules and the answer's params are in `work-format/approvals`, shared by server and
   client.
 
+**Agent questions (STORY-46).** Claude's AskUserQuestion reaches `canUseTool` like any tool that needs approval
+(docs/spike-claude-sdk.md#ask). `claude-question.ts` is the only Claude-specific part: it reads the call's questions,
+and turns the user's answers into `updatedInput.answers` (each question's text to the chosen labels joined with a
+comma and a space, Claude's format, so a comma inside a label is ambiguous to the agent), which Claude hands the agent
+as the tool's result, so the same turn goes on. A call whose questions Featra can't show (none, a blank option, two
+questions with one text, two options with one label) is denied at once, without asking the user, with a message telling
+the agent to ask again. Allowing it would run the tool with no answers. The provider seam is neutral: a
+`QuestionRequest` of `Question`s (`work-format/questions`: text, header, options, `multiSelect`), answered with
+`Answers` (question text to the chosen labels or the user's own words), or refused. The desk holds a question like an
+approval (one `hold` for both), tells the chat `question`, and `chat.answer` settles it with `question-answered`; it
+takes only answers that answer each question as it asks (`validAnswers`: one for a single choice, one or more for
+several), else the question keeps waiting (`badAnswer`). Stop, the SDK cancelling and the chat closing end it as an
+unanswered approval does (`approval-cancelled`, the same agent message), and the card shows as the stopped or cancelled
+call. The question shows on its call's own row (`ChatItem.question`), so no new item kind.
+
 **Stop.** Stop only marks a turn that is running. Before the agent has started, Stop ends the turn as stopped and the
 next message starts afresh; after the turn has ended, Stop does nothing. A tool request that Stop or closing cut short
 shows as stopped, not Denied. A project the user closes ends its chats, and their events are no longer pushed.
@@ -114,7 +131,7 @@ desktop build marks it external, so it is resolved from the app's own dependenci
 `FEATRA_E2E_AGENT_SDK` at a module that fakes `query` (ADR 0013).
 
 **Events, not view state, on the wire.** `work-format/chat-events` defines the events (`user`, `started`, `text`,
-`tool`, `approval`, `tool-allowed`, `tool-denied`, `approval-cancelled`, `tool-result`, `problem`, `turn-end`) and
+`tool`, `approval`, `tool-allowed`, `tool-denied`, `question`, `question-answered`, `approval-cancelled`, `tool-result`, `problem`, `turn-end`) and
 `work-format/chat` folds them into what the view shows. The server keeps the log; the client folds it, so a reconnect gets the whole chat again.
 
 **Protocol additions (ADR 0015).**
@@ -127,6 +144,7 @@ desktop build marks it external, so it is resolved from the app's own dependenci
 | `chat.send`    | `{ id, text }`                  | `null`, or refused while a turn runs                                          |
 | `chat.stop`    | `{ id }`                        | `null`: interrupts the running turn                                           |
 | `chat.approve` | `{ id, tool, choice, reason? }` | `null`; `choice` is `allow`, `allow-chat` or `deny`; `reason` only for `deny` |
+| `chat.answer`  | `{ id, tool, answers }`         | `null`; `answers` maps each question's text to the labels or own words chosen |
 | `chat.list`    | `{ dir }`                       | `{ providers, chats }`; then a `chat.list` push each time the list changes    |
 
 `chat.watch` and `chat.send` open the chat first, so a restored chat's transcript is read on its first watch.

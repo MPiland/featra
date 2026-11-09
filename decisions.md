@@ -694,3 +694,47 @@ Recorded for STORY-6, which builds it; STORY-45's AC3 (the five built-in roles d
   shows where the mode came from ("auto · from Claude settings"). There is no Featra-wide common set of modes. Why:
   the names match what the user already sees and sets in each provider, and a common set would hide differences
   between them.
+
+## 2026-11-09 — STORY-46: agent questions as cards
+
+- A question is a card on its call's own tool row (`ChatItem.question`), not a new item kind, and the AskUserQuestion
+  call still has its `tool` event. Why: the SDK's callback can run before or after its assistant message, and the row
+  already handles either order, Stop, a restart and a late cancel; a second item would need all of that again.
+- Questions are provider neutral (`work-format/questions`: `Question`, `Answers`), and the Claude format (answers keyed
+  by question text, several choices joined with ", ") lives only in `claude-question.ts`. Why: Codex adds its own
+  mapping without touching the card, the events or the desk (the brief).
+- Answers are `question text -> string[]` on the wire and in the log, not Claude's joined string. Why: the collapsed
+  card lists each choice, and a label with a comma in it stays one choice until the adapter joins them.
+- One desk, one `hold`, for approvals and questions; the provider seam gets a second handler, `ask`, beside `approve`.
+  Why: they end the same ways (answer, Stop, the SDK's signal, the chat closing, the same call asked again), so the
+  rules stay in one place and one test file of cancel cases covers both.
+- A question ends like an unanswered approval: `approval-cancelled`, and the agent is told `APPROVAL_CANCELLED` with
+  `interrupt: true`. Why: no new event for what means the same; the row shows Stopped or Cancelled, never Answered.
+- A question reads as waiting (`WaitReason` `"question"`) through the same `nextAsks`, so the STORY-21 dot, saving and
+  `idleSummary` needed no change. A restored chat never waits on a question, for the reason it never waits on an approval.
+- `chat.answer` takes only answers that answer every question as it asks (`validAnswers`); otherwise it is refused
+  (`badAnswer`) and the question keeps waiting. Why: the agent must never be handed an empty or a double answer, and the
+  client's Submit is disabled on the same rule, so the server's check is for any other client.
+- Other is a text field under each question, always there. For a single choice, typing in it replaces the picked option
+  and picking an option clears it; for several, it adds to the ticked options. Why: one field is one gesture, and the
+  user's own words win only when they wrote some.
+- A call AskUserQuestion makes with questions Featra can't show (none, a blank label or question, two questions with
+  one text, two options of one question with one label) is denied at once, without asking the user, and the agent is
+  told to ask again with valid, distinct questions and options. Why: Allow ran the tool with no answers. Review fix;
+  the Dev Lead approved it.
+- Changed assertion: `packages/server/test/chat-questions.test.ts` (was line 88, "asks about a call whose questions it
+  can't show as an ordinary approval") now asserts the immediate deny, no approval or question event and no waiting
+  chat. Reason: Allow sent no answers.
+- A `question-answered` event whose answers aren't all lists of text is rejected whole, not trimmed. Why: dropping an
+  answer silently showed an answered card with less than the user chose.
+- The card stays busy after a taken answer until `question-answered` replaces it. Why: a second Enter could send twice.
+- Multi-select answers reach the agent joined with ", " (Claude's format), so a comma inside a label is ambiguous to
+  it; noted in ADR 0018.
+- There is no skip button. Stop is how the user declines to answer. Why: not in the story; a skip would need a
+  product decision on what the agent is told.
+- The card has no keyboard shortcut of its own: native radios, checkboxes, text fields and a form, so Tab and Enter work
+  as everywhere. Enter in an Other field submits only once every question is answered.
+- `tool-summary` shows the first question as the call's summary. Why: a cancelled or stopped question falls back to a
+  plain row, which would otherwise show only the tool's name.
+- `packages/server/test/chat-stop.test.ts`: its hand-built `SessionOptions` gained the new required `ask`. No assertion
+  changed.

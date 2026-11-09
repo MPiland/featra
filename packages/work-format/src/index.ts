@@ -23,6 +23,7 @@ export * from "./card-edit.ts";
 export * from "./card-view.ts";
 export * from "./roles.ts";
 export * from "./approvals.ts";
+export * from "./questions.ts";
 export * from "./chat-rules.ts";
 export * from "./chat-events.ts";
 export * from "./chat-state.ts";

@@ -28,6 +28,8 @@ export interface ChatHost {
   stopError?: string;
   /** What `chat.approve` refuses with, if anything. */
   approveError?: string;
+  /** What `chat.answer` refuses with, if anything. */
+  answerError?: string;
   /** The providers `chat.list` reports. Default: Claude, installed. */
   providers?: ProviderInfo[];
   /** The clock a chat's start is stamped with. Default: one second per chat from 2026-11-09T10:00:00Z. */
@@ -99,6 +101,10 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     approve: async (id, tool, answer: ApprovalAnswer) => {
       calls.push(`chat.approve:${id}:${tool}:${answer.choice}${answer.reason ? `:${answer.reason}` : ""}`);
       return host.approveError ?? null;
+    },
+    answer: async (id, tool, answers) => {
+      calls.push(`chat.answer:${id}:${tool}:${JSON.stringify(answers)}`);
+      return host.answerError ?? null;
     },
     list: (dir, listener) => {
       const watcher = { dir, listener };

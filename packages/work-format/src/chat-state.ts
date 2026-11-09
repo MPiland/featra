@@ -5,6 +5,7 @@
  */
 import type { AllowScope } from "./approvals.ts";
 import type { ChatEvent, ChatProblem } from "./chat-events.ts";
+import type { Answers, Question } from "./questions.ts";
 import { assertNever } from "./utils/guards.ts";
 import { toolSummary } from "./tool-summary.ts";
 
@@ -20,6 +21,11 @@ export interface ToolResult {
 export type ToolApproval =
   | { status: "pending"; forChat: boolean; covers?: string }
   | { status: "allowed"; scope: AllowScope };
+
+/** Where a question stands: waiting on the user, or answered with what they chose. */
+export type ToolQuestion =
+  | { status: "pending"; questions: Question[] }
+  | { status: "answered"; questions: Question[]; answers: Answers };
 
 export type ChatItem =
   | { kind: "user"; key: string; text: string }
@@ -37,6 +43,8 @@ export type ChatItem =
       reason: string | null;
       /** The approval the call asked for, if it asked. */
       approval: ToolApproval | null;
+      /** The question the call asks the user (STORY-46), if it is one: the row shows it as a card. */
+      question: ToolQuestion | null;
       /** The user stopped the turn before the call had a result. */
       stopped: boolean;
       /** The call ended unanswered some other way: its request was cancelled, or its turn ended without a result. */
@@ -93,6 +101,7 @@ function upsertTool(
     denied: false,
     reason: null,
     approval: null,
+    question: null,
     stopped: false,
     cancelled: false,
   };
@@ -106,7 +115,13 @@ function updateTool(state: ChatState, id: string, change: (row: ToolItem) => Par
   return row?.kind === "tool" ? replace(state, at, { ...row, ...change(row) }) : state;
 }
 
-const pending = (row: ToolItem) => row.approval?.status === "pending";
+const pending = (row: ToolItem) => row.approval?.status === "pending" || row.question?.status === "pending";
+
+/** The row's approval and question with whichever was waiting taken off: no request is left open. */
+const unasked = (row: ToolItem) => ({
+  approval: row.approval?.status === "pending" ? null : row.approval,
+  question: row.question?.status === "pending" ? null : row.question,
+});
 
 function appendText(state: ChatState, block: string, delta: string): ChatState {
   const last = state.items.at(-1);
@@ -125,8 +140,8 @@ const endTools = (state: ChatState, stopped: boolean): ChatState => ({
   ...state,
   items: state.items.map((item) => {
     if (item.kind !== "tool" || item.result !== null || item.denied) return item;
-    const approval = pending(item) ? null : item.approval;
-    return stopped ? { ...item, approval, stopped: true } : { ...item, approval, cancelled: !item.stopped };
+    const open = unasked(item);
+    return stopped ? { ...item, ...open, stopped: true } : { ...item, ...open, cancelled: !item.stopped };
   }),
 });
 
@@ -144,6 +159,16 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       return upsertTool(state, event.id, event.name, event.input, () => ({
         approval: { status: "pending", forChat: event.forChat, ...(event.covers ? { covers: event.covers } : {}) },
       }));
+    case "question":
+      return upsertTool(state, event.id, event.name, { questions: event.questions }, () => ({
+        question: { status: "pending", questions: event.questions },
+      }));
+    case "question-answered":
+      return updateTool(state, event.id, (row) =>
+        row.question
+          ? { question: { status: "answered", questions: row.question.questions, answers: event.answers } }
+          : {},
+      );
     case "tool-allowed":
       return upsertTool(state, event.id, event.name, event.input, () => ({
         approval: { status: "allowed", scope: event.scope },
@@ -155,7 +180,7 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
         approval: null,
       }));
     case "approval-cancelled":
-      return updateTool(state, event.id, (row) => (pending(row) ? { approval: null, cancelled: true } : {}));
+      return updateTool(state, event.id, (row) => (pending(row) ? { ...unasked(row), cancelled: true } : {}));
     case "tool-result": {
       const at = toolIndex(state, event.id);
       const row = state.items[at];

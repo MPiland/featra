@@ -4,6 +4,7 @@
  * neutral, so a Codex or ACP adapter (M2) feeds the same view.
  */
 import type { AllowScope } from "./approvals.ts";
+import { isStrings, normalizeQuestions, type Answers, type Question } from "./questions.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /**
@@ -42,7 +43,14 @@ export type ChatEvent =
   | { type: "tool-allowed"; id: string; name: string; input: unknown; scope: AllowScope }
   /** The user denied a tool call, with the reason the agent was sent when there was one. */
   | { type: "tool-denied"; id: string; name: string; input: unknown; reason?: string }
-  /** A request ended unanswered: Stop, the chat closing, or the agent no longer waiting for it. */
+  /**
+   * The agent asks the user to choose (STORY-46): the chat waits until it is answered. `id` is the call's, so the
+   * question shows on the call's own row.
+   */
+  | { type: "question"; id: string; name: string; questions: Question[] }
+  /** The user answered a question; the agent goes on with the answers. */
+  | { type: "question-answered"; id: string; answers: Answers }
+  /** A request (an approval or a question) ended unanswered: Stop, the chat closing, or the agent no longer waiting. */
   | { type: "approval-cancelled"; id: string }
   | { type: "turn-end"; outcome: TurnOutcome }
   | { type: "problem"; problem: ChatProblem };
@@ -60,6 +68,16 @@ function normalizeProblem(raw: unknown): ChatProblem | null {
   if (raw.type === "not-installed" || raw.type === "logged-out" || raw.type === "gone") return { type: raw.type };
   if (raw.type === "failed") return { type: "failed", message: nonEmpty(raw.message) ? raw.message : "Failed." };
   return null;
+}
+
+/** The answers of a question-answered event, or null when any isn't a list of text. */
+function normalizeAnswers(raw: Record<string, unknown>): Answers | null {
+  const answers: Answers = {};
+  for (const [question, chosen] of Object.entries(raw)) {
+    if (!isStrings(chosen)) return null;
+    answers[question] = chosen;
+  }
+  return answers;
 }
 
 /** An event read from the socket, or null when it isn't one. */
@@ -96,6 +114,16 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
             ...(raw.forChat === true && nonEmpty(raw.covers) ? { covers: raw.covers } : {}),
           }
         : null;
+    case "question": {
+      const questions = normalizeQuestions(raw.questions);
+      return nonEmpty(raw.id) && nonEmpty(raw.name) && questions
+        ? { type: "question", id: raw.id, name: raw.name, questions }
+        : null;
+    }
+    case "question-answered": {
+      const answers = isRecord(raw.answers) ? normalizeAnswers(raw.answers) : null;
+      return nonEmpty(raw.id) && answers ? { type: "question-answered", id: raw.id, answers } : null;
+    }
     case "tool-allowed":
       return nonEmpty(raw.id) && nonEmpty(raw.name) && isOneOf(SCOPES, raw.scope)
         ? { type: "tool-allowed", id: raw.id, name: raw.name, input: raw.input ?? null, scope: raw.scope }
@@ -152,4 +180,6 @@ export const CHAT_MESSAGES = {
   noRequest: "This request isn't waiting for an answer.",
   /** Allow for this chat, for a call the agent says may only be allowed once. */
   onceOnly: "This call can only be allowed once.",
+  /** An answer that doesn't answer every question the way it asks (STORY-46). */
+  badAnswer: "Answer every question.",
 } as const;

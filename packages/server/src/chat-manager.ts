@@ -153,6 +153,7 @@ export function createChatManager({
       emit,
       resume: c.session,
       approve: (request, signal) => decide({ ...request, chat: c.id, cwd: c.dir }, signal),
+      ask: (request, signal) => desk.ask({ ...request, chat: c.id }, signal),
     });
   }
 
@@ -227,6 +228,7 @@ export function createChatManager({
       if (c.running) await c.agent?.interrupt();
     },
     approve: (id, tool, answer) => desk.answer(chat(id).id, tool, answer),
+    answer: (id, tool, answers) => desk.reply(chat(id).id, tool, answers),
     dirOf: (id) => {
       const c = chats.get(id);
       return c && !c.closed ? c.dir : null;

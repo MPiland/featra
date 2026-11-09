@@ -49,7 +49,11 @@ export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
       <Transcript
         items={items}
         running={running}
-        actions={{ onNewChat: () => void newChat(), onAnswer: (tool, answer) => chats.approve(chat.id, tool, answer) }}
+        actions={{
+          onNewChat: () => void newChat(),
+          onAnswer: (tool, answer) => chats.approve(chat.id, tool, answer),
+          onAnswerQuestion: (tool, answers) => chats.answer(chat.id, tool, answers),
+        }}
       />
       {!gone && (
         <Composer

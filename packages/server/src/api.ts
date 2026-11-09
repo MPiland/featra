@@ -4,6 +4,7 @@ import {
   cardUpdateParams,
   CHAT_MESSAGES,
   chatParams,
+  chatAnswerParams,
   chatApproveParams,
   chatSendParams,
   chatStartParams,
@@ -175,6 +176,12 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
         const p = chatApproveParams(params);
         if (!p) throw new ApiError("Expected { id, tool, choice, reason? }.");
         chats.approve(chat(params), p.tool, p.answer);
+        return null;
+      }
+      case "chat.answer": {
+        const p = chatAnswerParams(params);
+        if (!p) throw new ApiError("Expected { id, tool, answers }.");
+        chats.answer(chat(params), p.tool, p.answers);
         return null;
       }
       case "chat.list": {
