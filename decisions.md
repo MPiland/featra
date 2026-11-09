@@ -537,5 +537,10 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   before Claude wrote the session came back as "history is gone"; it now comes back as a fresh chat.
 - `chat.list` waits for the saved chats to be read before it answers (`ChatManager.ready`). Why: a bug. On a slow
   disk the first list after a restart came back empty. Regression test in `ws-chat-restore.test.ts`.
+- The E2E fake SDK names a session's folder after the cwd's real path (`realpathSync.native`), as Claude does. Why: the
+  fake was wrong, not the product. On the Windows runner the temp folder is an 8.3 short path (`RUNNER~1`); the SDK's
+  reader spells it out in full before it looks for the session, so it never found the fake's file and the restored
+  chat read as gone. Checked locally against the real reader under a short path: the old fake's session is not found,
+  the new one's is.
 - Known limits, not changed here: restored chats load before their project is opened (the API still gates them with
   `allow`), and the session file is read whole, with no size cap.

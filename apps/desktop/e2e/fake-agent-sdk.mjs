@@ -12,7 +12,7 @@
  * and its reply names the earlier prompts it kept: "You said: <text>, after: <earlier>".
  */
 import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 const MAIN = { parent_tool_use_id: null };
@@ -59,7 +59,10 @@ async function* toolTurn(options) {
   yield success("Done.");
 }
 
-/** The session's file, where Claude keeps it: `projects/<the cwd, non-alphanumerics as "-">/<session>.jsonl`. */
+/**
+ * The session's file, where Claude keeps it: `projects/<the cwd, non-alphanumerics as "-">/<session>.jsonl`. Claude
+ * names the folder after the cwd's real path, so on Windows a short 8.3 name (`RUNNER~1`) is spelled out in full.
+ */
 const sessionFile = (home, cwd, session) =>
   join(home, "projects", cwd.replace(/[^a-zA-Z0-9]/g, "-"), `${session}.jsonl`);
 
@@ -68,7 +71,8 @@ function sessionLog(options) {
   const home = process.env.CLAUDE_CONFIG_DIR;
   if (!home) return { id: "fake-session", earlier: [], write: () => {} };
   const id = options.resume ?? randomUUID();
-  const file = sessionFile(home, options.cwd, id);
+  const cwd = realpathSync.native(options.cwd);
+  const file = sessionFile(home, cwd, id);
   const lines = existsSync(file)
     ? readFileSync(file, "utf8")
         .split("\n")
@@ -83,7 +87,7 @@ function sessionLog(options) {
     return JSON.stringify({
       ...entry,
       userType: "external",
-      cwd: options.cwd,
+      cwd,
       sessionId: id,
       version: "2.1.0",
       message,
