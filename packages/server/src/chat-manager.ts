@@ -80,6 +80,7 @@ export function createChatManager({
   providers,
   roles,
   approve,
+  mcp,
   newId = randomUUID,
   now = () => new Date(),
   log = () => {},
@@ -160,6 +161,7 @@ export function createChatManager({
       role,
       emit,
       resume: c.session,
+      ...(mcp ? { mcp: () => mcp.attach({ id: c.id, dir: c.dir }) } : {}),
       approve: (request, signal) => decide({ ...request, chat: c.id, cwd: c.dir }, signal),
       ask: (request, signal) => desk.ask({ ...request, chat: c.id }, signal),
     });
@@ -186,6 +188,7 @@ export function createChatManager({
   /** Ends the chat's agent and forgets its log; the chat itself is kept, to open again. */
   function end(c: Chat) {
     c.listeners.clear();
+    mcp?.release(c.id);
     desk.forget(c.id);
     c.agent?.close();
     c.agent = null;
@@ -245,6 +248,15 @@ export function createChatManager({
     dirOf: (id) => {
       const c = chats.get(id);
       return c && !c.closed ? c.dir : null;
+    },
+    info(id) {
+      const c = chats.get(id);
+      if (!c || c.closed || c.events === null) return null;
+      return { dir: c.dir, session: `${c.summary.role.name} chat ${c.id.slice(0, 8)}` };
+    },
+    report(id, event) {
+      const c = chats.get(id);
+      if (c && c.events !== null && !c.closed) record(c, event);
     },
     list,
     watchList: (dir, listener) => lists.watch(dir, listener),

@@ -1,8 +1,15 @@
 /** The session manager's interface and its dependencies (ADR 0018); `chat-manager.ts` builds it. */
 import type { Answers, ApprovalAnswer, ChatEvent, ChatSummary, ModeInfo, ProviderInfo } from "@featra/work-format";
 import type { ChatStore } from "./chat-store.ts";
-import type { ApprovalHandler, ProviderAdapter } from "./provider.ts";
+import type { ApprovalHandler, McpServerSpec, ProviderAdapter } from "./provider.ts";
 import type { RoleRegistry } from "./role-registry.ts";
+
+/** What gives a chat's agent the Featra MCP, and takes it back when the agent ends (STORY-47). */
+export interface McpAttach {
+  /** The MCP for the chat's agent, or null when its project turned it off. */
+  attach: (chat: { id: string; dir: string }) => Promise<McpServerSpec | null>;
+  release: (chat: string) => void;
+}
 
 export interface ChatManager {
   /** Starts a chat from a role in the project folder; its agent starts with the first message. */
@@ -26,6 +33,10 @@ export interface ChatManager {
   answer: (id: string, tool: string, answers: Answers) => void;
   /** The chat's project folder, or null when there is no such chat. */
   dirOf: (id: string) => string | null;
+  /** An open chat's working folder and how its entries name it as their session, or null when it isn't open. */
+  info: (id: string) => { dir: string; session: string } | null;
+  /** Adds an event the chat's server-side tools produced (STORY-47) to an open chat's log; nothing for any other. */
+  report: (id: string, event: ChatEvent) => void;
   /** The project's chats as the list shows them, oldest first. */
   list: (dir: string) => ChatSummary[];
   /**
@@ -56,6 +67,8 @@ export interface ChatManagerDeps {
   /** The clock a chat's start is stamped with. */
   now?: () => Date;
   log?: (message: string) => void;
+  /** Gives each agent the Featra MCP (STORY-47); none by default. */
+  mcp?: McpAttach;
   /** Where chats are saved; nowhere by default. */
   store?: ChatStore;
   /** Whose rule project folders compare by (`projectKey`); this machine's by default. */

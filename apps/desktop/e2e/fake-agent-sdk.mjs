@@ -7,6 +7,9 @@
  *   user's answer. "twice" in the text asks for a second, identical Bash call after it.
  * - "question": an AskUserQuestion call (a choice of one and a choice of several), asked through canUseTool; its result
  *   is the answers the user gave, as Claude hands them to the agent, and the reply says them back.
+ * - "decide": starts the Featra MCP from options.mcpServers over stdio, as Claude does, and calls its log_decision tool
+ *   (STORY-47). Without the MCP (it is off in the project) the reply says so. The tool call is real; only the agent is
+ *   faked.
  * - "slow": starts a reply and waits for interrupt().
  * - anything else: streams "You said: <text>".
  *
@@ -14,9 +17,11 @@
  * the SDK's real reader can read it back after a restart. A resumed session (`options.resume`) goes on in that file,
  * and its reply names the earlier prompts it kept: "You said: <text>, after: <earlier>".
  */
+import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { createInterface } from "node:readline";
 
 const MAIN = { parent_tool_use_id: null };
 let seq = 0;
@@ -62,6 +67,72 @@ async function* toolTurn(options, signal, twice) {
   yield* bash(options, signal);
   if (twice) yield* bash(options, signal);
   yield* say("Done.");
+  yield success("Done.");
+}
+
+/** Calls one tool of an MCP server over stdio (newline-delimited JSON-RPC), as an agent's host does. */
+async function callMcpTool(spec, name, args) {
+  const child = spawn(spec.command, spec.args ?? [], {
+    env: { ...process.env, ...spec.env },
+    stdio: ["pipe", "pipe", "inherit"],
+  });
+  const waiting = new Map();
+  let next = 0;
+  createInterface({ input: child.stdout }).on("line", (line) => {
+    try {
+      const message = JSON.parse(line);
+      waiting.get(message.id)?.(message);
+    } catch {
+      // Not a JSON-RPC line.
+    }
+  });
+  const ended = () => {
+    for (const answer of waiting.values()) answer({ error: { message: "The MCP server exited." } });
+  };
+  child.once("exit", ended);
+  child.once("error", ended);
+  const send = (message) =>
+    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}
+`);
+  const call = (method, params) =>
+    new Promise((resolve) => {
+      const id = ++next;
+      waiting.set(id, resolve);
+      send({ id, method, params });
+    });
+  try {
+    await call("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "fake", version: "0" },
+    });
+    send({ method: "notifications/initialized" });
+    const reply = await call("tools/call", { name, arguments: args });
+    if (reply.error) return { text: reply.error.message, isError: true };
+    return { text: reply.result.content.map((c) => c.text).join(""), isError: reply.result.isError === true };
+  } finally {
+    child.kill();
+  }
+}
+
+/** Logs a decision through the Featra MCP the way an agent would, when Featra gave it one. */
+async function* decideTurn(options) {
+  const spec = options.mcpServers?.featra;
+  if (!spec) {
+    yield* say("No Featra MCP.");
+    yield success("No Featra MCP.");
+    return;
+  }
+  const id = `toolu_mcp_${++seq}`;
+  const input = {
+    decision: "Keep entries in the working folder",
+    why: "They are committed with the branch.",
+    rejected: ["A central log: not versioned with the work"],
+  };
+  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "mcp__featra__log_decision", input }]);
+  const result = await callMcpTool(spec, "log_decision", input);
+  yield toolResult(id, result.text, result.isError);
+  yield* say(`Tool said: ${result.text}`);
   yield success("Done.");
 }
 
@@ -179,7 +250,9 @@ export function query({ prompt, options }) {
       const text = String(message.message.content);
       yield { ...MAIN, type: "system", subtype: "init", session_id: session.id, model: options.model };
       turn = new AbortController();
-      if (text.includes("tool")) {
+      if (text.includes("decide")) {
+        yield* decideTurn(options);
+      } else if (text.includes("tool")) {
         yield* toolTurn(options, turn.signal, text.includes("twice"));
       } else if (text.includes("question")) {
         yield* questionTurn(options, turn.signal);

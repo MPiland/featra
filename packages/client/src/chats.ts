@@ -54,6 +54,8 @@ export interface ChatBridge {
   approve: (id: string, tool: string, answer: ApprovalAnswer) => Promise<string | null>;
   /** Answers a question the chat waits on (STORY-46); resolves with why it wasn't taken, or null. */
   answer: (id: string, tool: string, answers: Answers) => Promise<string | null>;
+  /** Takes back an entry the agent logged (STORY-47); resolves with why it couldn't, or null. */
+  undoLog: (id: string, entry: string) => Promise<string | null>;
   /** Calls back with the project's chat list now and on every change; returns the stop. */
   list: (dir: string, listener: (update: ChatListUpdate) => void) => () => void;
 }
@@ -97,6 +99,9 @@ export const CHAT_COPY = {
   loggedOut: "Claude Code isn't logged in. Run claude in a terminal to log in.",
   stopped: "Stopped.",
   gone: "This chat's history is gone.",
+  loggedTo: "Logged to",
+  undo: "Undo",
+  undone: "Undone",
 } as const;
 
 /** The one line a notice shows. */
@@ -179,6 +184,7 @@ export function serverChats(server: ServerClient): ChatBridge {
     stop: (id) => server.call("chat.stop", { id }).then(() => null, errorMessage),
     approve: (id, tool, answer) => server.call("chat.approve", { id, tool, ...answer }).then(() => null, errorMessage),
     answer: (id, tool, answers) => server.call("chat.answer", { id, tool, answers }).then(() => null, errorMessage),
+    undoLog: (id, entry) => server.call("chat.undoLog", { id, entry }).then(() => null, errorMessage),
     list(dir, listener) {
       let list = EMPTY_CHAT_LIST;
       return server.watch(
@@ -209,6 +215,7 @@ export function noChats(error: string): ChatBridge {
     stop: async () => error,
     approve: async () => error,
     answer: async () => error,
+    undoLog: async () => error,
     // No chats is the whole truth here, not an out-of-date list.
     list(_dir, listener) {
       listener({ list: EMPTY_CHAT_LIST, error: null });

@@ -5,6 +5,7 @@
  */
 import type { AllowScope } from "./approvals.ts";
 import type { ChatEvent, ChatProblem } from "./chat-events.ts";
+import type { LogFile } from "./knowledge-log.ts";
 import type { Answers, Question } from "./questions.ts";
 import { assertNever } from "./utils/guards.ts";
 import { toolSummary } from "./tool-summary.ts";
@@ -50,6 +51,8 @@ export type ChatItem =
       /** The call ended unanswered some other way: its request was cancelled, or its turn ended without a result. */
       cancelled: boolean;
     }
+  /** An entry an agent logged to a project file (STORY-47): what was logged, where, and whether the user took it back. */
+  | { kind: "log"; key: string; entry: string; file: LogFile; summary: string; undone: boolean }
   | { kind: "notice"; key: string; notice: ChatNotice };
 
 export interface ChatState {
@@ -181,6 +184,20 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       }));
     case "approval-cancelled":
       return updateTool(state, event.id, (row) => (pending(row) ? { ...unasked(row), cancelled: true } : {}));
+    case "logged":
+      return push(state, {
+        kind: "log",
+        key: key(state),
+        entry: event.entry,
+        file: event.file,
+        summary: event.summary,
+        undone: false,
+      });
+    case "log-undone":
+      return {
+        ...state,
+        items: state.items.map((i) => (i.kind === "log" && i.entry === event.entry ? { ...i, undone: true } : i)),
+      };
     case "tool-result": {
       const at = toolIndex(state, event.id);
       const row = state.items[at];
