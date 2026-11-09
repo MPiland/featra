@@ -20,6 +20,13 @@ stop it.").
 
 - **Provider adapter** (`provider.ts`): `ProviderAdapter.start(options)` returns a `ProviderSession` with `send`,
   `interrupt` and `close`, and reports `ChatEvent`s. Claude (`claude-provider.ts`) is the only adapter in M1.
+  Each adapter also has a display `name` and `installed()` (for Claude, `claude` is on the PATH); the chat list groups
+  by them, so no part of the list names a provider itself (STORY-21). `chat.list` looks again on each push, so a
+  provider installed while the app runs shows with the next change to the list.
+- **Chat list** (STORY-21): the manager keeps a row per chat (`ChatSummary` in `work-format/chat-list`), folded from
+  the same events as the log, and pushes the project's list when a row changes (not for each streamed delta). A chat
+  waits on the user (`waiting`) when its turn ended done or failed, not stopped; a message clears it. `WaitReason` is
+  `"reply"` today; STORY-45 adds a tool approval and STORY-46 a question, each set from its own event.
 - **Role registry** (`role-registry.ts`): the built-in roles come from `work-format/roles`; STORY-6 adds the project's
   own roles behind the same `list`/`get`.
 - **Approval handler**: every tool the agent must ask about goes to an `ApprovalHandler`. Until STORY-45 it is
@@ -54,21 +61,23 @@ shows. The server keeps the log; the client folds it, so a reconnect gets the wh
 
 **Protocol additions (ADR 0015).**
 
-| Method       | Params          | Result                                                                    |
-| ------------ | --------------- | ------------------------------------------------------------------------- |
-| `chat.roles` | `{ dir }`       | The roles a chat in the project can start from                            |
-| `chat.start` | `{ dir, role }` | `{ id }`: the chat, not yet running                                       |
-| `chat.watch` | `{ id }`        | `{ events }`, the log so far; then a `chat.event` push for each new event |
-| `chat.send`  | `{ id, text }`  | `null`, or refused while a turn runs                                      |
-| `chat.stop`  | `{ id }`        | `null`: interrupts the running turn                                       |
+| Method       | Params          | Result                                                                     |
+| ------------ | --------------- | -------------------------------------------------------------------------- |
+| `chat.roles` | `{ dir }`       | The roles a chat in the project can start from                             |
+| `chat.start` | `{ dir, role }` | `{ id }`: the chat, not yet running                                        |
+| `chat.watch` | `{ id }`        | `{ events }`, the log so far; then a `chat.event` push for each new event  |
+| `chat.send`  | `{ id, text }`  | `null`, or refused while a turn runs                                       |
+| `chat.stop`  | `{ id }`        | `null`: interrupts the running turn                                        |
+| `chat.list`  | `{ dir }`       | `{ providers, chats }`; then a `chat.list` push each time the list changes |
 
-`chat.watch` stops on `work.unwatch` or when the socket closes, like `work.watch`. A push can arrive before the
-watch's answer; the client keeps it and applies it after the log.
+`chat.watch` and `chat.list` stop on `work.unwatch` or when the socket closes, like `work.watch`. A push can arrive
+before the watch's answer; the client keeps it and applies it after the log.
 
 ## Consequences
 
 - The renderer never touches the SDK or a process; a crashed server ends its chats, and the client shows the failure.
-- Chats last until the server exits. STORY-44 makes them survive a restart.
+- Chats last until the server exits. STORY-44 makes them survive a restart: the manager's chat map and its rows are
+  what it saves and loads.
 - A new provider is one adapter: the manager, protocol and view stay as they are.
 - **Licence.** The Agent SDK is not MIT; ADR 0007 accepted it as a dependency.
 - **Limit.** Until STORY-45, a tool that needs approval is always denied.

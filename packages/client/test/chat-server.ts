@@ -1,8 +1,20 @@
 // The local server's chat side, as a fake: each chat's event log held in memory, pushed to its watchers. What the
 // view makes of the log is work-format's real fold; the events are the protocol's, as the server would send them.
 import { act } from "react";
-import { BUILT_IN_ROLES, foldChat, type ChatEvent, type Role } from "@featra/work-format";
-import type { ChatBridge, ChatUpdate } from "../src/chats.ts";
+import {
+  BUILT_IN_ROLES,
+  foldChat,
+  newSummary,
+  reduceSummary,
+  type ChatEvent,
+  type ChatSummary,
+  type ProviderInfo,
+  type Role,
+} from "@featra/work-format";
+import type { ChatBridge, ChatListUpdate, ChatUpdate } from "../src/chats.ts";
+
+/** Claude, installed: what the server reports on a machine with `claude` on the PATH. */
+export const CLAUDE_INSTALLED: ProviderInfo = { id: "claude", name: "Claude Code", installed: true };
 
 export interface ChatHost {
   /** The roles the server offers. Default: the built-in five. */
@@ -13,15 +25,42 @@ export interface ChatHost {
   sendError?: string;
   /** What `chat.stop` refuses with, if anything. */
   stopError?: string;
+  /** The providers `chat.list` reports. Default: Claude, installed. */
+  providers?: ProviderInfo[];
+  /** The clock a chat's start is stamped with. Default: one second per chat from 2026-11-09T10:00:00Z. */
+  now?: () => string;
 }
 
 export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   const logs = new Map<string, ChatEvent[]>();
   const watchers = new Map<string, Set<(u: ChatUpdate) => void>>();
+  // Each chat's row and project, kept with work-format's real fold, as the server keeps them.
+  const rows = new Map<string, { dir: string; summary: ChatSummary }>();
+  const listWatchers = new Set<{ dir: string; listener: (u: ChatListUpdate) => void }>();
+  const providers = host.providers ?? [CLAUDE_INSTALLED];
+  const now = host.now ?? (() => new Date(Date.UTC(2026, 10, 9, 10, 0, rows.size)).toISOString());
+  let listsSent = 0;
+  const listOf = (dir: string): ChatListUpdate => ({
+    list: { providers, chats: [...rows.values()].filter((r) => r.dir === dir).map((r) => r.summary) },
+    error: null,
+  });
+  const sendList = (w: { dir: string; listener: (u: ChatListUpdate) => void }) => {
+    listsSent += 1;
+    w.listener(listOf(w.dir));
+  };
+  const listChanged = (dir: string) => {
+    for (const w of listWatchers) if (w.dir === dir) sendList(w);
+  };
   const update = (id: string): ChatUpdate => ({ chat: foldChat(logs.get(id) ?? []), error: null });
   const record = (id: string, event: ChatEvent) => {
     logs.get(id)?.push(event);
     for (const l of watchers.get(id) ?? []) l(update(id));
+    const row = rows.get(id);
+    if (!row) return;
+    const summary = reduceSummary(row.summary, event);
+    if (summary === row.summary) return;
+    row.summary = summary;
+    listChanged(row.dir);
   };
   const bridge: ChatBridge = {
     roles: async () => host.roles ?? [...BUILT_IN_ROLES],
@@ -30,6 +69,9 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       if (host.startError) return { ok: false, error: host.startError };
       const id = `chat-${logs.size + 1}`;
       logs.set(id, []);
+      const found = (host.roles ?? BUILT_IN_ROLES).find((r) => r.id === role);
+      if (found) rows.set(id, { dir, summary: newSummary(id, found.provider, found, now()) });
+      listChanged(dir);
       return { ok: true, id };
     },
     watch: (id, listener) => {
@@ -49,6 +91,12 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       calls.push(`chat.stop:${id}`);
       return host.stopError ?? null;
     },
+    list: (dir, listener) => {
+      const watcher = { dir, listener };
+      listWatchers.add(watcher);
+      queueMicrotask(() => listWatchers.has(watcher) && sendList(watcher));
+      return () => void listWatchers.delete(watcher);
+    },
   };
   return {
     bridge,
@@ -58,5 +106,7 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
         for (const e of events) record(id, e);
       }),
     watching: (id: string) => watchers.get(id)?.size ?? 0,
+    /** How many chat lists the server has sent, so a test can wait until the list has arrived. */
+    listsSent: () => listsSent,
   };
 }

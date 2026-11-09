@@ -47,5 +47,9 @@ export interface ProviderSession {
 
 export interface ProviderAdapter {
   id: ProviderId;
+  /** What the chat list calls the provider's group ("Claude Code"). */
+  name: string;
+  /** Whether the user has the provider's agent installed: the chat list shows a group for each one that is. */
+  installed: () => Promise<boolean>;
   start: (options: SessionOptions) => ProviderSession;
 }

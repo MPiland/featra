@@ -5,15 +5,22 @@
  */
 import { foldChat, reduceChat, EMPTY_CHAT, type ChatNotice, type ChatState } from "@featra/work-format/chat";
 import { normalizeChatEvent, normalizeChatSnapshot, type ChatEvent } from "@featra/work-format/chat-events";
+import { EMPTY_CHAT_LIST, normalizeChatList, type ChatList, type ChatRoleRef } from "@featra/work-format/chat-list";
 import { assertNever, errorMessage, isRecord } from "@featra/work-format/guards";
 import { normalizeRoles, type Role } from "@featra/work-format/roles";
 import type { ServerClient } from "./server-client.ts";
 
-export type { ChatState, Role };
+export type { ChatList, ChatRoleRef, ChatState, Role };
 
 /** What a watch hears: the chat so far, and why it is out of date when it is. */
 export interface ChatUpdate {
   chat: ChatState;
+  error: string | null;
+}
+
+/** What a chat-list watch hears: the project's chats, and why the list is out of date when it is. */
+export interface ChatListUpdate {
+  list: ChatList;
   error: string | null;
 }
 
@@ -29,10 +36,16 @@ export interface ChatBridge {
   send: (id: string, text: string) => Promise<string | null>;
   /** Interrupts the running turn; resolves with why it couldn't, or null. */
   stop: (id: string) => Promise<string | null>;
+  /** Calls back with the project's chat list now and on every change; returns the stop. */
+  list: (dir: string, listener: (update: ChatListUpdate) => void) => () => void;
 }
 
 export const CHAT_COPY = {
   newChat: "New chat",
+  /** The File menu's item, in the menu's Title Case. */
+  newChatMenu: "New Chat",
+  chats: "Chats",
+  waiting: "Waiting for you",
   roles: "Roles",
   noRoles: "No roles to start from.",
   ask: "Ask",
@@ -111,6 +124,20 @@ export function serverChats(server: ServerClient): ChatBridge {
     },
     send: (id, text) => server.call("chat.send", { id, text }).then(() => null, errorMessage),
     stop: (id) => server.call("chat.stop", { id }).then(() => null, errorMessage),
+    list(dir, listener) {
+      let list = EMPTY_CHAT_LIST;
+      return server.watch(
+        "chat.list",
+        { dir },
+        {
+          data: (raw) => {
+            list = normalizeChatList(raw);
+            listener({ list, error: null });
+          },
+          error: (message) => listener({ list, error: message }),
+        },
+      );
+    },
   };
 }
 
@@ -125,5 +152,10 @@ export function noChats(error: string): ChatBridge {
     },
     send: async () => error,
     stop: async () => error,
+    // No chats is the whole truth here, not an out-of-date list.
+    list(_dir, listener) {
+      listener({ list: EMPTY_CHAT_LIST, error: null });
+      return () => {};
+    },
   };
 }

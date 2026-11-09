@@ -15,6 +15,7 @@
     "./roles": "./src/roles.ts",
     "./chat": "./src/chat-state.ts",
     "./chat-events": "./src/chat-events.ts",
+    "./chat-list": "./src/chat-list.ts",
     "./tool-summary": "./src/tool-summary.ts"
   },
   "scripts": {

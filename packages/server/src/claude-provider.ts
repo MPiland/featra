@@ -24,6 +24,9 @@ export interface ClaudeDeps {
   env?: NodeJS.ProcessEnv;
 }
 
+/** The Claude provider's name in the chat list, as the chat's problems name it too. */
+export const CLAUDE_NAME = "Claude Code";
+
 /** The agent's environment: the user's, without the flag that makes Electron run the server as Node. */
 export function agentEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const { ELECTRON_RUN_AS_NODE: _flag, ...rest } = env;
@@ -64,6 +67,8 @@ const userMessage = (text: string, session: string | null): SDKUserMessage => ({
 export function createClaudeProvider({ loadQuery, locate, env = process.env }: ClaudeDeps): ProviderAdapter {
   return {
     id: "claude",
+    name: CLAUDE_NAME,
+    installed: async () => (await locate()) !== null,
     start: (options) => startSession(options, { loadQuery, locate, env }),
   };
 }
