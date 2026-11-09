@@ -14,7 +14,8 @@ export interface ChatFacts {
 }
 
 interface Watcher {
-  dir: string;
+  /** The project watched, or null for every one. */
+  dir: string | null;
   wait: number;
   listener: (u: InboxUpdate) => void;
   /** The requests last sent, so a push comes only when they change. */
@@ -25,14 +26,14 @@ const keyOf = (chat: string, ask: string) => `${chat}:${ask}`;
 
 export function fakeInboxServer() {
   /** Each watch opened, with its wait: a changed setting shows as a new one. */
-  const watches: { dir: string; wait: number }[] = [];
+  const watches: { dir: string | null; wait: number }[] = [];
   let now = 0;
   const held = new Map<string, PendingAsk & { dir: string }>();
   const watchers = new Set<Watcher>();
-  const askedListeners = new Set<{ dir: string; listener: (item: InboxItem) => void }>();
+  const askedListeners = new Set<{ dir: string | null; listener: (item: InboxItem) => void }>();
   const itemsOf = (w: Watcher) =>
     dueItems(
-      [...held.values()].filter((p) => p.dir === w.dir),
+      [...held.values()].filter((p) => w.dir === null || p.dir === w.dir),
       w.wait,
       now,
     );
@@ -62,10 +63,16 @@ export function fakeInboxServer() {
     /** A chat recorded `event`; `open` are the requests it still waits on after it. */
     heard(chat: ChatFacts, event: ChatEvent, open: readonly Ask[]) {
       if (event.type === "approval" || event.type === "question") {
-        const base = { chat: chat.id, chatName: chat.chatName, ...(chat.card ? { card: chat.card } : {}) };
+        const base = {
+          chat: chat.id,
+          chatName: chat.chatName,
+          ...(chat.card ? { card: chat.card } : {}),
+          project: chat.dir,
+        };
         held.set(keyOf(chat.id, event.id), { ...base, request: event, at: now, dir: chat.dir });
         const since = new Date(now).toISOString();
-        for (const l of askedListeners) if (l.dir === chat.dir) l.listener({ ...base, request: event, since });
+        for (const l of askedListeners)
+          if (l.dir === null || l.dir === chat.dir) l.listener({ ...base, request: event, since });
       }
       const stillOpen = new Set(open.map((a) => keyOf(chat.id, a.id)));
       for (const [key, p] of held) if (p.chat === chat.id && !stillOpen.has(key)) held.delete(key);

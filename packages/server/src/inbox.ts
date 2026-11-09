@@ -21,26 +21,29 @@ export interface Timers {
   clear: (timer: unknown) => void;
 }
 
-const live = new Map<number, ReturnType<typeof setTimeout>>();
-let lastTimer = 0;
-export const realTimers: Timers = {
-  set(run, ms) {
-    const id = ++lastTimer;
-    live.set(
-      id,
-      setTimeout(() => {
-        live.delete(id);
-        run();
-      }, ms),
-    );
-    return id;
-  },
-  clear(timer) {
-    const handle = typeof timer === "number" ? live.get(timer) : undefined;
-    if (typeof timer === "number") live.delete(timer);
-    if (handle) clearTimeout(handle);
-  },
-};
+/** `setTimeout` and `clearTimeout` behind ids of this set's own, so no state is shared between Inboxes. */
+export function systemTimers(): Timers {
+  const live = new Map<number, ReturnType<typeof setTimeout>>();
+  let last = 0;
+  return {
+    set(run, ms) {
+      const id = ++last;
+      live.set(
+        id,
+        setTimeout(() => {
+          live.delete(id);
+          run();
+        }, ms),
+      );
+      return id;
+    },
+    clear(timer) {
+      const handle = typeof timer === "number" ? live.get(timer) : undefined;
+      if (typeof timer === "number") live.delete(timer);
+      if (handle) clearTimeout(handle);
+    },
+  };
+}
 
 /** What the Inbox needs to know of a chat when it shows one of its requests. */
 export interface ChatFacts {
@@ -67,17 +70,17 @@ export interface InboxHub {
   keep: (chat: string, asks: readonly Ask[]) => void;
   /** The chat ended or was closed: it holds no requests. */
   ended: (chat: string) => void;
-  /** The project's Inbox at `wait` ms, and again to `listener` whenever it changes, until `stop`. */
-  watch: (dir: string, wait: number, listener: (inbox: Inbox) => void) => { inbox: Inbox; stop: () => void };
-  /** Each request a chat of the project asks, to `listener` as it is asked; returns the stop. */
-  watchAsked: (dir: string, listener: (item: InboxItem) => void) => () => void;
+  /** The Inbox of the project (of every open project when `dir` is null) at `wait` ms, and again to `listener` whenever it changes, until `stop`. */
+  watch: (dir: string | null, wait: number, listener: (inbox: Inbox) => void) => { inbox: Inbox; stop: () => void };
+  /** Each request a chat of the project (of any open project when `dir` is null) asks, to `listener` as it is asked; returns the stop. */
+  watchAsked: (dir: string | null, listener: (item: InboxItem) => void) => () => void;
   close: () => void;
 }
 
 type Held = PendingAsk & { dir: string };
 
 interface Watcher {
-  dir: string;
+  dir: string | null;
   wait: number;
   listener: (inbox: Inbox) => void;
   /** The requests last sent, to send again only when they change. */
@@ -89,13 +92,28 @@ interface Watcher {
 const keyOf = (chat: string, ask: string) => `${chat}\n${ask}`;
 const idsOf = (inbox: Inbox) => inbox.items.map((i) => keyOf(i.chat, i.request.id)).join("\n\n");
 
-export function createInbox({ now, timers = realTimers, chat, same, log }: InboxDeps): InboxHub {
+export function createInbox({ now, timers = systemTimers(), chat, same, log }: InboxDeps): InboxHub {
   const held = new Map<string, Held>();
   const watchers = new Set<Watcher>();
-  const askedListeners = new Set<{ dir: string; listener: (item: InboxItem) => void }>();
+  const askedListeners = new Set<{ dir: string | null; listener: (item: InboxItem) => void }>();
+  // Every timer set and not yet run or cleared, so close can clear them all.
+  const scheduled = new Set<unknown>();
+  const after = (run: () => void, ms: number) => {
+    const timer: unknown = timers.set(() => {
+      scheduled.delete(timer);
+      run();
+    }, ms);
+    scheduled.add(timer);
+    return timer;
+  };
+  const cancel = (timer: unknown) => {
+    scheduled.delete(timer);
+    timers.clear(timer);
+  };
 
-  const inProject = (dir: string) => [...held.values()].filter((p) => same(p.dir, dir));
-  const inboxOf = (dir: string, wait: number): Inbox => ({
+  const covers = (watching: string | null, dir: string) => watching === null || same(watching, dir);
+  const inProject = (dir: string | null) => [...held.values()].filter((p) => dir === null || same(p.dir, dir));
+  const inboxOf = (dir: string | null, wait: number): Inbox => ({
     // The chat's name can change (its first message names it), so it is read when sent, not when asked.
     items: dueItems(inProject(dir), wait, now()).map((i) =>
       Object.assign(i, { chatName: chat(i.chat)?.chatName ?? i.chatName }),
@@ -104,9 +122,9 @@ export function createInbox({ now, timers = realTimers, chat, same, log }: Inbox
 
   /** Sets the timer for the next request to come due at the watcher's wait. */
   function schedule(w: Watcher) {
-    timers.clear(w.timer);
+    cancel(w.timer);
     const left = nextDueIn(inProject(w.dir), w.wait, now());
-    w.timer = left === null ? undefined : timers.set(() => refresh(w), left);
+    w.timer = left === null ? undefined : after(() => refresh(w), left);
   }
 
   /** Sends the watcher its Inbox if it changed, and sets the timer for what comes due next. */
@@ -121,7 +139,7 @@ export function createInbox({ now, timers = realTimers, chat, same, log }: Inbox
   }
 
   const refreshAll = (dir: string) => {
-    for (const w of watchers) if (same(w.dir, dir)) refresh(w);
+    for (const w of watchers) if (covers(w.dir, dir)) refresh(w);
   };
 
   function drop(key: string) {
@@ -135,12 +153,20 @@ export function createInbox({ now, timers = realTimers, chat, same, log }: Inbox
     opened(id, request) {
       const facts = chat(id);
       if (!facts) return;
+      // A request the chat opens again is the same request: it keeps when it was first asked, and is not announced twice.
+      if (held.has(keyOf(id, request.id))) return;
       const at = now();
-      const base = { chat: id, chatName: facts.chatName, ...(facts.card ? { card: facts.card } : {}), request };
+      const base = {
+        chat: id,
+        chatName: facts.chatName,
+        ...(facts.card ? { card: facts.card } : {}),
+        request,
+        project: facts.dir,
+      };
       held.set(keyOf(id, request.id), { ...base, at, dir: facts.dir });
       const asked: InboxItem = { ...base, since: new Date(at).toISOString() };
       tellAll(
-        [...askedListeners].filter((l) => same(l.dir, facts.dir)).map((l) => l.listener),
+        [...askedListeners].filter((l) => l.dir === null || same(l.dir, facts.dir)).map((l) => l.listener),
         asked,
         log,
       );
@@ -162,7 +188,7 @@ export function createInbox({ now, timers = realTimers, chat, same, log }: Inbox
       return {
         inbox,
         stop() {
-          timers.clear(w.timer);
+          cancel(w.timer);
           watchers.delete(w);
         },
       };
@@ -173,7 +199,8 @@ export function createInbox({ now, timers = realTimers, chat, same, log }: Inbox
       return () => void askedListeners.delete(entry);
     },
     close() {
-      for (const w of watchers) timers.clear(w.timer);
+      for (const timer of scheduled) timers.clear(timer);
+      scheduled.clear();
       watchers.clear();
       askedListeners.clear();
       held.clear();

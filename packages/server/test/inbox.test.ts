@@ -1,6 +1,7 @@
 /** STORY-7: the Inbox through the real chat manager and approval desk. Only the SDK, the `claude` lookup, the clock and timers are fake. */
 import { describe, expect, it } from "vitest";
 import { CHAT_MESSAGES, type InboxItem } from "@featra/work-format";
+import { DIR } from "./chat-fixture.ts";
 import { BASH, COLOUR, ids, WAIT, world } from "./inbox-world.ts";
 import { MINUTE } from "./manual-clock.ts";
 import { until } from "./until.ts";
@@ -22,6 +23,7 @@ describe("AC1: a request unanswered for the wait also appears in the Inbox with 
       chat: c.id,
       chatName: "fix the build",
       card: "STORY-9",
+      project: DIR,
       request: {
         type: "approval",
         id: "t1",

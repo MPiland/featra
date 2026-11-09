@@ -58,9 +58,13 @@ export interface ChatManager {
    * The project's approvals and questions that have waited at least `wait` ms on the server's clock (STORY-7), and the
    * whole Inbox again to `listener` each time that changes, until `stop`.
    */
-  watchInbox: (dir: string, wait: number, listener: (inbox: Inbox) => void) => { inbox: Inbox; stop: () => void };
+  watchInbox: (
+    dir: string | null,
+    wait: number,
+    listener: (inbox: Inbox) => void,
+  ) => { inbox: Inbox; stop: () => void };
   /** Calls `listener` with each request a chat of the project asks, as it is asked, whatever the wait; returns the stop. */
-  watchAsked: (dir: string, listener: (item: InboxItem) => void) => () => void;
+  watchAsked: (dir: string | null, listener: (item: InboxItem) => void) => () => void;
   /** Every provider the manager runs, and whether its agent is installed. */
   providers: () => Promise<ProviderInfo[]>;
   /**

@@ -74,7 +74,10 @@ const bridge: FeatraBridge = {
   notifications: {
     asked: (item) => ipcRenderer.send(IPC.notificationsAsked, item),
     onOpenChat: (listener) => {
-      const handler = (_e: unknown, chat: unknown) => typeof chat === "string" && listener(chat);
+      const handler = (_e: unknown, target: unknown) => {
+        const { chat, project } = (target ?? {}) as { chat?: unknown; project?: unknown };
+        if (typeof chat === "string") listener(chat, typeof project === "string" ? project : undefined);
+      };
       ipcRenderer.on(IPC.notificationsOpenChat, handler);
       return () => void ipcRenderer.removeListener(IPC.notificationsOpenChat, handler);
     },

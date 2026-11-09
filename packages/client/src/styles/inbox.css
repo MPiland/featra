@@ -51,6 +51,7 @@
 }
 
 .inbox-tool,
-.inbox-card {
+.inbox-card,
+.inbox-project {
   color: var(--tx3);
 }

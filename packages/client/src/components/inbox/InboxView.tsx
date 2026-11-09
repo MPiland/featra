@@ -1,6 +1,7 @@
 import type { InboxItem } from "@featra/work-format/inbox";
 import type { ChatBridge } from "../../chats.ts";
 import { INBOX_COPY } from "../../inbox.ts";
+import type { ProjectRef } from "../../projects.ts";
 import { ApprovalPrompt } from "../chat/ApprovalPrompt.tsx";
 import { QuestionForm } from "../chat/QuestionCard.tsx";
 
@@ -8,10 +9,16 @@ type Answering = Pick<ChatBridge, "approve" | "answer">;
 
 interface InboxViewProps {
   items: readonly InboxItem[];
+  /** The known projects, to name the one each request is in. */
+  projects: readonly ProjectRef[];
   /** Answers go through the chat's own bridge methods: the Inbox is not a second way to decide. */
   chats: Answering;
-  onOpenChat: (chat: string) => void;
+  onOpenChat: (chat: string, project?: string) => void;
 }
+
+/** A project's name: the list's, else the last part of its folder. */
+const projectName = (projects: readonly ProjectRef[], dir: string) =>
+  projects.find((p) => p.dir === dir)?.name ?? dir.split(/[\\/]/).findLast(Boolean) ?? dir;
 
 function Request({ item, chats }: { item: InboxItem; chats: Answering }) {
   const { request } = item;
@@ -29,7 +36,7 @@ function Request({ item, chats }: { item: InboxItem; chats: Answering }) {
 }
 
 /** The Inbox (STORY-7): each approval or question that has waited past the Inbox wait, with its chat and card. */
-export function InboxView({ items, chats, onOpenChat }: InboxViewProps) {
+export function InboxView({ items, projects, chats, onOpenChat }: InboxViewProps) {
   if (items.length === 0) {
     return (
       <section className="inbox inbox-empty">
@@ -47,9 +54,10 @@ export function InboxView({ items, chats, onOpenChat }: InboxViewProps) {
                 {item.request.type === "approval" ? INBOX_COPY.approval : INBOX_COPY.question}
               </span>
               {item.request.type === "approval" && <span className="inbox-tool">{item.request.name}</span>}
-              <button type="button" className="btn inbox-chat" onClick={() => onOpenChat(item.chat)}>
+              <button type="button" className="btn inbox-chat" onClick={() => onOpenChat(item.chat, item.project)}>
                 {item.chatName}
               </button>
+              {item.project && <span className="inbox-project">{projectName(projects, item.project)}</span>}
               {item.card && <span className="inbox-card">{item.card}</span>}
             </div>
             <Request item={item} chats={chats} />

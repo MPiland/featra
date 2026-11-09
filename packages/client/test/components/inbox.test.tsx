@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ChatEvent, Question } from "@featra/work-format";
 import { CHAT_COPY } from "../../src/chats.ts";
 import { INBOX_COPY } from "../../src/inbox.ts";
-import { renderApp, sidebar } from "../harness.tsx";
+import { PROJECT, renderApp, sidebar } from "../harness.tsx";
 import { openSettings } from "./settings/helpers.tsx";
 
 afterEach(cleanup);
@@ -92,14 +92,6 @@ describe("AC1: a request unanswered for the wait also appears in the Inbox with 
     await waitFor(() => expect(app.chats.inbox.watches.at(-1)?.wait).toBe(3000));
     await openSettings(app.user, "General");
     expect(screen.getByRole("button", { name: "Inbox wait: 3 seconds" })).toBeTruthy();
-  });
-
-  it("keeps the requests of the project in front, not another's", async () => {
-    const app = await started();
-    app.chats.emit("chat-1", call, approval);
-    app.chats.inbox.advance(10 * MINUTE);
-    expect(app.chats.inbox.watches.every((w) => w.dir === "/home/me/manager")).toBe(true);
-    expect(inboxEntry().textContent).toContain("1");
   });
 });
 
@@ -243,5 +235,60 @@ describe("AC4: the sidebar's Inbox shows how many are waiting", () => {
     app.chats.inbox.advance(10 * MINUTE);
     await app.user.click(within(sidebar()).getByRole("button", { name: "Settings" }));
     expect(screen.getByRole("button", { name: "Inbox, 1 waiting" })).toBeTruthy();
+  });
+});
+
+type User = ReturnType<typeof renderApp>["user"];
+/** Makes the website project current, through the project switcher. */
+const inWebsite = async ({ user }: { user: User }) => {
+  await user.click(screen.getByRole("button", { name: /^Switch project: / }));
+  await user.click(screen.getByRole("menuitemradio", { name: "website" }));
+  await waitFor(() => expect(within(sidebar()).getByRole("button", { name: /^Switch project: website/ })).toBeTruthy());
+};
+
+describe("every open project, not only the one in front (review fixes)", () => {
+  const WEBSITE = { dir: "/home/me/website", name: "website" };
+
+  it("watches without a project, so one watch covers every project", async () => {
+    const app = await started({ projects: [PROJECT, WEBSITE] });
+    await waitFor(() => expect(app.chats.inbox.watches.length).toBeGreaterThan(0));
+    expect(app.chats.inbox.watches.every((w) => w.dir === null)).toBe(true);
+    await inWebsite(app);
+    expect(app.chats.inbox.watches.every((w) => w.dir === null)).toBe(true);
+    expect(app.chats.inbox.watching()).toBe(1);
+  });
+
+  it("counts and lists another project's request, shows its project, and notifies for it", async () => {
+    const app = await started({ projects: [PROJECT, WEBSITE] });
+    await inWebsite(app);
+    app.chats.emit("chat-1", call, approval);
+    expect(app.calls).toContain("notify:chat-1:t1");
+    app.chats.inbox.advance(10 * MINUTE);
+    expect(inboxEntry().textContent).toContain("1");
+    await openInbox(app.user);
+    const item = within(main()).getByRole("listitem");
+    expect(within(item).getByText("manager")).toBeTruthy();
+  });
+
+  it("switches to the item's project, then opens its chat", async () => {
+    const app = await started({ projects: [PROJECT, WEBSITE] });
+    app.chats.emit("chat-1", call, approval);
+    app.chats.inbox.advance(10 * MINUTE);
+    await inWebsite(app);
+    await openInbox(app.user);
+    await app.user.click(within(await within(main()).findByRole("listitem")).getByRole("button", { name: "test it" }));
+    await waitFor(() => expect(app.calls).toContain(`switchTo:${PROJECT.dir}`));
+    expect(await screen.findByRole("region", { name: "Developer" })).toBeTruthy();
+    expect(within(sidebar()).getByRole("button", { name: /^Switch project: manager/ })).toBeTruthy();
+  });
+
+  it("switches to a clicked notification's project, then opens its chat", async () => {
+    const app = await started({ projects: [PROJECT, WEBSITE] });
+    app.chats.emit("chat-1", call, approval);
+    await inWebsite(app);
+    expect(screen.queryByRole("region", { name: "Developer" })).toBeNull();
+    app.clickNotification("chat-1", PROJECT.dir);
+    expect(await screen.findByRole("region", { name: "Developer" })).toBeTruthy();
+    expect(app.calls).toContain(`switchTo:${PROJECT.dir}`);
   });
 });

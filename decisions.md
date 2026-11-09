@@ -928,3 +928,23 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   "Settings › App", and the app's settings page in this build is General. The browser tab hides the page, as before.
 - **`QuestionForm` is exported from `QuestionCard.tsx`, and the Inbox reuses it.** Why: the form is the card without its
   chat frame; copying it would let the two drift.
+
+### STORY-7 review fixes (PR #14)
+
+- **The Inbox, its count and its notifications cover every open project; this replaces the "project in front" decision
+  above.** "Open" means the projects the server holds chats for. `inbox.watch` and `inbox.asked` take an optional
+  `dir`; without it they cover all of them, and the API still filters by the projects the client may see. Items carry
+  `project` (the chat's folder), the view shows its name, and a click or notification switches to that project first,
+  then opens the chat. Why: a request waiting in another project is as unanswered as one in front.
+- **At most one OS notification per chat: a new request closes that chat's earlier toast.** Why: the chat has one thing
+  to answer at a time, and a stack of stale toasts for one chat is noise. The notifier keeps the handle per chat.
+- **The question notification's body is the question's text, cut to 80 characters with an ellipsis.** Why: it says what
+  is asked without opening the app.
+- **`inbox.opened` for a request already held changes nothing: `at` is kept and `inbox.asked` isn't pushed again.**
+  Why: a repeat would restart the wait and re-notify. Regression test added.
+- **Timers are per Inbox, and every scheduled one is tracked so `close()` clears all.** Why: module-global state leaked
+  between servers and tests.
+- **`useInbox` ignores pushes from a watch it has replaced.** Why: a late push from the old watch would overwrite the
+  new list.
+- **Item 1 of the review (the General page showing only when `closeToTray` is known) is not changed.** Existing
+  assertions require the page hidden in that case; changing it means changing them. Left for the Dev Lead.

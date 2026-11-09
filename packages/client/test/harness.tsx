@@ -102,7 +102,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   let windowState: WindowState = { ...DEFAULT_WINDOW_STATE };
   const listeners = new Set<(s: WindowState) => void>();
   let releaseWrites: () => void = noop;
-  let openChat: (chat: string) => void = noop;
+  let openChat: (chat: string, project?: string) => void = noop;
   const writesReleased = new Promise<void>((r) => (releaseWrites = r));
   // The project folders on disk, as the server sees them: git init and Featra init move a folder to the next state.
   const setupOnDisk = new Map(Object.entries(host.setup ?? {}));
@@ -266,7 +266,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     setWindowState,
     releaseWrites: () => act(async () => releaseWrites()),
     /** The user clicks a desktop notification: the host tells the page which chat it named. */
-    clickNotification: (chat: string) => act(() => openChat(chat)),
+    clickNotification: (chat: string, dir?: string) => act(() => openChat(chat, dir)),
   };
 }
 

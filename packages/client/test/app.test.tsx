@@ -122,7 +122,7 @@ describe("AC3: sidebar entries", () => {
     expect(viewTitle().textContent).toBe("Artifacts");
   });
 
-  it("shows a placeholder for each view not built yet; Settings shows its pages (STORY-20), Work its list (STORY-3), Inbox its requests (STORY-7)", async () => {
+  it("shows a placeholder only for the views not built yet; Settings, Work and Inbox show their own pages: Settings its pages (STORY-20), Work its list (STORY-3), Inbox its empty state (STORY-7)", async () => {
     const { user } = renderApp();
     for (const name of ENTRIES.filter((e) => e !== "Settings" && e !== "Work" && e !== "Inbox")) {
       await user.click(within(sidebar()).getByRole("button", { name }));

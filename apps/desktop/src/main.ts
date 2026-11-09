@@ -100,20 +100,27 @@ if (!app.requestSingleInstanceLock()) {
       focused: () => (e2e ? (testHooks.focused ?? inFront()) : inFront()),
       show: ({ title, body, click }) => {
         if (e2e) {
-          testHooks.notifications.push({ title, body, click });
-          return;
+          const shownToast = { title, body, click };
+          testHooks.notifications.push(shownToast);
+          return {
+            close() {
+              const at = testHooks.notifications.indexOf(shownToast);
+              if (at >= 0) testHooks.notifications.splice(at, 1);
+            },
+          };
         }
-        if (!Notification.isSupported()) return;
+        if (!Notification.isSupported()) return undefined;
         const n = new Notification({ title, body });
         shown.add(n);
         n.on("click", click);
         n.on("close", () => shown.delete(n));
         n.show();
+        return { close: () => n.close() };
       },
-      open: (chat) => {
+      open: (chat, projectDir) => {
         if (!win || win.isDestroyed()) return;
         lifecycle.reveal(win);
-        win.webContents.send(IPC.notificationsOpenChat, chat);
+        win.webContents.send(IPC.notificationsOpenChat, { chat, project: projectDir });
       },
     });
     registerIpc({

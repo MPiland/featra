@@ -16,6 +16,8 @@ export interface InboxItem {
   card?: string;
   request: InboxRequest;
   since: string;
+  /** The folder of the project the chat is in. The server sets it, so one Inbox can span projects. */
+  project?: string;
 }
 
 /** What `inbox.watch` answers and pushes: the requests past the wait, oldest first. */
@@ -52,9 +54,10 @@ export function dueItems(pending: Iterable<PendingAsk>, wait: number, now: numbe
   return [...pending]
     .filter((p) => now - p.at >= wait)
     .toSorted(byAge)
-    .map(({ chat, chatName, card, request, at }) => {
+    .map(({ chat, chatName, card, request, at, project }) => {
       const item: InboxItem = { chat, chatName, request, since: new Date(at).toISOString() };
       if (card) item.card = card;
+      if (project) item.project = project;
       return item;
     });
 }
@@ -69,19 +72,27 @@ export function nextDueIn(pending: Iterable<PendingAsk>, wait: number, now: numb
   return soonest;
 }
 
-/** The `{ dir, waitMs }` params of `inbox.watch`, or null. */
-export function inboxParams(params: unknown): { dir: string; waitMs: number } | null {
-  if (!isRecord(params) || typeof params.dir !== "string" || !params.dir) return null;
+/** The `{ dir?, waitMs }` params of `inbox.watch`, or null. Without a `dir` the watch covers every open project. */
+export function inboxParams(params: unknown): { dir?: string; waitMs: number } | null {
+  if (!isRecord(params)) return null;
+  if (params.dir !== undefined && (typeof params.dir !== "string" || !params.dir)) return null;
   const ms = params.waitMs;
   if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0 || ms > waitMs(MAX_INBOX_WAIT_MINUTES)) return null;
-  return { dir: params.dir, waitMs: ms };
+  return { ...(params.dir === undefined ? {} : { dir: params.dir }), waitMs: ms };
+}
+
+/** The optional `{ dir }` of `inbox.asked`: null when it isn't one, `{}` for every open project. */
+export function askedParams(params: unknown): { dir?: string } | null {
+  if (params === undefined || params === null) return {};
+  if (!isRecord(params) || params.dir === undefined) return {};
+  return typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
 }
 
 /** An item read from the socket, or null when it isn't one. */
 export function normalizeInboxItem(raw: unknown): InboxItem | null {
   if (!isRecord(raw)) return null;
   const request = normalizeChatEvent(raw.request);
-  const { chat, chatName, card, since } = raw;
+  const { chat, chatName, card, since, project } = raw;
   if (request?.type !== "approval" && request?.type !== "question") return null;
   if (typeof chat !== "string" || !chat || typeof chatName !== "string" || typeof since !== "string") return null;
   return {
@@ -90,6 +101,7 @@ export function normalizeInboxItem(raw: unknown): InboxItem | null {
     ...(typeof card === "string" && card ? { card } : {}),
     request,
     since,
+    ...(typeof project === "string" && project ? { project } : {}),
   };
 }
 

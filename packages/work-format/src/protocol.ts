@@ -108,16 +108,16 @@ export interface ServerMethods {
    */
   "chat.list": { params: { dir: string }; result: ChatList };
   /**
-   * The project's approvals and questions that have waited on the user at least `waitMs` on the server's clock, oldest
+   * The approvals and questions (of one project, or of every open one without `dir`) that have waited on the user at least `waitMs` on the server's clock, oldest
    * first (STORY-7); then, until `work.unwatch`, an `inbox.list` push each time that set changes. The request's id names
    * the watch.
    */
-  "inbox.watch": { params: { dir: string; waitMs: number }; result: Inbox };
+  "inbox.watch": { params: { dir?: string; waitMs: number }; result: Inbox };
   /**
    * Nothing, then until `work.unwatch` an `inbox.asked` push as soon as a chat of the project asks for an approval or an
    * answer, whatever the wait (STORY-7): what a desktop notification is made from. The request's id names the watch.
    */
-  "inbox.asked": { params: { dir: string }; result: null };
+  "inbox.asked": { params: { dir?: string }; result: null };
 }
 
 /** Frames the server sends unasked, and the data each carries. */

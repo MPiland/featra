@@ -12,10 +12,12 @@ import {
   chatStartParams,
   copyParams,
   dirParams,
+  askedParams,
   inboxParams,
   roleEditParams,
   setupParams,
   unwatchParams,
+  type Inbox,
   type PushEvent,
   type ServerMethod,
   type ServerMethods,
@@ -236,20 +238,25 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles, 
       case "inbox.watch": {
         const p = inboxParams(params);
         if (!p) throw new ApiError("Expected { dir, waitMs }.");
-        const dir = allow(p.dir);
+        const dir = p.dir === undefined ? null : allow(p.dir);
         await chats.ready();
+        // Chats of a project that is no longer open are closed with it, so one Inbox over every project never shows them.
+        const open = (inbox: Inbox): Inbox =>
+          dir === null ? { items: inbox.items.filter((i) => allowed.has(i.project ?? "")) } : inbox;
         const { inbox, stop } = chats.watchInbox(dir, p.waitMs, (next) => {
-          if (allowed.has(dir)) connection.push("inbox.list", id, next);
+          if (dir === null || allowed.has(dir)) connection.push("inbox.list", id, open(next));
         });
         connection.keep(id, stop);
-        return inbox;
+        return open(inbox);
       }
       case "inbox.asked": {
-        const dir = project(params);
+        const p = askedParams(params);
+        if (!p) throw new ApiError("Expected { dir } or nothing.");
+        const dir = p.dir === undefined ? null : allow(p.dir);
         connection.keep(
           id,
           chats.watchAsked(dir, (item) => {
-            if (allowed.has(dir)) connection.push("inbox.asked", id, item);
+            if (allowed.has(dir ?? item.project ?? "")) connection.push("inbox.asked", id, item);
           }),
         );
         return null;

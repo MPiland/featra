@@ -94,3 +94,62 @@ describe("AC3: notifications", () => {
     expect(shown).toEqual([]);
   });
 });
+
+/** A notifier whose notifications can be closed, as Electron's can. */
+function closable() {
+  const shown: { body: string; open: boolean; click: () => void }[] = [];
+  const opened: [string, string | undefined][] = [];
+  const notifier = createNotifier({
+    enabled: () => true,
+    focused: () => false,
+    show: (n) => {
+      const toast = { body: n.body, open: true, click: n.click };
+      shown.push(toast);
+      return { close: () => void (toast.open = false) };
+    },
+    open: (chat, project) => void opened.push([chat, project]),
+  });
+  return { notifier, shown, opened };
+}
+
+describe("review fixes: one toast per chat, the question's words, and the project to open", () => {
+  const second: InboxItem = { ...approval, request: { ...approval.request, id: "t2" } };
+
+  it("replaces a chat's notification with its next one instead of stacking them", () => {
+    const { notifier, shown } = closable();
+    notifier.asked(approval);
+    notifier.asked(second);
+    expect(shown.map((n) => n.open)).toEqual([false, true]);
+  });
+
+  it("keeps a separate notification for each chat", () => {
+    const { notifier, shown } = closable();
+    notifier.asked(approval);
+    notifier.asked(question);
+    notifier.asked({ ...approval, request: { ...approval.request, id: "t3" } });
+    expect(shown.map((n) => n.open)).toEqual([false, true, true]);
+  });
+
+  it("says what the question asks, cut short when it is long", () => {
+    const { notifier, shown } = closable();
+    notifier.asked(question);
+    expect(shown[0]?.body).toBe("Plan the release: Which?");
+    const long = "Why ".repeat(100).trim();
+    const item: InboxItem = {
+      ...question,
+      request: {
+        ...question.request,
+        questions: [{ question: long, header: "", options: [], multiSelect: false }],
+      } as InboxItem["request"],
+    };
+    expect(notificationBody(item).length).toBeLessThan(120);
+    expect(notificationBody(item)).toMatch(/…$/);
+  });
+
+  it("opens the chat in its project", () => {
+    const { notifier, shown, opened } = closable();
+    notifier.asked({ ...approval, project: "/work/other" });
+    shown[0]?.click();
+    expect(opened).toEqual([["chat-1", "/work/other"]]);
+  });
+});

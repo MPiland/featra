@@ -15,18 +15,18 @@ export interface InboxUpdate {
 }
 
 export interface InboxBridge {
-  /** Calls back with the project's Inbox at `waitMs` now and on every change; returns the stop. */
-  watch: (dir: string, waitMs: number, listener: (update: InboxUpdate) => void) => () => void;
-  /** Calls back with each request a chat of the project asks, as it is asked, whatever the wait; returns the stop. */
-  asked: (dir: string, listener: (item: InboxItem) => void) => () => void;
+  /** Calls back with the Inbox of the project (every open project when `dir` is null) at `waitMs` now and on every change; returns the stop. */
+  watch: (dir: string | null, waitMs: number, listener: (update: InboxUpdate) => void) => () => void;
+  /** Calls back with each request a chat of the project (any open project when `dir` is null) asks, as it is asked, whatever the wait; returns the stop. */
+  asked: (dir: string | null, listener: (item: InboxItem) => void) => () => void;
 }
 
 /** What the page tells the host about the requests that arrive and what the host tells the page back. */
 export interface NotificationsBridge {
   /** A request just arrived. The host notifies when the setting is on and Featra isn't focused. */
   asked: (item: InboxItem) => void;
-  /** Calls back with the chat a clicked notification names; returns the stop. */
-  onOpenChat: (listener: (chat: string) => void) => () => void;
+  /** Calls back with the chat a clicked notification names, and its project; returns the stop. */
+  onOpenChat: (listener: (chat: string, project?: string) => void) => () => void;
 }
 
 export const INBOX_COPY = {
@@ -43,31 +43,23 @@ export function serverInbox(server: ServerClient): InboxBridge {
   return {
     watch(dir, waitMs, listener) {
       let inbox = EMPTY_INBOX;
-      return server.watch(
-        "inbox.watch",
-        { dir, waitMs },
-        {
-          data: (raw) => {
-            inbox = normalizeInbox(raw);
-            listener({ inbox, error: null });
-          },
-          error: (message) => listener({ inbox, error: message }),
+      return server.watch("inbox.watch", dir === null ? { waitMs } : { dir, waitMs }, {
+        data: (raw) => {
+          inbox = normalizeInbox(raw);
+          listener({ inbox, error: null });
         },
-      );
+        error: (message) => listener({ inbox, error: message }),
+      });
     },
     asked(dir, listener) {
-      return server.watch(
-        "inbox.asked",
-        { dir },
-        {
-          // The answer to the watch is null; each push is one request.
-          data: (raw) => {
-            const item = normalizeInboxItem(raw);
-            if (item) listener(item);
-          },
-          error: () => {},
+      return server.watch("inbox.asked", dir === null ? {} : { dir }, {
+        // The answer to the watch is null; each push is one request.
+        data: (raw) => {
+          const item = normalizeInboxItem(raw);
+          if (item) listener(item);
         },
-      );
+        error: () => {},
+      });
     },
   };
 }
