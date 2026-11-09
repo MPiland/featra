@@ -2,7 +2,7 @@
 id: STORY-47
 type: story
 title: Featra MCP logs decisions and open questions
-status: In Progress
+status: In Review
 parent: FEAT-3
 order: 7
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-47-mcp
-pr: null
+pr: 13
 created: 2026-11-08T22:00:00Z
 history:
   - at: 2026-11-08T22:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:story-47
+  - at: 2026-11-09T21:35:00Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:story-47
 ---
 
