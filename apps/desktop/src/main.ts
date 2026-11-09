@@ -49,6 +49,7 @@ if (!app.requestSingleInstanceLock()) {
   // The local server makes every project write (ADR 0012, ADR 0015). It runs on Electron's own Node.
   const server = createServerProcess({
     script: join(app.getAppPath(), "dist", "server.cjs"),
+    mcpEntry: join(app.getAppPath(), "dist", "mcp.cjs"),
     execPath: process.execPath,
     log: (message) => log.info(message),
     dataDir: app.getPath("userData"),

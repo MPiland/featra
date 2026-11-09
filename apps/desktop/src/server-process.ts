@@ -29,6 +29,8 @@ export interface ServerProcessDeps {
   log: (message: string) => void;
   /** The app's data folder, where the server saves chats (STORY-44). */
   dataDir?: string;
+  /** The bundled Featra MCP (`dist/mcp.cjs`) the server gives agents; without it no agent gets the MCP (STORY-47). */
+  mcpEntry?: string;
 }
 
 const START_TIMEOUT_MS = 15_000;
@@ -43,7 +45,7 @@ interface Running {
   silence: () => void;
 }
 
-export function createServerProcess({ script, execPath, log, dataDir }: ServerProcessDeps): ServerProcess {
+export function createServerProcess({ script, execPath, log, dataDir, mcpEntry }: ServerProcessDeps): ServerProcess {
   let running: Running | null = null;
   let dirs: string[] = [];
   let seq = 0;
@@ -53,7 +55,12 @@ export function createServerProcess({ script, execPath, log, dataDir }: ServerPr
     const token = randomBytes(32).toString("base64url");
     const child = fork(script, [], {
       execPath,
-      env: { ...process.env, ELECTRON_RUN_AS_NODE: "1", ...(dataDir ? { FEATRA_DATA_DIR: dataDir } : {}) },
+      env: {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: "1",
+        ...(dataDir ? { FEATRA_DATA_DIR: dataDir } : {}),
+        ...(mcpEntry ? { FEATRA_MCP_ENTRY: mcpEntry } : {}),
+      },
       stdio: ["ignore", "ignore", "pipe", "ipc"],
       serialization: "json",
     });

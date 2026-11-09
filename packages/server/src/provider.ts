@@ -65,6 +65,18 @@ export type QuestionHandler = (request: QuestionRequest, signal: AbortSignal) =>
  */
 export type ApprovalHandler = (request: ToolRequest, signal: AbortSignal) => Promise<ToolDecision>;
 
+/**
+ * A local stdio MCP server the agent is given for its session (STORY-47): Featra's own. Provider neutral: each
+ * adapter attaches it its own way (Claude's `mcpServers`), so Codex later takes the same description.
+ */
+export interface McpServerSpec {
+  /** The server's name, which an agent sees in its tools' names (Claude: `mcp__featra__log_decision`). */
+  name: string;
+  command: string;
+  args: string[];
+  env: Record<string, string>;
+}
+
 export interface SessionOptions {
   chat: string;
   /** The project folder: the agent's working directory. */
@@ -76,6 +88,11 @@ export interface SessionOptions {
   ask: (request: Omit<QuestionRequest, "chat">, signal: AbortSignal) => Promise<QuestionDecision>;
   /** Hears each event of the agent's stream, in order. */
   emit: (event: ChatEvent) => void;
+  /**
+   * The Featra MCP for this session, asked for when the agent starts; null when the project turned it off. The adapter
+   * attaches it, and lets the agent call its tools without asking: they only log (ADR 0019).
+   */
+  mcp?: () => Promise<McpServerSpec | null>;
   /** The provider's session to go on with (a restored chat, STORY-44); a new conversation without it. */
   resume?: string | null;
 }

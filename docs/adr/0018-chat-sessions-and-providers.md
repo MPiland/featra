@@ -167,3 +167,9 @@ Roles are listed by a registry over `.featra/roles/` and one reader per provider
 project and user), read live. The registry hands the chat manager a role with the model Claude can run and the mode the
 provider's own settings name; the manager passes it to the provider adapter unchanged. A new provider adds a reader and
 an adapter, nothing else.
+
+## STORY-47 note: Featra's own MCP
+
+A session may carry a provider-neutral `McpServerSpec` (the Featra MCP, ADR 0019). The Claude adapter passes it as
+`mcpServers` and adds one `allowedTools` rule for that server's tools, so the user is not asked to approve Featra's own
+tools. "Featra passes no allow lists" above holds for every other tool.

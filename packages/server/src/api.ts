@@ -8,6 +8,7 @@ import {
   chatApproveParams,
   chatSnapshot,
   chatSendParams,
+  chatUndoParams,
   chatStartParams,
   copyParams,
   dirParams,
@@ -20,6 +21,8 @@ import {
   type ServerPushes,
 } from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
+import type { AgentBridge } from "./agent-bridge.ts";
+import { ApiError } from "./api-error.ts";
 import { cardViewIn, type CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
@@ -30,8 +33,7 @@ import { initFeatra, initGit, setupStatus } from "./project-setup.ts";
 import { setUpProject, setupPlan } from "./project-setup-plan.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
-/** A request the server refuses: its message goes back to the client as the response's `error`. */
-export class ApiError extends Error {}
+export { ApiError };
 
 export interface ApiDeps {
   git: Git;
@@ -42,6 +44,8 @@ export interface ApiDeps {
   chats: ChatManager;
   roles: RoleRegistry;
   roleWatches: RoleWatches;
+  /** Takes back what an agent logged; without it there is nothing to take back. */
+  agents?: Pick<AgentBridge, "undo">;
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -64,7 +68,7 @@ export type Api = (
   connection: Connection,
 ) => Promise<ServerMethods[ServerMethod]["result"]>;
 
-export function createApi({ git, allowed, watches, copies, cards, chats, roles, roleWatches }: ApiDeps): Api {
+export function createApi({ git, allowed, watches, copies, cards, chats, roles, roleWatches, agents }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
     return dir;
@@ -199,6 +203,13 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles, 
         const p = chatAnswerParams(params);
         if (!p) throw new ApiError("Expected { id, tool, answers }.");
         chats.answer(chat(params), p.tool, p.answers);
+        return null;
+      }
+      case "chat.undoLog": {
+        const p = chatUndoParams(params);
+        if (!p) throw new ApiError("Expected { id, entry }.");
+        if (!agents) throw new ApiError(CHAT_MESSAGES.noEntry);
+        await agents.undo(chat(params), p.entry);
         return null;
       }
       case "chat.list": {

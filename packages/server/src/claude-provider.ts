@@ -11,7 +11,7 @@ import { sessionRules, suggestedRule } from "./claude-rules.ts";
 import { loadSessionReader } from "./claude-sdk.ts";
 import { claudeHistory, type SessionReader } from "./claude-transcript.ts";
 import { createInputQueue, type InputQueue } from "./input-queue.ts";
-import type { ProviderAdapter, ProviderSession, SessionOptions } from "./provider.ts";
+import type { McpServerSpec, ProviderAdapter, ProviderSession, SessionOptions } from "./provider.ts";
 
 /** A running query: the agent's messages, and how to stop its turn. */
 export type ClaudeQuery = AsyncIterable<unknown> & { interrupt: () => Promise<unknown> };
@@ -67,6 +67,7 @@ export function claudeOptions(
   canUseTool: CanUseTool,
   env: NodeJS.ProcessEnv,
   resume: string | null,
+  mcp: McpServerSpec | null = null,
 ): Options {
   return {
     cwd,
@@ -79,7 +80,16 @@ export function claudeOptions(
     canUseTool,
     env,
     ...(resume ? { resume } : {}),
+    ...(mcp ? mcpOptions(mcp) : {}),
   };
+}
+
+/**
+ * Featra's own MCP as Claude takes it: a stdio server, with its tools allowed without asking. Only these tools: the
+ * user's own allow and deny rules, and Ask for everything else, stand as before (ADR 0018, ADR 0019).
+ */
+function mcpOptions({ name, command, args, env }: McpServerSpec): Pick<Options, "mcpServers" | "allowedTools"> {
+  return { mcpServers: { [name]: { type: "stdio", command, args, env } }, allowedTools: [`mcp__${name}`] };
 }
 
 const userMessage = (text: string, session: string | null): SDKUserMessage => ({
@@ -105,7 +115,7 @@ export function createClaudeProvider({
 }
 
 function startSession(
-  { cwd, role, approve, ask, emit, resume }: SessionOptions,
+  { cwd, role, approve, ask, emit, resume, mcp }: SessionOptions,
   { loadQuery, locate, env }: Omit<Required<ClaudeDeps>, "loadSessions">,
 ): ProviderSession {
   // A restored chat resumes its session; the agent's own report of its session id takes over once it starts.
@@ -167,7 +177,8 @@ function startSession(
     if (!claude) return fail([{ type: "problem", problem: { type: "not-installed" } }, END_FAILED]);
     let running: ClaudeQuery;
     try {
-      const options = claudeOptions(role, cwd, claude, canUseTool, agentEnv(env), translator.sessionId());
+      const attached = (await mcp?.()) ?? null;
+      const options = claudeOptions(role, cwd, claude, canUseTool, agentEnv(env), translator.sessionId(), attached);
       const queryFn = await loadQuery();
       if (closed || stoppedEarly()) return;
       running = queryFn({ prompt: queue.iterable, options });

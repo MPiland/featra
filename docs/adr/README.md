@@ -50,3 +50,4 @@ What becomes easier or harder, and what we must now do.
 | [0016](0016-work-list-owner-copies.md)            | The Work list from owner copies                                  | accepted |
 | [0017](0017-card-pane-edits-owner-copy.md)        | The card pane edits the owner copy                               | accepted |
 | [0018](0018-chat-sessions-and-providers.md)       | Chats: a session manager in the server, behind provider adapters | accepted |
+| [0019](0019-agent-socket-and-scoped-secrets.md)   | The Featra MCP reaches the server over a narrow agent socket     | accepted |

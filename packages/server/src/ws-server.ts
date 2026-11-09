@@ -1,13 +1,30 @@
 import { timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
-import { errorMessage, parseRequest, SERVER_HOST, SERVER_PATH, type ServerResponse } from "@featra/work-format";
+import {
+  AGENT_PATH,
+  errorMessage,
+  parseAgentRequest,
+  parseRequest,
+  SERVER_HOST,
+  SERVER_PATH,
+  type AgentMethod,
+  type ServerResponse,
+} from "@featra/work-format";
 import { ApiError, type Api, type Connection } from "./api.ts";
+
+/** The agent socket (ADR 0019): which chat a secret opens, and what a chat's MCP process may ask. */
+export interface AgentSockets {
+  resolve: (token: string) => string | null;
+  call: (chat: string, method: AgentMethod, params: unknown) => Promise<unknown>;
+}
 
 export interface ServerOptions {
   /** The secret every connection must present (`?token=`): only Featra's own window has it. */
   token: string;
   api: Api;
+  /** The narrow socket agents' MCP processes use; without it there is none. */
+  agents?: AgentSockets;
   /** Logs a line in the host's log: failures only, never params or tokens. */
   log: (message: string) => void;
   /** 0 (the default) lets the OS pick a free port. */
@@ -29,9 +46,22 @@ const sameSecret = (given: string, token: string) => {
   return a.length === b.length && timingSafeEqual(a, b);
 };
 
-function authorised(req: IncomingMessage, token: string): boolean {
-  const url = new URL(req.url ?? "/", `http://${SERVER_HOST}`);
+function authorised(req: IncomingMessage, token: string, agents?: AgentSockets): boolean {
+  return agentChat(req, agents) !== null || windowConnection(req, token);
+}
+
+const urlOf = (req: IncomingMessage) => new URL(req.url ?? "/", `http://${SERVER_HOST}`);
+
+/** Featra's own window: the server's secret, on the window's path. */
+function windowConnection(req: IncomingMessage, token: string): boolean {
+  const url = urlOf(req);
   return url.pathname === SERVER_PATH && sameSecret(url.searchParams.get("token") ?? "", token);
+}
+
+/** The chat an agent's connection belongs to: the secret its MCP process was given, on the agent path. */
+function agentChat(req: IncomingMessage, agents?: AgentSockets): string | null {
+  const url = urlOf(req);
+  return agents && url.pathname === AGENT_PATH ? agents.resolve(url.searchParams.get("token") ?? "") : null;
 }
 
 function frameText(data: RawData): string {
@@ -66,17 +96,31 @@ function connect(socket: WebSocket): { connection: Connection; closeAll: () => v
   };
 }
 
+/** An agent's request, answered on its socket: the chat is the connection's, and the method one it may call. */
+async function answerAgent(socket: WebSocket, chat: string, agent: AgentSockets, text: string) {
+  const request = parseAgentRequest(text);
+  if ("error" in request) {
+    if (request.id !== null) socket.send(JSON.stringify({ id: request.id, ok: false, error: request.error }));
+    return;
+  }
+  const response: ServerResponse = await agent.call(chat, request.method, request.params).then(
+    (result) => ({ id: request.id, ok: true, result }),
+    (err: unknown) => ({ id: request.id, ok: false, error: errorMessage(err) }),
+  );
+  if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(response));
+}
+
 /**
  * Starts the WebSocket API (ADR 0015) on 127.0.0.1. Each request is answered on the socket it came in on; a watch
  * pushes `{ event, watch, data }` frames on it (ADR 0016) and ends when the socket closes.
  */
-export function startServer({ token, api, log, port = 0 }: ServerOptions): Promise<RunningServer> {
+export function startServer({ token, api, agents, log, port = 0 }: ServerOptions): Promise<RunningServer> {
   if (!token) return Promise.reject(new Error("The server needs a token."));
   const wss = new WebSocketServer({
     host: SERVER_HOST,
     port,
     maxPayload: MAX_FRAME_BYTES,
-    verifyClient: ({ req }: { req: IncomingMessage }) => authorised(req, token),
+    verifyClient: ({ req }: { req: IncomingMessage }) => authorised(req, token, agents),
   });
 
   const answer = async (socket: WebSocket, connection: Connection, text: string) => {
@@ -100,7 +144,16 @@ export function startServer({ token, api, log, port = 0 }: ServerOptions): Promi
     if (socket.readyState === socket.OPEN) socket.send(JSON.stringify(response));
   };
 
-  wss.on("connection", (socket) => {
+  wss.on("connection", (socket, req) => {
+    const chat = agentChat(req, agents);
+    if (agents && chat !== null) {
+      socket.on("message", (data, isBinary) => {
+        if (isBinary) return socket.close(1003, "Text frames only.");
+        void answerAgent(socket, chat, agents, frameText(data));
+      });
+      socket.on("error", (err) => log(`Socket error: ${err.message}`));
+      return;
+    }
     const { connection, closeAll } = connect(socket);
     socket.on("close", closeAll);
     socket.on("message", (data, isBinary) => {

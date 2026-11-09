@@ -29,6 +29,8 @@ export interface ChatHost {
   stopError?: string;
   /** What `chat.approve` refuses with, if anything. */
   approveError?: string;
+  /** What `chat.undoLog` refuses with, if anything. */
+  undoError?: string;
   /** What `chat.answer` refuses with, if anything. */
   answerError?: string;
   /** The providers `chat.list` reports. Default: Claude, installed. */
@@ -115,6 +117,10 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     answer: async (id, tool, answers) => {
       calls.push(`chat.answer:${id}:${tool}:${JSON.stringify(answers)}`);
       return host.answerError ?? null;
+    },
+    undoLog: async (id, entry) => {
+      calls.push(`chat.undoLog:${id}:${entry}`);
+      return host.undoError ?? null;
     },
     list: (dir, listener) => {
       const watcher = { dir, listener };

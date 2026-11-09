@@ -39,6 +39,9 @@ importers:
       '@featra/client':
         specifier: workspace:*
         version: link:../../packages/client
+      '@featra/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@featra/server':
         specifier: workspace:*
         version: link:../../packages/server
@@ -92,6 +95,19 @@ importers:
       vite:
         specifier: 8.3.5
         version: 8.3.5(@types/node@26.6.6)(yaml@2.9.1)
+
+  packages/mcp:
+    dependencies:
+      '@featra/work-format':
+        specifier: workspace:*
+        version: link:../work-format
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(zod@4.6.7)
+    devDependencies:
+      '@featra/server':
+        specifier: workspace:*
+        version: link:../server
 
   packages/server:
     dependencies:

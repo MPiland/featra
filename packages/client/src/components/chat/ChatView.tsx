@@ -59,6 +59,7 @@ export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
           onNewChat: () => void newChat(),
           onAnswer: (tool, answer) => chats.approve(chat.id, tool, answer),
           onAnswerQuestion: (tool, answers) => chats.answer(chat.id, tool, answers),
+          onUndoLog: (entry) => chats.undoLog(chat.id, entry),
         }}
       />
       {!gone && (

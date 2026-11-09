@@ -36,3 +36,5 @@ export * from "./chat-state.ts";
 export * from "./chat-list.ts";
 export * from "./chat-saved.ts";
 export * from "./tool-summary.ts";
+export * from "./knowledge-log.ts";
+export * from "./agent-protocol.ts";

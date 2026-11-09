@@ -116,6 +116,20 @@ export function setConfigValue<K extends keyof ProjectConfig>(
   return out;
 }
 
+/**
+ * Whether a project's agents get the Featra MCP (ADR 0006): the project's own `mcp`, else the app-wide default, else
+ * on. A config that can't be read sets nothing, so the default applies, and Settings shows the error.
+ */
+export function mcpEnabled(configText: string | null, appDefault: boolean | undefined): boolean {
+  let own: boolean | undefined;
+  try {
+    own = configText === null ? undefined : configOverrides(configText).mcp;
+  } catch {
+    own = undefined;
+  }
+  return own ?? appDefault ?? DEFAULT_CONFIG.mcp;
+}
+
 /** A new project's config file: only the version, so every work setting follows the app-wide defaults. */
 export const NEW_CONFIG = "# Featra project settings\nversion: 1\n";
 

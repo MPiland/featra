@@ -4,6 +4,7 @@
  * neutral, so a Codex or ACP adapter (M2) feeds the same view.
  */
 import type { AllowScope } from "./approvals.ts";
+import { LOG_FILES, type LogFile } from "./log-files.ts";
 import { normalizeMode, type ModeInfo } from "./modes.ts";
 import { isStrings, normalizeQuestions, type Answers, type Question } from "./questions.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
@@ -22,6 +23,7 @@ export type ChatProblem =
 export type TurnOutcome = "done" | "stopped" | "failed";
 const OUTCOMES: readonly TurnOutcome[] = ["done", "stopped", "failed"];
 const SCOPES: readonly AllowScope[] = ["once", "chat"];
+const LOGGED_FILES: readonly LogFile[] = Object.values(LOG_FILES);
 
 export type ChatEvent =
   /** The user sent a message: a turn starts. */
@@ -53,6 +55,10 @@ export type ChatEvent =
   | { type: "question-answered"; id: string; answers: Answers }
   /** A request (an approval or a question) ended unanswered: Stop, the chat closing, or the agent no longer waiting. */
   | { type: "approval-cancelled"; id: string }
+  /** An agent logged an entry through the Featra MCP (STORY-47): shown as "Logged to <file>" with Undo. */
+  | { type: "logged"; entry: string; file: LogFile; summary: string }
+  /** The user took a logged entry back out of its file. */
+  | { type: "log-undone"; entry: string }
   | { type: "turn-end"; outcome: TurnOutcome }
   | { type: "problem"; problem: ChatProblem };
 
@@ -140,6 +146,12 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
         : null;
     case "approval-cancelled":
       return nonEmpty(raw.id) ? { type: "approval-cancelled", id: raw.id } : null;
+    case "logged":
+      return nonEmpty(raw.entry) && isOneOf(LOGGED_FILES, raw.file) && str(raw.summary)
+        ? { type: "logged", entry: raw.entry, file: raw.file, summary: raw.summary }
+        : null;
+    case "log-undone":
+      return nonEmpty(raw.entry) ? { type: "log-undone", entry: raw.entry } : null;
     case "tool-result":
       return nonEmpty(raw.id) && str(raw.output)
         ? { type: "tool-result", id: raw.id, output: raw.output, isError: raw.isError === true }
@@ -184,6 +196,12 @@ export function chatSendParams(params: unknown): { id: string; text: string } | 
   return chat && isRecord(params) && str(params.text) && params.text.trim() ? { ...chat, text: params.text } : null;
 }
 
+/** The `{ id, entry }` params of `chat.undoLog`, or null. */
+export function chatUndoParams(params: unknown): { id: string; entry: string } | null {
+  const chat = chatParams(params);
+  return chat && isRecord(params) && nonEmpty(params.entry) ? { ...chat, entry: params.entry } : null;
+}
+
 /** What the server says about a chat: its refusals, shown to the user, and the denial the agent is told. */
 export const CHAT_MESSAGES = {
   unknownRole: "No such role.",
@@ -192,6 +210,10 @@ export const CHAT_MESSAGES = {
   busy: "Wait for the reply, or stop it.",
   /** A restored chat whose session its provider no longer has: it can't go on. */
   gone: "This chat's history is gone. Start a new chat.",
+  /** Undo of an entry that is no longer in the chat's log (STORY-47). */
+  noEntry: "That entry is already removed.",
+  /** Undo of an entry the user changed in the file: it stays, as the user left it. */
+  editedEntry: "That entry was edited. Remove it from the file yourself.",
   /** An answer to a tool request that isn't waiting: already answered, cancelled, or never asked. */
   noRequest: "This request isn't waiting for an answer.",
   /** Allow for this chat, for a call the agent says may only be allowed once. */

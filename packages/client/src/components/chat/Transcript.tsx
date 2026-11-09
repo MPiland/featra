@@ -4,6 +4,7 @@ import type { Answers } from "@featra/work-format/questions";
 import type { ChatItem } from "@featra/work-format/chat";
 import { assertNever } from "@featra/work-format/guards";
 import { CHAT_COPY, noticeText } from "../../chats.ts";
+import { LogRow } from "./LogRow.tsx";
 import { QuestionCard } from "./QuestionCard.tsx";
 import { ToolRow } from "./ToolRow.tsx";
 
@@ -15,6 +16,7 @@ export interface TranscriptActions {
   onNewChat: () => void;
   onAnswer: (tool: string, answer: ApprovalAnswer) => Promise<string | null>;
   onAnswerQuestion: (tool: string, answers: Answers) => Promise<string | null>;
+  onUndoLog: (entry: string) => Promise<string | null>;
 }
 
 function Item({ item, actions }: { item: ChatItem; actions: TranscriptActions }) {
@@ -29,6 +31,8 @@ function Item({ item, actions }: { item: ChatItem; actions: TranscriptActions })
       ) : (
         <ToolRow item={item} onAnswer={actions.onAnswer} />
       );
+    case "log":
+      return <LogRow item={item} onUndo={actions.onUndoLog} />;
     case "notice":
       return (
         <p className={item.notice.type === "stopped" ? "chat-notice" : "chat-notice bad"} role="status">

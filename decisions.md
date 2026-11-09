@@ -821,3 +821,39 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   this story).
 - **Role watchers end when their project is closed**, not only when the socket does. Why: the project's chats were
   already closed there, and the watchers kept folders open.
+
+## 2026-11-09 — STORY-47: Featra MCP logs decisions and open questions
+
+- **The MCP reaches the server over a second, narrow socket (`/v1/agent`) with a secret per chat; the server takes the
+  chat from the secret.** Why: the window's token opens every method, `chat.approve` among them, so handing it to an
+  agent's process would let the agent approve its own tools. An agent can log into its own chat and do nothing else
+  (ADR 0019).
+- **`McpServerSpec` is provider-neutral, in the session options; the Claude adapter maps it to `mcpServers` plus an
+  `allowedTools` rule for `mcp__featra`.** Why: a Codex or ACP adapter maps the same spec to its own config, and the
+  user is not asked to approve Featra's own tools. This amends ADR 0018's "no allow lists" for that one rule (noted in
+  the ADR).
+- **Each entry carries a hidden `<!-- featra:ID -->` marker; Undo removes that entry's lines only.** Why: Undo must
+  take back exactly what was logged, even with later entries logged or the user's own text added. If the user edited
+  the entry's lines Undo refuses ("That entry was edited. Remove it from the file yourself.") so their words are never
+  thrown away; if the entry is already gone it succeeds quietly, since the file is already as Undo would leave it.
+- **The server is the only writer: a per-file queue, atomic temp-file and rename writes, and a missing file is created
+  from the scaffold header.** Why: two agents logging at once must both land, a crash must not leave half an entry,
+  and `decisions.md` may not exist yet in a project that skipped init.
+- **Entries are written in the chat's working folder** (`decisions.md` and `open-questions.md` at its root). Why: the
+  card's note, so they are committed with that branch's work.
+- **The setting is read by the server each time an agent starts: the project's `.featra/config.yaml` `mcp`, else the
+  app default in `settings.json` (read only), else on.** Why: Settings › Project already has the toggle and its
+  override logic; a change applies to the next chat, and the server never writes the user's settings.
+- **The tool descriptions are the only instruction agents get.** Why: Featra injects no system prompt (ADR 0006), so
+  each description names what to log (a choice that changes behavior or scope, a public contract, stored data or
+  security, or one that picks between real trade-offs) and what not to (trivia). A tool takes more tools later:
+  `draft_cards` (FEAT-4) is one more entry in the registry.
+- **A bad tool input is a tool error that says what to fix; nothing is written.** Why: agents' input is data from
+  outside, and the agent can correct and call again.
+- **The `card` input is optional and checked as a card id.** Why: no chat knows its card yet (open-questions.md), so
+  the agent says it when it knows it.
+- **`logged` and `log-undone` chat events are live only: the transcript restored after a restart does not show them,
+  and Undo works while the server runs.** Why: the ledger of entries is in memory and the saved transcript is the
+  agent's own. The entry stays in the file for the user to edit.
+- **The Featra MCP toggle joins the Agents group in Settings.** It uses the existing work-setting machinery (app
+  default and project override), so no earlier assertion changed.
