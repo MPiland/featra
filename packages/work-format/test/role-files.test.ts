@@ -110,6 +110,23 @@ describe("provider agent files (AC4)", () => {
     expect(parseClaudeAgent("---\n: [\n---\nx", "x").ok).toBe(false);
   });
 
+  it("reads a Codex agent as Codex writes it: a multi-line prompt, a sandbox and nicknames Featra ignores", () => {
+    const toml = [
+      'name = "checker"',
+      'description = "Checks the work"',
+      'sandbox_mode = "read-only"',
+      'nickname_candidates = ["Ada", "Lin"]',
+      'developer_instructions = """',
+      "Check the work.",
+      "Report what you find.",
+      '"""',
+    ].join("\n");
+    expect(parseCodexAgent(toml, "file")).toMatchObject({
+      ok: true,
+      agent: { name: "checker", description: "Checks the work", prompt: "Check the work.\nReport what you find." },
+    });
+  });
+
   it("reads a Codex agent: developer_instructions as the prompt, reasoning effort in Featra's words", () => {
     const toml =
       'name = "scout"\nmodel = "gpt-5"\nmodel_reasoning_effort = "minimal"\ndeveloper_instructions = "Look around."\n';

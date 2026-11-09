@@ -102,6 +102,13 @@ describe("codexStartMode (AC7)", () => {
     });
   });
 
+  it("matches a trust entry Codex wrote as a literal key with the Windows long-path prefix", () => {
+    const user = `[projects.'\\\\?\\c:\\dev\\app']\ntrust_level = "trusted"\n`;
+    expect(codexStartMode({ user, project: null, dir: DIR }).mode).toMatchObject({
+      name: "on-request · workspace-write",
+    });
+  });
+
   it("honours full access: never with danger-full-access", () => {
     const user = 'approval_policy = "never"\nsandbox_mode = "danger-full-access"\n';
     expect(codexStartMode({ user, project: null, dir: DIR }).mode?.fullAccess).toBe(true);
