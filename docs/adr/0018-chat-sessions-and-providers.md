@@ -61,13 +61,24 @@ allow; the adapter passes it to the handler with the SDK's abort signal and `for
 
 - **Allow** allows this call (`tool-allowed`, scope `once`). **Deny** denies it with `denyMessage(reason)`, so the
   agent is told the user's optional reason (trimmed, at most 500 characters), and the row shows Denied with the reason.
-- **Allow for this chat** also remembers a rule for the chat, in the server's memory only. A shell tool (Bash,
-  PowerShell) matches by its whole input except `description`, `timeout` and `run_in_background`, so a field that
-  changes how it runs (`dangerouslyDisableSandbox`, or one the SDK adds later) is asked about again; any other tool
-  matches by its name (`chatRuleKey`). A later matching call is allowed without asking and shows "Allowed for this
-  chat" (scope `chat`). It is offered and applied only for a call with `forChat: true`, and never once the turn is
-  stopped: the desk checks the turn's signal before its rules. Featra doesn't pass `updatedPermissions`, so nothing is written to the
-  user's Claude settings.
+- **Allow for this chat** (decided by the user, 2026-11-09) uses the provider's own rule first. A provider may
+  suggest a rule for a request, an optional adapter capability (`ToolRequest.suggested`: an opaque `rule` and a short
+  `covers` line). Allow for this chat then hands the rule back through the decision (`ToolDecision.rule`) and the
+  provider applies it for its session and matches later calls itself; they never reach the desk. Claude's adapter
+  (`claude-rules.ts`) keeps only the `addRules` allow updates among the SDK's `suggestions`, sends them back unchanged
+  as `updatedPermissions` but with `destination: "session"` (Bash suggestions name `localSettings`), and drops mode
+  and directory updates, so nothing is written to the user's Claude settings. Codex and later providers fill in
+  `suggested` when they come; nothing Claude-specific is in shared code.
+- Without a suggestion, Featra's own rule (`chatRule` in `work-format/chat-rules`), kept in the server's memory per
+  chat: a shell tool (Bash, PowerShell) by its whole input except `description`, `timeout` and `run_in_background`,
+  so a field that changes how it runs (`dangerouslyDisableSandbox`, or one the SDK adds later) asks again; Write and
+  Edit for paths inside the chat's working folder, outside `.git` and `.claude`, with `..` resolved; WebFetch by
+  domain; an MCP tool by name. Any other call has no rule and isn't offered Allow for this chat. A later matching
+  call is allowed without asking and shows "Allowed for this chat" (scope `chat`).
+- The `approval` event says what Allow for this chat covers in a short line built from the rule (`covers`: "npm test
+  commands", "Edits in this folder"), shown as the button's description. It is offered only for a call with
+  `forChat: true` (false when the SDK sets `suppressAlwaysAllowRule`) and a rule, and never once the turn is stopped:
+  the desk checks the turn's signal before its rules.
 - **Unanswered.** Stop aborts the turn; the SDK's signal cancels the request (`approval-cancelled`), the agent is
   told `APPROVAL_CANCELLED` with `interrupt: true` so it stops rather than try another step, and the row shows
   Stopped. The agent failing aborts the turn first, so nothing is left waiting. The same call asked again replaces

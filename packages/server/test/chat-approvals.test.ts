@@ -35,7 +35,7 @@ describe("AC1, AC2: a tool that needs permission waits inline until the user ans
     const asked = run.ask("Bash", BASH, "t1").then((d) => ((answered = true), d));
     await until(() => of(c.events, "approval").length === 1);
     expect(of(c.events, "approval")).toEqual([
-      { type: "approval", id: "t1", name: "Bash", input: BASH, forChat: true },
+      { type: "approval", id: "t1", name: "Bash", input: BASH, forChat: true, covers: "This command: npm test" },
     ]);
     expect(tool(c)).toMatchObject({ name: "Bash", input: BASH, approval: { status: "pending", forChat: true } });
     await new Promise((r) => setTimeout(r, 20));

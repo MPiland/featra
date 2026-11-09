@@ -548,10 +548,12 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
 ## 2026-11-09 — STORY-45: inline tool approvals
 
 - Allow for this chat is kept in the server's memory only, per chat, and ends with the chat's agent (Stop leaves it;
-  closing the chat or its project, or a restart, forgets it). Featra doesn't pass the SDK's `updatedPermissions`. Why:
+  closing the chat or its project, or a restart, forgets it). Featra doesn't pass the SDK's `updatedPermissions`
+  (superseded below: a provider's rule, for its session only). Why:
   the brief; nothing Featra does should write to the user's own Claude settings, and a rule outliving the chat would
   allow calls the user never saw.
-- Allow for this chat matches a shell tool (Bash, PowerShell) by its exact command, and any other tool by its name.
+- (Superseded below.) Allow for this chat matches a shell tool (Bash, PowerShell) by its exact command, and any other
+  tool by its name.
   Why: allowing `npm test` must not allow `rm -rf .`; for the file and web tools the name is the permission the user
   is thinking of, and a per-path rule would ask again on every file.
 - A call the SDK marks `suppressAlwaysAllowRule` is never covered by a rule and offers no Allow for this chat; the
@@ -608,3 +610,44 @@ Each fix has a regression test in `packages/server/test/chat-approvals-review.te
   now also expect `interrupt: true` (strengthened, not weakened).
 - The desk checks a stopped turn before the chat's rules, and offers Allow for this chat only when the request says
   `forChat: true`. Why: a rule allowed a call after Stop, and a request that didn't say defaulted to offering it.
+
+### Allow for this chat: the provider's rule first (decided by the user, 2026-11-09)
+
+The user decided the scope of Allow for this chat after the PR #10 review; it replaces "any other tool by its name".
+
+- The provider's own rule comes first. When the provider suggests a rule for a request, Allow for this chat applies
+  it for this session only, and the provider does the matching. Why: the provider knows its own tools' permission
+  shapes (prefixes like `npm test:*`, domains) better than Featra can, and its matching stays in step with it.
+- It is an optional capability of the adapter seam: `ToolRequest.suggested` (`rule`, opaque to shared code, and a
+  `covers` line), answered by `ToolDecision.rule`. Why: every provider must work; Codex (M2) fills it in later, and
+  nothing Claude-specific is in the desk, the manager or work-format.
+- Claude: the SDK's `canUseTool` `suggestions` are `PermissionUpdate`s (checked against the SDK's TypeScript reference
+  and permissions docs, and typechecked against the installed SDK's `PermissionUpdate`). Bash suggestions name the
+  `localSettings` destination, which writes `.claude/settings.local.json`. Featra keeps only `addRules` updates with
+  `behavior: "allow"`, sends them back as `updatedPermissions` with their rules unchanged but `destination: "session"`
+  ("Current session only"), and drops `setMode`, `addDirectories` and the rest. Why: never write the user's Claude
+  settings, and Allow for this chat never widens more than a rule (a mode change would allow every edit). The SDK
+  checks allow rules before `canUseTool`, so a later matching call is allowed without reaching Featra.
+- `suppressAlwaysAllowRule` still turns Allow for this chat off. The SDK documents it as "don't offer a persistent
+  always-allow choice for this request". A session rule isn't written anywhere, but for the user it is still an
+  always-allow for the rest of the chat, and the docs don't say the flag only concerns settings files. Fail closed:
+  such a call offers only Allow and Deny, and no rule (the provider's or Featra's) covers it.
+- Without a suggestion, Featra's own rule (`chatRule`, `work-format/chat-rules.ts`): a shell tool by the exact command
+  plus every field that changes how it runs; Write and Edit only for paths inside the chat's working folder, never
+  under `.git` or `.claude` at any depth, with `..` resolved first, `~` and drive-relative paths treated as outside,
+  and Windows paths compared without case; WebFetch per domain (http and https only); MCP tools per tool. Any other
+  tool has no rule, so Allow for this chat isn't offered and it is always asked about. Why: the user's list; anything
+  Featra can't place fails closed. Symlinks inside the folder aren't resolved: the server doesn't read the disk to
+  decide, and Claude's own sandbox and settings still apply.
+- Copy: the `approval` event carries `covers`, a short line built from the rule ("npm test commands", "This command:
+  npm test", "Edits in this folder", "Fetches from example.com"), shown as the Allow for this chat button's
+  description. It replaces the client's `chatRuleText`. Why: the user's copy decision; the server knows which rule
+  applies, the client doesn't.
+- This PR's own earlier checks that changed with the decision: `work-format/test/approvals.test.ts` keyed any
+  non-shell tool by name (`chatRuleKey("Write", a)` equal to `chatRuleKey("Write", b)`) and said "Bash: npm test, in
+  this chat"; those moved to `chat-rules.test.ts` with the new rules. The client check of the button's description
+  and the server checks of the `approval` event now expect `covers`.
+- Tests: `work-format/test/chat-rules.test.ts` (inside, outside, `.git`, `.claude`, `..` traversal, Windows paths,
+  domains, MCP, unknown tools), `server/test/claude-rules.test.ts`, and `server/test/chat-approvals-suggested.test.ts`
+  (Claude's suggestion passed back as a session rule; a later matching call never reaches Featra's prompt, since the
+  fake SDK applies session rules as Claude does).

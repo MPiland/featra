@@ -6,19 +6,36 @@
 import {
   APPROVAL_CANCELLED,
   CHAT_MESSAGES,
-  chatRuleKey,
+  chatRule,
   denyMessage,
   type ApprovalAnswer,
+  type ChatRule,
   type ChatEvent,
 } from "@featra/work-format";
 import { ChatError } from "./chat-error.ts";
-import type { ApprovalHandler, ToolDecision, ToolRequest } from "./provider.ts";
+import type { ApprovalHandler, SuggestedRule, ToolDecision, ToolRequest } from "./provider.ts";
 
 /** A request that ended unanswered because the turn or the chat did: the agent stops rather than try another step. */
 const CANCELLED: ToolDecision = { allow: false, message: APPROVAL_CANCELLED, interrupt: true };
 
+/** Allow for this chat on a request: the provider's rule, which it applies, or Featra's own, kept here. */
+type Offer = { suggested: SuggestedRule } | { own: ChatRule };
+
+/**
+ * What Allow for this chat would remember for a request: the provider's suggestion first, else Featra's rule. None
+ * when the request doesn't say it may be allowed for the chat (or says it may only be allowed once).
+ */
+function offerFor(request: ToolRequest): Offer | null {
+  if (request.forChat !== true) return null;
+  if (request.suggested) return { suggested: request.suggested };
+  const own = chatRule(request.name, request.input, request.cwd);
+  return own ? { own } : null;
+}
+
 interface Waiting {
   request: ToolRequest;
+  /** What Allow for this chat would remember, or null when it isn't offered. */
+  offer: Offer | null;
   /** Ends the request with `decision`, telling the chat `event` (none when the chat itself ended). */
   settle: (decision: ToolDecision, event: ChatEvent | null) => void;
 }
@@ -48,10 +65,10 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
       const { chat, id, name, input } = request;
       // A stopped turn allows nothing, not even what a rule covers.
       if (signal.aborted) return Promise.resolve(CANCELLED);
-      // Allow for this chat only where the request says it may; one that says it may only be allowed once, or
-      // doesn't say, is always asked about.
-      const forChat = request.forChat === true;
-      if (forChat && rules.get(chat)?.has(chatRuleKey(name, input))) {
+      const offer = offerFor(request);
+      // Featra's own rules; a provider's rule is matched by the provider, so its calls don't reach here.
+      const own = request.forChat === true ? chatRule(name, input, request.cwd) : null;
+      if (own && rules.get(chat)?.has(own.key)) {
         tell(chat, { type: "tool-allowed", id, name, input, scope: "chat" });
         return Promise.resolve({ allow: true, input });
       }
@@ -67,10 +84,11 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
           if (event) tell(chat, event);
           resolve(decision);
         }
-        const entry: Waiting = { request, settle };
+        const entry: Waiting = { request, offer, settle };
         requests.set(id, entry);
         signal.addEventListener("abort", cancel, { once: true });
-        tell(chat, { type: "approval", id, name, input, forChat });
+        const covers = offer ? ("own" in offer ? offer.own.covers : offer.suggested.covers) : null;
+        tell(chat, { type: "approval", id, name, input, forChat: covers !== null, ...(covers ? { covers } : {}) });
       });
     },
     answer(chat, tool, { choice, reason }) {
@@ -81,22 +99,23 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         const event: ChatEvent = { type: "tool-denied", id, name, input, ...(reason ? { reason } : {}) };
         return entry.settle({ allow: false, message: denyMessage(reason) }, event);
       }
+      const { offer } = entry;
       if (choice === "allow-chat") {
-        if (entry.request.forChat !== true) throw new ChatError(CHAT_MESSAGES.onceOnly);
-        let set = rules.get(chat);
-        if (!set) rules.set(chat, (set = new Set()));
-        set.add(chatRuleKey(name, input));
+        if (!offer) throw new ChatError(CHAT_MESSAGES.onceOnly);
+        if ("own" in offer) {
+          let set = rules.get(chat);
+          if (!set) rules.set(chat, (set = new Set()));
+          set.add(offer.own.key);
+        }
       }
-      entry.settle(
-        { allow: true, input },
-        {
-          type: "tool-allowed",
-          id,
-          name,
-          input,
-          scope: choice === "allow" ? "once" : "chat",
-        },
-      );
+      const rule = choice === "allow-chat" && offer && "suggested" in offer ? offer.suggested.rule : undefined;
+      entry.settle(rule === undefined ? { allow: true, input } : { allow: true, input, rule }, {
+        type: "tool-allowed",
+        id,
+        name,
+        input,
+        scope: choice === "allow" ? "once" : "chat",
+      });
     },
     forget(chat) {
       rules.delete(chat);

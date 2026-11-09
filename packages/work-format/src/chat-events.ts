@@ -34,9 +34,10 @@ export type ChatEvent =
   | { type: "tool-result"; id: string; output: string; isError: boolean }
   /**
    * A tool call needs the user's approval (STORY-45): the chat waits until it is answered. `forChat` is false when
-   * the agent says the call may not be allowed for the rest of the chat, so only Allow and Deny are offered.
+   * Allow for this chat isn't offered (the agent says the call may only be allowed once, or there is no rule for it),
+   * so only Allow and Deny are. `covers` says what Allow for this chat would cover, when it is offered.
    */
-  | { type: "approval"; id: string; name: string; input: unknown; forChat: boolean }
+  | { type: "approval"; id: string; name: string; input: unknown; forChat: boolean; covers?: string }
   /** The call may run: the user allowed it, or an Allow for this chat already covers it (`scope: "chat"`). */
   | { type: "tool-allowed"; id: string; name: string; input: unknown; scope: AllowScope }
   /** The user denied a tool call, with the reason the agent was sent when there was one. */
@@ -86,7 +87,14 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
       };
     case "approval":
       return nonEmpty(raw.id) && nonEmpty(raw.name)
-        ? { type: "approval", id: raw.id, name: raw.name, input: raw.input ?? null, forChat: raw.forChat === true }
+        ? {
+            type: "approval",
+            id: raw.id,
+            name: raw.name,
+            input: raw.input ?? null,
+            forChat: raw.forChat === true,
+            ...(raw.forChat === true && nonEmpty(raw.covers) ? { covers: raw.covers } : {}),
+          }
         : null;
     case "tool-allowed":
       return nonEmpty(raw.id) && nonEmpty(raw.name) && isOneOf(SCOPES, raw.scope)

@@ -18,47 +18,6 @@ export interface ApprovalAnswer {
   reason?: string;
 }
 
-/**
- * Tools whose input is a shell command. Allow for this chat matches one of these by its exact command, never by the
- * tool alone: allowing `npm test` must not allow `rm -rf .`.
- */
-export const SHELL_TOOLS: readonly string[] = ["Bash", "PowerShell"];
-
-const command = (input: unknown): string | null =>
-  isRecord(input) && typeof input.command === "string" ? input.command : null;
-
-/**
- * A shell call's fields that don't change what runs or how it is sandboxed: its label, how long it may take, and
- * whether the agent waits for it. Every other field, known or not (`dangerouslyDisableSandbox`, or one the SDK adds
- * later), is part of the permission, so a rule never covers a call that runs differently.
- */
-export const SHELL_FIELDS_IGNORED: readonly string[] = ["description", "timeout", "run_in_background"];
-
-/** A shell call's input as a key: every field but the ignored ones, in a fixed order. */
-function shellKey(input: unknown): string {
-  if (!isRecord(input)) return JSON.stringify(input) ?? "null";
-  const kept = Object.keys(input)
-    .filter((k) => !SHELL_FIELDS_IGNORED.includes(k) && input[k] !== undefined)
-    .toSorted()
-    .map((k) => [k, input[k]]);
-  return JSON.stringify(kept);
-}
-
-/**
- * What Allow for this chat remembers for a call: for a shell tool, the tool and its exact command with every field
- * that changes how it runs; for anything else, the tool's name. Two calls with the same key are the same permission.
- */
-export function chatRuleKey(name: string, input: unknown): string {
-  if (!SHELL_TOOLS.includes(name)) return name;
-  return `${name}\u0000${shellKey(input)}`;
-}
-
-/** What Allow for this chat covers, as the button's description says it. */
-export function chatRuleText(name: string, input: unknown): string {
-  const cmd = SHELL_TOOLS.includes(name) ? command(input) : null;
-  return cmd === null ? `Every ${name} call in this chat` : `${name}: ${cmd}, in this chat`;
-}
-
 /** The longest Deny reason the agent is sent. */
 export const DENY_REASON_MAX = 500;
 

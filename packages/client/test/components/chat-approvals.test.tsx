@@ -20,7 +20,15 @@ const head = () => within(log()).getByRole("button", { name: /^Bash/ });
 const dot = () => screen.getByRole("region", { name: CHAT_COPY.chats }).querySelector(".chat-dot");
 
 const call: ChatEvent = { type: "tool", id: "t1", name: "Bash", input: BASH };
-const ask = (forChat = true): ChatEvent => ({ type: "approval", id: "t1", name: "Bash", input: BASH, forChat });
+const COVERS = "npm test commands";
+const ask = (forChat = true): ChatEvent => ({
+  type: "approval",
+  id: "t1",
+  name: "Bash",
+  input: BASH,
+  forChat,
+  ...(forChat ? { covers: COVERS } : {}),
+});
 
 /** A Developer chat whose agent asks to run `npm test`. */
 async function asked(opts: Parameters<typeof renderApp>[0] = {}, forChat = true) {
@@ -43,7 +51,7 @@ describe("AC1: a tool call that needs permission shows inline", () => {
         .getAllByRole("button")
         .map((b) => b.textContent),
     ).toEqual([CHAT_COPY.allow, CHAT_COPY.allowForChat, CHAT_COPY.deny]);
-    expect(button(CHAT_COPY.allowForChat).getAttribute("title")).toBe("Bash: npm test, in this chat");
+    expect(button(CHAT_COPY.allowForChat).getAttribute("title")).toBe(COVERS);
     expect(reason().getAttribute("placeholder")).toBe(CHAT_COPY.denyReasonHint);
     expect(head().textContent).toBe(`Bashnpm test${CHAT_COPY.needsApproval}`);
   });

@@ -33,6 +33,7 @@ export function ToolRow({
           name={item.name}
           input={item.input}
           forChat={item.approval.forChat}
+          covers={item.approval.covers ?? null}
           onAnswer={(answer) => onAnswer(item.id, answer)}
         />
       )}

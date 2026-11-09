@@ -4,21 +4,37 @@
  */
 import type { ChatEvent, ProviderId, Role } from "@featra/work-format";
 
+/**
+ * A rule the provider suggests for Allow for this chat (ADR 0018): an optional adapter capability. The provider applies
+ * `rule` for the rest of its session and matches later calls itself; Featra passes it back untouched and only shows
+ * `covers`. Without one, Featra's own rule (`chatRule`) applies.
+ */
+export interface SuggestedRule {
+  rule: unknown;
+  covers: string;
+}
+
 /** A tool call the agent wants to make, as the approval handler sees it. */
 export interface ToolRequest {
   /** The chat it came from. */
   chat: string;
+  /** The chat's working folder, for rules on paths. */
+  cwd: string;
   /** The provider's id for this call: the tool row it belongs to. */
   id: string;
   name: string;
   input: Record<string, unknown>;
   /** False when the agent says the call may only be allowed once: no Allow for this chat covers or comes from it. */
   forChat?: boolean;
+  /** The provider's own rule for Allow for this chat on this call, when it has one. */
+  suggested?: SuggestedRule;
 }
 
-/** `interrupt` on a deny tells the agent to stop its turn rather than try another step (Stop, the chat ending). */
+/**
+ * `rule` on an allow is the provider's suggested rule the user chose Allow for this chat for: the provider applies it.
+ * `interrupt` on a deny tells the agent to stop its turn rather than try another step (Stop, the chat ending). */
 export type ToolDecision =
-  | { allow: true; input: Record<string, unknown> }
+  | { allow: true; input: Record<string, unknown>; rule?: unknown }
   | { allow: false; message: string; interrupt?: boolean };
 
 /**
@@ -33,7 +49,7 @@ export interface SessionOptions {
   cwd: string;
   role: Role;
   /** Asked before each tool that needs approval. */
-  approve: (request: Omit<ToolRequest, "chat">, signal: AbortSignal) => Promise<ToolDecision>;
+  approve: (request: Omit<ToolRequest, "chat" | "cwd">, signal: AbortSignal) => Promise<ToolDecision>;
   /** Hears each event of the agent's stream, in order. */
   emit: (event: ChatEvent) => void;
   /** The provider's session to go on with (a restored chat, STORY-44); a new conversation without it. */

@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { chatRuleText, type ApprovalAnswer } from "@featra/work-format/approvals";
+import type { ApprovalAnswer } from "@featra/work-format/approvals";
 import { CHAT_COPY } from "../../chats.ts";
 
 interface ApprovalPromptProps {
   name: string;
   input: unknown;
-  /** Allow for this chat is offered: the agent didn't say the call may only be allowed once. */
+  /** Allow for this chat is offered: there is a rule for the call, and the agent didn't say it may only be allowed once. */
   forChat: boolean;
+  /** What Allow for this chat covers, as its button's description. */
+  covers: string | null;
   /** Sends the answer; resolves with why it wasn't taken, or null. */
   onAnswer: (answer: ApprovalAnswer) => Promise<string | null>;
 }
@@ -17,7 +19,7 @@ export const showInput = (input: unknown) => (typeof input === "string" ? input 
  * A tool call waiting on the user (STORY-45): its input, Allow, Allow for this chat and Deny, with an optional reason
  * for Deny that the agent is sent. Native controls in reading order, so Tab reaches each; Enter in the reason denies.
  */
-export function ApprovalPrompt({ name, input, forChat, onAnswer }: ApprovalPromptProps) {
+export function ApprovalPrompt({ name, input, forChat, covers, onAnswer }: ApprovalPromptProps) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,7 +46,7 @@ export function ApprovalPrompt({ name, input, forChat, onAnswer }: ApprovalPromp
             type="button"
             className="btn"
             disabled={busy}
-            title={chatRuleText(name, input)}
+            title={covers ?? undefined}
             onClick={() => void answer({ choice: "allow-chat" })}
           >
             {CHAT_COPY.allowForChat}

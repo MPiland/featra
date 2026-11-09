@@ -106,7 +106,10 @@ describe("the desk checks a stopped turn before the chat's rules", () => {
   it("offers no Allow for this chat on a request that doesn't say it may", async () => {
     const told: ChatEvent[] = [];
     const desk = createApprovalDesk((_chat, e) => told.push(e));
-    void desk.approve({ chat: "c1", id: "t1", name: "Bash", input: BASH }, new AbortController().signal);
+    void desk.approve(
+      { chat: "c1", cwd: "/home/u/demo", id: "t1", name: "Bash", input: BASH },
+      new AbortController().signal,
+    );
     expect(told).toEqual([{ type: "approval", id: "t1", name: "Bash", input: BASH, forChat: false }]);
     expect(() => desk.answer("c1", "t1", { choice: "allow-chat" })).toThrow(CHAT_MESSAGES.onceOnly);
   });

@@ -54,6 +54,7 @@ describe("STORY-45: chat.approve", () => {
         name: "Bash",
         input: BASH,
         forChat: true,
+        covers: "This command: npm test",
       });
 
       socket.send({ id: 4, method: "chat.approve", params: { id, tool: "t1", choice: "maybe" } });

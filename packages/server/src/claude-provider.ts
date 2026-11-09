@@ -6,6 +6,7 @@
 import type { CanUseTool, Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import { errorMessage, type ChatEvent, type PermissionMode, type Role } from "@featra/work-format";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
+import { sessionRules, suggestedRule } from "./claude-rules.ts";
 import { loadSessionReader } from "./claude-sdk.ts";
 import { claudeHistory, type SessionReader } from "./claude-transcript.ts";
 import { createInputQueue, type InputQueue } from "./input-queue.ts";
@@ -101,11 +102,18 @@ function startSession(
   /** A turn is open from its message until its turn-end. */
   let open = false;
 
-  const canUseTool: CanUseTool = async (name, toolInput, { signal, toolUseID, suppressAlwaysAllowRule }) => {
-    const request = { id: toolUseID, name, input: toolInput, forChat: suppressAlwaysAllowRule !== true };
+  const canUseTool: CanUseTool = async (name, toolInput, options) => {
+    const { signal, toolUseID, suppressAlwaysAllowRule, suggestions } = options;
+    // Claude says not to offer an always-allow for this call: Allow for this chat isn't offered either.
+    const forChat = suppressAlwaysAllowRule !== true;
+    const rules = forChat ? sessionRules(suggestions) : [];
+    const suggested = suggestedRule(rules);
+    const request = { id: toolUseID, name, input: toolInput, forChat, ...(suggested ? { suggested } : {}) };
     const decision = await approve(request, AbortSignal.any([signal, turn.signal]));
+    // Allow for this chat on Claude's suggestion hands back the very rules suggested: Claude applies them.
+    const chosen = decision.allow && suggested !== null && decision.rule === suggested.rule;
     return decision.allow
-      ? { behavior: "allow", updatedInput: decision.input }
+      ? { behavior: "allow", updatedInput: decision.input, ...(chosen ? { updatedPermissions: rules } : {}) }
       : { behavior: "deny", message: decision.message, ...(decision.interrupt ? { interrupt: true } : {}) };
   };
 

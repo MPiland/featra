@@ -1,11 +1,9 @@
-/** STORY-45: tool approvals: Allow for this chat's rule, the answer's params, the events, the fold and the waiting dot. */
+/** STORY-45: tool approvals: the answer's params, the events, the fold and the waiting dot. */
 import { describe, expect, it } from "vitest";
 import {
   APPROVAL_CHOICES,
   BUILT_IN_ROLES,
   chatApproveParams,
-  chatRuleKey,
-  chatRuleText,
   DENY_REASON_MAX,
   denyMessage,
   foldChat,
@@ -27,6 +25,14 @@ const rows = (events: ChatEvent[]) => events.reduce(reduceRow, START);
 
 const call: ChatEvent = { type: "tool", id: "t1", name: "Bash", input: BASH };
 const ask = (id = "t1", forChat = true): ChatEvent => ({ type: "approval", id, name: "Bash", input: BASH, forChat });
+const COVERED: ChatEvent = {
+  type: "approval",
+  id: "t1",
+  name: "Bash",
+  input: BASH,
+  forChat: true,
+  covers: "npm test commands",
+};
 const allowed = (id = "t1", scope: "once" | "chat" = "once"): ChatEvent => ({
   type: "tool-allowed",
   id,
@@ -43,30 +49,6 @@ const denied = (reason?: string): ChatEvent => ({
 });
 const turn = (outcome: "done" | "stopped"): ChatEvent => ({ type: "turn-end", outcome });
 const toolOf = (events: ChatEvent[]) => foldChat(events).items.find((i) => i.kind === "tool");
-
-describe("Allow for this chat matches a shell tool by its exact command, any other tool by its name", () => {
-  it("keys Bash and PowerShell by command, and other tools by name alone", () => {
-    expect(chatRuleKey("Bash", BASH)).toBe(chatRuleKey("Bash", { command: "npm test", description: "x" }));
-    expect(chatRuleKey("Bash", BASH)).not.toBe(chatRuleKey("Bash", { command: "rm -rf ." }));
-    expect(chatRuleKey("PowerShell", BASH)).not.toBe(chatRuleKey("PowerShell", { command: "ls" }));
-    expect(chatRuleKey("Bash", BASH)).not.toBe(chatRuleKey("PowerShell", BASH));
-    expect(chatRuleKey("Write", { file_path: "a" })).toBe(chatRuleKey("Write", { file_path: "b" }));
-    expect(chatRuleKey("Bash", {})).not.toBe(chatRuleKey("Bash", { other: 1 }));
-  });
-
-  it("keys a shell call on every field that changes how it runs, known or not", () => {
-    const same = { ...BASH, description: "Run tests", timeout: 60_000, run_in_background: true };
-    expect(chatRuleKey("Bash", same)).toBe(chatRuleKey("Bash", BASH));
-    expect(chatRuleKey("Bash", { ...BASH, dangerouslyDisableSandbox: true })).not.toBe(chatRuleKey("Bash", BASH));
-    expect(chatRuleKey("Bash", { ...BASH, later: "x" })).not.toBe(chatRuleKey("Bash", BASH));
-    expect(chatRuleKey("Bash", { a: 1, ...BASH })).toBe(chatRuleKey("Bash", { ...BASH, a: 1 }));
-  });
-
-  it("says what it covers", () => {
-    expect(chatRuleText("Bash", BASH)).toBe("Bash: npm test, in this chat");
-    expect(chatRuleText("Write", { file_path: "a" })).toBe("Every Write call in this chat");
-  });
-});
 
 describe("AC1: Deny's optional reason is sent to the agent", () => {
   it("tells the agent the reason, trimmed and cut to its limit, or just that the user denied it", () => {
@@ -125,6 +107,9 @@ describe("the approval events cross the wire", () => {
     // Allow for this chat is offered only when the request says so.
     expect(normalizeChatEvent({ type: "approval", id: "t1", name: "Bash", input: BASH })).toEqual(ask("t1", false));
     expect(normalizeChatEvent({ type: "approval", id: "t1", input: BASH, forChat: true })).toBeNull();
+    expect(normalizeChatEvent(JSON.parse(JSON.stringify(COVERED)))).toEqual(COVERED);
+    expect(normalizeChatEvent({ ...COVERED, forChat: false })).toEqual(ask("t1", false));
+    expect(normalizeChatEvent({ ...COVERED, covers: "" })).toEqual(ask());
     expect(normalizeChatEvent({ type: "tool-allowed", id: "t1", name: "Bash", scope: "forever" })).toBeNull();
     expect(normalizeChatEvent({ type: "approval-cancelled" })).toBeNull();
   });
@@ -134,6 +119,9 @@ describe("AC1, AC2: the tool row follows the request", () => {
   it("waits with Allow for this chat offered or not, then shows how it was answered", () => {
     expect(toolOf([call, ask()])).toMatchObject({ approval: { status: "pending", forChat: true } });
     expect(toolOf([call, ask("t1", false)])).toMatchObject({ approval: { status: "pending", forChat: false } });
+    expect(toolOf([call, COVERED])).toMatchObject({
+      approval: { status: "pending", forChat: true, covers: "npm test commands" },
+    });
     expect(toolOf([call, ask(), allowed()])).toMatchObject({ approval: { status: "allowed", scope: "once" } });
     expect(toolOf([call, ask(), allowed("t1", "chat")])).toMatchObject({
       approval: { status: "allowed", scope: "chat" },

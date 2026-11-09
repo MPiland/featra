@@ -152,7 +152,7 @@ export function createChatManager({
       role,
       emit,
       resume: c.session,
-      approve: (request, signal) => decide({ ...request, chat: c.id }, signal),
+      approve: (request, signal) => decide({ ...request, chat: c.id, cwd: c.dir }, signal),
     });
   }
 
