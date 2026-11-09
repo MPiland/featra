@@ -28,8 +28,8 @@ As a builder, I bring my existing Claude and Codex sessions into Featra with the
 
 ## Acceptance criteria
 
-- [ ] Imported Claude sessions keep their linked sub-sessions nested
-- [ ] Imported Codex subagents show as nested chats
+- [ ] Imported sessions keep their linked sub-sessions nested, for every provider
+- [ ] Imported subagents (Claude's Agent tool, Codex subagents, any provider that records them) show as nested chats
 - [ ] Imported chats are marked as imported
 
 ## Tasks

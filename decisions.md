@@ -403,3 +403,9 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
   still M2, but reading Codex roles is M1. Other providers get a reader when they document an agent format.
 - FEAT-3's tests fake the Agent SDK at the package boundary, and Featra's own session code runs for real.
 - FEAT-3 gets a feature branch, and each story gets its own worktree.
+
+## 2026-11-09 Subagents nest for every provider
+
+- Subagents a chat starts (Claude's Agent tool, Codex subagents, any provider that reports them) show nested under that
+  chat, read-only. New STORY-48 in FEAT-15; STORY-32's import ACs are now provider-neutral too. Why: the user wants one
+  model for every provider, not a Claude or Codex special case. FEAT-3 keeps its scope.
