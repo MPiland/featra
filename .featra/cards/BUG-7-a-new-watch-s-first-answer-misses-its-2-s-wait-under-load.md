@@ -53,3 +53,7 @@ history:
 
 - Timed through BUG-6's timing soak at 84adbdc (2026-11-08): `card.watch` failed in 6 of 50 local runs. Each time it was the new watch's first answer. In 5 runs, one git step in that process took 1.6–6.2 s while git in the other test processes took under 1 s. In run 20 it was a 4.4 s stall in which no git returned in any process. A first scan in 2 git rounds saves about 0.2 s and would have saved at most one of those runs. So the cause is the local PC, not a product bug, and there's no regression test. BUG-6's Notes have the timings.
 - Closed through BUG-6: the Windows soak at a567a1e (https://github.com/MPiland/featra/actions/runs/42542436037) ran 50 full `pnpm test:unit` runs in a row on CI's `windows-2025` runner, the place the user chose for AC2 soaks. All 50 passed, `card.watch` included, with its assertions and 2 s waits unchanged. Moved to Done by the BUG-6 session as the Dev Lead decided. The user's Accept is still open (`requireAccept`).
+- 2026-11-09, about 02:30Z, local pre-commit hook in the BUG-6 session (recorded by session:bug-4): the same knock-on.
+  3 tests in `ws-work.test.ts` failed, the visible one being AC6's setup `git commit -q -m titles` at `ws-work.test.ts:122`,
+  which had nothing to commit because AC5 stopped before its edit. A retry with no code change passed. It needs its
+  own card only if it shows up on CI.
