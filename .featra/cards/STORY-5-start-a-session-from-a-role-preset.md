@@ -42,7 +42,18 @@ inside Featra instead of a terminal.
 
 ## Tasks
 
-- [ ] Break down when picked up
+- [ ] work-format: built-in roles (`roles.ts`), the chat event model and its reducer (`chat.ts`), tool-row summaries
+  (`tool-summary.ts`); `chat.roles`, `chat.start`, `chat.watch`, `chat.send`, `chat.stop` and the `chat.event` push in
+  `ServerMethods`
+- [ ] Server: the provider adapter seam (`provider.ts`), the Claude adapter on the Agent SDK (`claude-provider.ts`,
+  `claude-messages.ts`, `claude-locate.ts`), the role registry seam, the session manager (`chat-manager.ts`) with a
+  pluggable approval handler that denies until STORY-45, and the API cases
+- [ ] Desktop: the SDK loaded lazily and kept out of the bundle; an E2E-only fake of the SDK's `query`
+- [ ] Client: the chat bridge, New chat with a role picker in the sidebar, the chat view (transcript, tool rows,
+  notices, composer with Enter, Shift+Enter and Stop)
+- [ ] Tests: work-format unit tests, Claude adapter tests over a fake `query`, session manager and socket tests,
+  client component tests, the e2e journey `apps/desktop/e2e/chat.spec.ts`
+- [ ] Docs: an ADR for sessions and providers, ADR 0015 method table, architecture.md, CONTEXT.md, decisions.md
 
 ## Notes
 
