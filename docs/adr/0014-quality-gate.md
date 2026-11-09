@@ -55,6 +55,10 @@ meanwhile, in this ADR's Consequences.
   `tooling/test/lint-rules.test.ts` lints them through the real `.oxlintrc.json`.
 - The hook runs `pnpm check` on the working tree, not only the staged files. A commit with unstaged broken code is
   blocked too, which is the safer side.
+- The hook takes git's exec-path off PATH before it runs the gate (amended 2026-11-08, BUG-6). Git puts it first for
+  hooks. On Windows the `git.exe` there has none of git's DLLs beside it, so every git the tests start began slower:
+  a new watch's first answer took 2.2 s in the hook, against 0.5–0.9 s without it. Without this the server's timed
+  tests failed in the hook and passed outside it.
 - `pnpm install` sets `core.hooksPath` to `.githooks` (a relative path, in the repository's shared config), so every
   worktree runs its own checkout's hook.
 - The codebase gets one formatting commit. After that, no commit lands that fails the gate, whoever writes it.

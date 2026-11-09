@@ -1,28 +1,15 @@
+import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { WorkList } from "@featra/work-format";
-import { createRepoGit, type RepoGit } from "../src/repo-git.ts";
 import { createWorkWatches } from "../src/work-watch.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
+import { countedGit } from "./counted-git.ts";
+import { GIT_ASKED_MS, until } from "./until.ts";
 
 /** The shared per-folder watch (ADR 0016), on a real repository, the real git and the real file watcher. */
-const real = createRepoGit();
-/** Every call the scans make to git. */
-const gitCalls: string[] = [];
-const counted =
-  <A extends unknown[], R>(name: string, f: (...args: A) => R) =>
-  (...args: A) => {
-    gitCalls.push(name);
-    return f(...args);
-  };
-const git: RepoGit = {
-  paths: counted("paths", real.paths),
-  worktrees: counted("worktrees", real.worktrees),
-  branches: counted("branches", real.branches),
-  cardFiles: counted("cardFiles", real.cardFiles),
-  blobs: counted("blobs", real.blobs),
-  restore: counted("restore", real.restore),
-};
+// Every call the scans make to git.
+const { git, calls: gitCalls } = countedGit();
 const scanner = createScanner(git);
 const logged: string[] = [];
 const watches = createWorkWatches(scanner, (m) => logged.push(m));
@@ -115,6 +102,27 @@ describe("work watches", () => {
       repo.git(repo.main, "branch", "feature/2", tip);
       // A full git rescan, which STORY-3's 1 s for card edits doesn't cover: it takes up to about 3 s on a loaded PC.
       expect(features(await heard.next(5000)).toSorted()).toEqual(["FEAT-1", "FEAT-2"]);
+    } finally {
+      stop();
+    }
+    expect(logged).toEqual([]);
+  });
+
+  it("asks git again when a worktree goes, and when the last one goes", async () => {
+    // Without a checkout, so nothing of the worktree is watched but git's own `worktrees` folder.
+    const paths = ["a", "b"].map((name) => {
+      const path = join(repo.root, `bare-${name}`);
+      repo.git(repo.main, "worktree", "add", "-q", "--no-checkout", "-b", `claude/bare-${name}`, path);
+      return path;
+    });
+    const heard = hearing();
+    const { stop } = await watches.watch(repo.main, heard.listener);
+    try {
+      for (const path of paths) {
+        gitCalls.length = 0;
+        repo.git(repo.main, "worktree", "remove", "--force", path);
+        await until(() => gitCalls.includes("worktrees"), GIT_ASKED_MS);
+      }
     } finally {
       stop();
     }

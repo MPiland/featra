@@ -18,7 +18,7 @@ const base = card("STORY-1", "story", "FEAT-1", "Ready");
 
 beforeEach(async () => {
   scanner = createScanner(git);
-  actions = createCopyActions({ git, scanner, now: () => NOW });
+  actions = createCopyActions({ git, scan: scanner.scan, now: () => NOW });
   repo = await cardRepo();
   await repo.write(repo.main, card("FEAT-1", "feature", null, "active"));
   await repo.write(repo.main, base);

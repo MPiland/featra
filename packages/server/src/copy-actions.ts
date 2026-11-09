@@ -1,7 +1,8 @@
 /**
  * What the user can do with a stale copy (ADR 0016): apply its edit to the owner's card, or discard it. Both rescan
  * first and act only on a copy that is still stale. Apply works out the owner's new card before writing anything,
- * so a refusal leaves every file as it was; then it writes the owner and puts the stale copy back as git has it.
+ * so a refusal leaves every file as it was; then it writes the owner and puts the stale copy back as git has it, and
+ * scans again so watchers hear the change.
  */
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -19,11 +20,12 @@ import {
 } from "@featra/work-format";
 import { locationKey } from "./collect.ts";
 import type { RepoGit } from "./repo-git.ts";
-import type { Scan, Scanner } from "./work-scan.ts";
+import type { Scan } from "./work-scan.ts";
 
 export interface CopyActionDeps {
   git: RepoGit;
-  scanner: Scanner;
+  /** Scans a folder; the server passes the watches' scan, so one scan before and one after also push (BUG-6). */
+  scan: (dir: string) => Promise<Scan | null>;
   now: () => Date;
 }
 
@@ -39,13 +41,13 @@ function findStale(scan: Scan | null, key: string) {
 
 const GONE: CopyActionResult = { ok: false, error: "That copy has no changes now." };
 
-export function createCopyActions({ git, scanner, now }: CopyActionDeps) {
+export function createCopyActions({ git, scan: scanDir, now }: CopyActionDeps) {
   const restore = (scan: Scan, root: string, location: Parameters<typeof copyKey>[0], path: string) =>
     git.restore(root, path, scan.collected.headTexts.get(copyKey(location, path)) != null);
 
   return {
     async apply(dir: string, key: string): Promise<CopyActionResult> {
-      const found = findStale(await scanner.scan(dir), key);
+      const found = findStale(await scanDir(dir), key);
       if (!found) return GONE;
       const { scan, stale, copy, root } = found;
       const ownerRoot = scan.collected.roots.get(locationKey(stale.owner));
@@ -70,17 +72,19 @@ export function createCopyActions({ git, scanner, now }: CopyActionDeps) {
       } catch (err) {
         return { ok: false, error: `Can't apply the copy: ${errorMessage(err)}` };
       }
+      await scanDir(dir);
       return { ok: true };
     },
 
     async discard(dir: string, key: string): Promise<CopyActionResult> {
-      const found = findStale(await scanner.scan(dir), key);
+      const found = findStale(await scanDir(dir), key);
       if (!found) return GONE;
       try {
         await restore(found.scan, found.root, found.stale.location, found.stale.path);
       } catch (err) {
         return { ok: false, error: `Can't discard the copy: ${errorMessage(err)}` };
       }
+      await scanDir(dir);
       return { ok: true };
     },
   };

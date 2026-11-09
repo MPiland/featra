@@ -25,6 +25,7 @@ const repo = join(root, "repo");
 const worktree = join(root, "worktree");
 const bin = join(root, "bin");
 const calls = join(root, "pnpm-calls.txt");
+const gatePath = join(root, "pnpm-path.txt");
 
 /**
  * The environment without git's own variables. Run from the pre-commit hook, the gate inherits GIT_DIR, GIT_INDEX_FILE
@@ -40,6 +41,7 @@ function env(pnpmExit: number): NodeJS.ProcessEnv {
     [pathKey]: `${bin}${delimiter}${outsideGit[pathKey] ?? ""}`,
     FAKE_PNPM_EXIT: String(pnpmExit),
     FAKE_PNPM_CALLS: calls,
+    FAKE_PNPM_PATH: gatePath,
     GIT_CEILING_DIRECTORIES: root,
   };
 }
@@ -62,7 +64,10 @@ function commit(cwd: string, file: string, pnpmExit: number) {
 beforeAll(() => {
   mkdirSync(bin);
   // Git runs hooks with its own sh (Git Bash on Windows), so a sh script named `pnpm` is found first on PATH.
-  writeFileSync(join(bin, "pnpm"), '#!/bin/sh\necho "$@" >> "$FAKE_PNPM_CALLS"\nexit "$FAKE_PNPM_EXIT"\n');
+  writeFileSync(
+    join(bin, "pnpm"),
+    '#!/bin/sh\necho "$@" >> "$FAKE_PNPM_CALLS"\nprintf %s "$PATH" > "$FAKE_PNPM_PATH"\nexit "$FAKE_PNPM_EXIT"\n',
+  );
   chmodSync(join(bin, "pnpm"), 0o755);
   mkdirSync(join(repo, ".githooks"), { recursive: true });
   git(repo, "init", "--quiet", "--initial-branch=main");
@@ -105,6 +110,15 @@ describe("AC5: a git pre-commit hook runs `pnpm check` in every worktree", () =>
     expect(blocked.gateArgs).toBe("check");
     expect(blocked.committed).toBe(false);
     expect(commit(worktree, "side.txt", 0)).toEqual({ status: 0, gateArgs: "check", committed: true });
+  });
+
+  it("the gate runs without git's exec-path on PATH, so its tests start the git a shell would (BUG-6)", () => {
+    commit(repo, "path.txt", 0);
+    // The hook's own sh spells folders its way (`/mingw64/...` in Git Bash); ask it for the exec-path in that form.
+    const execPath = execFileSync("sh", ["-c", 'cd "$(git --exec-path)" && pwd'], { env: env(0), encoding: "utf8" });
+    const entries = readFileSync(gatePath, "utf8").split(":");
+    expect(entries).not.toContain(execPath.trim());
+    expect(entries).toContain(execFileSync("sh", ["-c", 'cd "$1" && pwd', "sh", bin], { encoding: "utf8" }).trim());
   });
 
   it("outside a git checkout the installer does nothing and succeeds", () => {

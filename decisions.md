@@ -337,3 +337,28 @@ amended). STORY-3's 1 s and 2 s criteria stay as written. The unit-test time lim
 30 s, because it only catches hung tests and slow but correct tests failed under load.
 
 BUG-5 lands through STORY-43's branch, since main has no CI workflows until FEAT-18 merges.
+
+## 2026-11-08 — BUG-6: the server's own writes reuse the watch's git answers
+
+BUG-6's cause was serial git starts. Under the full parallel unit run, each git start takes 150–1100 ms. Apply ran
+about nine in a row: a full scan, the restore, and then a refresh that forced git again, though writing a card and
+`git restore` change no ref, HEAD or worktree. That took 2.1–3.3 s. A new watch's first scan ran four rounds and
+took 1.2–2.6 s. Both missed the AC6 test's 2 s wait. Now apply, discard and card edits scan through the watch both
+before and after they write, and reuse its git part unless a git target fired. A fresh scan reads every rev's card
+tree and the missing blobs through one `cat-file --batch`, so it takes three rounds. Apply now runs one git command
+and answers in 0.35–0.7 s, and the first watch answer takes 0.8–1.0 s. ADR 0016 and ADR 0017 are amended. The test
+and its 2 s wait are unchanged.
+
+Reuse is only safe if every git change fires a git target, and removing a worktree did not. Git deletes
+`worktrees/<name>` as one folder, which the `HEAD`/`gitdir` name filter dropped. Windows also keeps reporting a
+deleted folder under a recursive watch by its absolute path, and each of those events reset the 50 ms settle, so the
+rescan never ran. Each worktree's folder, and the `worktrees` folder itself, now count as git targets. An event that
+names the watched folder itself closes that watch, like a watcher error. Tests for both cases failed before the fix.
+
+## 2026-11-08 — Unit soaks run on CI's Windows runner
+
+BUG-6's AC2 asked for 50 full `pnpm test:unit` runs in a row on Windows. On the user's PC, AC6's only failure in the
+timed soak came during a stall of the whole machine: for 4.4 s no git returned in any of the 8 test processes. Cutting
+a git round would not have saved it, and the 2 s wait is what STORY-3 promises. So the user moved AC2's 50 runs to CI's
+Windows runner, the same as the e2e soaks, with the 2 s wait and every assertion unchanged. `soak.yml` now repeats
+the whole unit suite too (`soak/windows/unit/50`), stops at the first failing run and keeps every run's output.

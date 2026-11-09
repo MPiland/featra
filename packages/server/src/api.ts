@@ -99,15 +99,11 @@ export function createApi({ git, allowed, watches, copies, cards }: ApiDeps): Ap
       }
       case "work.applyCopy": {
         const p = copy(params);
-        const result = await copies.apply(p.dir, p.key);
-        await watches.refresh(p.dir);
-        return result;
+        return copies.apply(p.dir, p.key);
       }
       case "work.discardCopy": {
         const p = copy(params);
-        const result = await copies.discard(p.dir, p.key);
-        await watches.refresh(p.dir);
-        return result;
+        return copies.discard(p.dir, p.key);
       }
       case "card.watch": {
         const p = cardParams(params);

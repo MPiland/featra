@@ -1,4 +1,4 @@
-import { execFile, spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { isRecord } from "@featra/work-format";
 
 /** What one git command printed and how it ended. */
@@ -24,7 +24,7 @@ const REPO_OVERRIDES = [
   "GIT_PREFIX",
 ];
 
-function gitEnv(): NodeJS.ProcessEnv {
+export function gitEnv(): NodeJS.ProcessEnv {
   const env = { ...process.env };
   for (const key of REPO_OVERRIDES) delete env[key];
   return env;
@@ -32,6 +32,9 @@ function gitEnv(): NodeJS.ProcessEnv {
 
 export const failed = (what: string, r: Run) =>
   new Error(`${what} failed: ${r.stderr.trim() || `exit code ${r.code}`}`);
+
+/** Why git couldn't start: not installed, or another error. */
+export const spawnError = (e: Error) => (isRecord(e) && e.code === "ENOENT" ? new Error(GIT_MISSING) : e);
 
 const MAX_OUTPUT = 64 * 1024 * 1024;
 
@@ -48,23 +51,5 @@ export function runGit(command: string, dir: string, args: string[]): Promise<Ru
         resolve({ code: typeof err?.code === "number" ? err.code : 0, stdout, stderr });
       },
     );
-  });
-}
-
-/** Runs `git <args>` in `dir` with `input` on stdin, and resolves with stdout as bytes (for `cat-file --batch`). */
-export function runGitBytes(command: string, dir: string, args: string[], input: string): Promise<Buffer> {
-  return new Promise<Buffer>((resolve, reject) => {
-    const child = spawn(command, args, { cwd: dir, env: gitEnv(), windowsHide: true });
-    const out: Buffer[] = [];
-    const err: Buffer[] = [];
-    child.stdout.on("data", (b: Buffer) => out.push(b));
-    child.stderr.on("data", (b: Buffer) => err.push(b));
-    child.on("error", (e) => reject(isRecord(e) && e.code === "ENOENT" ? new Error(GIT_MISSING) : e));
-    child.on("close", (code) => {
-      if (code === 0) return resolve(Buffer.concat(out));
-      const r = { code: code ?? -1, stdout: "", stderr: Buffer.concat(err).toString("utf8") };
-      reject(failed(`git ${args[0] ?? ""}`, r));
-    });
-    child.stdin.end(input);
   });
 }
