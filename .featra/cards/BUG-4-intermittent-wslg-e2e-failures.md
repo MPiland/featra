@@ -2,7 +2,7 @@
 id: BUG-4
 type: bug
 title: Intermittent WSLg e2e failures
-status: In Review
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-4
+  - at: 2026-11-09T03:31:05.573Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-09T03:31:05.573Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
