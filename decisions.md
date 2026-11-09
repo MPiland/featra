@@ -354,3 +354,10 @@ Reuse is only safe if every git change fires a git target, and removing a worktr
 deleted folder under a recursive watch by its absolute path, and each of those events reset the 50 ms settle, so the
 rescan never ran. Each worktree's folder, and the `worktrees` folder itself, now count as git targets. An event that
 names the watched folder itself closes that watch, like a watcher error. Tests for both cases failed before the fix.
+
+## 2026-11-08 — Unit soaks run on CI's Windows runner
+
+BUG-6's AC2 asked for 50 full `pnpm test:unit` runs in a row on Windows. On the user's PC, AC6's only failure in the
+timed soak came during a stall of the whole machine: for 4.4 s no git returned in any of the 8 test processes. Cutting
+a git round would not have saved it, and the 2 s wait is what STORY-3 promises. So the user moved AC2's 50 runs to CI's
+Windows runner, the same as the e2e soaks, with the 2 s wait and every assertion unchanged.
