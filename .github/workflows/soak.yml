@@ -1,14 +1,20 @@
-# Soak run: one spec (or the whole suite) repeated on one platform, stopping at the first failure and keeping its
-# trace. Start it from the Actions tab, with `gh workflow run soak.yml -f spec=tray.spec.ts -f platform=windows -f runs=150`
-# (needs this file on main), or by pushing a branch named soak/<platform>/<specs>/<runs>, e.g. soak/windows/tray/150.
+# Soak run: one e2e spec (or the whole e2e suite), or the whole unit suite, repeated on one platform, stopping at the
+# first failure and keeping its output. Start it from the Actions tab, with
+# `gh workflow run soak.yml -f spec=tray.spec.ts -f platform=windows -f runs=150` (needs this file on main), or by
+# pushing a branch named soak/<platform>/<specs>/<runs>, e.g. soak/windows/tray/150 or soak/windows/unit/50.
 # tooling/ci/soak-plan.ts reads either form.
 name: Soak
 
 on:
   workflow_dispatch:
     inputs:
+      suite:
+        description: The Electron e2e suite, or the whole unit suite (`pnpm test:unit`).
+        type: choice
+        options: [e2e, unit]
+        default: e2e
       spec:
-        description: Spec file(s) under apps/desktop/e2e, space-separated; empty runs the whole suite.
+        description: Spec file(s) under apps/desktop/e2e, space-separated; empty runs the whole suite. Unit takes none.
         type: string
         default: ""
       platform:
@@ -23,7 +29,7 @@ on:
   push:
     branches: ["soak/**"]
 
-run-name: Soak ${{ github.event_name == 'push' && github.ref_name || format('{0} on {1} x{2}', inputs.spec || 'full suite', inputs.platform, inputs.runs) }}
+run-name: Soak ${{ github.event_name == 'push' && github.ref_name || format('{0} {1} on {2} x{3}', inputs.suite, inputs.spec || 'full suite', inputs.platform, inputs.runs) }}
 
 permissions:
   contents: read
@@ -34,6 +40,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
+      suite: ${{ steps.plan.outputs.suite }}
       platform: ${{ steps.plan.outputs.platform }}
       specs: ${{ steps.plan.outputs.specs }}
       runs: ${{ steps.plan.outputs.runs }}
@@ -44,13 +51,14 @@ jobs:
           node-version: 24
       - id: plan
         env:
+          SUITE: ${{ inputs.suite }}
           SPEC: ${{ inputs.spec }}
           PLATFORM: ${{ inputs.platform }}
           RUNS: ${{ inputs.runs }}
         run: node tooling/ci/soak-plan.ts
 
   soak:
-    name: Soak (${{ needs.plan.outputs.platform }})
+    name: Soak ${{ needs.plan.outputs.suite }} (${{ needs.plan.outputs.platform }})
     needs: plan
     runs-on: ${{ needs.plan.outputs.platform == 'windows' && 'windows-2025' || 'ubuntu-24.04' }}
     timeout-minutes: 360
@@ -58,8 +66,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
         with:
-          e2e: "true"
+          e2e: ${{ needs.plan.outputs.suite == 'e2e' }}
       - name: Soak
+        if: needs.plan.outputs.suite == 'e2e'
         shell: bash
         env:
           SPECS: ${{ needs.plan.outputs.specs }}
@@ -70,8 +79,38 @@ jobs:
           cmd=(pnpm --filter @featra/desktop test:e2e "${specs[@]}" --repeat-each "$RUNS" --max-failures 1)
           if [ "$PLATFORM" = ubuntu ]; then cmd=(tooling/e2e/xvfb.sh "${cmd[@]}"); fi
           "${cmd[@]}"
+      # Each run's whole output is kept; the loop stops at the first failing run (BUG-6).
+      - name: Soak the unit suite
+        if: needs.plan.outputs.suite == 'unit'
+        shell: bash
+        env:
+          RUNS: ${{ needs.plan.outputs.runs }}
+        run: |
+          mkdir -p soak-output
+          for i in $(seq 1 "$RUNS"); do
+            echo "::group::Run $i of $RUNS"
+            set +e
+            pnpm test:unit 2>&1 | tee "soak-output/run-$i.log"
+            status=${PIPESTATUS[0]}
+            set -e
+            echo "::endgroup::"
+            if [ "$status" -ne 0 ]; then
+              echo "::error::Run $i of $RUNS failed; its output is in the soak-output artifact."
+              exit "$status"
+            fi
+            echo "Run $i of $RUNS passed."
+          done
+          echo "All $RUNS runs passed."
+      - name: Upload the unit runs' output
+        if: always() && needs.plan.outputs.suite == 'unit'
+        uses: actions/upload-artifact@v4
+        with:
+          name: soak-unit-${{ needs.plan.outputs.platform }}-output
+          path: soak-output
+          retention-days: 30
+          if-no-files-found: ignore
       - name: Upload the failing run's trace
-        if: failure()
+        if: failure() && needs.plan.outputs.suite == 'e2e'
         uses: actions/upload-artifact@v4
         with:
           name: soak-${{ needs.plan.outputs.platform }}-traces

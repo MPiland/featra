@@ -40,19 +40,24 @@ Passing tests keep no output.
 
 ## Soak runs
 
-`.github/workflows/soak.yml` repeats a spec to catch intermittent failures. It stops at the first failure and keeps
-that run's trace as the `soak-<platform>-traces` artifact. There are two ways to start one.
+`.github/workflows/soak.yml` repeats an e2e spec, or the whole unit suite, to catch intermittent failures. It stops at
+the first failure. An e2e soak keeps that run's trace as the `soak-<platform>-traces` artifact. A unit soak runs
+`pnpm test:unit` again and again and keeps every run's output, one log per run, as `soak-unit-<platform>-output`. Unit
+soaks for timed criteria run here, on the Windows runner, rather than on a busy PC (BUG-6). There are two ways to start
+one.
 
 **Push a soak branch.** Works from any commit, before the workflow reaches main. Name the branch
 `soak/<platform>/<specs>/<runs>`:
 
 ```bash
 git push origin HEAD:refs/heads/soak/windows/tray/150
+git push origin HEAD:refs/heads/soak/windows/unit/50
 ```
 
 - `<platform>`: `windows` or `ubuntu`.
-- `<specs>`: spec names without `.spec.ts`, joined by `+` (`tray+menu`), or `all` for the whole suite.
-- `<runs>`: how many times each test runs (Playwright's `--repeat-each`).
+- `<specs>`: spec names without `.spec.ts`, joined by `+` (`tray+menu`), `all` for the whole e2e suite, or `unit` for
+  the whole unit suite.
+- `<runs>`: how many times each test runs (Playwright's `--repeat-each`), or how many full unit runs in a row.
 
 Delete the branch when the run is done. Push again (or re-run the workflow) to repeat it.
 
@@ -63,7 +68,9 @@ default branch.
 gh workflow run soak.yml -R MPiland/featra --ref <branch> -f spec=tray.spec.ts -f platform=windows -f runs=150
 ```
 
-- `spec`: one or more spec files under `apps/desktop/e2e`, separated by spaces. Leave it empty for the whole suite.
+- `suite`: `e2e` (the default) or `unit`, as `-f suite=unit`.
+- `spec`: one or more spec files under `apps/desktop/e2e`, separated by spaces. Leave it empty for the whole suite, and
+  always for `unit`.
 - `platform` and `runs`: as above.
 
 `tooling/ci/soak-plan.ts` reads both forms and rejects anything else. A run is capped at six hours (GitHub's limit for
