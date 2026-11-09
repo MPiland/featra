@@ -521,5 +521,21 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
 - Tests fake only `query`, the clock and Claude's folder: `CLAUDE_CONFIG_DIR` points the real reader at a temp folder,
   and test helpers (`claude-sessions.ts`) and the E2E fake SDK write session files there as Claude does. The fake SDK
   only writes when `CLAUDE_CONFIG_DIR` is set and logs `resume` only when it is set, so other journeys are unchanged.
-- `chat-manager.ts` is 312 lines after moving the store and the history read into `chat-store.ts`; splitting further
-  would cut the chat lifecycle in two.
+- `chat-manager.ts` stays under 300 lines: saving and the history read live in `chat-store.ts`, and the list's
+  watchers in `chat-list-watch.ts`.
+
+### Review fixes (PR #9)
+
+- `chats.json` is read strictly (`JsonStore.read`): a missing file is no chats, one that isn't JSON is renamed to
+  `chats.json.bad` and the app starts afresh, and any other read error (EBUSY from antivirus, EACCES) is logged and the
+  file is not saved over that run; the run's chats stay in memory. Why: a bug. One locked read at start-up read as "no
+  chats", and the next save wiped every saved chat. The desktop's own stores keep the lenient `load`: they are
+  settings, and they load at start-up where a rejection would stop the app. Regression tests in `chat-restore.test.ts`.
+- Chats compare project folders through `projectKey`, exported from `allowed-projects.ts`, so `D:\Dev\Foo` and
+  `d:\dev\foo` are one project on Windows and macOS. Why: a bug; a project reopened under another case showed no chats.
+- A session id is saved once the agent answers, not on `started`. Why: a bug. A chat stopped, or an app that crashed,
+  before Claude wrote the session came back as "history is gone"; it now comes back as a fresh chat.
+- `chat.list` waits for the saved chats to be read before it answers (`ChatManager.ready`). Why: a bug. On a slow
+  disk the first list after a restart came back empty. Regression test in `ws-chat-restore.test.ts`.
+- Known limits, not changed here: restored chats load before their project is opened (the API still gates them with
+  `allow`), and the session file is read whole, with no size cap.

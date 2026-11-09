@@ -60,7 +60,11 @@ shows as stopped, not Denied. A project the user closes ends its chats, and thei
 provider, start, waiting) to `chats.json` in the app's data folder (Electron's userData, passed to the server as
 `FEATRA_DATA_DIR`), never in the repo; `work-format/chat-saved` reads it defensively. It saves on each row or session
 change, through the atomic `json-store`, and the first save waits for the file to be read, so it never drops a chat
-not yet loaded. Restored chats are listed at once but loaded lazily: `open(id)` reads the transcript through the
+not yet loaded (`chat-store.ts`). A missing file is no chats; one that isn't JSON is kept as `chats.json.bad`; any
+other read failure (locked, no access) is logged and nothing is saved over the file that run. A new session id is saved
+once the agent answers (text or a tool), since Claude may not have written the session before then; a chat stopped or
+crashed earlier comes back as a fresh chat. Project folders compare by `projectKey` (`allowed-projects.ts`), without
+case on Windows and macOS. Restored chats are listed at once but loaded lazily: `open(id)` reads the transcript through the
 adapter and makes the agent session with `resume`; the agent itself starts with the next message. A chat whose
 session the provider no longer has gets a `gone` problem ("This chat's history is gone."), refuses messages, and the
 client offers a new chat with the same role. A closed project's chats are kept and saved, out of the list, and come

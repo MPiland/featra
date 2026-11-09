@@ -3,7 +3,14 @@ import { join } from "node:path";
 
 export interface JsonStore<T> {
   readonly file: string;
+  /** The stored state; anything unreadable reads as `normalize(undefined)`. */
   load: () => Promise<T>;
+  /**
+   * The stored state, for a file whose loss would cost the user's work: a missing file is empty, one that isn't JSON
+   * is kept as `<name>.bad` and read as empty, and any other failure (locked, no access) rejects, so nothing is
+   * saved over a file that may still be good.
+   */
+  read: () => Promise<T>;
   save: (state: T) => Promise<void>;
   /** Deletes the file (Reset App Data), after any save already queued. */
   remove: () => Promise<void>;
@@ -42,6 +49,21 @@ export function createJsonStore<T>(dir: string, name: string, normalize: (raw: u
       try {
         return normalize(JSON.parse(await readFile(file, "utf8")));
       } catch {
+        return normalize(undefined);
+      }
+    },
+    async read() {
+      let text: string;
+      try {
+        text = await readFile(file, "utf8");
+      } catch (err) {
+        if (err instanceof Error && "code" in err && err.code === "ENOENT") return normalize(undefined);
+        throw err;
+      }
+      try {
+        return normalize(JSON.parse(text));
+      } catch {
+        await rename(file, `${file}.bad`);
         return normalize(undefined);
       }
     },

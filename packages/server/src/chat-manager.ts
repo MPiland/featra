@@ -6,7 +6,6 @@
 import { randomUUID } from "node:crypto";
 import {
   CHAT_MESSAGES,
-  errorMessage,
   newSummary,
   reduceSummary,
   savedChat,
@@ -16,7 +15,9 @@ import {
   type ProviderInfo,
   type Role,
 } from "@featra/work-format";
-import { memoryChatStore, savedHistory, type ChatStore } from "./chat-store.ts";
+import { projectKey } from "./allowed-projects.ts";
+import { createListWatchers, tellAll } from "./chat-list-watch.ts";
+import { chatSaver, memoryChatStore, savedHistory, type ChatStore } from "./chat-store.ts";
 import type { ApprovalHandler, ProviderAdapter, ProviderSession } from "./provider.ts";
 import type { RoleRegistry } from "./role-registry.ts";
 
@@ -33,6 +34,8 @@ interface Chat {
   summary: ChatSummary;
   /** The provider's session it goes on with: the one the agent reported, or the one it was saved with. */
   session: string | null;
+  /** A new session the agent reported, saved once the agent answers: before then Claude may not have written it. */
+  pending: string | null;
   /** The log; null until a restored chat is opened, when its transcript is read. */
   events: ChatEvent[] | null;
   opening: Promise<void> | null;
@@ -75,6 +78,8 @@ export interface ChatManager {
   close: () => void;
   /** Resolves once every change so far is saved. */
   flush: () => Promise<void>;
+  /** Resolves once the saved chats are read, so a list holds them. */
+  ready: () => Promise<void>;
 }
 
 export interface ChatManagerDeps {
@@ -87,6 +92,8 @@ export interface ChatManagerDeps {
   log?: (message: string) => void;
   /** Where chats are saved; nowhere by default. */
   store?: ChatStore;
+  /** Whose rule project folders compare by (`projectKey`); this machine's by default. */
+  platform?: string;
 }
 
 /** A chat not yet opened: a saved one, or a new one before its log and agent are made. */
@@ -95,6 +102,7 @@ const restored = (id: string, dir: string, summary: ChatSummary, session: string
   dir,
   summary: { ...summary, running: false },
   session,
+  pending: null,
   events: null,
   opening: null,
   listeners: new Set(),
@@ -114,9 +122,9 @@ export function createChatManager({
   now = () => new Date(),
   log = () => {},
   store = memoryChatStore(),
+  platform = process.platform,
 }: ChatManagerDeps): ChatManager {
   const chats = new Map<string, Chat>();
-  const listWatchers = new Set<{ dir: string; listener: (chats: ChatSummary[]) => void }>();
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
 
   const chat = (id: string): Chat => {
@@ -125,59 +133,42 @@ export function createChatManager({
     return found;
   };
 
-  const shown = (dir: string) => [...chats.values()].filter((c) => c.dir === dir && !c.closed);
+  const same = (a: string, b: string) => projectKey(a, platform) === projectKey(b, platform);
+  const shown = (dir: string) => [...chats.values()].filter((c) => same(c.dir, dir) && !c.closed);
   const list = (dir: string) =>
     shown(dir)
       .map((c) => c.summary)
       .toSorted(oldestFirst);
 
-  /** Calls each listener; one watcher's failure (a closed socket, say) must not stop the others or the agent. */
-  function tell<T>(listeners: Iterable<(value: T) => void>, value: T) {
-    for (const listener of listeners) {
-      try {
-        listener(value);
-      } catch (err) {
-        log(`A chat watcher failed: ${errorMessage(err)}`);
-      }
-    }
-  }
+  const tell = <T>(listeners: Iterable<(value: T) => void>, value: T) => tellAll(listeners, value, log);
+  const lists = createListWatchers(list, same, log);
+  const listChanged = (dir: string) => lists.changed(dir);
 
-  function listChanged(dir: string) {
-    const watching = [...listWatchers].filter((w) => w.dir === dir);
-    if (watching.length > 0)
-      tell(
-        watching.map((w) => w.listener),
-        list(dir),
-      );
-  }
-
-  // Saved chats join the map once read. Nothing is saved before then, so a save never drops a chat not yet read.
-  const loaded = store.load().then(
-    (file) => {
+  const saver = chatSaver(
+    store,
+    log,
+    (saved) => {
       const dirs = new Set<string>();
-      for (const s of file.chats.filter((c) => !chats.has(c.summary.id))) {
+      for (const s of saved.filter((c) => !chats.has(c.summary.id))) {
         chats.set(s.summary.id, restored(s.summary.id, s.dir, s.summary, s.session));
         dirs.add(s.dir);
       }
       for (const dir of dirs) listChanged(dir);
     },
-    (err: unknown) => log(`Couldn't read the saved chats: ${errorMessage(err)}`),
+    () => [...chats.values()].map((c) => savedChat(c.dir, c.session, c.summary)),
   );
-  let saving: Promise<void> = loaded;
-  function save() {
-    saving = saving
-      .then(() =>
-        store.save({ version: 1, chats: [...chats.values()].map((c) => savedChat(c.dir, c.session, c.summary)) }),
-      )
-      .catch((err: unknown) => log(`Couldn't save the chats: ${errorMessage(err)}`));
-  }
+  const save = () => saver.save();
 
   function record(c: Chat, event: ChatEvent) {
     if (event.type === "user") c.running = true;
     if (event.type === "turn-end") c.running = false;
     c.events?.push(event);
     tell(c.listeners, event);
-    const session = event.type === "started" ? (c.agent?.sessionId() ?? c.session) : c.session;
+    if (event.type === "started") c.pending = c.agent?.sessionId() ?? null;
+    // The agent's answer means Claude has written the turn, so the session can be resumed after a restart.
+    const answered = event.type === "text" || event.type === "tool" || event.type === "tool-result";
+    const session = answered && c.pending ? c.pending : c.session;
+    if (answered) c.pending = null;
     const summary = reduceSummary(c.summary, event);
     if (summary === c.summary && session === c.session) return;
     const rowChanged = summary !== c.summary;
@@ -253,7 +244,7 @@ export function createChatManager({
       return id;
     },
     async open(id) {
-      await loaded;
+      await saver.loaded;
       const c = chat(id);
       if (c.events !== null) return;
       c.opening ??= load(c);
@@ -281,11 +272,7 @@ export function createChatManager({
       return c && !c.closed ? c.dir : null;
     },
     list,
-    watchList(dir, listener) {
-      const watcher = { dir, listener };
-      listWatchers.add(watcher);
-      return { chats: list(dir), stop: () => listWatchers.delete(watcher) };
-    },
+    watchList: (dir, listener) => lists.watch(dir, listener),
     providers: () =>
       Promise.all(
         providers.map(async (p) => ({ id: p.id, name: p.name, installed: await p.installed().catch(() => false) })),
@@ -305,8 +292,9 @@ export function createChatManager({
     },
     close() {
       for (const c of chats.values()) end(c);
-      listWatchers.clear();
+      lists.clear();
     },
-    flush: () => saving,
+    flush: () => saver.flush(),
+    ready: () => saver.loaded,
   };
 }

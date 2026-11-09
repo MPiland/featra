@@ -172,6 +172,7 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles }
         return null;
       case "chat.list": {
         const dir = project(params);
+        await chats.ready();
         const providers = await chats.providers();
         // Each push looks for the providers again, so one installed or removed while the app runs shows. Only the
         // newest push is sent: a slower lookup for an older one must not overwrite it.

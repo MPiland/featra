@@ -11,10 +11,12 @@ export interface AllowedProjects {
   onChange: (listener: () => void) => () => void;
 }
 
-/** Folder names compare without case on Windows and macOS, as the project list does. */
+/** A project folder as it compares: resolved, and without case on Windows and macOS, as the project list does. */
+export const projectKey = (dir: string, platform: string = process.platform) =>
+  platform === "win32" || platform === "darwin" ? resolve(dir).toLowerCase() : resolve(dir);
+
 export function createAllowedProjects(platform: string = process.platform): AllowedProjects {
-  const caseless = platform === "win32" || platform === "darwin";
-  const key = (dir: string) => (caseless ? resolve(dir).toLowerCase() : resolve(dir));
+  const key = (dir: string) => projectKey(dir, platform);
   let dirs = new Set<string>();
   const listeners = new Set<() => void>();
   return {

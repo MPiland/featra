@@ -2,14 +2,13 @@
  * STORY-44: chats come back after a restart, through the real session manager, Claude adapter, JSON store and the
  * SDK's real session reader. Faked: the SDK's `query`, the folder Claude's session files live in, and the clock.
  */
-import { readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { CHAT_MESSAGES, normalizeSavedChats, type ChatEvent, type SavedChats } from "@featra/work-format";
+import { CHAT_MESSAGES, type ChatEvent, type SavedChats } from "@featra/work-format";
 import { createChatManager, type ChatManager } from "../src/chat-manager.ts";
 import { createClaudeProvider } from "../src/claude-provider.ts";
-import { createJsonStore } from "../src/json-store.ts";
 import { createRoleRegistry } from "../src/role-registry.ts";
-import { CHATS_FILE } from "../src/services.ts";
+import { fileChatStore } from "../src/chat-store.ts";
 import { claudeHome, projectFolder, sessionLines } from "./claude-sessions.ts";
 import { fakeClaude, sdk } from "./fake-query.ts";
 import { filesIn, tempFolder } from "./temp-folder.ts";
@@ -40,7 +39,7 @@ afterEach(async () => {
   await data.dispose();
 });
 
-const store = () => createJsonStore(data.dir, CHATS_FILE, normalizeSavedChats);
+const store = () => fileChatStore(data.dir);
 const saved = async (): Promise<SavedChats> => JSON.parse(await readFile(store().file, "utf8")) as SavedChats;
 
 /** The app, started (or started again) on the same data folder. */
@@ -216,13 +215,85 @@ describe("saved chats: the edges", () => {
     expect(log[0]).toEqual({ type: "user", text: "hello" });
   });
 
-  it("a chats file that isn't JSON is read as no chats, and is written over by the next save", async () => {
+  it("keeps a chats file that isn't JSON as chats.json.bad, and starts afresh", async () => {
     await writeFile(store().file, "{ torn", "utf8");
     const again = app();
     await again.manager.flush();
     expect(again.manager.list(project.dir)).toEqual([]);
     const id = await again.manager.start(project.dir, "qa");
     await again.manager.flush();
+    expect(await readFile(`${store().file}.bad`, "utf8")).toBe("{ torn");
     expect((await saved()).chats.map((c) => c.summary.id)).toEqual([id]);
+  });
+
+  it("refuses to read a chats file it can't open, rather than reading it as no chats", async () => {
+    await mkdir(store().file);
+    await expect(store().load()).rejects.toMatchObject({ code: "EISDIR" });
+  });
+
+  it("never saves over a chats file it couldn't read: this run's chats stay in memory", async () => {
+    const saves: SavedChats[] = [];
+    const logged: string[] = [];
+    const busy = Object.assign(new Error("EBUSY: resource busy or locked"), { code: "EBUSY" });
+    const manager = createChatManager({
+      providers: [createClaudeProvider(fakeClaude().deps)],
+      roles: createRoleRegistry(),
+      store: { load: () => Promise.reject(busy), save: async (chats) => void saves.push(chats) },
+      log: (m) => logged.push(m),
+    });
+    managers.push(manager);
+    const id = await manager.start(project.dir, "qa");
+    await manager.flush();
+    expect(manager.list(project.dir).map((c) => c.id)).toEqual([id]);
+    expect(saves).toEqual([]);
+    expect(logged).toEqual([expect.stringContaining("EBUSY")]);
+  });
+
+  it("a chat stopped before Claude wrote its session comes back as a fresh chat, not a gone one", async () => {
+    const first = app();
+    const id = await first.manager.start(project.dir, "qa");
+    first.manager.send(id, "hello");
+    await until(() => first.runs.length > 0);
+    first.runs[0]!.say(sdk.init("claude-sonnet-5-5", sessionLines(project.dir).session), sdk.failure());
+    await until(() => first.manager.list(project.dir)[0]?.running === false);
+    await first.manager.flush();
+    first.manager.close();
+
+    const again = app();
+    const { log } = await opened(again.manager, id);
+    expect(log).toEqual([]);
+    again.manager.send(id, "hello again");
+    await until(() => again.runs.length > 0);
+    expect(again.runs[0]!.options.resume).toBeUndefined();
+  });
+});
+
+/** A chat started in the project, its folder named in capitals. */
+const startUpper = async (platform: string) => {
+  const manager = createChatManager({
+    providers: [createClaudeProvider(fakeClaude().deps)],
+    roles: createRoleRegistry(),
+    platform,
+  });
+  managers.push(manager);
+  const id = await manager.start(project.dir.toUpperCase(), "qa");
+  return { manager, id };
+};
+
+describe("a project folder named in another case", () => {
+  it("is the same project on Windows and macOS, as the project list has it", async () => {
+    for (const platform of ["win32", "darwin"]) {
+      const { manager, id } = await startUpper(platform);
+      const pushed: string[][] = [];
+      manager.watchList(project.dir.toLowerCase(), (chats) => pushed.push(chats.map((c) => c.id)));
+      expect(manager.list(project.dir.toLowerCase()).map((c) => c.id)).toEqual([id]);
+      manager.send(id, "hello");
+      expect(pushed.at(-1)).toEqual([id]);
+    }
+  });
+
+  it("is another project on Linux", async () => {
+    const { manager } = await startUpper("linux");
+    expect(manager.list(project.dir.toLowerCase())).toEqual([]);
   });
 });

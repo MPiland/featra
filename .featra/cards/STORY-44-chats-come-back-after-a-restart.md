@@ -59,3 +59,5 @@ As a builder, I quit Featra and find my chats where I left them, so a restart ne
 - Decision 2026-11-08: chats survive a restart and resume through the SDK.
 - From STORY-5: the Claude adapter keeps the session id (`ProviderSession.sessionId()`), but the chat manager doesn't
   store or expose it yet. This story adds that.
+- Known limits (Dev Lead review, PR #9): restored chats load before their project is opened (the API still gates
+  them with `allow`); the session file is read whole, with no size cap.

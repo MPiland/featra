@@ -5,6 +5,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ChatEvent, ChatList } from "@featra/work-format";
 import { createAllowedProjects } from "../src/allowed-projects.ts";
+import { fileChatStore } from "../src/chat-store.ts";
 import { createServices } from "../src/services.ts";
 import { startServer } from "../src/ws-server.ts";
 import { claudeHome, projectFolder, sessionLines } from "./claude-sessions.ts";
@@ -30,13 +31,27 @@ afterAll(async () => {
   await home.dispose();
 });
 
+/** `chats.json` in the app's data, read `ms` late, as from a slow disk. */
+function slowly(ms: number) {
+  const file = fileChatStore(data.dir);
+  return {
+    ...file,
+    load: () => new Promise<Awaited<ReturnType<typeof file.load>>>((r) => setTimeout(() => r(file.load()), ms)),
+  };
+}
+
 /** The server as the desktop starts it, on the app's data folder. */
-async function serve() {
+async function serve(slowRead = 0) {
   const allowed = createAllowedProjects();
   allowed.set([project.dir]);
   const claude = fakeClaude();
   const logged: string[] = [];
-  const services = createServices({ allowed, log: (m) => logged.push(m), claude: claude.deps, dataDir: data.dir });
+  const services = createServices({
+    allowed,
+    log: (m) => logged.push(m),
+    claude: claude.deps,
+    chatStore: slowly(slowRead),
+  });
   const server = await startServer({ token: TOKEN, api: services.api, log: (m) => logged.push(m) });
   const socket = await openFrames<ChatList | ChatEvent>(`${server.url}?token=${TOKEN}`);
   return {
@@ -62,10 +77,13 @@ describe("STORY-44: chats come back after a restart", () => {
     const { id } = (await first.call(1, "chat.start", { dir: project.dir, role: "developer" })).result as {
       id: string;
     };
-    await first.call(2, "chat.send", { id, text: "hello" });
+    await first.call(2, "chat.watch", { id });
+    await first.call(3, "chat.send", { id, text: "hello" });
     await until(() => first.claude.runs[0]?.heard.length === 1);
     first.claude.runs[0]!.say(sdk.init("claude-sonnet-5-5", session), sdk.assistant("m1", [sdk.text("Hi.")]));
     first.claude.runs[0]!.say(sdk.success());
+    // The turn is recorded, and its session saved, before the app quits.
+    await first.socket.next((f) => (f.data as ChatEvent | undefined)?.type === "turn-end");
     await sessionLines(project.dir, session)
       .prompt("hello")
       .reply("m1", [sdk.text("Hi.")])
@@ -94,5 +112,15 @@ describe("STORY-44: chats come back after a restart", () => {
       await again.stop();
     }
     expect(again.logged).toEqual([]);
+  });
+
+  it("answers chat.list with the saved chats, even when the file is read slowly", async () => {
+    const again = await serve(300);
+    try {
+      const list = (await again.call(1, "chat.list", { dir: project.dir })).result as ChatList;
+      expect(list.chats.map((c) => c.title)).toEqual(["hello"]);
+    } finally {
+      await again.stop();
+    }
   });
 });

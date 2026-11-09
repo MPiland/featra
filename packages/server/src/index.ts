@@ -13,6 +13,7 @@ export * from "./work-watch.ts";
 export * from "./services.ts";
 export * from "./provider.ts";
 export * from "./chat-manager.ts";
+export * from "./chat-list-watch.ts";
 export * from "./chat-store.ts";
 export * from "./claude-provider.ts";
 export * from "./claude-messages.ts";
