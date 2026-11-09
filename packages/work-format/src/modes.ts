@@ -20,9 +20,12 @@ export const CLAUDE_FULL_ACCESS: ClaudeMode = "bypassPermissions";
 export const CODEX_APPROVALS = ["untrusted", "on-failure", "on-request", "never"] as const;
 export const CODEX_SANDBOXES = ["read-only", "workspace-write", "danger-full-access"] as const;
 
-/** Which settings file the mode came from; `local` is Claude's `settings.local.json`. */
-export type SettingsLevel = "user" | "project" | "local";
-const LEVELS: readonly SettingsLevel[] = ["user", "project", "local"];
+/**
+ * Where the mode came from: a settings file (`local` is Claude's `settings.local.json`, `managed` the machine-wide
+ * managed settings) or `agent`, the agent file's own `permissionMode`.
+ */
+export type SettingsLevel = "user" | "project" | "local" | "managed" | "agent";
+const LEVELS: readonly SettingsLevel[] = ["user", "project", "local", "managed", "agent"];
 
 /** The mode a chat starts in: from the provider's settings, or Featra's own Ask when they name none. */
 export interface ModeInfo {
@@ -40,13 +43,16 @@ export const ASK_MODE: ModeInfo = { provider: "claude", name: "Ask", level: null
 
 /** The mode's text: its name, and where it came from ("auto · from Claude settings"). */
 export function modeLabel(mode: ModeInfo): string {
-  return mode.level === null ? mode.name : `${mode.name} · from ${SETTINGS_PROVIDER_NAMES[mode.provider]} settings`;
+  if (mode.level === null) return mode.name;
+  if (mode.level === "agent") return `${mode.name} · from the agent`;
+  return `${mode.name} · from ${SETTINGS_PROVIDER_NAMES[mode.provider]} settings`;
 }
 
 /** Which settings file, in words, for the label's tooltip. */
 export function modeWhere(mode: ModeInfo): string | null {
   if (mode.level === null) return null;
-  const file = { user: "user", project: "project", local: "local project" }[mode.level];
+  if (mode.level === "agent") return "Set in the agent's own file";
+  const file = { user: "user", project: "project", local: "local project", managed: "managed" }[mode.level];
   return `Set in ${SETTINGS_PROVIDER_NAMES[mode.provider]}'s ${file} settings`;
 }
 
@@ -60,4 +66,13 @@ export function normalizeMode(raw: unknown): ModeInfo | null {
   if (!isOneOf(SETTINGS_PROVIDERS, provider) || typeof name !== "string" || !name) return null;
   if (level !== null && !isOneOf(LEVELS, level)) return null;
   return { provider, name, level, fullAccess: fullAccess === true };
+}
+
+/** Why a role starts on Ask when its mode is bypassPermissions but Claude's settings switch full access off. */
+export const BYPASS_DISABLED_NOTE = "Claude's settings turn off full access: starting on Ask.";
+
+/** The mode for a value of Claude's `permissionMode` or `permissions.defaultMode`, or null when it isn't one of them. */
+export function claudeModeInfo(name: unknown, level: SettingsLevel): ModeInfo | null {
+  if (!isOneOf(CLAUDE_MODES, name)) return null;
+  return { provider: "claude", name, level, fullAccess: name === CLAUDE_FULL_ACCESS };
 }

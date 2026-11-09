@@ -48,16 +48,19 @@ describe("claudeStartMode (AC7)", () => {
     expect(claudeStartMode([layer("user", setting("auto"))]).mode?.fullAccess).toBe(false);
   });
 
-  it("skips a malformed file or an unknown mode with a problem, and reads the next layer", () => {
-    const read = claudeStartMode([
-      layer("local", "{ nope"),
-      layer("project", setting("yolo")),
-      layer("user", setting("plan")),
-    ]);
+  it("skips a malformed file with a problem, and reads the next layer", () => {
+    const read = claudeStartMode([layer("local", "{ nope"), layer("project", null), layer("user", setting("plan"))]);
     expect(read.mode?.name).toBe("plan");
-    expect(read.problems).toHaveLength(2);
+    expect(read.problems).toHaveLength(1);
     expect(read.problems[0]).toContain("local.json");
-    expect(read.problems[1]).toContain("project.json");
+  });
+
+  it("stops at an unknown mode on Ask with a note, so a typo never unlocks a lower layer's bypass", () => {
+    const read = claudeStartMode([layer("project", setting("yolo")), layer("user", setting("bypassPermissions"))]);
+    expect(read.mode).toBeNull();
+    expect(read.problems).toHaveLength(1);
+    expect(read.problems[0]).toContain("project.json");
+    expect(read.note).toContain("project.json");
   });
 
   it("ignores settings of the wrong shape", () => {

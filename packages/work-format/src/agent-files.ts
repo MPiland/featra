@@ -6,6 +6,7 @@
  */
 import { parse as parseToml } from "smol-toml";
 import { splitFrontmatter } from "./frontmatter.ts";
+import { claudeModeInfo, type ModeInfo } from "./modes.ts";
 import { EFFORTS, type Effort } from "./roles.ts";
 import { errorMessage, isOneOf } from "./utils/guards.ts";
 
@@ -17,6 +18,10 @@ export interface AgentDef {
   /** As the file says it; absent when it names none. */
   model?: string;
   effort: Effort;
+  /** A Claude agent's own `permissionMode`: it beats the settings files for this role. */
+  mode?: ModeInfo;
+  /** Why the agent's `permissionMode` isn't used: the role starts on Ask. */
+  modeProblem?: string;
 }
 
 export type AgentRead = { ok: true; agent: AgentDef } | { ok: false; error: string };
@@ -31,9 +36,11 @@ export function parseClaudeAgent(content: string, stem: string): AgentRead {
   const file = splitFrontmatter(content);
   if ("error" in file) return { ok: false, error: file.error };
   if (!file.has) return { ok: false, error: "no frontmatter" };
-  const { name, description, model, effort } = file.data;
+  const { name, description, model, effort, permissionMode } = file.data;
   const desc = text(description);
   const m = text(model);
+  const set = text(permissionMode);
+  const mode = set ? claudeModeInfo(set, "agent") : null;
   return {
     ok: true,
     agent: {
@@ -42,6 +49,8 @@ export function parseClaudeAgent(content: string, stem: string): AgentRead {
       prompt: file.body,
       ...(m ? { model: m } : {}),
       effort: isOneOf(EFFORTS, effort) ? effort : AGENT_EFFORT,
+      ...(mode ? { mode } : {}),
+      ...(set && !mode ? { modeProblem: `permissionMode "${set}" isn't a Claude mode Featra knows.` } : {}),
     },
   };
 }

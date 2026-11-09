@@ -273,34 +273,3 @@ describe("provider roles (AC4)", () => {
     expect(w.log.join()).not.toContain("secret");
   });
 });
-
-describe("a provider role in a chat (AC5)", () => {
-  it("falls back to Claude's default for a model it doesn't have, with a one-line note", async () => {
-    const w = await world();
-    await w.put(w.dir, ".codex/agents/scout.toml", CODEX_AGENT);
-    const role = await w.registry.get(w.dir, "codex:project:scout");
-    expect(role).toMatchObject({ provider: "claude", model: "default", prompt: "Look around.", effort: "low" });
-    expect(role?.note).toBe("Claude doesn't have the model \"gpt-5\": using Claude's default.");
-  });
-
-  it("keeps a Claude model, with no note, and Claude's default for none or inherit", async () => {
-    const w = await world();
-    await w.put(w.dir, ".claude/agents/a.md", "---\nname: a\nmodel: inherit\n---\nA");
-    await w.put(w.dir, ".claude/agents/b.md", "---\nname: b\n---\nB");
-    await w.put(w.dir, ".claude/agents/c.md", "---\nname: c\nmodel: sonnet\n---\nC");
-    const roles = (await w.registry.read(w.dir)).roles.slice(5);
-    expect(roles.map((r) => [r.model, r.note])).toEqual([
-      ["default", undefined],
-      ["default", undefined],
-      ["sonnet", undefined],
-    ]);
-  });
-
-  it("notes a custom role's unknown model too, and drops the note once the model is fixed", async () => {
-    const w = await world();
-    await w.put(w.dir, ".featra/roles/mine.md", "---\nname: Mine\nmodel: gemini-pro\n---\nM");
-    expect((await byId(w, "mine"))?.note).toContain("gemini-pro");
-    await w.put(w.dir, ".featra/roles/mine.md", "---\nname: Mine\nmodel: opus\n---\nM");
-    expect((await byId(w, "mine"))?.note).toBeUndefined();
-  });
-});

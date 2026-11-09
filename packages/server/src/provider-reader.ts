@@ -4,7 +4,14 @@
  * the provider's files on every call, and never written. A provider that documents no agent format gets none.
  */
 import { join } from "node:path";
-import type { AgentRead, ModeRead, Role, SettingsProvider } from "@featra/work-format";
+import {
+  ASK_MODE,
+  errorMessage,
+  type AgentRead,
+  type ModeRead,
+  type Role,
+  type SettingsProvider,
+} from "@featra/work-format";
 import type { RoleFs } from "./role-fs.ts";
 
 /** What a reader found: the roles from its agent files, and what it couldn't read. */
@@ -49,7 +56,7 @@ export async function readAgentFolder(fs: RoleFs, folder: AgentFolder): Promise<
   try {
     names = (await fs.list(folder.path)).filter((n) => n.endsWith(folder.ext)).toSorted();
   } catch (e) {
-    return { roles, problems: [`Can't read ${folder.label}: ${e instanceof Error ? e.message : String(e)}`] };
+    return { roles, problems: [`Can't read ${folder.label}: ${errorMessage(e)}`] };
   }
   for (const name of names) {
     const stem = name.slice(0, -folder.ext.length);
@@ -74,9 +81,13 @@ export async function readAgentFolder(fs: RoleFs, folder: AgentFolder): Promise<
         permission: "ask",
         source: { kind: "provider", provider: folder.provider, scope: folder.scope },
         ...(agent.description ? { description: agent.description } : {}),
+        // Its own `permissionMode` beats the settings files; a bad one is a problem and the role starts on Ask.
+        ...(agent.mode ? { mode: agent.mode } : {}),
+        ...(agent.modeProblem ? { mode: ASK_MODE, note: `${agent.modeProblem} Starting on Ask.` } : {}),
       });
+      if (agent.modeProblem) problems.push(`${where}: ${agent.modeProblem}`);
     } catch (e) {
-      problems.push(`Can't read ${where}: ${e instanceof Error ? e.message : String(e)}`);
+      problems.push(`Can't read ${where}: ${errorMessage(e)}`);
     }
   }
   return { roles, problems };
@@ -109,4 +120,30 @@ export function userChain(fs: RoleFs, name: string, envVar: string, parts: reado
   const set = fs.env[envVar];
   if (set) return chain(set, parts, folder);
   return fs.home ? chain(fs.home, [name, ...parts], folder) : [];
+}
+
+/** A provider's agent folders: the project's and the user's, read together as the reader's `agents`. */
+export async function readAgents(
+  fs: RoleFs,
+  dir: string,
+  provider: { id: SettingsProvider; dotFolder: string; envVar: string; ext: string; parse: AgentFolder["parse"] },
+): Promise<AgentsRead> {
+  const { id, dotFolder, envVar, ext, parse } = provider;
+  const user = userFolder(fs, dotFolder, envVar);
+  const folder = (scope: AgentFolder["scope"], path: string, label: string): AgentFolder => ({
+    provider: id,
+    scope,
+    path,
+    ext,
+    parse,
+    label,
+  });
+  const [project, mine] = await Promise.all([
+    readAgentFolder(fs, folder("project", join(dir, dotFolder, "agents"), `${dotFolder}/agents`)),
+    user ? readAgentFolder(fs, folder("user", join(user, "agents"), `~/${dotFolder}/agents`)) : null,
+  ]);
+  return {
+    roles: [...project.roles, ...(mine?.roles ?? [])],
+    problems: [...project.problems, ...(mine?.problems ?? [])],
+  };
 }

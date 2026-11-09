@@ -14,6 +14,10 @@ import { SETTLE_MS, type WatchFolder } from "./work-watch.ts";
 export interface RoleWatches {
   /** The project's roles now, then `listener` with each changed list until `stop`. */
   watch: (dir: string, listener: (list: RoleList) => void) => Promise<{ list: RoleList; stop: () => void }>;
+  /** Ends the watches of every project `keep` no longer names: a closed project holds no watcher. */
+  closeProjects: (keep: (dir: string) => boolean) => void;
+  /** Ends every watch. */
+  close: () => void;
 }
 
 /** The targets with one entry per path: the names each wants, or everything when any wants the whole folder. */
@@ -35,7 +39,14 @@ export function createRoleWatches(
   log: (message: string) => void,
   watchFolder: WatchFolder = watch,
 ): RoleWatches {
+  const active = new Map<symbol, { dir: string; stop: () => void }>();
   return {
+    closeProjects(keep) {
+      for (const { dir, stop } of Array.from(active.values())) if (!keep(dir)) stop();
+    },
+    close() {
+      for (const { stop } of Array.from(active.values())) stop();
+    },
     async watch(dir, listener) {
       const watchers = new Map<string, FSWatcher>();
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -101,17 +112,18 @@ export function createRoleWatches(
         timer = setTimeout(refresh, SETTLE_MS);
       }
 
+      const key = Symbol(dir);
+      const stop = () => {
+        closed = true;
+        active.delete(key);
+        clearTimeout(timer);
+        for (const w of watchers.values()) w.close();
+        watchers.clear();
+      };
+      active.set(key, { dir, stop });
       const first = await read();
       last = JSON.stringify(first);
-      return {
-        list: first,
-        stop() {
-          closed = true;
-          clearTimeout(timer);
-          for (const w of watchers.values()) w.close();
-          watchers.clear();
-        },
-      };
+      return { list: first, stop };
     },
   };
 }

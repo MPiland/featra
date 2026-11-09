@@ -6,16 +6,18 @@
  */
 import { join } from "node:path";
 import {
-  ASK_MODE,
   BUILT_IN_ROLES,
+  BYPASS_DISABLED_NOTE,
+  errorMessage,
   fitModel,
   parseRoleFile,
   roleIdOf,
   ROLES_DIR,
-  type ModeInfo,
+  type ModeRead,
   type Role,
   type RoleEdit,
   type RoleEditResult,
+  type RoleFields,
   type RoleList,
 } from "@featra/work-format";
 import type { ProviderReader, WatchTarget } from "./provider-reader.ts";
@@ -43,6 +45,8 @@ export interface RoleRegistryDeps {
 /** What `.featra/roles/` holds, read: the built-in overrides by role id, the custom roles, and what couldn't be read. */
 export interface RoleFiles {
   overrides: Map<string, Role>;
+  /** What each override file itself says, so a save writes only what changed and the rest stays Featra's. */
+  raw: Map<string, Partial<RoleFields>>;
   custom: Role[];
   problems: string[];
 }
@@ -50,16 +54,14 @@ export interface RoleFiles {
 /** Claude runs every chat in M1 (ADR 0018), so its settings name the mode; Codex's are read but have no runner yet. */
 const RUNNER = "claude";
 
-const why = (e: unknown) => (e instanceof Error ? e.message : String(e));
-
 async function readRoleFiles(fs: RoleFs, dir: string): Promise<RoleFiles> {
   const folder = join(dir, ROLES_DIR);
-  const found: RoleFiles = { overrides: new Map(), custom: [], problems: [] };
+  const found: RoleFiles = { overrides: new Map(), raw: new Map(), custom: [], problems: [] };
   let names: string[];
   try {
     names = (await fs.list(folder)).toSorted();
   } catch (e) {
-    found.problems.push(`Can't read ${ROLES_DIR}: ${why(e)}`);
+    found.problems.push(`Can't read ${ROLES_DIR}: ${errorMessage(e)}`);
     return found;
   }
   for (const file of names) {
@@ -76,6 +78,7 @@ async function readRoleFiles(fs: RoleFs, dir: string): Promise<RoleFiles> {
       const { fields } = read;
       const built = BUILT_IN_ROLES.find((r) => r.id === id);
       if (built) {
+        found.raw.set(id, fields);
         found.overrides.set(id, {
           ...built,
           ...(fields.name ? { name: fields.name } : {}),
@@ -97,18 +100,25 @@ async function readRoleFiles(fs: RoleFs, dir: string): Promise<RoleFiles> {
         });
       }
     } catch (e) {
-      found.problems.push(`Can't read ${ROLES_DIR}/${file}: ${why(e)}`);
+      found.problems.push(`Can't read ${ROLES_DIR}/${file}: ${errorMessage(e)}`);
     }
   }
   return found;
 }
 
-/** The role as a chat runs it: a model Claude has (or its default, with a note), and the mode its settings name. */
-function runnable(role: Role, mode: ModeInfo): Role {
-  const { model, note } = fitModel(role.model);
-  const { note: _old, ...rest } = role;
-  // With no setting the role starts on Ask, which is how an absent mode reads.
-  return { ...rest, model, ...(mode.level === null ? {} : { mode }), ...(note ? { note } : {}) };
+/**
+ * The role as a chat runs it: a model Claude has (or its default, with a note), and its mode: the agent's own
+ * `permissionMode`, else the one Claude's settings name. Bypass is never run when Claude's settings switch it off.
+ */
+function runnable(role: Role, read: ModeRead): Role {
+  const { model, note: modelNote } = fitModel(role.model);
+  const { mode: own, note: roleNote, ...rest } = role;
+  const blocked = own?.fullAccess === true && read.bypassOff === true;
+  const mode = blocked ? null : (own ?? read.mode);
+  const modeNote = blocked ? BYPASS_DISABLED_NOTE : own ? null : (read.note ?? null);
+  const note = [roleNote, modelNote, modeNote].filter(Boolean).join(" ");
+  // With no mode the role starts on Ask, which is how an absent mode reads.
+  return { ...rest, model, ...(mode && mode.level !== null ? { mode } : {}), ...(note ? { note } : {}) };
 }
 
 const BUILT_INS_ONLY: RoleRegistry = {
@@ -126,10 +136,12 @@ export function createRoleRegistry(deps?: RoleRegistryDeps): RoleRegistry {
   async function scan(dir: string): Promise<{ list: RoleList; files: RoleFiles }> {
     const [files, agents, modes] = await Promise.all([
       readRoleFiles(fs, dir),
-      Promise.all(readers.map((r) => r.agents(dir).catch((e: unknown) => ({ roles: [], problems: [why(e)] })))),
-      Promise.all(readers.map((r) => r.mode(dir).catch((e: unknown) => ({ mode: ASK_MODE, problems: [why(e)] })))),
+      Promise.all(
+        readers.map((r) => r.agents(dir).catch((e: unknown) => ({ roles: [], problems: [errorMessage(e)] }))),
+      ),
+      Promise.all(readers.map((r) => r.mode(dir).catch((e: unknown) => ({ mode: null, problems: [errorMessage(e)] })))),
     ]);
-    const mode = modes[readers.findIndex((r) => r.id === RUNNER)]?.mode ?? ASK_MODE;
+    const read = modes[readers.findIndex((r) => r.id === RUNNER)] ?? { mode: null, problems: [] };
     const base = [
       ...BUILT_IN_ROLES.map((r) => files.overrides.get(r.id) ?? r),
       ...files.custom.toSorted((a, b) => a.name.localeCompare(b.name)),
@@ -137,7 +149,7 @@ export function createRoleRegistry(deps?: RoleRegistryDeps): RoleRegistry {
     ];
     const problems = [...files.problems, ...agents.flatMap((a) => a.problems), ...modes.flatMap((m) => m.problems)];
     for (const p of problems) log(p);
-    return { list: { roles: base.map((r) => runnable(r, mode)), problems }, files };
+    return { list: { roles: base.map((r) => runnable(r, read)), problems }, files };
   }
 
   const read = async (dir: string) => (await scan(dir)).list;
@@ -156,7 +168,7 @@ export function createRoleRegistry(deps?: RoleRegistryDeps): RoleRegistry {
       try {
         return await applyRoleEdit(fs, dir, edit, list.roles, files);
       } catch (e) {
-        return { ok: false, error: `Couldn't save: ${why(e)}` };
+        return { ok: false, error: `Couldn't save: ${errorMessage(e)}` };
       }
     },
   };

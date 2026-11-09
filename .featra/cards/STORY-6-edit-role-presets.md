@@ -63,6 +63,7 @@ Codex, so every chat starts with the right prompt, model and effort.
 - [x] The chat starts in the mode Claude's settings name, and carries the note
 - [x] Settings > Project > Roles page and editor; the mode, warning mark and note in the chat views
 - [x] Playwright journey, decisions, ADR note and AC links
+- [x] Review fixes: managed settings, agent permissionMode, no overwrites, trust ancestors, partial saves, watcher close (tests: packages/server/test/role-managed.test.ts, role-edit-safety.test.ts, role-trust.test.ts, ws-roles-close.test.ts, role-watch.test.ts; packages/work-format/test/settings-paths.test.ts)
 
 ## Notes
 

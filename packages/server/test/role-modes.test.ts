@@ -103,16 +103,25 @@ describe("the mode a role starts in (AC6, AC7)", () => {
     }
   });
 
-  it("ignores a mode Featra doesn't run, or a malformed file, with a problem, and falls to the next file", async () => {
+  it("skips a malformed file with a problem and falls to the next file", async () => {
     const w = await world();
     await w.put(w.home, ".claude/settings.json", settings("plan"));
-    await w.put(w.dir, ".claude/settings.json", settings("yolo"));
     await w.put(w.dir, ".claude/settings.local.json", "{ not json");
     expect(await modeOf(w)).toMatchObject({ name: "plan", level: "user" });
     const { problems } = await w.registry.read(w.dir);
-    expect(problems).toHaveLength(2);
+    expect(problems).toHaveLength(1);
     expect(problems.join("\n")).toContain(".claude/settings.local.json");
-    expect(problems.join("\n")).toContain(".claude/settings.json");
+  });
+
+  it("starts on Ask with a problem naming the file for a mode Featra doesn't run, whatever sits below it", async () => {
+    const w = await world();
+    await w.put(w.home, ".claude/settings.json", settings("bypassPermissions"));
+    await w.put(w.dir, ".claude/settings.json", settings("yolo"));
+    const { roles, problems } = await w.registry.read(w.dir);
+    expect(roles.every((r) => r.mode === undefined)).toBe(true);
+    expect(roles[0]?.note).toContain(".claude/settings.json");
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain(".claude/settings.json");
   });
 
   it("starts in Ask with no home folder and no project setting", async () => {

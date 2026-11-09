@@ -11,6 +11,8 @@ export interface RoleFs {
   home: string | null;
   /** The environment, for the providers' own folder overrides (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`). */
   env: NodeJS.ProcessEnv;
+  /** Claude's machine-wide managed settings file, which outranks every other settings layer; null when none applies. */
+  managedSettings: string | null;
   /** A file's text, or null when it isn't there. Anything else that goes wrong throws. */
   read: (path: string) => Promise<string | null>;
   /** The names in a folder, or none when it isn't there. */
@@ -32,10 +34,25 @@ function userHome(): string | null {
   }
 }
 
-export function nodeRoleFs(env: NodeJS.ProcessEnv = process.env, home: string | null = userHome()): RoleFs {
+const MANAGED_SETTINGS: Partial<Record<NodeJS.Platform, string>> = {
+  win32: String.raw`C:\Program Files\ClaudeCode\managed-settings.json`,
+  darwin: "/Library/Application Support/ClaudeCode/managed-settings.json",
+  linux: "/etc/claude-code/managed-settings.json",
+};
+
+/** Where Claude keeps its managed settings on this platform. */
+export const claudeManagedPath = (platform: NodeJS.Platform = process.platform): string | null =>
+  MANAGED_SETTINGS[platform] ?? null;
+
+export function nodeRoleFs(
+  env: NodeJS.ProcessEnv = process.env,
+  home: string | null = userHome(),
+  managedSettings: string | null = claudeManagedPath(),
+): RoleFs {
   return {
     home,
     env,
+    managedSettings,
     read: (path) =>
       readFile(path, "utf8").catch((e: unknown) => {
         if (missing(e)) return null;

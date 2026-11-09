@@ -33,13 +33,7 @@ export function RoleEditor({ role, onEdit }: RoleEditorProps) {
     return result.ok ? null : { error: result.error, current };
   };
   const save = (patch: Partial<Pick<Role, "prompt" | "model" | "effort">>) =>
-    run({
-      action: "save",
-      id: role.id,
-      prompt: patch.prompt ?? role.prompt,
-      model: patch.model ?? role.model,
-      effort: patch.effort ?? role.effort,
-    });
+    run({ action: "save", id: role.id, ...patch });
   const mode = role.mode ?? ASK_MODE;
   const act = (action: "reset" | "duplicate" | "customize" | "delete") => run({ action, id: role.id });
 
@@ -69,9 +63,7 @@ export function RoleEditor({ role, onEdit }: RoleEditorProps) {
           multiline
           readOnly={provider}
           nowLabel={ROLES_COPY.now}
-          onSave={(to) =>
-            refusal({ action: "save", id: role.id, prompt: to, model: role.model, effort: role.effort }, role.prompt)
-          }
+          onSave={(to) => refusal({ action: "save", id: role.id, prompt: to }, role.prompt)}
         />
         {provider ? (
           <p className="role-readout">

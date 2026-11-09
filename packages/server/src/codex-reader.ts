@@ -4,36 +4,38 @@
  * Codex's `auth.json` or anything else in its folder.
  */
 import { join } from "node:path";
-import { codexStartMode, parseCodexAgent } from "@featra/work-format";
-import { chain, readAgentFolder, userChain, userFolder, type ProviderReader } from "./provider-reader.ts";
+import { codexStartMode, parseCodexAgent, withAncestors } from "@featra/work-format";
+import { chain, readAgents, userChain, userFolder, type ProviderReader } from "./provider-reader.ts";
 import type { RoleFs } from "./role-fs.ts";
 
 const HOME_DIR = "CODEX_HOME";
+const PROVIDER = { id: "codex", dotFolder: ".codex", envVar: HOME_DIR, ext: ".toml", parse: parseCodexAgent } as const;
 
-const folder = (scope: "project" | "user", path: string, label: string) =>
-  ({ provider: "codex", scope, path, ext: ".toml", parse: parseCodexAgent, label }) as const;
+const WORKTREE = /[\\/]\.git[\\/]worktrees[\\/].*$/;
+
+/** The main checkouts of the git worktrees `dir` sits in: where a trust entry may name a worktree's project. */
+async function mainCheckouts(fs: RoleFs, dir: string): Promise<string[]> {
+  const roots: string[] = [];
+  for (const folder of withAncestors(dir)) {
+    const text = await fs.read(join(folder, ".git")).catch(() => null);
+    const gitdir = /^gitdir:\s*(.+?)\s*$/m.exec(text ?? "")?.[1];
+    if (gitdir && WORKTREE.test(gitdir)) roots.push(gitdir.replace(WORKTREE, ""));
+  }
+  return roots;
+}
 
 export function createCodexReader(fs: RoleFs): ProviderReader {
   return {
     id: "codex",
-    async agents(dir) {
-      const user = userFolder(fs, ".codex", HOME_DIR);
-      const [project, mine] = await Promise.all([
-        readAgentFolder(fs, folder("project", join(dir, ".codex", "agents"), ".codex/agents")),
-        user ? readAgentFolder(fs, folder("user", join(user, "agents"), "~/.codex/agents")) : null,
-      ]);
-      return {
-        roles: [...project.roles, ...(mine?.roles ?? [])],
-        problems: [...project.problems, ...(mine?.problems ?? [])],
-      };
-    },
+    agents: (dir) => readAgents(fs, dir, PROVIDER),
     async mode(dir) {
       const user = userFolder(fs, ".codex", HOME_DIR);
-      const [userText, projectText] = await Promise.all([
+      const [userText, projectText, roots] = await Promise.all([
         user ? fs.read(join(user, "config.toml")) : null,
         fs.read(join(dir, ".codex", "config.toml")),
+        mainCheckouts(fs, dir),
       ]);
-      return codexStartMode({ user: userText, project: projectText, dir });
+      return codexStartMode({ user: userText, project: projectText, dir, roots });
     },
     watched: (dir) => [
       ...chain(dir, [".codex", "agents"], true),

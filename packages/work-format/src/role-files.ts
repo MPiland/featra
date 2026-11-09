@@ -37,13 +37,22 @@ export function parseRoleFile(text: string): RoleFileRead {
       ...(name !== undefined ? { name: name.trim() } : {}),
       ...(model !== undefined ? { model: model.trim() } : {}),
       ...(effort !== undefined ? { effort } : {}),
-      prompt: file.body,
+      // A blank body names no prompt: a built-in's override that sets only the model keeps the built-in's own prompt.
+      ...(file.body ? { prompt: file.body } : {}),
     },
   };
 }
 
-export const serializeRoleFile = ({ name, model, effort, prompt }: RoleFields): string =>
-  joinFrontmatter({ name, model, effort }, prompt);
+/** A role file's text. Only the fields given are written, so an override leaves the rest to the built-in. */
+export const serializeRoleFile = ({ name, model, effort, prompt }: Partial<RoleFields>): string =>
+  joinFrontmatter(
+    {
+      ...(name !== undefined ? { name } : {}),
+      ...(model !== undefined ? { model } : {}),
+      ...(effort !== undefined ? { effort } : {}),
+    },
+    prompt ?? "",
+  );
 
 /** The file's name for a role id. */
 export const roleFile = (id: string) => `${id}.md`;

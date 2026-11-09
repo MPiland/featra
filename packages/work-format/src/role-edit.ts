@@ -14,11 +14,14 @@ export interface RoleList {
 
 export const EMPTY_ROLE_LIST: RoleList = { roles: [], problems: [] };
 
-/** What a role's edit form saves. A custom role's name changes through `rename`. */
+/**
+ * What a role's edit form saves: only the fields the user changed, so a built-in keeps taking Featra's updates to the
+ * rest. A custom role's name changes through `rename`.
+ */
 export interface RoleForm {
-  prompt: string;
-  model: string;
-  effort: Effort;
+  prompt?: string;
+  model?: string;
+  effort?: Effort;
 }
 
 /** One change to the project's roles. */
@@ -63,8 +66,20 @@ export function roleEditParams(params: unknown): { dir: string; edit: RoleEdit }
         ? { dir, edit: { action: "rename", id: e.id, name: e.name } }
         : null;
     case "save":
-      return nonEmpty(e.id) && typeof e.prompt === "string" && typeof e.model === "string" && isOneOf(EFFORTS, e.effort)
-        ? { dir, edit: { action: "save", id: e.id, prompt: e.prompt, model: e.model, effort: e.effort } }
+      return nonEmpty(e.id) &&
+        (e.prompt === undefined || typeof e.prompt === "string") &&
+        (e.model === undefined || typeof e.model === "string") &&
+        (e.effort === undefined || isOneOf(EFFORTS, e.effort))
+        ? {
+            dir,
+            edit: {
+              action: "save",
+              id: e.id,
+              ...(e.prompt !== undefined ? { prompt: e.prompt } : {}),
+              ...(e.model !== undefined ? { model: e.model } : {}),
+              ...(e.effort !== undefined ? { effort: e.effort } : {}),
+            },
+          }
         : null;
     case "reset":
     case "duplicate":

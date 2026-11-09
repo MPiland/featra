@@ -26,7 +26,10 @@ const contents = async (root: string) => {
 export async function roleWorld(opts: { env?: NodeJS.ProcessEnv; home?: boolean } = {}) {
   const project = await tempFolder();
   const home = await tempFolder();
-  const fs = nodeRoleFs(opts.env ?? {}, opts.home === false ? null : home.dir);
+  // Claude's managed settings live in a folder of the test's own: the machine's real ones are never read.
+  const managed = await tempFolder();
+  const managedFile = join(managed.dir, "managed-settings.json");
+  const fs = nodeRoleFs(opts.env ?? {}, opts.home === false ? null : home.dir, managedFile);
   const log: string[] = [];
   const registry = createRoleRegistry({
     fs,
@@ -37,6 +40,7 @@ export async function roleWorld(opts: { env?: NodeJS.ProcessEnv; home?: boolean 
     dir: project.dir,
     home: home.dir,
     fs,
+    managedFile,
     registry,
     log,
     put,
@@ -47,6 +51,7 @@ export async function roleWorld(opts: { env?: NodeJS.ProcessEnv; home?: boolean 
     dispose: async () => {
       await project.dispose();
       await home.dispose();
+      await managed.dispose();
     },
   };
 }

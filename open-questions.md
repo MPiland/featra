@@ -12,3 +12,5 @@
   `trust_level`, keyed by a literal string that may carry the `\?\` long-path prefix and a lower-case drive. Featra
   reads all of that. Still unconfirmed: what Codex runs a trusted project with neither key set; Featra shows
   `on-request` with `workspace-write`. Recommendation: confirm when the Codex adapter ships. Non-blocking (STORY-6).
+- A Codex agent's own `sandbox_mode` is not shown or used: every role runs on Claude in M1 and Claude's settings
+  name the mode. Recommendation: show it as the role's mode when the Codex adapter ships. Non-blocking (STORY-6).

@@ -6,6 +6,7 @@ import type { RoleList } from "@featra/work-format";
 import { createRoleWatches } from "../src/role-watch.ts";
 import { CLAUDE_AGENT, roleWorld, settings } from "./role-world.ts";
 import { until } from "./until.ts";
+import { watchSpy } from "./watch-spy.ts";
 
 const worlds: Awaited<ReturnType<typeof roleWorld>>[] = [];
 const stops: (() => void)[] = [];
@@ -19,11 +20,11 @@ async function watching(opts?: Parameters<typeof roleWorld>[0]) {
   worlds.push(w);
   const heard: RoleList[] = [];
   const failures: string[] = [];
-  const { list, stop } = await createRoleWatches(w.registry, (m) => failures.push(m)).watch(w.dir, (next) =>
-    heard.push(next),
-  );
+  const spy = watchSpy();
+  const watches = createRoleWatches(w.registry, (m) => failures.push(m), spy.watchFolder);
+  const { list, stop } = await watches.watch(w.dir, (next) => heard.push(next));
   stops.push(stop);
-  return { w, list, heard, failures, stop };
+  return { w, list, heard, failures, stop, watches, open: spy.open };
 }
 
 const ids = (list: RoleList | undefined) => list?.roles.map((r) => r.id) ?? [];
@@ -98,5 +99,34 @@ describe("the roles page follows the files", () => {
     await new Promise((r) => setTimeout(r, 300));
     expect(heard).toHaveLength(1);
     expect(failures).toEqual([]);
+  });
+});
+
+describe("a closed project holds no watcher (AC1)", () => {
+  it("closeProjects ends the watches of projects no longer kept, and only those", async () => {
+    const a = await watching();
+    const b = await watching();
+    const spy = watchSpy();
+    const watches = createRoleWatches(a.w.registry, () => {}, spy.watchFolder);
+    const mine = await watches.watch(a.w.dir, () => {});
+    const other = await watches.watch(b.w.dir, () => {});
+    stops.push(mine.stop, other.stop);
+    expect(spy.open.size).toBeGreaterThan(0);
+    const both = spy.open.size;
+    watches.closeProjects((dir) => dir === b.w.dir);
+    expect(spy.open.size).toBeGreaterThan(0);
+    expect(spy.open.size).toBeLessThan(both);
+    watches.closeProjects(() => false);
+    expect(spy.open.size).toBe(0);
+  });
+
+  it("close ends every watch", async () => {
+    const { w } = await watching();
+    const spy = watchSpy();
+    const mine = createRoleWatches(w.registry, () => {}, spy.watchFolder);
+    await mine.watch(w.dir, () => {});
+    expect(spy.open.size).toBeGreaterThan(0);
+    mine.close();
+    expect(spy.open.size).toBe(0);
   });
 });
