@@ -2,7 +2,7 @@
 id: STORY-52
 type: story
 title: Start a feature
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 1
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-52-start-feature
-pr: 26
+pr: "26"
 created: 2026-11-10T18:00:00Z
 history:
   - at: 2026-11-10T18:00:00Z
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-10T21:09:26Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
