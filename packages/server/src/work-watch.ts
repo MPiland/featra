@@ -97,7 +97,9 @@ export function createWorkWatches(
 ): WorkWatches {
   const entries = new Map<string, Entry>();
 
-  const rewatch = (e: Entry, targets: Target[]) => {
+  /** Starts and ends watchers to match `targets`; whether it started any. */
+  const rewatch = (e: Entry, targets: Target[]): boolean => {
+    let started = false;
     const wanted = new Map(targets.map((t) => [`${t.recursive ? "r" : "f"}|${t.path}`, t]));
     for (const [key, w] of e.watchers) {
       if (wanted.has(key)) continue;
@@ -124,10 +126,12 @@ export function createWorkWatches(
         });
         w.on("error", gone);
         e.watchers.set(key, w);
+        started = true;
       } catch {
         // Not there (yet): the next scan tries again.
       }
     }
+    return started;
   };
 
   const scanOnce = async (e: Entry): Promise<{ scan: Scan | null; list: WorkList }> => {
@@ -148,7 +152,8 @@ export function createWorkWatches(
     }
     e.last = scan;
     if (e.closed) return { scan, list };
-    rewatch(e, targetsOf(e.dir, scan));
+    // An edit between the scan's read and a new watcher starting was heard by nobody: look once more (BUG-12).
+    if (rewatch(e, targetsOf(e.dir, scan))) trigger(e);
     for (const listener of e.listeners) listener(scan, list);
     return { scan, list };
   };

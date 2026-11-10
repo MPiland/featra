@@ -15,6 +15,10 @@ const env = {
   GIT_AUTHOR_EMAIL: "test@example.invalid",
   GIT_COMMITTER_NAME: "Test",
   GIT_COMMITTER_EMAIL: "test@example.invalid",
+  // A commit starts `git maintenance run --auto` as another process, and every start is slow under load (BUG-12).
+  GIT_CONFIG_COUNT: "1",
+  GIT_CONFIG_KEY_0: "maintenance.auto",
+  GIT_CONFIG_VALUE_0: "false",
 };
 
 export const T0 = "2026-11-01T00:00:00Z";

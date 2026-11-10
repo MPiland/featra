@@ -100,8 +100,8 @@ describe("work watches", () => {
     try {
       expect(features(list)).toEqual(["FEAT-1"]);
       repo.git(repo.main, "branch", "feature/2", tip);
-      // A full git rescan, which STORY-3's 1 s for card edits doesn't cover: it takes up to about 3 s on a loaded PC.
-      expect(features(await heard.next(5000)).toSorted()).toEqual(["FEAT-1", "FEAT-2"]);
+      // A full git rescan, which STORY-3's 1 s for card edits doesn't cover: no criterion times it (BUG-12).
+      expect(features(await heard.next(GIT_ASKED_MS)).toSorted()).toEqual(["FEAT-1", "FEAT-2"]);
     } finally {
       stop();
     }

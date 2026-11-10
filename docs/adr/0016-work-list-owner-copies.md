@@ -112,6 +112,10 @@ Three more rules keep the watch sound:
   watch ends, every watcher it opened is closed.
 - A scan queued before the watch ended doesn't run. It would start after the scanner closed and reopen the card index,
   and an open index can't be deleted on Windows.
+- A scan that starts a watcher is followed by one more rescan (amended 2026-11-10, BUG-12). A new watcher hears nothing
+  from before it started, so an edit between the scan's read of the files and the watcher starting was heard by nobody,
+  and the list stayed stale until some other event. The extra rescan is disk-only (no git event fired) and ends when a
+  scan starts no watcher.
 
 **Protocol additions (ADR 0015).**
 
