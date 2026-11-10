@@ -2,7 +2,7 @@
 id: STORY-51
 type: story
 title: Approve or reject a draft
-status: Acceptance
+status: Done
 parent: FEAT-4
 order: 4
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T13:04:49Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T13:04:49Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -59,3 +69,4 @@ As a builder, I approve a draft to make it the feature's scope, or reject it.
 ## Notes
 
 - Split from the original STORY-8 on 2026-11-10 (decisions.md).
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.

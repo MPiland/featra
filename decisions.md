@@ -1242,3 +1242,8 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Fix.** The spec now closes the app in `finally`, so a failing step reports itself within its own timeout, and waits
   for the tool's answer ("Tool said: Drafted FEAT-N") in the log before looking for the pane, so a slow agent turn and a
   missing pane fail at different steps. No timeout was lengthened. If it recurs, the failing step will now be named.
+
+## 2026-11-10 — FEAT-4 accepted
+
+- The user accepted STORY-8, STORY-49, STORY-50, STORY-51 and FEAT-4 ("Accept and merge") without a hands-on check;
+  a true UAT comes later. FEAT-4 merges to main.

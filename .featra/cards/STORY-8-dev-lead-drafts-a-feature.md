@@ -2,7 +2,7 @@
 id: STORY-8
 type: story
 title: Dev Lead drafts a feature
-status: Acceptance
+status: Done
 parent: FEAT-4
 order: 1
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T13:04:48Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T13:04:48Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -62,3 +72,4 @@ As a builder, I talk a feature through with the Dev Lead, and it drafts the feat
 ## Notes
 
 - Split from the original STORY-8 on 2026-11-10 (decisions.md).
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.
