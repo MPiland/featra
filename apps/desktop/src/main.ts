@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { IPC } from "@featra/client/bridge";
 import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
+import { applyDockIcon } from "./app-icon.ts";
 import { allowedDirs, registerIpc } from "./ipc.ts";
 import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog } from "./log.ts";
@@ -61,6 +62,7 @@ if (!app.requestSingleInstanceLock()) {
 
   void app.whenReady().then(async () => {
     if (process.platform === "win32") app.setAppUserModelId("dev.featra.app"); // notifications need it on Windows
+    applyDockIcon(app.dock, process.platform);
     setNativeMenu();
     const [remembered, hasTray, stored] = await Promise.all([
       appState.load(),
