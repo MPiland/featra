@@ -2,7 +2,7 @@
 id: STORY-8
 type: story
 title: Dev Lead drafts a feature
-status: In Progress
+status: In Review
 parent: FEAT-4
 order: 1
 origin: planned
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: session:story-8
+  - at: 2026-11-10T04:25:25Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-8
 ---
 
 ## Description
@@ -33,10 +38,10 @@ As a builder, I talk a feature through with the Dev Lead, and it drafts the feat
 
 ## Acceptance criteria
 
-- [ ] The Dev Lead's `draft_cards` call creates a Draft feature with its stories (user story, ACs, tasks), owned by main and not committed
-- [ ] The Draft feature shows in Work with a Review badge
-- [ ] A later `draft_cards` call from the same chat updates that draft in place: same feature and IDs, changes recorded in each card's history
-- [ ] `draft_cards` works from any provider's chat through the Featra MCP
+- [x] The Dev Lead's `draft_cards` call creates a Draft feature with its stories (user story, ACs, tasks), owned by main and not committed
+- [x] The Draft feature shows in Work with a Review badge
+- [x] A later `draft_cards` call from the same chat updates that draft in place: same feature and IDs, changes recorded in each card's history
+- [x] `draft_cards` works from any provider's chat through the Featra MCP
 
 ## Tasks
 
