@@ -23,8 +23,13 @@ async function draftInNewChat(page: Page, id: string) {
     .getByRole("dialog", { name: "New chat" })
     .getByRole("button", { name: /^Dev Lead/ })
     .click();
+  // Wait for the new chat's composer to settle, then send with the button and see the message land.
+  await expect(composer(page)).toBeEditable();
   await composer(page).fill("draft a feature");
-  await composer(page).press("Enter");
+  const send = page.getByRole("button", { name: "Send", exact: true });
+  await expect(send).toBeEnabled();
+  await send.click();
+  await expect(page.getByRole("log", { name: "Chat" })).toContainText("draft a feature");
   const draft = pane(page, id);
   await expect(draft).toBeVisible();
   // The drafting turn has ended before the user answers it.
