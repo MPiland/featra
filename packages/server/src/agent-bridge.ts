@@ -8,8 +8,11 @@ import { randomBytes } from "node:crypto";
 import { access } from "node:fs/promises";
 import {
   AGENT_PATH,
+  assertNever,
   parseDraft,
   parseLogInput,
+  parseStartInput,
+  starter,
   SERVER_HOST,
   isRecord,
   type AgentMethod,
@@ -20,6 +23,7 @@ import { ApiError } from "./api-error.ts";
 import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { DraftWriter } from "./draft-writer.ts";
+import type { FeatureStart } from "./feature-start.ts";
 import type { LogWriter } from "./log-writer.ts";
 import type { McpServerSpec } from "./provider.ts";
 import { sameSecret } from "./secret.ts";
@@ -33,6 +37,8 @@ export const AGENT_MESSAGES = {
   readOnly: "Logging is off: this project's knowledge setting is read-only.",
   draftReadOnly: "Drafting is off: this project's knowledge setting is read-only.",
   noDrafts: "Drafting cards isn't available.",
+  startReadOnly: "Starting is off: this project's knowledge setting is read-only.",
+  noStart: "Starting a feature isn't available.",
 } as const;
 
 export interface AgentBridgeDeps {
@@ -51,6 +57,8 @@ export interface AgentBridgeDeps {
   writer: LogWriter;
   /** Writes the cards agents draft (STORY-8). Without it `cards.draft` is refused. */
   drafts?: DraftWriter;
+  /** Starts approved features (STORY-52). Without it `feature.start` is refused. */
+  starts?: FeatureStart;
   newToken?: () => string;
 }
 
@@ -79,6 +87,7 @@ export function createAgentBridge({
   chats,
   writer,
   drafts,
+  starts,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -129,6 +138,15 @@ export function createAgentBridge({
     return result;
   }
 
+  async function start(chat: string, dir: string, params: unknown) {
+    const off = await refusal(dir, AGENT_MESSAGES.startReadOnly);
+    if (off !== null) throw new ApiError(off);
+    if (!starts) throw new ApiError(AGENT_MESSAGES.noStart);
+    const input = parseStartInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return starts.start(dir, input.id, starter(chat));
+  }
+
   return {
     setPort: (next) => {
       port = next;
@@ -170,7 +188,16 @@ export function createAgentBridge({
     async call(chat, method, params) {
       const info = chats.info(chat);
       if (!info) throw new ApiError("No such chat.");
-      return method === "cards.draft" ? draft(chat, info.dir, params) : appendLog(chat, info.dir, info.session, params);
+      switch (method) {
+        case "cards.draft":
+          return draft(chat, info.dir, params);
+        case "feature.start":
+          return start(chat, info.dir, params);
+        case "log.append":
+          return appendLog(chat, info.dir, info.session, params);
+        default:
+          return assertNever(method);
+      }
     },
     async undo(chat, id) {
       await writer.undo(chat, id);

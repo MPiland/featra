@@ -22,8 +22,11 @@ export interface AgentMethods {
   "log.append": { params: LogInput; result: LoggedEntry };
   /** Drafts a feature and its stories, or revises the chat's open draft in place (STORY-8). */
   "cards.draft": { params: DraftInput; result: DraftResult };
+  /** Starts an approved feature: its branch, with the feature active on it, by the chat's session (STORY-52). */
+  "feature.start": { params: { feature: string }; result: { branch: string } };
 }
 export type AgentMethod = keyof AgentMethods;
+export const AGENT_METHODS = ["log.append", "cards.draft", "feature.start"] as const satisfies readonly AgentMethod[];
 
 export interface AgentRequest {
   id: number;
@@ -42,6 +45,7 @@ export function parseAgentRequest(text: string): AgentRequest | { id: number | n
   if (!isRecord(raw) || typeof raw.id !== "number" || !Number.isSafeInteger(raw.id)) {
     return { id: null, error: "Malformed request." };
   }
-  if (raw.method !== "log.append" && raw.method !== "cards.draft") return { id: raw.id, error: "Unknown method." };
-  return { id: raw.id, method: raw.method, params: raw.params };
+  const method = AGENT_METHODS.find((m) => m === raw.method);
+  if (!method) return { id: raw.id, error: "Unknown method." };
+  return { id: raw.id, method, params: raw.params };
 }

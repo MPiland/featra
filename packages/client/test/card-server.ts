@@ -1,6 +1,8 @@
 // The local server's card side, as a fake: cards held in memory, edited with work-format's own rules.
 import {
   applyCardEdit,
+  notStartableReason,
+  startedFeature,
   buildCardView,
   buildWorkList,
   DEFAULT_CONFIG,
@@ -31,7 +33,7 @@ export function fakeCardServer(
   /** What the server answers to Send back. */
   sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
   /** What the server answers to Approve and Reject; left out, the fake does what the server does to the cards. */
-  review: Partial<Pick<CardBridge, "approve" | "reject">> = {},
+  review: Partial<Pick<CardBridge, "approve" | "reject" | "start">> = {},
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -106,6 +108,17 @@ export function fakeCardServer(
         plan.drop.map((c) => c.id),
       );
       changed(dir, plan.feature);
+      return { ok: true };
+    },
+    // Start is the server's to prove (git, the branch): the fake records the call and, unless a test sets the answer,
+    // makes the feature active as work-format's rules say.
+    start: async (dir, id) => {
+      calls.push(`start:${dir}:${id}`);
+      if (review.start) return review.start(dir, id);
+      const feature = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = notStartableReason(feature, id);
+      if (why !== null || !feature) return { ok: false, error: why ?? "That card is gone." };
+      changed(dir, startedFeature(feature, "user", EDIT_AT));
       return { ok: true };
     },
     reject: async (dir, id) => {

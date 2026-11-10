@@ -11,6 +11,7 @@ import {
   parseDecision,
   parseDraft,
   parseQuestion,
+  parseStartInput,
   type DraftInput,
   type DraftResult,
   type LoggedEntry,
@@ -24,6 +25,8 @@ export interface FeatraHost {
   log: (input: LogInput) => Promise<LoggedEntry>;
   /** Drafts a feature and its stories, or revises the chat's open draft in place (STORY-8). */
   draft: (input: DraftInput) => Promise<DraftResult>;
+  /** Starts an approved feature: its branch, with the feature active on it (STORY-52). */
+  start: (feature: string) => Promise<{ branch: string }>;
 }
 
 export interface Tool {
@@ -176,5 +179,28 @@ const DRAFT_CARDS: Tool = {
   },
 };
 
+const START_FEATURE: Tool = {
+  name: "start_feature",
+  failed: "Not started.",
+  description: [
+    "Start a feature the user has approved: Featra creates its branch (feature/<number>-<title>) from the base branch,",
+    "marks the feature active there, and from then on the feature and its stories live on that branch.",
+    "Call it only once the user has approved the feature and asked you to start it.",
+    "It never changes the user's checkout and never pushes. It is refused when the feature isn't approved,",
+    "already has a branch, or the base branch can't be found; the error says which.",
+  ].join(" "),
+  inputSchema: {
+    type: "object",
+    properties: { feature: { type: "string", description: "The feature's card id, such as FEAT-5." } },
+    required: ["feature"],
+  },
+  async run(input, host) {
+    const parsed = parseStartInput(input);
+    if (!parsed.ok) throw new ToolRefusal(parsed.error);
+    const { branch } = await host.start(parsed.id);
+    return `Started ${parsed.id} on ${branch}. Not pushed.`;
+  },
+};
+
 /** Every tool the server offers, in the order an agent lists them. */
-export const TOOLS: readonly Tool[] = [LOG_DECISION, DEFER_QUESTION, DRAFT_CARDS];
+export const TOOLS: readonly Tool[] = [LOG_DECISION, DEFER_QUESTION, DRAFT_CARDS, START_FEATURE];

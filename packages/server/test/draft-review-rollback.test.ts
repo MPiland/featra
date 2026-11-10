@@ -5,28 +5,13 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { withoutInheritedGitConfig } from "./git-config-env.ts";
 import { lines, draftFixture } from "./draft-review-fixture.ts";
 
 const f = draftFixture();
 
-/**
- * The pre-commit hook runs these tests under `git -c core.hooksPath=.githooks`, and the product's git keeps that
- * environment config (ADR 0023), so the repo's own hook would be skipped. This file's tests that need the repo's hook
- * to run take that config out of the process environment, and put it back.
- */
-const CONFIG = ["GIT_CONFIG_PARAMETERS", "GIT_CONFIG_COUNT"] as const;
-let savedConfig: Record<string, string | undefined>;
-beforeEach(() => {
-  savedConfig = Object.fromEntries(CONFIG.map((k) => [k, process.env[k]]));
-  for (const k of CONFIG) delete process.env[k];
-});
-afterEach(() => {
-  for (const k of CONFIG) {
-    if (savedConfig[k] === undefined) delete process.env[k];
-    else process.env[k] = savedConfig[k];
-  }
-});
+withoutInheritedGitConfig();
 
 const snapshot = async () => {
   const names = (await readdir(f.cardsDir())).toSorted();

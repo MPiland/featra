@@ -1322,3 +1322,11 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Claude runner only in F4.** The spawn interface is provider-neutral; the Codex runner stays on the roadmap.
 - Stories: STORY-52 Start a feature, STORY-9 Spawn a story agent, STORY-53 Watch, stop and resume, STORY-10 Agents update
   their own card, STORY-54 Story agents report to the Dev Lead, STORY-55 Native subagents appear nested.
+
+## 2026-11-10 — Start's commit runs no hooks (user)
+
+- The user ruled: Start's commit is card-only and runs no hooks. Featra's own card-only bookkeeping commits on a branch
+  with no checkout (Start's, built with git plumbing and published with a create-only `update-ref`) don't run the
+  repository's hooks. Every commit made in a checkout still does: Approve in main, and every commit of an agent or the
+  user. Reason: Featra's own pre-commit runs the full check, which a temporary worktree can't pass; the plumbing commit
+  needs no worktree at all (ADR 0024).

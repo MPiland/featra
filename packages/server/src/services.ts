@@ -11,6 +11,7 @@ import { loadAgentQuery } from "./claude-sdk.ts";
 import { createDraftActions } from "./draft-actions.ts";
 import { createDraftReview } from "./draft-review.ts";
 import { createDraftWriter } from "./draft-writer.ts";
+import { createFeatureStart } from "./feature-start.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createLogWriter, type LogWriterDeps } from "./log-writer.ts";
@@ -93,6 +94,7 @@ export function createServices({
     store,
     mcp: { attach: (chat) => agents.attach(chat), release: (chat) => agents.release(chat) },
   });
+  const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,
@@ -103,6 +105,7 @@ export function createServices({
     chats,
     writer: createLogWriter({ now, ...logs }),
     drafts: createDraftWriter({ scan: watches.scan, now, lane }),
+    starts,
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
@@ -117,6 +120,7 @@ export function createServices({
     cards,
     drafts,
     review: createDraftReview({ scan: watches.scan, now, lane, gitCommand }),
+    starts,
     chats,
     roles,
     roleWatches,

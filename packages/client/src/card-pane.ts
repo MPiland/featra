@@ -33,6 +33,8 @@ export interface CardBridge {
   approve: (dir: string, id: string) => Promise<ReviewResult>;
   /** Rejects a draft feature: the server deletes its cards (STORY-51). */
   reject: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Starts an approved feature: the server makes its branch and the feature is active there (STORY-52). */
+  start: (dir: string, id: string) => Promise<ReviewResult>;
 }
 
 /** Whether Approve or Reject went through, or why not. */
@@ -68,6 +70,7 @@ export const CARD_COPY = {
   sendBackUnrecorded: "Sent. Couldn't record it in history.",
   approve: "Approve",
   reject: "Reject",
+  start: "Start",
   rejectAsk: (id: string, stories: number) => `Delete ${id} and its ${stories} ${stories === 1 ? "story" : "stories"}?`,
   rejectConfirm: "Delete",
   rejectCancel: "Cancel",
@@ -118,6 +121,7 @@ export function serverCards(server: ServerClient): CardBridge {
       ),
     approve: (dir, id) => review(server.call("draft.approve", { dir, id })),
     reject: (dir, id) => review(server.call("draft.reject", { dir, id })),
+    start: (dir, id) => review(server.call("feature.start", { dir, id })),
   };
 }
 
@@ -132,5 +136,6 @@ export function noCards(error: string): CardBridge {
     sendBack: async () => ({ ok: false, error }),
     approve: async () => ({ ok: false, error }),
     reject: async () => ({ ok: false, error }),
+    start: async () => ({ ok: false, error }),
   };
 }

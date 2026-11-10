@@ -5,6 +5,7 @@ import { InlineText } from "../controls/InlineText.tsx";
 import { CloseIcon } from "../icons.tsx";
 import { DraftReview } from "./DraftReview.tsx";
 import { SendBack } from "./SendBack.tsx";
+import { StartFeature } from "./StartFeature.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
 import { AcSection, Evidence, TaskSection, TextSection, type SaveEdit } from "./CardSections.tsx";
@@ -135,6 +136,15 @@ export function CardPane({
                 onApprove={() => work.approve(dir, id)}
                 onReject={() => work.reject(dir, id)}
                 onRejected={onClose}
+              />
+            </div>
+          )}
+          {view.startable && (
+            <div className="draft-actions">
+              <StartFeature
+                key={`start-${id}`}
+                onStart={() => work.start(dir, id)}
+                onStarted={() => pane.current?.focus()}
               />
             </div>
           )}

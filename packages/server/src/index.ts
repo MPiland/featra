@@ -24,3 +24,4 @@ export * from "./role-registry.ts";
 export * from "./agent-bridge.ts";
 export * from "./draft-writer.ts";
 export * from "./log-writer.ts";
+export * from "./feature-start.ts";

@@ -68,6 +68,7 @@ function Story({ story }: { story: StoryRow }) {
 export function Feature({ feature }: { feature: FeatureRow }) {
   const [open, setOpen] = useState(false);
   const review = useReviewDraft();
+  const { open: openCard } = useCardSelection();
   const title = feature.id === null ? WORK_COPY.noFeature : feature.title;
   return (
     <>
@@ -91,6 +92,17 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               onClick={() => review(feature.draftedBy ?? "", feature.id ?? "")}
             >
               {WORK_COPY.reviewDraft}
+            </button>
+          )}
+          {feature.status === "approved" && feature.id && (
+            // An approved feature has no story to open it from: this opens its card, where Start is (STORY-52).
+            <button
+              type="button"
+              className="review-draft"
+              aria-label={WORK_COPY.openFeatureOf(feature.id)}
+              onClick={() => openCard(feature.id ?? "")}
+            >
+              {WORK_COPY.openFeature}
             </button>
           )}
           <StaleMark id={feature.id} />
