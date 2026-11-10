@@ -2,7 +2,7 @@
 id: BUG-13
 type: bug
 title: New chat looks like an input
-status: In Progress
+status: In Review
 parent: FEAT-3
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-13-new-chat
-pr: null
+pr: 17
 created: 2026-11-10T03:05:28Z
 history:
   - at: 2026-11-10T03:05:28Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:bug-13
+  - at: 2026-11-10T03:14:45Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:bug-13
 ---
 
