@@ -1282,6 +1282,11 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   (150 to 185 s each); commits with 3 workers passed 2 of 2 (about 220 s). Still worth doing on the
   PC (the repo cannot): stop or cap WSL (`wsl --shutdown`, or `memory=` in `.wslconfig`) and reboot to clear the
   kernel pools. A failure with "Test timed out in 30000ms" in several files at once is this, not a regression.
+- **Capped results (2026-11-10):** 5 capped gate runs passed 4 of 5 (261, 233, 231, 257 s; one failed at 271 s on a
+  multi-file stall: a hook timeout, work-watch "worktree goes", ws-work AC5, AC6 and card.watch together). The capped
+  soak was stopped after 8 runs, 6 passing; the failures were stalls of 20 s or more (run 6: door, worktree-goes,
+  card-actions timeouts; run 8: card.watch "No matching frame in 2000 ms" in a 59.5 s run). Capping helps but does not
+  cure memory exhaustion, so AC2 is not ticked.
 
 ## 2026-11-10 — FEAT-4 accepted
 
