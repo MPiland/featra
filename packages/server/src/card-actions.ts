@@ -37,7 +37,7 @@ const contextOf = (scan: Scan): CardEditContext => ({
   cards: scan.resolution.cards.map((c) => c.card),
 });
 
-function ownedIn(scan: Scan | null, id: string) {
+export function ownedIn(scan: Scan | null, id: string) {
   const owned = scan?.resolution.cards.find((c) => c.card.id === id);
   if (!scan || !owned) return null;
   return { owned, root: scan.collected.roots.get(locationKey(owned.owner)) ?? null };
@@ -61,7 +61,7 @@ export async function writeAtomic(file: string, text: string): Promise<void> {
   }
 }
 
-const fileIn = (root: string, path: string) => join(root, ...path.split("/"));
+export const fileIn = (root: string, path: string) => join(root, ...path.split("/"));
 
 export function createCardActions({ scan: scanDir, now, lane = createCardLane() }: CardActionDeps) {
   async function apply(dir: string, id: string, edit: CardEdit): Promise<CardUpdateResult> {

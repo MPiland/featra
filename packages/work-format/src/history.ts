@@ -36,6 +36,17 @@ export function recordAcceptance(card: Card, accepted: boolean, by: string, at: 
   return change(card, "accepted", null, accepted ? "accepted" : "withdrawn", by, at);
 }
 
+/** Records that the user sent a draft back, with the reason (trimmed) as written: STORY-50. */
+export function recordSentBack(card: Card, reason: string, by: string, at: string): Card {
+  return change(card, "sent-back", null, reason.trim(), by, at);
+}
+
+/** What the drafting chat is told when its draft is sent back: short, and naming the feature it refers to. */
+/** The longest reason a send-back takes, in characters. */
+export const SEND_BACK_MAX = 2000;
+
+export const sendBackMessage = (feature: string, reason: string): string => `Sent back ${feature}: ${reason.trim()}`;
+
 const ms = (iso: string) => Date.parse(iso);
 
 /** When the card came into existence; cards without any timestamp are treated as always existing. */

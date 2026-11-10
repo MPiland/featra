@@ -65,6 +65,11 @@ export interface ServerMethods {
   "card.watch": { params: { dir: string; id: string }; result: CardView | null };
   /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
+  /**
+   * Sends a draft feature back to the chat that drafted it with the user's reason, then records it in the feature's
+   * history (STORY-50). Refused without a reason, for a feature that isn't a draft, or when its chat is gone.
+   */
+  "draft.sendBack": { params: { dir: string; id: string; reason: string }; result: { recorded: boolean } };
   /** The roles a chat in this project can start from (ADR 0018). */
   "chat.roles": { params: { dir: string }; result: Role[] };
   /**
@@ -177,6 +182,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "work.discardCopy",
   "card.watch",
   "card.update",
+  "draft.sendBack",
   "chat.roles",
   "roles.watch",
   "roles.edit",

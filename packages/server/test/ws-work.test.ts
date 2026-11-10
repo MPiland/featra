@@ -134,3 +134,38 @@ describe("card.watch and card.update (ADR 0017)", () => {
     expect(logged).toEqual([]);
   });
 });
+
+describe("draft.sendBack (STORY-50)", () => {
+  it("is checked at the door: an unopened project, malformed params, an empty reason, and a card that isn't a draft", async () => {
+    const socket = await open();
+    try {
+      const ask = async (id: number, params: unknown) => {
+        socket.send({ id, method: "draft.sendBack", params });
+        return socket.next((f) => f.id === id, 10_000);
+      };
+      expect(await ask(20, { dir: repo.root, id: "FEAT-1", reason: "x" })).toEqual({
+        id: 20,
+        ok: false,
+        error: "Not an open project.",
+      });
+      expect(await ask(21, { dir: repo.main, id: "FEAT-1" })).toEqual({
+        id: 21,
+        ok: false,
+        error: "Expected { dir, id, reason }.",
+      });
+      expect(await ask(22, { dir: repo.main, id: "FEAT-1", reason: "  " })).toEqual({
+        id: 22,
+        ok: false,
+        error: "Say why you're sending it back.",
+      });
+      // FEAT-1 is a draft nobody drafted: there is no chat to send to.
+      expect(await ask(23, { dir: repo.main, id: "FEAT-1", reason: "Too big." })).toEqual({
+        id: 23,
+        ok: false,
+        error: "FEAT-1 isn't a draft.",
+      });
+    } finally {
+      socket.close();
+    }
+  });
+});

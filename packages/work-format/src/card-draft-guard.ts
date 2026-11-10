@@ -84,10 +84,11 @@ export const stamped = (card: Card): Card => ({ ...card, extra: { ...card.extra,
 
 /**
  * Whether a history entry is a change to what a draft says. Moves between stages, evidence and acceptance are not,
- * and neither are the notes (a draft doesn't write them).
+ * a send-back is not (it asks the agent to revise, so it must never block it), and neither are the notes (a draft
+ * doesn't write them).
  */
 const notDraftText = (e: { field: string; to: string | null }) =>
-  ["status", "evidence", "accepted"].includes(e.field) || (e.field === "content" && e.to === "notes");
+  ["status", "evidence", "accepted", "sent-back"].includes(e.field) || (e.field === "content" && e.to === "notes");
 
 /**
  * Whether someone other than the drafting chat changed a card since the draft last wrote it: a text edit made in the

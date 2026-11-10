@@ -10,7 +10,7 @@ import {
   type CardUpdateResult,
   type CardView,
 } from "@featra/work-format/card-view";
-import { errorMessage } from "@featra/work-format/guards";
+import { errorMessage, isRecord } from "@featra/work-format/guards";
 import type { ServerClient } from "./server-client.ts";
 
 export type { CardEdit, CardUpdateResult, CardView };
@@ -27,7 +27,12 @@ export interface CardBridge {
   watchCard: (dir: string, id: string, listener: (update: CardUpdate) => void) => () => void;
   /** Saves one edit to the card's owner copy; answers with the card as it is after, or why not. */
   updateCard: (dir: string, id: string, edit: CardEdit) => Promise<CardUpdateResult>;
+  /** Sends a draft feature back to its chat with the reason (STORY-50). */
+  sendBack: (dir: string, id: string, reason: string) => Promise<SendBackResult>;
 }
+
+/** Why a send-back didn't go, or that it did; `recorded` is false when the chat has it but history doesn't. */
+export type SendBackResult = { ok: true; recorded: boolean } | { ok: false; error: string };
 
 export const CARD_COPY = {
   close: "Close card",
@@ -46,6 +51,14 @@ export const CARD_COPY = {
   tasks: "Tasks",
   stories: "Stories",
   backTo: (id: string) => `Back to ${id}`,
+  sendBack: "Send back…",
+  sendBackForm: "Send back",
+  sendBackReason: "Reason",
+  sendBackHint: "What should change?",
+  sendBackSend: "Send",
+  sendBackCancel: "Cancel",
+  sendBackGone: "Its chat is gone.",
+  sendBackUnrecorded: "Sent. Couldn't record it in history.",
   pr: "PR",
   owner: (owner: string) => `Saved to ${owner}`,
   edit: (label: string) => `Edit ${label.toLowerCase()}`,
@@ -80,6 +93,11 @@ export function serverCards(server: ServerClient): CardBridge {
         error: errorMessage(err),
         view: null,
       })),
+    sendBack: (dir, id, reason) =>
+      server.call("draft.sendBack", { dir, id, reason }).then(
+        (r): SendBackResult => ({ ok: true, recorded: !(isRecord(r) && r.recorded === false) }),
+        (err: unknown): SendBackResult => ({ ok: false, error: errorMessage(err) }),
+      ),
   };
 }
 
@@ -91,5 +109,6 @@ export function noCards(error: string): CardBridge {
       return () => {};
     },
     updateCard: async () => ({ ok: false, error, view: null }),
+    sendBack: async () => ({ ok: false, error }),
   };
 }

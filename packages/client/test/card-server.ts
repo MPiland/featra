@@ -26,6 +26,8 @@ export function fakeCardServer(
   given: Record<string, Card[]>,
   calls: string[],
   listChanged: (dir: string, list: WorkList) => void,
+  /** What the server answers to Send back. */
+  sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -69,6 +71,12 @@ export function fakeCardServer(
       if (!r.ok) return { ok: false, error: r.error, view: viewOf(dir, id) };
       changed(dir, r.card);
       return { ok: true, view: viewOf(dir, id) as CardView };
+    },
+    // Send back is the server's to prove (ordering, validation, history): the fake only records the call and answers
+    // what the test sets, by default that the chat has it and history does too.
+    sendBack: async (dir, id, reason) => {
+      calls.push(`sendBack:${dir}:${id}:${reason}`);
+      return sendBack(dir, id, reason);
     },
   };
   return {

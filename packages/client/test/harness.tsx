@@ -24,6 +24,7 @@ import {
 } from "../src/bridge.ts";
 import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
 import type { Card } from "@featra/work-format";
+import type { CardBridge } from "../src/card-pane.ts";
 import { fakeCardServer } from "./card-server.ts";
 import { fakeChatServer, type ChatHost } from "./chat-server.ts";
 import { fakeRolesServer, type RolesHost } from "./roles-server.ts";
@@ -34,6 +35,8 @@ export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
 export const LOCATION = "/home/me";
 
 export interface HostOptions extends ChatHost, RolesHost {
+  /** What the card server answers to Send back. Default: sent and recorded. */
+  sendBack?: CardBridge["sendBack"];
   closeToTray?: CloseToTraySupport;
   /** The current project, or null for none. Default: PROJECT. */
   project?: ProjectRef | null;
@@ -110,9 +113,14 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   // The server's Work list per folder, and who is watching it.
   const workLists = new Map(Object.entries(host.work ?? {}));
   const watchers = new Map<string, Set<(u: WorkUpdate) => void>>();
-  const cards = fakeCardServer(host.cards ?? {}, calls, (dir, next) => {
-    for (const l of watchers.get(dir) ?? []) l({ list: next, error: null });
-  });
+  const cards = fakeCardServer(
+    host.cards ?? {},
+    calls,
+    (dir, next) => {
+      for (const l of watchers.get(dir) ?? []) l({ list: next, error: null });
+    },
+    host.sendBack,
+  );
   const chats = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
   const listOf = (dir: string) => cards.listOf(dir) ?? workLists.get(dir) ?? EMPTY_WORK_LIST;

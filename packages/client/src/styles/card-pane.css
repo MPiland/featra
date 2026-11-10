@@ -377,3 +377,39 @@ button.inline-text:hover {
 .chat-head .review-draft {
   margin-left: auto;
 }
+
+/* Send back… on a draft (STORY-50). */
+.send-back {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.send-back textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--menu-line);
+  border-radius: 6px;
+  background: var(--row);
+  color: var(--tx);
+  font: inherit;
+  resize: vertical;
+}
+
+.send-back textarea:focus-visible,
+.send-back .btn:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.send-back .btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.send-back-actions {
+  display: flex;
+  gap: 8px;
+}
