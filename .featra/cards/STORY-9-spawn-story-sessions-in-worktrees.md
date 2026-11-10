@@ -44,3 +44,4 @@ As the user or the Dev Lead, I start a story's agent in its own worktree, with t
 
 - 2026-11-10 (dev-lead): Reshaped with the user: story agents are Featra-run provider sessions that behave like subagents (see decisions.md).
 - 2026-11-10 (dev-lead): added the remote-safe criterion with the user, so a Dev Lead prompted from a remote client (M2) can still spawn stories.
+- 2026-11-10 (dev-lead): A story added to a started feature must be written to the feature branch (owner); today it shows from main with the 'isn't in its owner' problem line. Decide where it is written as part of this story.

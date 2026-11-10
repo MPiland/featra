@@ -184,7 +184,7 @@ const START_FEATURE: Tool = {
   failed: "Not started.",
   description: [
     "Start a feature the user has approved: Featra creates its branch (feature/<number>-<title>) from the base branch,",
-    "marks the feature In progress there, and from then on the feature and its stories live on that branch.",
+    "marks the feature active there, and from then on the feature and its stories live on that branch.",
     "Call it only once the user has approved the feature and asked you to start it.",
     "It never changes the user's checkout and never pushes. It is refused when the feature isn't approved,",
     "already has a branch, or the base branch can't be found; the error says which.",
