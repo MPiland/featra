@@ -4,6 +4,7 @@
  */
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
+import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { evidenceState } from "./evidence.ts";
 import { locationLabel, sameLocation } from "./ownership.ts";
 import type { OwnedCard } from "./owner-copies.ts";
@@ -41,6 +42,7 @@ export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEd
   const { card } = owned;
   const ev = evidenceState(card);
   const proof = proofOf(card, ev.provenAcs);
+  const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   return {
     id: card.id,
     type: card.type,
@@ -58,5 +60,6 @@ export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEd
     stories: storiesOf(card, ctx.cards),
     owner: locationLabel(owned.owner),
     readOnly: readOnlyReason(owned, checkedOut, ctx.config.baseBranch),
+    ...(draftChat === null ? {} : { draftChat }),
   };
 }

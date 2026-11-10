@@ -27,6 +27,8 @@ export interface CardBridge {
   watchCard: (dir: string, id: string, listener: (update: CardUpdate) => void) => () => void;
   /** Saves one edit to the card's owner copy; answers with the card as it is after, or why not. */
   updateCard: (dir: string, id: string, edit: CardEdit) => Promise<CardUpdateResult>;
+  /** Sends a draft feature back to its chat with the reason; answers with why not, or null once the chat has it (STORY-50). */
+  sendBack: (dir: string, id: string, reason: string) => Promise<string | null>;
 }
 
 export const CARD_COPY = {
@@ -46,6 +48,13 @@ export const CARD_COPY = {
   tasks: "Tasks",
   stories: "Stories",
   backTo: (id: string) => `Back to ${id}`,
+  sendBack: "Send back…",
+  sendBackForm: "Send back",
+  sendBackReason: "Reason",
+  sendBackHint: "What should change?",
+  sendBackSend: "Send",
+  sendBackCancel: "Cancel",
+  sendBackGone: "Its chat is gone.",
   pr: "PR",
   owner: (owner: string) => `Saved to ${owner}`,
   edit: (label: string) => `Edit ${label.toLowerCase()}`,
@@ -80,6 +89,7 @@ export function serverCards(server: ServerClient): CardBridge {
         error: errorMessage(err),
         view: null,
       })),
+    sendBack: (dir, id, reason) => server.call("draft.sendBack", { dir, id, reason }).then(() => null, errorMessage),
   };
 }
 
@@ -91,5 +101,6 @@ export function noCards(error: string): CardBridge {
       return () => {};
     },
     updateCard: async () => ({ ok: false, error, view: null }),
+    sendBack: async () => error,
   };
 }

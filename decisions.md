@@ -1128,3 +1128,27 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Tests I changed:** only fixtures: the agent-bridge fakes in server, mcp and desktop tests gained `retitle: () => {}`
   because the dependency is now required. The "no Approved" client test gained a role-based check on the status list;
   its old assertion stays.
+
+## 2026-11-10 — STORY-50: send a draft back
+
+- **Where it appears.** Send back… is in the draft pane in the chat and on the draft feature in Work's card pane (the
+  one `CardPane`), and only while the feature is a draft waiting on review (`CardView.draftChat` is set, which needs
+  type feature, status `draft` and `drafted-by`). It is never on a story, a hand-made draft, or a feature that has left
+  draft. Note: Work reaches a draft feature's pane only through Review draft when its chat is gone, so there the button
+  is always the disabled one; with a live chat Review draft opens the chat.
+- **Message.** `Sent back FEAT-N: <reason>` (`sendBackMessage`, work-format), the reason trimmed. It appears in the
+  transcript as an ordinary user message because it goes through `chats.send`.
+- **Busy chat.** Handled exactly as a normal send: the chat manager refuses ("Wait for the reply, or stop it."), the
+  pane shows the refusal, the reason is kept, and no history is written. No queue was invented.
+- **Missing chat.** Send back is disabled with "Its chat is gone." (the button's `aria-describedby`); the server also
+  refuses and records nothing.
+- **Order.** One server method, `draft.sendBack`: validate (non-blank reason, a draft feature, its chat open in this
+  project), send, then append the history entry. A failed send writes nothing. The client never writes history. The
+  work runs in the shared card lane, so the agent's next revision queues behind the history write.
+- **History.** New field `sent-back` (`from: null`, `to: <reason>`, `by: user`). The ruling-5 guard lists it with the
+  moves that are not a text edit, so a send-back never blocks the agent's next revision; tests at work-format and
+  through the real writer prove it, and that a real pane edit after a send-back still blocks.
+- **Provider neutral:** nothing names a provider. Approve and Reject remain STORY-51.
+- **Tests changed:** none weakened. The e2e helpers (`project`, `git`, `cardFile`) moved from `draft.spec.ts` and
+  `review-draft.spec.ts` into `e2e/draft-project.ts` for reuse; their assertions are untouched. The client fake card
+  server gained `sendBack`.

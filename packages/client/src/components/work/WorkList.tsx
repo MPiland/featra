@@ -136,6 +136,7 @@ export function WorkList(props: {
             paneId={paneId}
             width={width}
             openedFrom={from}
+            hasChat={hasChat}
             onOpen={(id) => select(id, id === from ? undefined : (selected ?? undefined))}
             onClose={close}
           />

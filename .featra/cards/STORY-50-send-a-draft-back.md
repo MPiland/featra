@@ -2,7 +2,7 @@
 id: STORY-50
 type: story
 title: Send a draft back
-status: New
+status: In Progress
 parent: FEAT-4
 order: 3
 origin: planned
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-50-send-back
 pr: null
 created: 2026-11-10T03:47:43Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-10T06:10:00Z
+    field: status
+    from: New
+    to: In Progress
+    by: developer
 ---
 
 ## Description
@@ -34,7 +39,11 @@ As a builder, I send a draft back to the Dev Lead with a reason, so it revises t
 
 ## Tasks
 
-- [ ] Break down when picked up
+- [x] work-format: `sent-back` history entry; the draft guard ignores it; the card view names the draft's chat
+- [x] Server: one `draft.sendBack` method sends to the chat, then records history (nothing on a failed send)
+- [x] Client: Send back… with a required reason in the chat's draft pane and in Work's card pane
+- [x] Add the e2e journey `send-back.spec.ts`
+- [x] Decisions, ADR note
 
 ## Notes
 

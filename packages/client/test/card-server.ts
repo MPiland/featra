@@ -3,6 +3,10 @@ import {
   applyCardEdit,
   buildCardView,
   buildWorkList,
+  draftedBy,
+  needsReview,
+  recordSentBack,
+  sendBackMessage,
   DEFAULT_CONFIG,
   MAIN,
   type Card,
@@ -26,6 +30,8 @@ export function fakeCardServer(
   given: Record<string, Card[]>,
   calls: string[],
   listChanged: (dir: string, list: WorkList) => void,
+  /** The chat server's send: what the server hands the drafting chat. Answers with why not, or null. */
+  sendToChat: (chat: string, text: string) => Promise<string | null> = async () => null,
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -69,6 +75,18 @@ export function fakeCardServer(
       if (!r.ok) return { ok: false, error: r.error, view: viewOf(dir, id) };
       changed(dir, r.card);
       return { ok: true, view: viewOf(dir, id) as CardView };
+    },
+    // What the server does: send the message to the chat first, record history only once the chat has it.
+    sendBack: async (dir, id, reason) => {
+      calls.push(`sendBack:${dir}:${id}:${reason}`);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const chat = card && card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
+      if (!card || chat === null) return `${id} isn't a draft.`;
+      if (!reason.trim()) return "Say why you're sending it back.";
+      const failed = await sendToChat(chat, sendBackMessage(id, reason));
+      if (failed !== null) return failed;
+      changed(dir, recordSentBack(card, reason, "user", EDIT_AT));
+      return null;
     },
   };
   return {

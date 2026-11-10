@@ -10,8 +10,15 @@ export const CONTAINER_STATUSES: readonly ContainerStatus[] = ["draft", "approve
 /** stories and bugs use project stage names; `Cancelled` is always available. */
 export const CANCELLED = "Cancelled";
 
-export type HistoryField = "status" | "parent" | "evidence" | "accepted" | "content";
-export const HISTORY_FIELDS: readonly HistoryField[] = ["status", "parent", "evidence", "accepted", "content"];
+export type HistoryField = "status" | "parent" | "evidence" | "accepted" | "content" | "sent-back";
+export const HISTORY_FIELDS: readonly HistoryField[] = [
+  "status",
+  "parent",
+  "evidence",
+  "accepted",
+  "content",
+  "sent-back",
+];
 
 /** Append-only record of a change, written at the card's owner (ADR 0002). */
 export interface HistoryEvent {

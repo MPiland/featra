@@ -110,9 +110,14 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   // The server's Work list per folder, and who is watching it.
   const workLists = new Map(Object.entries(host.work ?? {}));
   const watchers = new Map<string, Set<(u: WorkUpdate) => void>>();
-  const cards = fakeCardServer(host.cards ?? {}, calls, (dir, next) => {
-    for (const l of watchers.get(dir) ?? []) l({ list: next, error: null });
-  });
+  const cards = fakeCardServer(
+    host.cards ?? {},
+    calls,
+    (dir, next) => {
+      for (const l of watchers.get(dir) ?? []) l({ list: next, error: null });
+    },
+    (chat, text) => chats.bridge.send(chat, text),
+  );
   const chats = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
   const listOf = (dir: string) => cards.listOf(dir) ?? workLists.get(dir) ?? EMPTY_WORK_LIST;

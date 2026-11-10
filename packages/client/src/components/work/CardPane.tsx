@@ -3,6 +3,7 @@ import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
 import { InlineText } from "../controls/InlineText.tsx";
 import { CloseIcon } from "../icons.tsx";
+import { SendBack } from "./SendBack.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
 import { AcSection, Evidence, TaskSection, TextSection, type SaveEdit } from "./CardSections.tsx";
@@ -21,7 +22,11 @@ export interface CardPaneProps {
   openedFrom?: string;
   /** Take focus on open (default). A pane that opens beside a chat being typed in leaves it. */
   focusOnOpen?: boolean;
+  /** Whether the project still has a chat. Send back is off for a draft whose chat is gone; default: it has. */
+  hasChat?: (chat: string) => boolean;
 }
+
+const anyChat = () => true;
 
 // A null parent goes through the dropdown as "", since its values are strings.
 const toChoice = (v: string | null) => v ?? "";
@@ -42,6 +47,7 @@ export function CardPane({
   onOpen,
   openedFrom,
   focusOnOpen = true,
+  hasChat = anyChat,
 }: CardPaneProps) {
   const card = useCard(work, dir, id);
   const pane = useRef<HTMLElement>(null);
@@ -114,6 +120,13 @@ export function CardPane({
           </div>
           <Evidence evidence={view.evidence} />
           <p className="meta">{view.readOnly ?? CARD_COPY.owner(view.owner)}</p>
+          {view.draftChat && !readOnly && (
+            <SendBack
+              key={id}
+              unavailable={hasChat(view.draftChat) ? null : CARD_COPY.sendBackGone}
+              onSend={(reason) => work.sendBack(dir, id, reason)}
+            />
+          )}
           {error && (
             <p className="card-error" role="alert">
               {error}

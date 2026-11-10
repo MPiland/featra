@@ -1,49 +1,15 @@
-import { execFileSync } from "node:child_process";
-import { mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
-import { newCard, serializeCard } from "@featra/work-format";
 import { launch, tempUserData } from "./app.ts";
+import { git, project } from "./draft-project.ts";
 
 /**
  * STORY-8: the Dev Lead drafts a feature through the Featra MCP, in the real app with its real local server, the real
  * MCP process and real git. Only the platform and the agent are faked (agent.ts): fake-agent-sdk.mjs starts the MCP
  * from the options Featra gave the session and calls draft_cards, as an agent would.
  */
-const env = (() => {
-  const e: Record<string, string | undefined> = { ...process.env };
-  for (const key of Object.keys(e)) if (key.startsWith("GIT_")) delete e[key];
-  return {
-    ...e,
-    GIT_AUTHOR_NAME: "Test",
-    GIT_AUTHOR_EMAIL: "test@example.invalid",
-    GIT_COMMITTER_NAME: "Test",
-    GIT_COMMITTER_EMAIL: "test@example.invalid",
-  };
-})();
-const git = (cwd: string, ...args: string[]) =>
-  execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
-
-/** A project in git with one finished feature, so the draft's IDs are the next ones. */
-async function project(config = "version: 1\n") {
-  const dir = await realpath(await mkdtemp(join(tmpdir(), "featra-draft-e2e-")));
-  await mkdir(join(dir, ".featra", "cards"), { recursive: true });
-  git(dir, "init", "-q", "-b", "main");
-  git(dir, "config", "core.autocrlf", "false");
-  await writeFile(join(dir, ".featra", "config.yaml"), config);
-  const first = newCard(
-    { id: "FEAT-1", type: "feature", title: "First", status: "done" },
-    "user",
-    "2026-11-01T00:00:00Z",
-  );
-  await writeFile(join(dir, ".featra", "cards", "FEAT-1-first.md"), serializeCard(first), "utf8");
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", "plan");
-  return { dir, dispose: () => rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }) };
-}
-
 const cards = async (dir: string) => (await readdir(join(dir, ".featra", "cards"))).toSorted();
 const composer = (page: Page) => page.getByRole("textbox", { name: "Message" });
 const list = (page: Page) => page.getByRole("region", { name: "Work list" });

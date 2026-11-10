@@ -8,6 +8,7 @@ import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts"
 import { locateClaude } from "./claude-locate.ts";
 import { createClaudeProvider, type ClaudeDeps } from "./claude-provider.ts";
 import { loadAgentQuery } from "./claude-sdk.ts";
+import { createDraftActions } from "./draft-actions.ts";
 import { createDraftWriter } from "./draft-writer.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
@@ -91,6 +92,7 @@ export function createServices({
     store,
     mcp: { attach: (chat) => agents.attach(chat), release: (chat) => agents.release(chat) },
   });
+  const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,
     execPath: mcpExecPath,
@@ -112,6 +114,7 @@ export function createServices({
     watches,
     copies,
     cards,
+    drafts,
     chats,
     roles,
     roleWatches,
