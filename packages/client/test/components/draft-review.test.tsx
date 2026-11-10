@@ -32,8 +32,8 @@ function drafted(chat: string): Card[] {
 type Host = Parameters<typeof renderApp>[0];
 
 /** A Dev Lead chat (chat-1) that has drafted FEAT-2, open with its pane. */
-async function chatWithDraft(host: Host = {}) {
-  const app = renderApp({ ...host, cards: { [PROJECT.dir]: [...BUILT, ...drafted("chat-1")] } });
+async function chatWithDraft(host: Host = {}, more: Card[] = []) {
+  const app = renderApp({ ...host, cards: { [PROJECT.dir]: [...BUILT, ...drafted("chat-1"), ...more] } });
   await app.chats.bridge.start(PROJECT.dir, "dev-lead");
   await screen.findByRole("region", { name: "Work list" });
   app.chats.retitle("chat-1", "Shaping", "draft");
@@ -86,7 +86,7 @@ describe("AC1 and AC3: Approve", () => {
     const { app, pane } = await chatWithDraft();
     await app.user.click(await within(pane).findByRole("button", { name: "Approve" }));
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(within(pane).queryByRole("group")).toBeNull();
+    expect(within(pane).queryByRole("alertdialog")).toBeNull();
     await waitFor(() => expect(app.calls).toContain(`approve:${PROJECT.dir}:${FEATURE}`));
     await waitFor(() => gone(pane, "Approve", "Reject", "Send back…"));
     expect(app.cardsIn(PROJECT.dir).find((c) => c.id === FEATURE)?.status).toBe("approved");
@@ -160,7 +160,7 @@ describe("AC2: Reject", () => {
   it("asks first, naming the feature and how many stories go, and does nothing until confirmed", async () => {
     const { app, pane } = await chatWithDraft();
     await app.user.click(await within(pane).findByRole("button", { name: "Reject" }));
-    const ask = await within(pane).findByRole("group", { name: "Reject" });
+    const ask = await within(pane).findByRole("alertdialog", { name: "Reject" });
     expect(within(ask).getByText(`Delete ${FEATURE} and its 2 stories?`)).toBeTruthy();
     expect(document.activeElement).toBe(within(ask).getByRole("button", { name: "Cancel" }));
     expect(app.calls.some((c) => c.startsWith("reject:"))).toBe(false);
@@ -170,11 +170,11 @@ describe("AC2: Reject", () => {
     const { app, pane } = await chatWithDraft();
     await app.user.click(await within(pane).findByRole("button", { name: "Reject" }));
     await app.user.click(within(pane).getByRole("button", { name: "Cancel" }));
-    expect(within(pane).queryByRole("group")).toBeNull();
+    expect(within(pane).queryByRole("alertdialog")).toBeNull();
     expect(document.activeElement).toBe(button(pane, "Reject"));
     await app.user.click(button(pane, "Reject"));
     await app.user.keyboard("{Escape}");
-    expect(within(pane).queryByRole("group")).toBeNull();
+    expect(within(pane).queryByRole("alertdialog")).toBeNull();
     expect(screen.getByRole("complementary", { name: `${FEATURE} card` })).toBeTruthy();
     expect(app.calls.some((c) => c.startsWith("reject:"))).toBe(false);
   });
@@ -210,5 +210,74 @@ describe("AC2: Reject", () => {
     await app.user.click(within(pane).getByRole("button", { name: "Delete" }));
     await waitFor(() => expect(screen.queryByRole("complementary", { name: `${FEATURE} card` })).toBeNull());
     expect(app.calls).toContain(`reject:${PROJECT.dir}:${FEATURE}`);
+  });
+
+  it("counts every story it deletes: a Cancelled one and one the user added too", async () => {
+    const { app, pane } = await chatWithDraft({}, [
+      cardOf({ id: "STORY-90", type: "story", parent: FEATURE, status: "New" }),
+      cardOf({ id: "STORY-91", type: "story", parent: FEATURE, status: "Cancelled" }),
+    ]);
+    await app.user.click(await within(pane).findByRole("button", { name: "Reject" }));
+    const ask = await within(pane).findByRole("alertdialog", { name: "Reject" });
+    expect(within(ask).getByText(`Delete ${FEATURE} and its 4 stories?`)).toBeTruthy();
+  });
+});
+
+/** A chat with a draft whose Reject question is open. */
+const openAsk = async (host: Host = {}) => {
+  const made = await chatWithDraft(host);
+  await made.app.user.click(await within(made.pane).findByRole("button", { name: "Reject" }));
+  return { ...made, ask: await within(made.pane).findByRole("alertdialog", { name: "Reject" }) };
+};
+
+describe("the Reject question as a dialog", () => {
+  it("describes itself with the question", async () => {
+    const { ask } = await openAsk();
+    expect(ask.getAttribute("aria-describedby")).toBeTruthy();
+    expect(document.getElementById(ask.getAttribute("aria-describedby") as string)?.textContent).toBe(
+      `Delete ${FEATURE} and its 2 stories?`,
+    );
+  });
+
+  it("closes on Escape with focus on Delete, on Cancel, or on nothing in particular", async () => {
+    const { app, pane, ask } = await openAsk();
+    within(ask).getByRole<HTMLButtonElement>("button", { name: "Delete" }).focus();
+    await app.user.keyboard("{Escape}");
+    expect(within(pane).queryByRole("alertdialog")).toBeNull();
+    expect(document.activeElement).toBe(button(pane, "Reject"));
+    await app.user.click(button(pane, "Reject"));
+    await app.user.click(within(pane).getByText(`Delete ${FEATURE} and its 2 stories?`));
+    (document.activeElement as HTMLElement | null)?.blur();
+    await app.user.keyboard("{Escape}");
+    expect(within(pane).queryByRole("alertdialog")).toBeNull();
+    expect(screen.getByRole("complementary", { name: `${FEATURE} card` })).toBeTruthy();
+    expect(app.calls.some((c) => c.startsWith("reject:"))).toBe(false);
+  });
+
+  it("keeps focus inside: Tab wraps between Delete and Cancel, and focus moved outside comes back", async () => {
+    const { app, ask } = await openAsk();
+    const del = within(ask).getByRole<HTMLButtonElement>("button", { name: "Delete" });
+    const cancel = within(ask).getByRole<HTMLButtonElement>("button", { name: "Cancel" });
+    expect(document.activeElement).toBe(cancel);
+    await app.user.tab();
+    expect(ask.contains(document.activeElement)).toBe(true);
+    await app.user.tab();
+    expect(ask.contains(document.activeElement)).toBe(true);
+    await app.user.tab({ shift: true });
+    expect(ask.contains(document.activeElement)).toBe(true);
+    del.focus();
+    await app.user.tab();
+    expect(document.activeElement).toBe(cancel);
+    screen.getByRole("button", { name: "Work" }).focus();
+    expect(ask.contains(document.activeElement)).toBe(true);
+  });
+
+  it("puts focus back on Reject after a refused delete, with the error shown", async () => {
+    const { app, pane } = await openAsk({
+      review: { reject: async () => ({ ok: false, error: "FEAT-2 can't be deleted: git tracks it." }) },
+    });
+    await app.user.click(within(pane).getByRole("button", { name: "Delete" }));
+    expect((await within(pane).findByRole("alert")).textContent).toBe("FEAT-2 can't be deleted: git tracks it.");
+    expect(document.activeElement).toBe(button(pane, "Reject"));
   });
 });

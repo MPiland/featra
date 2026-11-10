@@ -4,6 +4,7 @@ import {
   buildCardView,
   DEFAULT_CONFIG,
   MAIN,
+  newCard,
   parseCard,
   planDraft,
   recordSentBack,
@@ -79,5 +80,20 @@ describe("CardView.draftChat", () => {
     const approved = cards.map((c) => (c.id === plan.result.feature ? { ...c, status: "approved" } : c));
     expect(viewOf(approved, plan.result.feature).draftChat).toBeUndefined();
     expect(viewOf(cards, plan.result.stories[0] as string).draftChat).toBeUndefined();
+  });
+
+  it("counts every story Reject would delete: Cancelled and user-added ones too, though the list hides Cancelled", () => {
+    const { cards, plan } = firstDraft();
+    const [first] = plan.result.stories as [string, ...string[]];
+    const added = newCard(
+      { id: "STORY-90", type: "story", title: "Mine", status: "New", parent: plan.result.feature },
+      "user",
+      T2,
+    );
+    const all = [...cards.map((c) => (c.id === first ? { ...c, status: "Cancelled" } : c)), added];
+    const view = viewOf(all, plan.result.feature);
+    expect(view.draftStories).toBe(plan.result.stories.length + 1);
+    expect(view.stories).toHaveLength(plan.result.stories.length);
+    expect(viewOf(cards, plan.result.stories[0] as string).draftStories).toBeUndefined();
   });
 });

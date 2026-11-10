@@ -126,11 +126,14 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
   const baseline = scopeBaseline(featureId, cards, config);
   const items = itemsOf(featureId, cards);
   const added: AddedItem[] = [];
+  // With a stored baseline (STORY-51), added scope is whatever isn't in its list: no clock to tie on. Without one, an
+  // item added is one that joined after the computed baseline.
+  const stored = baselineOf(cards.find((c) => c.id === featureId && c.type === "feature") ?? { extra: {} });
   if (baseline !== null) {
     for (const c of items) {
       const at = joinedAt(c, featureId);
-      if (at !== null && ms(at) > ms(baseline))
-        added.push({ id: c.id, title: c.title, type: c.type, origin: c.origin, at });
+      const isAdded = stored ? !stored.stories.includes(c.id) : at !== null && ms(at) > ms(baseline);
+      if (isAdded) added.push({ id: c.id, title: c.title, type: c.type, origin: c.origin, at: at ?? baseline });
     }
   }
   const bugs = items.filter((c) => c.type === "bug");

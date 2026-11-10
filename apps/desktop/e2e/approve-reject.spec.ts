@@ -18,12 +18,17 @@ const onDisk = async (dir: string, prefix: string) =>
 
 /** Starts a Dev Lead chat and has it draft a feature; resolves with the pane the draft opens in. */
 async function draftInNewChat(page: Page, id: string) {
+  const open = page.locator("section.chat");
+  const before = await open.first().getAttribute("data-chat");
   await page.getByRole("button", { name: "New chat" }).click();
   await page
     .getByRole("dialog", { name: "New chat" })
     .getByRole("button", { name: /^Dev Lead/ })
     .click();
-  // Wait for the new chat's composer to settle, then send with the button and see the message land.
+  // The old chat's composer stays on screen until the new chat replaces it, and is editable: filling it then sends the
+  // text to the old chat (the CI trace showed a 6 ms fill against 72 ms in a fresh composer). Wait for the swap, then
+  // send with the button and see the message land.
+  if (before) await expect(open.first()).not.toHaveAttribute("data-chat", before);
   await expect(composer(page)).toBeEditable();
   await composer(page).fill("draft a feature");
   const send = page.getByRole("button", { name: "Send", exact: true });

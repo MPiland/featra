@@ -1190,3 +1190,40 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   hears nothing. A later `draft_cards` from that chat gets the existing refusal (tested).
 - **Tests.** No existing assertion changed. The client card-server fake gained `review`; the e2e helper `project()`
   sets a repo-local git identity so the app's server can commit.
+
+### STORY-51 review rulings (2026-11-10, PR #23)
+
+- **Draft scope.** The draft is the feature and every story under it that is untracked and owned by main, including a
+  story the user added during review. The Reject count and the Approve commit use that same set. A child in a worktree
+  or on a feature branch, or a tracked live child, refuses both actions and names the story. Tested with a user-added
+  story and a worktree-owned story.
+- **Git environment.** The global strip of `GIT_CONFIG_PARAMETERS` and `GIT_CONFIG_COUNT` in `gitEnv` is reverted; a
+  test proves product git still passes `GIT_CONFIG_COUNT` through. The hook-failure tests remove those variables from
+  `process.env` themselves (and restore them), because the pre-commit hook runs the tests under
+  `core.hooksPath=.githooks`.
+- **Default branch.** `baseBranch` from the config if set, then `origin/HEAD`, then main or master, whichever exists.
+  Detached HEAD, a repo with no commits and a missing branch each get a clear message. The scan itself resolves the
+  branch, since the main root exists only when the base branch is checked out. Tested with master, origin/HEAD, config
+  winning, detached HEAD and an empty repo.
+- **Rollback.** The index entries of the draft's paths are recorded before `git add` and restored with the checked
+  runner after a failure; if restoring fails the message says so. Tested with a path the user had staged and with a
+  failing reset (a hook that breaks the branch).
+- **Cancelled stories.** One git already tracks goes into the commit as Cancelled; an untracked one is deleted.
+- **Baseline.** For a feature with a stored baseline, added scope is the stories not in `baseline.stories`. Tested for a
+  story added after approval, one created in the same second, and an old feature with no stored baseline (same result as
+  before).
+- **Stale write.** Approve parses each card from the bytes it reads in the lane and checks them unchanged right before
+  writing; the scan's copy is not used. Tested with an edit after the scan (kept) and during the approve (refused).
+- **Reject question.** It is an `alertdialog` labelled "Reject" and described by its question. Escape closes it from
+  anywhere, focus stays inside (Tab wraps, outside focus returns to Cancel), and after cancelling or a refusal focus goes
+  back to Reject. Delete is `aria-disabled` while busy so it keeps focus. Client tests changed the role query from
+  `group` to `alertdialog`; no assertion was weakened.
+- **E2E Enter vs click.** Root cause is e2e timing, not product. The chat's draft pane opens with
+  `focusOnOpen={shown.focus}` and does not take the composer's focus. The CI trace of the failing run shows the second
+  chat's `fill` taking 6 ms (8777.265 to 8783.806) against 72 ms in the first chat (8179 to 8251): the text went into
+  the previous chat's composer, which is still on screen and editable until the new chat replaces it. The helper now
+  waits for the open chat's `data-chat` to change before filling, and keeps the Send click.
+- **Tests.** `draft-review.test.ts` was split into `draft-review-fixture.ts` plus approve, reject, rollback, scope and
+  branches files. The rebase test now expects the rebase refusal exactly (the mid-operation check runs first); it
+  accepted either message before. Added: paths with a space, master, detached HEAD, a failing reset, a story not in the
+  draft.

@@ -22,9 +22,6 @@ const REPO_OVERRIDES = [
   "GIT_ALTERNATE_OBJECT_DIRECTORIES",
   "GIT_COMMON_DIR",
   "GIT_PREFIX",
-  // `git -c` (as the pre-commit hook is run) passes its settings down; they would override each repo's own config.
-  "GIT_CONFIG_PARAMETERS",
-  "GIT_CONFIG_COUNT",
 ];
 
 export function gitEnv(): NodeJS.ProcessEnv {

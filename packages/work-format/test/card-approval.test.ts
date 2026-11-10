@@ -4,6 +4,7 @@ import {
   approvalMessage,
   baselineOf,
   DEFAULT_CONFIG,
+  newCard,
   originForNewItem,
   parseCard,
   planApproval,
@@ -110,6 +111,51 @@ describe("the scope baseline after approval", () => {
   it("is the first start for a feature with none stored, and null before that", () => {
     const { cards, feature } = draft();
     expect(scopeBaseline(feature, cards, DEFAULT_CONFIG)).toBeNull();
+  });
+});
+
+const later = (id: string, feature: string, at: string) =>
+  newCard({ id, type: "story", title: id, status: "New", parent: feature }, "user", at);
+
+describe("added scope after approval reads the stored list, not the time (STORY-51 review)", () => {
+  it("a story added after approval is added scope, with its origin", () => {
+    const { cards, feature, plan } = approved();
+    const extra = later("STORY-90", feature, "2026-11-10T13:00:00Z");
+    const after = [...cards.filter((c) => c.id !== feature), plan.feature, extra];
+    expect(scopeSummary(feature, after, DEFAULT_CONFIG).added.map((a) => a.id)).toEqual(["STORY-90"]);
+  });
+
+  it("a story created in the same second as the approval, and not in the list, is added scope", () => {
+    const { cards, feature, plan } = approved();
+    const extra = later("STORY-91", feature, AT);
+    const after = [...cards.filter((c) => c.id !== feature), plan.feature, extra];
+    expect(scopeSummary(feature, after, DEFAULT_CONFIG).added.map((a) => a.id)).toEqual(["STORY-91"]);
+  });
+
+  it("the stories in the stored list are never added scope, whatever their times", () => {
+    const { feature, plan } = approved();
+    expect(scopeSummary(feature, [plan.feature, ...plan.keep], DEFAULT_CONFIG).added).toEqual([]);
+  });
+
+  it("a feature with no stored baseline keeps the old computed result: the first start, and later joiners are added", () => {
+    const feature = newCard(
+      { id: "FEAT-8", type: "feature", title: "Old", status: "approved", parent: null },
+      "user",
+      "2026-11-01T00:00:00Z",
+    );
+    const first = setStatus(
+      later("STORY-80", "FEAT-8", "2026-11-01T00:00:00Z"),
+      "In Progress",
+      "developer",
+      "2026-11-02T00:00:00Z",
+    );
+    const joiner = later("STORY-81", "FEAT-8", "2026-11-03T00:00:00Z");
+    const early = later("STORY-82", "FEAT-8", "2026-11-01T12:00:00Z");
+    const summary = scopeSummary("FEAT-8", [feature, first, joiner, early], DEFAULT_CONFIG);
+    expect(summary.baseline).toBe("2026-11-02T00:00:00Z");
+    expect(summary.added.map((a) => a.id)).toEqual(["STORY-81"]);
+    expect(summary.addedLabel).toBe("+1 added since start");
+    expect(scopeSummary("FEAT-8", [feature, early], DEFAULT_CONFIG)).toMatchObject({ baseline: null, added: [] });
   });
 });
 

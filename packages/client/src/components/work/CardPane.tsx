@@ -131,7 +131,7 @@ export function CardPane({
               <DraftReview
                 key={`review-${id}`}
                 id={id}
-                stories={view.stories.length}
+                stories={view.draftStories ?? view.stories.length}
                 onApprove={() => work.approve(dir, id)}
                 onReject={() => work.reject(dir, id)}
                 onRejected={onClose}
