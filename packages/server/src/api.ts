@@ -18,6 +18,7 @@ import {
   roleEditParams,
   sendBackParams,
   setupParams,
+  starter,
   unwatchParams,
   type Inbox,
   type PushEvent,
@@ -33,6 +34,7 @@ import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
 import type { DraftActions } from "./draft-actions.ts";
 import type { DraftReview } from "./draft-review.ts";
+import type { FeatureStart } from "./feature-start.ts";
 import type { Git } from "./git.ts";
 import type { RoleRegistry } from "./role-registry.ts";
 import type { RoleWatches } from "./role-watch.ts";
@@ -50,6 +52,7 @@ export interface ApiDeps {
   cards: CardActions;
   drafts: DraftActions;
   review: DraftReview;
+  starts: FeatureStart;
   chats: ChatManager;
   roles: RoleRegistry;
   roleWatches: RoleWatches;
@@ -85,6 +88,7 @@ export function createApi({
   cards,
   drafts,
   review,
+  starts,
   chats,
   roles,
   roleWatches,
@@ -183,6 +187,11 @@ export function createApi({
         if (!p) throw new ApiError("Expected { dir, id }.");
         const dir = allow(p.dir);
         return method === "draft.approve" ? review.approve(dir, p.id) : review.reject(dir, p.id);
+      }
+      case "feature.start": {
+        const p = cardParams(params);
+        if (!p) throw new ApiError("Expected { dir, id }.");
+        return starts.start(allow(p.dir), p.id, starter(null));
       }
       case "roles.watch": {
         const dir = project(params);

@@ -75,6 +75,12 @@ export interface ServerMethods {
    * main's checkout, never pushing. All or nothing; refused when the feature isn't a draft any more.
    */
   "draft.approve": { params: { dir: string; id: string }; result: { commit: string } };
+  /**
+   * Starts an approved feature (STORY-52, ADR 0024): creates `feature/N-slug` from the base branch without touching
+   * main's checkout, with the feature active on it, and answers with the branch. All or nothing; refused when the
+   * feature isn't approved, its branch exists, or the base branch can't be found.
+   */
+  "feature.start": { params: { dir: string; id: string }; result: { branch: string } };
   /** Rejects a draft feature: deletes its card files. Refused when git tracks any of them. */
   "draft.reject": { params: { dir: string; id: string }; result: { removed: number } };
   /** The roles a chat in this project can start from (ADR 0018). */
@@ -191,6 +197,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "card.update",
   "draft.sendBack",
   "draft.approve",
+  "feature.start",
   "draft.reject",
   "chat.roles",
   "roles.watch",

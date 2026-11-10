@@ -5,6 +5,7 @@
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
+import { notStartableReason } from "./card-start.ts";
 import { evidenceState } from "./evidence.ts";
 import { locationLabel, sameLocation } from "./ownership.ts";
 import type { OwnedCard } from "./owner-copies.ts";
@@ -60,6 +61,7 @@ export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEd
     stories: storiesOf(card, ctx.cards),
     owner: locationLabel(owned.owner),
     readOnly: readOnlyReason(owned, checkedOut, ctx.config.baseBranch),
+    ...(notStartableReason(card, card.id) === null ? { startable: true as const } : {}),
     ...(draftChat === null
       ? {}
       : { draftChat, draftStories: ctx.cards.filter((c) => c.type === "story" && c.parent === card.id).length }),

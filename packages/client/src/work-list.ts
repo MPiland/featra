@@ -67,6 +67,8 @@ export const WORK_COPY = {
   review: "Review",
   reviewDraft: "Review draft",
   reviewDraftOf: (id: string) => `Review draft ${id}`,
+  openFeature: "Open",
+  openFeatureOf: (id: string) => `Open ${id}`,
   none: "—",
   epic: "epic",
   showStories: (title: string) => `Show stories of ${title}`,

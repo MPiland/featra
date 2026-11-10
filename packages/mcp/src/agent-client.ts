@@ -73,6 +73,11 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       if (!result) throw new Error("Featra gave an unexpected answer.");
       return result;
     },
+    async start(feature) {
+      const result = await call("feature.start", { feature });
+      if (!isRecord(result) || typeof result.branch !== "string") throw new Error("Featra gave an unexpected answer.");
+      return { branch: result.branch };
+    },
     close: () => socket.close(),
   };
 }
