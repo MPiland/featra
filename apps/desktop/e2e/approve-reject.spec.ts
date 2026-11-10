@@ -19,7 +19,7 @@ const onDisk = async (dir: string, prefix: string) =>
 /** Starts a Dev Lead chat and has it draft a feature; resolves with the pane the draft opens in. */
 async function draftInNewChat(page: Page, id: string) {
   const open = page.locator("section.chat");
-  const before = await open.first().getAttribute("data-chat");
+  const before = (await open.count()) > 0 ? await open.first().getAttribute("data-chat") : null;
   await page.getByRole("button", { name: "New chat" }).click();
   await page
     .getByRole("dialog", { name: "New chat" })

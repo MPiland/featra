@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { gitEnv, runGit } from "../src/git-run.ts";
 import { cleanGitEnv, tempFolder } from "./temp-folder.ts";
@@ -28,7 +28,11 @@ describe("the git environment the server passes on", () => {
       expect(r.stdout.trim()).toBe("Env Person");
       // The test's own helper, by contrast, strips every GIT_ variable.
       expect(
-        execFileSync("git", ["config", "user.name"], { cwd: folder.dir, env: cleanGitEnv() }).toString().trim(),
+        spawnSync("git", ["config", "user.name"], {
+          cwd: folder.dir,
+          env: cleanGitEnv(),
+          encoding: "utf8",
+        }).stdout.trim(),
       ).not.toBe("Env Person");
     } finally {
       await folder.dispose();
