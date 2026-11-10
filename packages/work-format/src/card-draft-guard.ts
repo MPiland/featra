@@ -25,15 +25,33 @@ export function draftedBy(card: Card): string | null {
 export const needsReview = (card: Pick<Card, "status" | "extra">): boolean =>
   card.status === "draft" && typeof card.extra[DRAFTED_BY] === "string";
 
-const byNumber = (a: Card, b: Card) => (parseId(a.id)?.n ?? 0) - (parseId(b.id)?.n ?? 0);
+/**
+ * The newest of a chat's drafts, by id number (an item without an id is skipped): the one rule for which draft belongs
+ * to a chat. The server revises it, and the chat's pane shows it, so the two can't disagree.
+ */
+export function newestDraft<T extends { id: string | null; chat: string | null }>(
+  chat: string,
+  items: readonly T[],
+): T | null {
+  let newest: T | null = null;
+  let best = -1;
+  for (const item of items) {
+    const n = item.id === null ? null : (parseId(item.id)?.n ?? 0);
+    if (item.chat === chat && n !== null && n >= best) {
+      newest = item;
+      best = n;
+    }
+  }
+  return newest;
+}
 
 /** The latest feature a chat drafted, whatever its status now. */
 export function draftedFeature(chat: string, cards: readonly Card[]): Card | null {
   return (
-    cards
-      .filter((c) => c.type === "feature" && draftedBy(c) === chat)
-      .toSorted(byNumber)
-      .at(-1) ?? null
+    newestDraft(
+      chat,
+      cards.filter((c) => c.type === "feature").map((c) => ({ id: c.id, chat: draftedBy(c), card: c })),
+    )?.card ?? null
   );
 }
 
@@ -64,8 +82,12 @@ export const contentKey = (card: Pick<Card, "title" | "description" | "acs" | "t
 /** `card` carrying the fingerprint of its current text, so a later call can tell whether anyone else changed it. */
 export const stamped = (card: Card): Card => ({ ...card, extra: { ...card.extra, [DRAFT_HASH]: contentKey(card) } });
 
-/** History fields that are not what a draft says: moves between stages, evidence and acceptance. */
-const NOT_TEXT = new Set(["status", "evidence", "accepted"]);
+/**
+ * Whether a history entry is a change to what a draft says. Moves between stages, evidence and acceptance are not,
+ * and neither are the notes (a draft doesn't write them).
+ */
+const notDraftText = (e: { field: string; to: string | null }) =>
+  ["status", "evidence", "accepted"].includes(e.field) || (e.field === "content" && e.to === "notes");
 
 /**
  * Whether someone other than the drafting chat changed a card since the draft last wrote it: a text edit made in the
@@ -76,7 +98,7 @@ export function userEdited(card: Card, chat: string): boolean {
   if (typeof stored === "string" && stored !== contentKey(card)) return true;
   const author = draftAuthor(chat);
   const last = card.history.findLastIndex((e) => e.by === author);
-  return card.history.some((e, i) => i > last && e.by === "user" && !NOT_TEXT.has(e.field));
+  return card.history.some((e, i) => i > last && e.by === "user" && !notDraftText(e));
 }
 
 const list = (label: string, items: readonly { text: string }[]) =>

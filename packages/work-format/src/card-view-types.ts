@@ -34,6 +34,13 @@ export interface CardEvidence {
   accepted: boolean;
 }
 
+/** A story under a feature: what the pane lists so each can be opened. */
+export interface CardChild {
+  id: string;
+  title: string;
+  status: string;
+}
+
 export interface CardView {
   id: string;
   type: "epic" | "feature" | "story" | "bug";
@@ -51,6 +58,8 @@ export interface CardView {
   tasks: CardViewTask[];
   notes: string;
   pr: string | null;
+  /** A feature's stories, in order, without the Cancelled ones; empty for any other card. */
+  stories: CardChild[];
   /** Where the card is read from and written to, as a label. */
   owner: string;
   /** Why the card can't be edited here, or null when it can. */
@@ -149,6 +158,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     tasks: list(raw.tasks, (t) => ({ text: text(t.text), done: t.done === true })),
     notes: text(raw.notes),
     pr: textOrNull(raw.pr),
+    stories: list(raw.stories, (s) => ({ id: text(s.id), title: text(s.title), status: text(s.status) })),
     owner: text(raw.owner),
     readOnly: textOrNull(raw.readOnly),
   };

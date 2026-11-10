@@ -1,5 +1,4 @@
-import { useId, useMemo, useRef, useState } from "react";
-import { paneWidthFor } from "../../pane-width.ts";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import type { ProjectRef } from "../../projects.ts";
 import {
   filterCounts,
@@ -11,8 +10,10 @@ import {
 } from "../../work-list.ts";
 import { SelectedCard } from "./card-selection.tsx";
 import { CardPane } from "./CardPane.tsx";
-import { PaneHandle, useMeasuredWidth, type ChosenWidth } from "./PaneHandle.tsx";
+import { PaneHandle, type ChosenWidth } from "./PaneHandle.tsx";
 import { Epic } from "./Epic.tsx";
+import { ReviewDraft } from "./review-draft.tsx";
+import { useDockedPane } from "./useDockedPane.ts";
 import { StaleCopies } from "./StaleCopies.tsx";
 import { StaleCards } from "./stale-mark.tsx";
 import { useWorkList } from "./useWorkList.ts";
@@ -23,23 +24,33 @@ import { useWorkList } from "./useWorkList.ts";
  * beside the list (ADR 0017); closing it puts focus back on the story. The pane's width is the user's choice, fitted
  * to the work area so the list keeps its minimum (`pane-width.ts`).
  */
-export function WorkList(props: { work: WorkBridge; project: ProjectRef; paneWidth: ChosenWidth }) {
-  const { work, project, paneWidth } = props;
+export function WorkList(props: {
+  work: WorkBridge;
+  project: ProjectRef;
+  paneWidth: ChosenWidth;
+  /** Opens the chat that drafted a feature, with the draft pane (STORY-49). */
+  onReviewDraft: (chat: string) => void;
+  /** Whether the project has that chat; Review draft falls back to this pane when its chat is gone. */
+  hasChat: (chat: string) => boolean;
+}) {
+  const { work, project, paneWidth, onReviewDraft, hasChat } = props;
   const update = useWorkList(work, project.dir);
   const [filter, setFilter] = useState<ListFilter>("all");
   const [selected, setSelected] = useState<string | null>(null);
+  // The card the open one was reached from (a draft's feature, then one of its stories), so the pane can go back.
+  const [from, setFrom] = useState<string | undefined>(undefined);
+  const select = useCallback((id: string | null, cameFrom?: string) => {
+    setSelected(id);
+    setFrom(cameFrom);
+  }, []);
   const paneId = useId();
   const listRef = useRef<HTMLElement>(null);
-  const splitRef = useRef<HTMLDivElement>(null);
-  const split = useMeasuredWidth(splitRef);
-  // The width while the handle is dragged; kept in the UI state when the drag ends.
-  const [dragged, setDragged] = useState<number | null>(null);
-  const width = paneWidthFor(dragged ?? paneWidth.chosen, split);
-  const choose = (w: number) => {
-    setDragged(null);
-    paneWidth.choose(w);
-  };
-  const selection = useMemo(() => ({ selected, paneId, open: setSelected }), [selected, paneId]);
+  const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
+  const reviewDraft = useCallback(
+    (chat: string, feature: string) => (hasChat(chat) ? onReviewDraft(chat) : select(feature)),
+    [hasChat, onReviewDraft, select],
+  );
+  const selection = useMemo(() => ({ selected, paneId, open: select }), [selected, paneId, select]);
   const close = () => {
     const id = selected;
     setSelected(null);
@@ -71,9 +82,11 @@ export function WorkList(props: { work: WorkBridge; project: ProjectRef; paneWid
         {epics.length === 0 && <p className="meta">{WORK_COPY.noMatch}</p>}
         <StaleCards value={new Set(list.stale.map((s) => s.cardId))}>
           <SelectedCard.Provider value={selection}>
-            {epics.map((e) => (
-              <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
-            ))}
+            <ReviewDraft.Provider value={reviewDraft}>
+              {epics.map((e) => (
+                <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
+              ))}
+            </ReviewDraft.Provider>
           </SelectedCard.Provider>
         </StaleCards>
       </>
@@ -114,14 +127,7 @@ export function WorkList(props: { work: WorkBridge; project: ProjectRef; paneWid
       </section>
       {selected && (
         <>
-          <PaneHandle
-            width={width}
-            split={split}
-            paneId={paneId}
-            onMove={setDragged}
-            onChoose={choose}
-            onClose={close}
-          />
+          <PaneHandle width={width} split={split} paneId={paneId} onMove={onMove} onChoose={choose} onClose={close} />
           <CardPane
             key={selected}
             work={work}
@@ -129,6 +135,8 @@ export function WorkList(props: { work: WorkBridge; project: ProjectRef; paneWid
             id={selected}
             paneId={paneId}
             width={width}
+            openedFrom={from}
+            onOpen={(id) => select(id, id === from ? undefined : (selected ?? undefined))}
             onClose={close}
           />
         </>

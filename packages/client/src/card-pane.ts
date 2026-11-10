@@ -44,6 +44,8 @@ export const CARD_COPY = {
   notesEmpty: "Add notes",
   acs: "Acceptance criteria",
   tasks: "Tasks",
+  stories: "Stories",
+  backTo: (id: string) => `Back to ${id}`,
   pr: "PR",
   owner: (owner: string) => `Saved to ${owner}`,
   edit: (label: string) => `Edit ${label.toLowerCase()}`,

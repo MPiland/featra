@@ -24,22 +24,33 @@ const base: Card = {
 };
 const cards = [feature("FEAT-1"), feature("FEAT-2"), { ...feature("EPIC-1"), type: "epic" as const }, base];
 const ctx = { config, cards };
+/** The content event a pane text edit now appends (STORY-49): `part` changed, from the JSON of its old value. */
+const content = (c: Card, part: string, old: unknown): Card => ({
+  ...c,
+  history: [
+    ...c.history,
+    { at: at(30), field: "content", from: JSON.stringify({ [part]: old }), to: part, by: "user" },
+  ],
+});
 const edit = (c: Card, e: Parameters<typeof applyCardEdit>[1]) => applyCardEdit(c, e, ctx, "user", at(30));
 
 describe("applyCardEdit: text fields", () => {
-  it("replaces the user story and appends no history", () => {
+  it("replaces the user story and appends a content event (STORY-49)", () => {
     const r = edit(base, { field: "description", from: base.description, to: "As a builder, I edit a card.\r\n" });
-    expect(r).toEqual({ ok: true, card: { ...base, description: "As a builder, I edit a card." } });
+    expect(r).toEqual({
+      ok: true,
+      card: content({ ...base, description: "As a builder, I edit a card." }, "story", base.description),
+    });
   });
 
   it("edits the title, notes, one AC and one task, keeping each AC's test link", () => {
     expect(edit(base, { field: "title", from: base.title, to: " New\ntitle " })).toEqual({
       ok: true,
-      card: { ...base, title: "New title" },
+      card: content({ ...base, title: "New title" }, "title", base.title),
     });
     expect(edit(base, { field: "notes", from: "first notes", to: "more" })).toEqual({
       ok: true,
-      card: { ...base, notes: "more" },
+      card: content({ ...base, notes: "more" }, "notes", "first notes"),
     });
     const ac = edit(base, { field: "ac", index: 0, from: "Opens a pane", to: "Opens a docked pane" });
     expect(ac.ok && ac.card.acs).toEqual([{ text: "Opens a docked pane", done: false, test: "e2e/card-pane.spec.ts" }]);

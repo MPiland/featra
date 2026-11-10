@@ -41,6 +41,7 @@ describe("the MCP bundle", () => {
       chats: {
         info: (id) => (id === "chat-1" ? { dir: DIR, session: "Developer chat 1a2b3c4d" } : null),
         report: () => {},
+        retitle: () => {},
       },
       writer: createLogWriter({ fs, platform: "linux" }),
     });

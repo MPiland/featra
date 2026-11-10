@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { EMPTY_CHAT } from "@featra/work-format/chat";
-import { CHAT_MESSAGES } from "@featra/work-format/chat-events";
 import { ASK_MODE, modeLabel, modeWhere } from "@featra/work-format/modes";
 import { type ChatBridge, type ChatRoleRef, type ChatUpdate } from "../../chats.ts";
 import { Composer } from "./Composer.tsx";
@@ -15,17 +14,19 @@ export interface OpenChat {
   role: ChatRoleRef;
 }
 
-interface ChatViewProps {
+export interface ChatViewProps {
   chats: ChatBridge;
   chat: OpenChat;
   /** The project folder, where a new chat with the same role starts. */
   dir: string;
   /** A new chat started from this one's role. */
   onStarted: (id: string, role: ChatRoleRef) => void;
+  /** What the header offers beside the chat's settings (STORY-49: Review draft). */
+  headerExtra?: ReactNode;
 }
 
 /** One chat: the role it runs as, its transcript, and the composer. A chat whose history is gone offers a new one. */
-export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
+export function ChatView({ chats, chat, dir, onStarted, headerExtra }: ChatViewProps) {
   const [update, setUpdate] = useState<ChatUpdate>({ chat: EMPTY_CHAT, error: null });
   const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => chats.watch(chat.id, setUpdate), [chats, chat.id]);
@@ -55,6 +56,7 @@ export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
             {modeChoice ? modeChoice.label : modeLabel(mode)}
           </span>
         </span>
+        {headerExtra}
       </header>
       {update.note && <p className="chat-note">{update.note}</p>}
       {error && (
@@ -90,19 +92,5 @@ export function ChatView({ chats, chat, dir, onStarted }: ChatViewProps) {
         />
       )}
     </section>
-  );
-}
-
-/**
- * The chat history points at: its view, or a line saying the server doesn't have it. Switching project leaves the old
- * project's chats (`leaveChats`), so it never shows one of them.
- */
-export function ChatPane({ chat, ...props }: Omit<ChatViewProps, "chat"> & { chat: OpenChat | null }) {
-  return chat ? (
-    <ChatView key={chat.id} chat={chat} {...props} />
-  ) : (
-    <p className="chat-error" role="alert">
-      {CHAT_MESSAGES.noChat}
-    </p>
   );
 }

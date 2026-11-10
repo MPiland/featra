@@ -47,7 +47,7 @@ export interface AgentBridgeDeps {
   /** Whether the MCP's script is there (it is missing from a build that didn't make it). */
   exists?: (file: string) => Promise<boolean>;
   log?: (message: string) => void;
-  chats: Pick<ChatManager, "info" | "report">;
+  chats: Pick<ChatManager, "info" | "report" | "retitle">;
   writer: LogWriter;
   /** Writes the cards agents draft (STORY-8). Without it `cards.draft` is refused. */
   drafts?: DraftWriter;
@@ -118,7 +118,15 @@ export function createAgentBridge({
     if (!drafts) throw new ApiError(AGENT_MESSAGES.noDrafts);
     const input = parseDraft(params);
     if (!input.ok) throw new ApiError(input.error);
-    return drafts.draft(dir, chat, input.value);
+    const result = await drafts.draft(dir, chat, input.value);
+    // The chat takes the feature's title (STORY-49); a name the user set stays. The cards are already written, so a
+    // rename that fails is logged and the call still succeeds.
+    try {
+      chats.retitle(chat, input.value.feature.title, "draft");
+    } catch (error) {
+      log(`Couldn't rename chat ${chat} after its draft: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return result;
   }
 
   return {

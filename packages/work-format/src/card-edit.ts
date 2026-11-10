@@ -12,7 +12,8 @@ import {
   type CardTextField,
 } from "./card-view-types.ts";
 import { checkTransition } from "./evidence.ts";
-import { setParent, setStatus } from "./history.ts";
+import { needsReview } from "./card-draft-guard.ts";
+import { appendHistory, setParent, setStatus } from "./history.ts";
 import { CANCELLED, CONTAINER_STATUSES, type Card, type ProjectConfig } from "./types.ts";
 
 export type CardEditResult = { ok: true; card: Card } | { ok: false; error: string };
@@ -27,6 +28,8 @@ export interface CardEditContext {
 
 /** The statuses the rules let the card move to, in workflow order, with its current one. */
 export function statusChoices(card: Card, { config, cards }: CardEditContext): CardOption[] {
+  // A draft leaves draft by Approve (STORY-51), never from this list.
+  if (needsReview(card)) return [{ value: card.status, label: CONTAINER_STATUS_LABELS[card.status] ?? card.status }];
   const work = card.type === "story" || card.type === "bug";
   const all = work ? [...config.stages.map((s) => s.name), CANCELLED] : [...CONTAINER_STATUSES];
   if (!all.includes(card.status)) all.unshift(card.status);
@@ -101,6 +104,36 @@ function survivesFile(card: Card, field: keyof typeof KEY_OF): boolean {
   }
 }
 
+/** What a text edit changed, as a `content` event names it (the vocabulary a draft's own events use). */
+function partOf(card: Card, field: CardTextField | CardItemField): string {
+  if (field === "description") return card.type === "feature" ? "description" : "story";
+  return { title: "title", notes: "notes", ac: "criteria", task: "tasks" }[field];
+}
+
+/** The old value of that part, as the event's `from` records it. */
+function oldPart(card: Card, part: string): unknown {
+  switch (part) {
+    case "title":
+      return card.title;
+    case "notes":
+      return card.notes;
+    case "criteria":
+      return card.acs.map((a) => a.text);
+    case "tasks":
+      return card.tasks.map((t) => t.text);
+    default:
+      return card.description;
+  }
+}
+
+/** `edited` with a `by` content event for the text edit that made it from `card`; `card` itself when nothing changed. */
+function recorded(card: Card, edited: Card, field: CardTextField | CardItemField, by: string, at: string): Card {
+  const part = partOf(card, field);
+  if (canonical(oldPart(card, part)) === canonical(oldPart(edited, part))) return card;
+  const from = JSON.stringify({ [part]: oldPart(card, part) });
+  return appendHistory(edited, { at, field: "content", from, to: part, by });
+}
+
 /** The owner's card with `edit` applied, as by `by` at `at`, or why it can't be. */
 export function applyCardEdit(
   card: Card,
@@ -113,6 +146,9 @@ export function applyCardEdit(
   if (edit.field === "status") {
     if (card.status !== edit.from) return refuse(CHANGED_ELSEWHERE);
     if (edit.to === card.status) return { ok: true, card };
+    // A draft waiting on review leaves draft only by Approve or Reject (STORY-51), never by a status edit.
+    if (needsReview(card))
+      return refuse(`Can't move to ${edit.to}: a draft is approved or rejected with Approve and Reject.`);
     const check = checkTransition(card, edit.to, ctx.config, ctx.cards);
     if (!check.ok) return refuse(`Can't move to ${edit.to}: ${check.reason}.`);
     result = { ok: true, card: setStatus(card, edit.to, by, at) };
@@ -124,6 +160,7 @@ export function applyCardEdit(
   } else {
     result = "index" in edit ? withItem(card, edit) : withText(card, edit);
     if (result.ok && !survivesFile(result.card, edit.field)) return refuse("That text can't be saved as typed.");
+    if (result.ok) result = { ok: true, card: recorded(card, result.card, edit.field, by, at) };
   }
   return result;
 }

@@ -32,7 +32,8 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   these.
 - **Draft** — a feature an agent made with `draft_cards`: status `draft`, owned by main, uncommitted, with its stories.
   It names the chat that drafted it (`drafted-by`) and shows in Work with a **Review** badge until it is approved or
-  rejected. A later call from that chat updates it in place (ADR 0021).
+  rejected. A later call from that chat updates it in place (ADR 0021). It opens as a card pane docked in that chat,
+  and the chat is named for it (ADR 0022).
 
 ## Progress
 

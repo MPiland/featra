@@ -16,7 +16,7 @@ async function twoChats() {
     entry: "/app/mcp.cjs",
     exists: async () => true,
     enabled: async () => true,
-    chats: { info: () => null, report: () => {} },
+    chats: { info: () => null, report: () => {}, retitle: () => {} },
     writer: createLogWriter(),
     newToken: () => `secret-${++n}`,
   });

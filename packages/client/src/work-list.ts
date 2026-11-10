@@ -65,6 +65,8 @@ export const WORK_COPY = {
   bugs: (n: number) => (n === 1 ? "1 open bug" : `${n} open bugs`),
   addedLater: "added",
   review: "Review",
+  reviewDraft: "Review draft",
+  reviewDraftOf: (id: string) => `Review draft ${id}`,
   none: "—",
   epic: "epic",
   showStories: (title: string) => `Show stories of ${title}`,

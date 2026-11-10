@@ -40,7 +40,9 @@ export function fakeCardServer(
   };
   /** The server sees the folder's cards change: it pushes the list and each watched card. */
   const changed = (dir: string, card: Card) => {
-    cardSets.set(dir, replace(cardSets.get(dir) ?? [], card));
+    const cards = cardSets.get(dir) ?? [];
+    // A card the folder doesn't have yet is one an agent just made (a draft).
+    cardSets.set(dir, cards.some((c) => c.id === card.id) ? replace(cards, card) : [...cards, card]);
     listChanged(dir, listOf(dir) as WorkList);
     for (const [key, set] of watchers) {
       const [d, id] = JSON.parse(key) as [string, string];

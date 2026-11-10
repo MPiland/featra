@@ -10,6 +10,7 @@ import type {
   ModeInfo,
   ProviderInfo,
   SettingsChange,
+  TitleBy,
 } from "@featra/work-format";
 import type { ChatStore } from "./chat-store.ts";
 import type { Timers } from "./inbox.ts";
@@ -44,6 +45,11 @@ export interface ChatManager {
    * for a value the chat's provider doesn't offer.
    */
   configure: (id: string, change: SettingsChange) => Promise<ChatControlState>;
+  /**
+   * Renames a chat (STORY-49). A draft renames its chat to the feature's title, never over a name the user set; the
+   * user's own name replaces anything. Pushes the list and saves.
+   */
+  retitle: (id: string, title: string, by: TitleBy) => void;
   send: (id: string, text: string) => void;
   /** Interrupts the running turn, if any. */
   stop: (id: string) => Promise<void>;
