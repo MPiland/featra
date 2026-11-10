@@ -1171,3 +1171,22 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Dev Lead approval (2026-11-10):** the client assertions on the sent message, transcript and history entry were
   removed because ruling 5 made the client fake thin; the same facts are proven against real code in
   `draft-send-back.test.ts` and `draft-send-back-chat.test.ts`. Approved.
+
+## 2026-11-10 — STORY-51: approve or reject a draft (ADR 0023)
+
+- **Buttons.** Approve and Reject sit next to Send back, in the chat's draft pane and Work's card pane, on a draft
+  feature only (`CardView.draftChat`). Text is exactly "Approve" (FEAT-5 renames it). Approve asks nothing; Reject asks
+  "Delete FEAT-N and its N stories?" (Delete / Cancel, focus on Cancel, Escape closes only the question).
+- **Lane.** `draft.approve` and `draft.reject` run in the card lane and re-check draft state there. The STORY-49 guard
+  on `card.update` still refuses a status move out of draft.
+- **Baseline.** There was no stored form, so `extra.baseline = { at, stories }` on the feature, built by the pure
+  `planApproval`; `scopeBaseline` returns the stored `at` when present and otherwise the old computed value.
+- **History and stories.** Approval appends a `by: user` status event; stories stay New. Cancelled draft stories are
+  deleted, not committed (one git already tracks is kept and left out of the commit).
+- **Commit.** Pathspec-limited in main's checkout, message `FEAT-N: approved <title>`, hooks run, never pushed. Refused
+  up front when main isn't on the base branch or is mid merge/rebase/cherry-pick/revert/bisect. A failed commit restores
+  every card file byte for byte and shows the git error.
+- **Reject.** Refused if any file is tracked or staged; deletes the files; git stays clean. The chat keeps its title and
+  hears nothing. A later `draft_cards` from that chat gets the existing refusal (tested).
+- **Tests.** No existing assertion changed. The client card-server fake gained `review`; the e2e helper `project()`
+  sets a repo-local git identity so the app's server can commit.

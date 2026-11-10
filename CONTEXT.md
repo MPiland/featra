@@ -30,7 +30,7 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **History event** — an append-only entry in a card's `history[]` (`at`, `from`, `to`, `by`) recording a status or
   scope change (`content` marks an edit to a card's text, with what changed in `to`). Burn-up charts are built from
   these.
-- **Draft** — a feature an agent made with `draft_cards`: status `draft`, owned by main, uncommitted, with its stories.
+- **Draft** — a feature an agent made with `draft_cards`: status `draft`, owned by main, uncommitted, with its stories. The user Approves it (its cards are committed to main) or Rejects it (they are deleted).
   It names the chat that drafted it (`drafted-by`) and shows in Work with a **Review** badge until it is approved or
   rejected. A later call from that chat updates it in place (ADR 0021). It opens as a card pane docked in that chat,
   and the chat is named for it (ADR 0022).
@@ -39,7 +39,7 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 
 - **Stage** — a story's position in the project's workflow (default: New, Ready, In Progress, In Review, Acceptance,
   Done). Each stage maps to a **stage category**: not started, active, done.
-- **Scope baseline** — the moment a feature's first story goes In Progress. Items added after it are **added scope**.
+- **Scope baseline** — set when the feature is approved: the time and the stories live then (a feature without one falls back to the moment its first story goes In Progress). Items added after it are **added scope**.
 - **Origin** — why a card exists: `planned`, `added` (after the baseline) or `bug`.
 - **Burn-up** — chart of a feature's total scope and done count over time. Featra does not forecast.
 - **Evidence state** — what is actually known about a story:

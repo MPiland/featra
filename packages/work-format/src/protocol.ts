@@ -70,6 +70,13 @@ export interface ServerMethods {
    * history (STORY-50). Refused without a reason, for a feature that isn't a draft, or when its chat is gone.
    */
   "draft.sendBack": { params: { dir: string; id: string; reason: string }; result: { recorded: boolean } };
+  /**
+   * Approves a draft feature (STORY-51, ADR 0023): marks it approved, sets its scope baseline and commits its cards to
+   * main's checkout, never pushing. All or nothing; refused when the feature isn't a draft any more.
+   */
+  "draft.approve": { params: { dir: string; id: string }; result: { commit: string } };
+  /** Rejects a draft feature: deletes its card files. Refused when git tracks any of them. */
+  "draft.reject": { params: { dir: string; id: string }; result: { removed: number } };
   /** The roles a chat in this project can start from (ADR 0018). */
   "chat.roles": { params: { dir: string }; result: Role[] };
   /**
@@ -183,6 +190,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "card.watch",
   "card.update",
   "draft.sendBack",
+  "draft.approve",
+  "draft.reject",
   "chat.roles",
   "roles.watch",
   "roles.edit",

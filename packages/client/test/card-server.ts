@@ -4,7 +4,9 @@ import {
   buildCardView,
   buildWorkList,
   DEFAULT_CONFIG,
+  draftStories,
   MAIN,
+  planApproval,
   type Card,
   type CardView,
   type OwnedCard,
@@ -28,6 +30,8 @@ export function fakeCardServer(
   listChanged: (dir: string, list: WorkList) => void,
   /** What the server answers to Send back. */
   sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
+  /** What the server answers to Approve and Reject; left out, the fake does what the server does to the cards. */
+  review: Partial<Pick<CardBridge, "approve" | "reject">> = {},
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -45,6 +49,18 @@ export function fakeCardServer(
     const cards = cardSets.get(dir) ?? [];
     // A card the folder doesn't have yet is one an agent just made (a draft).
     cardSets.set(dir, cards.some((c) => c.id === card.id) ? replace(cards, card) : [...cards, card]);
+    listChanged(dir, listOf(dir) as WorkList);
+    for (const [key, set] of watchers) {
+      const [d, id] = JSON.parse(key) as [string, string];
+      if (d === dir) for (const l of set) l({ view: viewOf(dir, id), loading: false, error: null });
+    }
+  };
+  /** The server deletes cards: it pushes the new list, and each watched card that is gone is null. */
+  const removed = (dir: string, ids: string[]) => {
+    cardSets.set(
+      dir,
+      (cardSets.get(dir) ?? []).filter((c) => !ids.includes(c.id)),
+    );
     listChanged(dir, listOf(dir) as WorkList);
     for (const [key, set] of watchers) {
       const [d, id] = JSON.parse(key) as [string, string];
@@ -77,6 +93,27 @@ export function fakeCardServer(
     sendBack: async (dir, id, reason) => {
       calls.push(`sendBack:${dir}:${id}:${reason}`);
       return sendBack(dir, id, reason);
+    },
+    // Approve and Reject are the server's to prove (git, the commit, the files): the fake records the call and, unless a
+    // test sets the answer, changes the cards as the server does, with work-format's own rules.
+    approve: async (dir, id) => {
+      calls.push(`approve:${dir}:${id}`);
+      if (review.approve) return review.approve(dir, id);
+      const plan = planApproval(id, cardSets.get(dir) ?? [], EDIT_AT);
+      if (!plan.ok) return { ok: false, error: plan.error };
+      removed(
+        dir,
+        plan.drop.map((c) => c.id),
+      );
+      changed(dir, plan.feature);
+      return { ok: true };
+    },
+    reject: async (dir, id) => {
+      calls.push(`reject:${dir}:${id}`);
+      if (review.reject) return review.reject(dir, id);
+      const cards = cardSets.get(dir) ?? [];
+      removed(dir, [id, ...draftStories(id, cards).map((c) => c.id)]);
+      return { ok: true };
     },
   };
   return {

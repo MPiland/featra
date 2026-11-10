@@ -1,3 +1,4 @@
+import { baselineOf } from "./card-approval.ts";
 import { stageCategory } from "./config.ts";
 import { createdMs, existsAt, parentAt, statusAt } from "./history.ts";
 import { CANCELLED, type Card, type CardType, type Origin, type ProgressMode, type ProjectConfig } from "./types.ts";
@@ -73,10 +74,12 @@ function memberAt(card: Card, featureId: string, t: number): boolean {
 }
 
 /**
- * The scope baseline: the first moment an item of this feature left the not-started stages.
- * Null until work starts. Once set it never moves, even if that item later goes back.
+ * The scope baseline: when the feature was approved (STORY-51), else, for a feature with none stored, the first moment
+ * an item of it left the not-started stages. Null until then. Once set it never moves, even if that item goes back.
  */
 export function scopeBaseline(featureId: string, cards: readonly Card[], config: ProjectConfig): string | null {
+  const stored = baselineOf(cards.find((c) => c.id === featureId && c.type === "feature") ?? { extra: {} });
+  if (stored) return stored.at;
   let best: number | null = null;
   for (const c of everUnder(featureId, cards)) {
     for (const e of c.history) {

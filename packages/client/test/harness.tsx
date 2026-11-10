@@ -37,6 +37,8 @@ export const LOCATION = "/home/me";
 export interface HostOptions extends ChatHost, RolesHost {
   /** What the card server answers to Send back. Default: sent and recorded. */
   sendBack?: CardBridge["sendBack"];
+  /** What the card server answers to Approve and Reject. Default: it changes the cards as the server does. */
+  review?: Partial<Pick<CardBridge, "approve" | "reject">>;
   closeToTray?: CloseToTraySupport;
   /** The current project, or null for none. Default: PROJECT. */
   project?: ProjectRef | null;
@@ -120,6 +122,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       for (const l of watchers.get(dir) ?? []) l({ list: next, error: null });
     },
     host.sendBack,
+    host.review,
   );
   const chats = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);

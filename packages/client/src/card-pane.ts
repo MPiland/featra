@@ -29,7 +29,14 @@ export interface CardBridge {
   updateCard: (dir: string, id: string, edit: CardEdit) => Promise<CardUpdateResult>;
   /** Sends a draft feature back to its chat with the reason (STORY-50). */
   sendBack: (dir: string, id: string, reason: string) => Promise<SendBackResult>;
+  /** Approves a draft feature: the server commits its cards to main (STORY-51). */
+  approve: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Rejects a draft feature: the server deletes its cards (STORY-51). */
+  reject: (dir: string, id: string) => Promise<ReviewResult>;
 }
+
+/** Whether Approve or Reject went through, or why not. */
+export type ReviewResult = { ok: true } | { ok: false; error: string };
 
 /** Why a send-back didn't go, or that it did; `recorded` is false when the chat has it but history doesn't. */
 export type SendBackResult = { ok: true; recorded: boolean } | { ok: false; error: string };
@@ -59,6 +66,11 @@ export const CARD_COPY = {
   sendBackCancel: "Cancel",
   sendBackGone: "Its chat is gone.",
   sendBackUnrecorded: "Sent. Couldn't record it in history.",
+  approve: "Approve",
+  reject: "Reject",
+  rejectAsk: (id: string, stories: number) => `Delete ${id} and its ${stories} ${stories === 1 ? "story" : "stories"}?`,
+  rejectConfirm: "Delete",
+  rejectCancel: "Cancel",
   pr: "PR",
   owner: (owner: string) => `Saved to ${owner}`,
   edit: (label: string) => `Edit ${label.toLowerCase()}`,
@@ -69,6 +81,12 @@ export const CARD_COPY = {
   proof: { passed: "Test passed", linked: "No result yet", none: "No test yet" } satisfies Record<AcProof, string>,
   count: (done: number, total: number, what: string) => `${done} of ${total} ${what}`,
 } as const;
+
+const review = (call: Promise<unknown>): Promise<ReviewResult> =>
+  call.then(
+    (): ReviewResult => ({ ok: true }),
+    (err: unknown): ReviewResult => ({ ok: false, error: errorMessage(err) }),
+  );
 
 /** The pane's bridge over the server client. */
 export function serverCards(server: ServerClient): CardBridge {
@@ -98,6 +116,8 @@ export function serverCards(server: ServerClient): CardBridge {
         (r): SendBackResult => ({ ok: true, recorded: !(isRecord(r) && r.recorded === false) }),
         (err: unknown): SendBackResult => ({ ok: false, error: errorMessage(err) }),
       ),
+    approve: (dir, id) => review(server.call("draft.approve", { dir, id })),
+    reject: (dir, id) => review(server.call("draft.reject", { dir, id })),
   };
 }
 
@@ -110,5 +130,7 @@ export function noCards(error: string): CardBridge {
     },
     updateCard: async () => ({ ok: false, error, view: null }),
     sendBack: async () => ({ ok: false, error }),
+    approve: async () => ({ ok: false, error }),
+    reject: async () => ({ ok: false, error }),
   };
 }

@@ -2,7 +2,7 @@
 id: STORY-51
 type: story
 title: Approve or reject a draft
-status: New
+status: In Progress
 parent: FEAT-4
 order: 4
 origin: planned
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-51-approve-reject
 pr: null
 created: 2026-11-10T03:47:43Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-10T10:00:00Z
+    field: status
+    from: New
+    to: In Progress
+    by: developer
 ---
 
 ## Description
@@ -28,13 +33,18 @@ As a builder, I approve a draft to make it the feature's scope, or reject it.
 
 ## Acceptance criteria
 
-- [ ] Approve marks the feature approved, sets its scope baseline, and commits the cards to main locally, without pushing
-- [ ] Reject removes the draft cards, leaving nothing in git
-- [ ] After approval, Send back and Reject disappear; the chat stays open
+- [x] Approve marks the feature approved, sets its scope baseline, and commits the cards to main locally, without pushing
+- [x] Reject removes the draft cards, leaving nothing in git
+- [x] After approval, Send back and Reject disappear; the chat stays open
 
 ## Tasks
 
-- [ ] Break down when picked up
+- [x] work-format: planApproval (baseline, cancelled stories dropped, history) and scopeBaseline reads it
+- [x] server: approve in the card lane (guards, pathspec commit, rollback) and reject (tracked-file check)
+- [x] protocol, api and client bridge: draft.approve and draft.reject
+- [x] client: Approve and Reject (confirm) beside Send back, in the chat pane and Work's pane
+- [x] tests: work-format, server (real git), client, Playwright journey
+- [x] ADR 0023, decisions.md, CONTEXT.md
 
 ## Notes
 

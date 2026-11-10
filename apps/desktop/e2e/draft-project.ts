@@ -25,6 +25,10 @@ export async function project(config = "version: 1\n") {
   await mkdir(join(dir, ".featra", "cards"), { recursive: true });
   git(dir, "init", "-q", "-b", "main");
   git(dir, "config", "core.autocrlf", "false");
+  // The app commits as this repository's own user (Approve, STORY-51), not as the test process.
+  git(dir, "config", "user.name", "Test");
+  git(dir, "config", "user.email", "test@example.invalid");
+  git(dir, "config", "commit.gpgsign", "false");
   await writeFile(join(dir, ".featra", "config.yaml"), config);
   const first = newCard(
     { id: "FEAT-1", type: "feature", title: "First", status: "done" },
