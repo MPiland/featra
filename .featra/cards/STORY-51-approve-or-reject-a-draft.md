@@ -2,7 +2,7 @@
 id: STORY-51
 type: story
 title: Approve or reject a draft
-status: In Progress
+status: In Review
 parent: FEAT-4
 order: 4
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-51-approve-reject
-pr: null
+pr: https://github.com/MPiland/featra/pull/23
 created: 2026-11-10T03:47:43Z
 history:
   - at: 2026-11-10T03:47:43Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: developer
+  - at: 2026-11-10T12:00:00Z
+    field: status
+    from: In Progress
+    to: In Review
     by: developer
 ---
 
