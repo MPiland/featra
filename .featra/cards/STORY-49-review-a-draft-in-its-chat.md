@@ -2,7 +2,7 @@
 id: STORY-49
 type: story
 title: Review a draft in its chat
-status: In Review
+status: Acceptance
 parent: FEAT-4
 order: 2
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-10T05:55:30Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
