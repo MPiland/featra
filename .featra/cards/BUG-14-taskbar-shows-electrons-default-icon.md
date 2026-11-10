@@ -2,7 +2,7 @@
 id: BUG-14
 type: bug
 title: Taskbar shows Electron's default icon
-status: In Review
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-14
+  - at: 2026-11-10T03:26:39Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T03:26:39Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
