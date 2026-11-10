@@ -2,7 +2,7 @@
 id: STORY-51
 type: story
 title: Approve or reject a draft
-status: In Review
+status: Acceptance
 parent: FEAT-4
 order: 4
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-10T09:17:02Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
