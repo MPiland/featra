@@ -32,9 +32,9 @@ const raw = (cwd: string, ...args: string[]) =>
 const git = (cwd: string, ...args: string[]) => raw(cwd, ...args).trim();
 const file = (tree: string, id: string) => join(tree, ...cardPath(id).split("/"));
 
-export async function cardRepo() {
+export async function cardRepo(folder = "main") {
   const root = await realpath(await mkdtemp(join(tmpdir(), "featra-work-")));
-  const main = join(root, "main");
+  const main = join(root, folder);
   await mkdir(main);
   git(main, "init", "-q", "-b", "main");
   git(main, "config", "core.autocrlf", "false");

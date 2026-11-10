@@ -12,9 +12,9 @@ afterAll(() => h.close());
 const text = (result: unknown) => (result as { content: { text: string }[] }).content[0]?.text ?? "";
 
 describe("the Featra MCP over stdio", () => {
-  it("offers log_decision and defer_question, with the descriptions that teach when to log", async () => {
+  it("offers log_decision, defer_question and draft_cards, with the descriptions that teach when to log", async () => {
     const { tools } = await (await h.connect()).listTools();
-    expect(tools.map((t) => t.name)).toEqual(["log_decision", "defer_question"]);
+    expect(tools.map((t) => t.name)).toEqual(["log_decision", "defer_question", "draft_cards"]);
     const decision = (tools[0]?.description ?? "").toLowerCase();
     for (const cue of [
       "changes behavior or scope",

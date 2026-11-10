@@ -9,6 +9,7 @@ import {
   branchStateOf,
   CARDS_DIR,
   CONFIG_FILE,
+  configOverrides,
   copyKey,
   DEFAULT_CONFIG,
   errorMessage,
@@ -58,12 +59,14 @@ function parsed(location: OwnerLocation, path: string, text: string, workingTree
   }
 }
 
-async function readConfig(top: string, problems: string[]): Promise<ProjectConfig> {
+/** The project's config, and whether its file names a base branch (else the repository's default is used). */
+async function readConfig(top: string, problems: string[]): Promise<{ config: ProjectConfig; baseSet: boolean }> {
   try {
-    return parseConfig(await readFile(join(top, ...CONFIG_FILE.split("/")), "utf8"));
+    const text = await readFile(join(top, ...CONFIG_FILE.split("/")), "utf8");
+    return { config: parseConfig(text), baseSet: configOverrides(text).baseBranch !== undefined };
   } catch (err) {
     if (!missing(err)) problems.push(`Can't read ${CONFIG_FILE}: ${errorMessage(err)}`);
-    return DEFAULT_CONFIG;
+    return { config: DEFAULT_CONFIG, baseSet: false };
   }
 }
 
@@ -84,6 +87,8 @@ type Source =
 export interface GitState {
   paths: RepoPaths;
   baseBranch: string;
+  /** Whether the base branch was found from the repository (no `baseBranch` in the config), not named by the user. */
+  detected: boolean;
   trees: WorktreeInfo[];
   branches: BranchInfo[];
   sources: Source[];
@@ -116,7 +121,7 @@ async function readGit(paths: RepoPaths, baseBranch: string, { git, index }: Col
     const files = (rev && committed.get(rev)) || [];
     return tree ? { location, tree, inHead: new Map(files.map((f) => [f.path, f.text])) } : { location, files };
   });
-  return { paths, baseBranch, trees, branches, sources };
+  return { paths, baseBranch, detected: false, trees, branches, sources };
 }
 
 /**
@@ -127,8 +132,16 @@ export async function collect(dir: string, deps: CollectDeps, reuse?: GitState):
   const paths = reuse?.paths ?? (await deps.git.paths(dir));
   if (!paths || !(await isDir(join(paths.top, FEATRA_DIR)))) return null;
   const problems: string[] = [];
-  const config = await readConfig(paths.top, problems);
-  const git = reuse?.baseBranch === config.baseBranch ? reuse : await readGit(paths, config.baseBranch, deps);
+  const configRead = await readConfig(paths.top, problems);
+  // The config's `baseBranch` wins; without one, the repository's default (origin/HEAD, main, master), found once and
+  // kept for rescans that reuse git's part (ADR 0016).
+  const found = configRead.baseSet
+    ? configRead.config.baseBranch
+    : ((reuse?.detected ? reuse.baseBranch : await deps.git.defaultBranch(paths.top)) ?? configRead.config.baseBranch);
+  const config =
+    found === configRead.config.baseBranch ? configRead.config : { ...configRead.config, baseBranch: found };
+  const fresh = reuse?.baseBranch === config.baseBranch ? reuse : await readGit(paths, config.baseBranch, deps);
+  const git = fresh.detected === !configRead.baseSet ? fresh : { ...fresh, detected: !configRead.baseSet };
 
   const roots = new Map<string, string>();
   const headTexts = new Map<string, string | null>();

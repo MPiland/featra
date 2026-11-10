@@ -2,6 +2,7 @@
  * Builds the Work list from the owner copies: epics, their features, the features' stories, and the counts. Every
  * count comes from the rollups (ADR 0003) at the moment the list is built; nothing here is stored.
  */
+import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";
@@ -41,12 +42,12 @@ export function featureTone(status: string): Tone {
 }
 
 /** Which filter chips a feature appears under, from its status and its stories' tones. */
-export function featureFilters(status: string | null, storyTones: readonly Tone[]): WorkFilter[] {
+export function featureFilters(status: string | null, storyTones: readonly Tone[], review = false): WorkFilter[] {
   const tones = storyTones.filter((t) => t !== "cancelled");
   const out: WorkFilter[] = [];
   const inProgress = status === null ? tones.some((t) => t === "active" || t === "review") : status === "active";
   if (inProgress) out.push("in-progress");
-  if (tones.includes("review")) out.push("needs-review");
+  if (review || tones.includes("review")) out.push("needs-review");
   const backlog = status === null ? tones.includes("idle") : status === "draft" || status === "approved";
   if (backlog) out.push("backlog");
   const done = status === null ? tones.length > 0 && tones.every((t) => t === "done") : status === "done";
@@ -102,8 +103,10 @@ function featureRow(feature: Card | null, stories: Card[], cards: readonly Card[
     id: feature?.id ?? null,
     title: feature?.title ?? "",
     status: feature?.status ?? null,
+    draftedBy: (feature && draftedBy(feature)) || undefined,
+    review: feature && needsReview(feature) ? true : undefined,
     tone: feature ? featureTone(feature.status) : "idle",
-    filters: featureFilters(feature?.status ?? null, tones),
+    filters: featureFilters(feature?.status ?? null, tones, feature ? needsReview(feature) : false),
     progress: feature
       ? labelled(featureProgress(feature.id, cards, config))
       : { done, total: tones.length, label: progressLabel(done, tones.length, "stories") },

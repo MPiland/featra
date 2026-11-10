@@ -8,16 +8,18 @@ import { randomBytes } from "node:crypto";
 import { access } from "node:fs/promises";
 import {
   AGENT_PATH,
+  parseDraft,
   parseLogInput,
   SERVER_HOST,
   isRecord,
   type AgentMethod,
+  type AgentMethods,
   type KnowledgePermission,
-  type LoggedEntry,
 } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
 import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
+import type { DraftWriter } from "./draft-writer.ts";
 import type { LogWriter } from "./log-writer.ts";
 import type { McpServerSpec } from "./provider.ts";
 import { sameSecret } from "./secret.ts";
@@ -29,6 +31,8 @@ export const MCP_NAME = "featra";
 export const AGENT_MESSAGES = {
   mcpOff: "Featra MCP is off for this project.",
   readOnly: "Logging is off: this project's knowledge setting is read-only.",
+  draftReadOnly: "Drafting is off: this project's knowledge setting is read-only.",
+  noDrafts: "Drafting cards isn't available.",
 } as const;
 
 export interface AgentBridgeDeps {
@@ -43,8 +47,10 @@ export interface AgentBridgeDeps {
   /** Whether the MCP's script is there (it is missing from a build that didn't make it). */
   exists?: (file: string) => Promise<boolean>;
   log?: (message: string) => void;
-  chats: Pick<ChatManager, "info" | "report">;
+  chats: Pick<ChatManager, "info" | "report" | "retitle">;
   writer: LogWriter;
+  /** Writes the cards agents draft (STORY-8). Without it `cards.draft` is refused. */
+  drafts?: DraftWriter;
   newToken?: () => string;
 }
 
@@ -54,7 +60,7 @@ export interface AgentBridge extends McpAttach {
   /** The chat a connection's secret belongs to; null for any other. */
   resolve: (token: string) => string | null;
   /** One request from a chat's MCP process. */
-  call: (chat: string, method: AgentMethod, params: unknown) => Promise<LoggedEntry>;
+  call: (chat: string, method: AgentMethod, params: unknown) => Promise<AgentMethods[AgentMethod]["result"]>;
   /** Takes back an entry the chat's agent logged (the user's Undo). */
   undo: (chat: string, entry: string) => Promise<void>;
 }
@@ -72,6 +78,7 @@ export function createAgentBridge({
   log = () => {},
   chats,
   writer,
+  drafts,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -82,10 +89,44 @@ export function createAgentBridge({
     byChat.delete(chat);
   };
 
-  /** Why logging is off for the project, or null when it is on. Read each time, so Settings applies at once. */
-  async function refusal(dir: string): Promise<string | null> {
-    if (!(await enabled(dir))) return AGENT_MESSAGES.mcpOff;
-    return (await knowledge(dir)) === "read-only" ? AGENT_MESSAGES.readOnly : null;
+  /** Why the MCP is off for the project, or null when it is on. Read each time, so Settings applies at once. */
+  async function mcpRefusal(dir: string): Promise<string | null> {
+    return (await enabled(dir)) ? null : AGENT_MESSAGES.mcpOff;
+  }
+
+  /**
+   * Why agents may not write to the project: the MCP is off, or its knowledge setting is read-only, which keeps agents
+   * from writing anything (logs and drafted cards alike), so the MCP is not offered at all (`attach`).
+   */
+  async function refusal(dir: string, readOnly: string = AGENT_MESSAGES.readOnly): Promise<string | null> {
+    return (await mcpRefusal(dir)) ?? ((await knowledge(dir)) === "read-only" ? readOnly : null);
+  }
+
+  async function appendLog(chat: string, dir: string, session: string, params: unknown) {
+    const off = await refusal(dir);
+    if (off !== null) throw new ApiError(off);
+    const input = parseLogInput(isRecord(params) ? params.kind : undefined, params);
+    if (!input.ok) throw new ApiError(input.error);
+    const { entry: id, file, summary } = await writer.append(dir, chat, input.value, session);
+    chats.report(chat, { type: "logged", entry: id, file, summary });
+    return { entry: id, file };
+  }
+
+  async function draft(chat: string, dir: string, params: unknown) {
+    const off = await refusal(dir, AGENT_MESSAGES.draftReadOnly);
+    if (off !== null) throw new ApiError(off);
+    if (!drafts) throw new ApiError(AGENT_MESSAGES.noDrafts);
+    const input = parseDraft(params);
+    if (!input.ok) throw new ApiError(input.error);
+    const result = await drafts.draft(dir, chat, input.value);
+    // The chat takes the feature's title (STORY-49); a name the user set stays. The cards are already written, so a
+    // rename that fails is logged and the call still succeeds.
+    try {
+      chats.retitle(chat, input.value.feature.title, "draft");
+    } catch (error) {
+      log(`Couldn't rename chat ${chat} after its draft: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return result;
   }
 
   return {
@@ -126,16 +167,10 @@ export function createAgentBridge({
       for (const [chat, secret] of byChat) if (sameSecret(token, secret)) found = chat;
       return found;
     },
-    async call(chat, _method, params) {
+    async call(chat, method, params) {
       const info = chats.info(chat);
       if (!info) throw new ApiError("No such chat.");
-      const off = await refusal(info.dir);
-      if (off !== null) throw new ApiError(off);
-      const input = parseLogInput(isRecord(params) ? params.kind : undefined, params);
-      if (!input.ok) throw new ApiError(input.error);
-      const { entry: id, file, summary } = await writer.append(info.dir, chat, input.value, info.session);
-      chats.report(chat, { type: "logged", entry: id, file, summary });
-      return { entry: id, file };
+      return method === "cards.draft" ? draft(chat, info.dir, params) : appendLog(chat, info.dir, info.session, params);
     },
     async undo(chat, id) {
       await writer.undo(chat, id);

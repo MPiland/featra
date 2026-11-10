@@ -1,9 +1,10 @@
 /**
  * What an agent's MCP process says to the server (STORY-47, ADR 0019): a second, narrow socket beside the window's,
- * so an agent can log and nothing else. The same one-frame-per-message shape as `protocol.ts`, so answers parse with
+ * so an agent can log and draft cards and nothing else. The same one-frame-per-message shape as `protocol.ts`, so answers parse with
  * `parseResponse`. Each connection is one chat's: the server knows which from the connection's token, never from the
  * params.
  */
+import type { DraftInput, DraftResult } from "./card-draft-input.ts";
 import type { LogFile, LogInput } from "./knowledge-log.ts";
 import { isRecord } from "./utils/guards.ts";
 
@@ -19,6 +20,8 @@ export interface LoggedEntry {
 export interface AgentMethods {
   /** Appends an entry to `decisions.md` or `open-questions.md` in the chat's working folder. */
   "log.append": { params: LogInput; result: LoggedEntry };
+  /** Drafts a feature and its stories, or revises the chat's open draft in place (STORY-8). */
+  "cards.draft": { params: DraftInput; result: DraftResult };
 }
 export type AgentMethod = keyof AgentMethods;
 
@@ -39,6 +42,6 @@ export function parseAgentRequest(text: string): AgentRequest | { id: number | n
   if (!isRecord(raw) || typeof raw.id !== "number" || !Number.isSafeInteger(raw.id)) {
     return { id: null, error: "Malformed request." };
   }
-  if (raw.method !== "log.append") return { id: raw.id, error: "Unknown method." };
+  if (raw.method !== "log.append" && raw.method !== "cards.draft") return { id: raw.id, error: "Unknown method." };
   return { id: raw.id, method: raw.method, params: raw.params };
 }

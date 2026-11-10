@@ -59,6 +59,7 @@ export async function startHarness(): Promise<Harness> {
     chats: {
       info: (id) => (id === CHAT ? { dir: DIR, session: "Developer chat 1a2b3c4d" } : null),
       report: (_id, event) => void events.push(event),
+      retitle: () => {},
     },
     writer: createLogWriter({
       fs: disk,

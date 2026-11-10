@@ -1019,3 +1019,231 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - The button is "Approve" in FEAT-4; FEAT-5 renames it "Approve and start" when approving also starts the work.
 - A later `draft_cards` call from the same chat updates that draft in place, keeping its IDs.
 - Drafts stay uncommitted on main; Approve commits them locally without pushing; Reject deletes the files.
+
+## 2026-11-10 — STORY-8: Dev Lead drafts a feature
+
+- **`draft_cards` is one tool over one agent-socket method (`cards.draft`); the server writes the cards, to main's
+  checkout, uncommitted** (ADR 0021). Why: ADR 0002 has main own a draft and the server allocate IDs, and a draft is
+  the user's to review before anything is committed. IDs come from `nextId` over all owner cards, calls are serialized,
+  and new files are all written or none.
+- **One open draft per chat.** A call without one makes a Draft feature; a call with one revises it in place, with no
+  `feature` parameter. Why: the story's rule is "a later call from the same chat updates that draft", and a parameter
+  the agent could get wrong buys nothing.
+- **A story is kept by its `id`; a story left out is Cancelled, not deleted; a story with no `id` is new.** Why: the
+  agent sends the whole draft each time, and history must keep what was dropped. An `id` the draft doesn't have is
+  refused, so a typo can't touch another card.
+- **The drafting chat is stored on the feature as the frontmatter key `drafted-by`.** Why: STORY-49 opens that chat from
+  it, and `card.extra` already round-trips unknown keys. Review is derived (status `draft` plus `drafted-by`) and shown
+  on the Work row as a "Review" badge; drafts also count under the Needs review filter.
+- **New history field `content`:** `to` names what changed (title, story, criteria, tasks; a feature's description and
+  stories), `from` is null, `by` is `session:<chat>`. Why: AC3 wants each card's history to record the change, and
+  `status` events can't. A card whose text didn't change gets no event. Ticks and test links on unchanged text are kept.
+- **Stories are created at the first not-started stage with role `developer` and no agent; a draft feature has no epic.**
+  Why: the most standard defaults; the user sets the rest when reviewing.
+- **The MCP off switch and the knowledge setting apply.** Read-only knowledge already withholds the whole MCP (tested
+  behaviour), so it withholds `draft_cards` too, and a running chat is refused ("Drafting is off: this project's
+  knowledge setting is read-only."). Why: a draft writes cards, which read-only forbids. Both are read at each call and
+  the refusal writes nothing.
+- **The tool description teaches the card format, and a refused input says what to fix.** Why: Featra injects no
+  prompt (ADR 0006); the agent reads the description and the error.
+- **Two existing assertions grew by `draft_cards`:** the MCP's tool list in `packages/mcp/test/stdio.test.ts` and
+  `apps/desktop/test/mcp-bundle.test.ts`. Why: they assert the full list of tools, and the story adds one. Nothing was
+  weakened. `FeatureRow.draftedBy` and `review` are optional, so the normalizer's existing test is unchanged.
+
+## 2026-11-10 — STORY-8 review: rulings 1-9
+
+- **A revision is atomic (ruling 1).** The writer resolves every card's owner root and reads every file it will
+  replace before the first write; any failure restores the old files and removes the new ones. A card owned by a branch
+  that isn't checked out refuses the call before anything is written. Why: a half-applied revision leaves a draft that
+  no call produced.
+- **Only stories in the first stage can be left out or changed (rulings 2, 3).** A started story must be sent
+  unchanged; leaving it out or changing it refuses the whole call, naming each story and its stage. A started story
+  keeps its order, and a change of order alone doesn't touch it. Why: the agent must not cancel or rewrite work that
+  has begun.
+- **A feature that has left `draft` is not revised (ruling 4).** The call is refused ("FEAT-N is already <status>;
+  drafts can't be changed after approval. Ask the user to add scope in Work."); the brief's `update_card` doesn't
+  exist, so the message points at Work. No second feature is made silently. This replaces my first-pass behaviour of
+  starting a new draft after approval; the test that asserted it was rewritten.
+- **The user's edits are not overwritten (ruling 5).** Two signals: a `by: user` history entry after the draft's last
+  entry (status, evidence and acceptance moves don't count, they aren't the draft's text), and a fingerprint
+  (`drafted-content`, a hash of title, description, criteria and tasks) stored on each card the draft writes. The
+  fingerprint is needed because card-pane text edits write no history. A call that only repeats what the user wrote is
+  let through and recorded as a `merged` event, so the draft takes the text as its own and isn't blocked for good. The
+  error lists each such card with its title, criteria and tasks. Each revision's history entry now records the old
+  values in `from`.
+- **A change of order is a history entry (ruling 6):** part `order`, with the old order in `from`.
+- **One serialised lane for every card write, and exclusive creation (ruling 7).** Drafts and card-pane edits share the
+  server's card lane. A new card file is created with an exclusive link, and an ID that exists on disk under any name
+  is taken; the call allocates again (up to ten tries). Known limit: a second app instance on the same project is out
+  of scope, and nothing here serialises it.
+- **"Not drafted." is added in one place (ruling 8):** the MCP server, from the tool's `failed` prefix. The bridge, the
+  writer and the tool throw bare messages.
+- **The Review badge is named for its feature and uses a token that meets contrast (ruling 9):** `role="img"` and
+  `aria-label="FEAT-N draft, needs review"`; `--warn` is at least 4.5:1 on the row surfaces in both themes, asserted
+  from the shipped CSS in `apps/desktop/test/badge-contrast.test.ts`.
+- **Tests I changed because a ruling changed the behaviour:** the second-feature test (4); `from: null` in three history
+  assertions (5); the agent-socket assertions on `extra` (the fingerprint) and on the doubled prefix (8); the old
+  "can't be written" test, whose obstruction is now a taken ID that gets a new one, now injects the disk failure.
+- **Dev Lead approval of those test changes (2026-11-10):** each one follows a ruling above and asserts the new
+  behaviour as strictly or more strictly; none was weakened. Approved.
+
+## 2026-11-10 — STORY-49: review a draft in its chat
+
+- **Pane text edits now write history, for every card (AC4).** `applyCardEdit` appends a `by: user` `content` event
+  naming the part and the old value; an edit that changes nothing writes none. This is the STORY-8 review's finding
+  (pane text edits wrote no history). ADR 0022.
+- **Ruling 5 still holds, with a test that proves it:** a `draft_cards` revision after a pane edit is refused (work-format
+  and through the real card actions and draft writer). A `notes` edit does not block the agent, since a draft doesn't
+  write notes.
+- **Hand-set chat names (ambiguous in the brief, decided):** the chat summary records who set its title
+  (`titleBy`: message, draft or user). A draft replaces a message-derived or earlier draft title and never a user's.
+  There is no rename-by-hand yet, so no product path sets `user`; the rule and its test are in place for when one does.
+- **A draft feature's status list shows only its current status**, so the pane can't approve it (STORY-51).
+- **The draft is found from the Work list, not stored on the chat.** One source of truth for what a draft is.
+- **Auto-open only for a draft made while the chat is open**, without taking focus from the composer. A draft that
+  was already there is offered with Review draft in the header, and Work's Review draft opens the pane focused.
+- **Existing test changed (reason: AC4 mandates the new behaviour):** `card-edit.test.ts` "replaces the user story and
+  appends no history" now expects the content event, and the description, title and notes assertions expect it too.
+  Strictly stronger; no assertion was removed.
+
+## 2026-11-10 — STORY-49 review: rulings 1-6
+
+- **1. A draft's status can't be edited through `card.update`.** `applyCardEdit` refuses any move out of `draft` for a
+  feature waiting on review (`needsReview`: draft with `drafted-by`), whatever the target, so every caller is refused,
+  not only the pane. STORY-51 adds the dedicated Approve and Reject path. A status edit that changes nothing is still
+  accepted. A hand-made `draft` feature without `drafted-by` is not covered (nothing drafted it). Server test through
+  the real card actions.
+- **2. Notes: a draft revision can't touch them, so the exemption stays.** `planDraft` never writes notes (the card is
+  kept with its own notes); tests at work-format and through the real writer prove a revision leaves the user's notes
+  exactly as written. A notes edit therefore doesn't count as a user edit of the draft.
+- **3. One rule for which draft a chat owns:** `newestDraft` in work-format (highest id number among the chat's
+  drafts). `draftedFeature` (the server's revision) and the client's `useChatDraft` both use it; it only counts while
+  it waits on review. Tests for two drafts at work-format and in the client.
+- **4. Review draft when the chat is gone** (deleted or not in the project's chat list): it opens the draft in Work's
+  docked card pane, which now opens a feature's stories with a way back, instead of an error.
+- **5. The review request is used up once the pane opens.** The chat tells the app, which clears `reviewChat`; going
+  back or forward to the chat shows the Review draft button and doesn't open the pane again.
+- **6. The rename after a draft is best effort.** `retitle` is a required dependency of the agent bridge; a failure is
+  logged and the draft call still answers, since the cards are already written.
+- **Tests I changed:** only fixtures: the agent-bridge fakes in server, mcp and desktop tests gained `retitle: () => {}`
+  because the dependency is now required. The "no Approved" client test gained a role-based check on the status list;
+  its old assertion stays.
+
+## 2026-11-10 — STORY-50: send a draft back
+
+- **Where it appears.** Send back… is in the draft pane in the chat and on the draft feature in Work's card pane (the
+  one `CardPane`), and only while the feature is a draft waiting on review (`CardView.draftChat` is set, which needs
+  type feature, status `draft` and `drafted-by`). It is never on a story, a hand-made draft, or a feature that has left
+  draft. Note: Work reaches a draft feature's pane only through Review draft when its chat is gone, so there the button
+  is always the disabled one; with a live chat Review draft opens the chat.
+- **Message.** `Sent back FEAT-N: <reason>` (`sendBackMessage`, work-format), the reason trimmed. It appears in the
+  transcript as an ordinary user message because it goes through `chats.send`.
+- **Busy chat.** Handled exactly as a normal send: the chat manager refuses ("Wait for the reply, or stop it."), the
+  pane shows the refusal, the reason is kept, and no history is written. No queue was invented.
+- **Missing chat.** Send back is disabled with "Its chat is gone." (the button's `aria-describedby`); the server also
+  refuses and records nothing.
+- **Order.** One server method, `draft.sendBack`: validate (non-blank reason, a draft feature, its chat open in this
+  project), send, then append the history entry. A failed send writes nothing. The client never writes history. The
+  work runs in the shared card lane, so the agent's next revision queues behind the history write.
+- **History.** New field `sent-back` (`from: null`, `to: <reason>`, `by: user`). The ruling-5 guard lists it with the
+  moves that are not a text edit, so a send-back never blocks the agent's next revision; tests at work-format and
+  through the real writer prove it, and that a real pane edit after a send-back still blocks.
+- **Provider neutral:** nothing names a provider. Approve and Reject remain STORY-51.
+- **Tests changed:** none weakened. The e2e helpers (`project`, `git`, `cardFile`) moved from `draft.spec.ts` and
+  `review-draft.spec.ts` into `e2e/draft-project.ts` for reuse; their assertions are untouched. The client fake card
+  server gained `sendBack`.
+
+### STORY-50 review rulings
+
+- **A history write that fails after the send.** The server retries the write once. If it still fails, `draft.sendBack`
+  succeeds with `{ recorded: false }` instead of an error, and the client closes the form and says "Sent. Couldn't
+  record it in history." The message is never sent twice: a retry only repeats the write. Tested with an injected disk
+  failure.
+- **Reason limit.** 2,000 characters (`SEND_BACK_MAX`, trimmed length on the server). The server refuses more, and the
+  textarea stops at the limit and shows a counter from 1,800 characters.
+- **Lane scope.** `chats.open` runs before the card lane; the lane covers only the send and the history write.
+- **No stale write.** After the send, the owner's copy of the card is read again inside the lane and the entry is
+  appended to that, so an edit made outside Featra in between is kept. The trailing rescan is gone.
+- **Work's Send back is reachable only when the chat is gone** (its feature rows open a card pane only then). That is
+  accepted.
+- **Client tests** cover UI behaviour only (the fake card server answers what a test sets); ordering and validation are
+  proved by the server tests. The earlier client assertions on the chat message and the history entry moved there.
+- **Dev Lead approval (2026-11-10):** the client assertions on the sent message, transcript and history entry were
+  removed because ruling 5 made the client fake thin; the same facts are proven against real code in
+  `draft-send-back.test.ts` and `draft-send-back-chat.test.ts`. Approved.
+
+## 2026-11-10 — STORY-51: approve or reject a draft (ADR 0023)
+
+- **Buttons.** Approve and Reject sit next to Send back, in the chat's draft pane and Work's card pane, on a draft
+  feature only (`CardView.draftChat`). Text is exactly "Approve" (FEAT-5 renames it). Approve asks nothing; Reject asks
+  "Delete FEAT-N and its N stories?" (Delete / Cancel, focus on Cancel, Escape closes only the question).
+- **Lane.** `draft.approve` and `draft.reject` run in the card lane and re-check draft state there. The STORY-49 guard
+  on `card.update` still refuses a status move out of draft.
+- **Baseline.** There was no stored form, so `extra.baseline = { at, stories }` on the feature, built by the pure
+  `planApproval`; `scopeBaseline` returns the stored `at` when present and otherwise the old computed value.
+- **History and stories.** Approval appends a `by: user` status event; stories stay New. Cancelled draft stories are
+  deleted, not committed (one git already tracks is kept and left out of the commit).
+- **Commit.** Pathspec-limited in main's checkout, message `FEAT-N: approved <title>`, hooks run, never pushed. Refused
+  up front when main isn't on the base branch or is mid merge/rebase/cherry-pick/revert/bisect. A failed commit restores
+  every card file byte for byte and shows the git error.
+- **Reject.** Refused if any file is tracked or staged; deletes the files; git stays clean. The chat keeps its title and
+  hears nothing. A later `draft_cards` from that chat gets the existing refusal (tested).
+- **Tests.** No existing assertion changed. The client card-server fake gained `review`; the e2e helper `project()`
+  sets a repo-local git identity so the app's server can commit.
+
+### STORY-51 review rulings (2026-11-10, PR #23)
+
+- **Draft scope.** The draft is the feature and every story under it that is untracked and owned by main, including a
+  story the user added during review. The Reject count and the Approve commit use that same set. A child in a worktree
+  or on a feature branch, or a tracked live child, refuses both actions and names the story. Tested with a user-added
+  story and a worktree-owned story.
+- **Git environment.** The global strip of `GIT_CONFIG_PARAMETERS` and `GIT_CONFIG_COUNT` in `gitEnv` is reverted; a
+  test proves product git still passes `GIT_CONFIG_COUNT` through. The hook-failure tests remove those variables from
+  `process.env` themselves (and restore them), because the pre-commit hook runs the tests under
+  `core.hooksPath=.githooks`.
+- **Default branch.** `baseBranch` from the config if set, then `origin/HEAD`, then main or master, whichever exists.
+  Detached HEAD, a repo with no commits and a missing branch each get a clear message. The scan itself resolves the
+  branch, since the main root exists only when the base branch is checked out. Tested with master, origin/HEAD, config
+  winning, detached HEAD and an empty repo.
+- **Rollback.** The index entries of the draft's paths are recorded before `git add` and restored with the checked
+  runner after a failure; if restoring fails the message says so. Tested with a path the user had staged and with a
+  failing reset (a hook that breaks the branch).
+- **Cancelled stories.** One git already tracks goes into the commit as Cancelled; an untracked one is deleted.
+- **Baseline.** For a feature with a stored baseline, added scope is the stories not in `baseline.stories`. Tested for a
+  story added after approval, one created in the same second, and an old feature with no stored baseline (same result as
+  before).
+- **Stale write.** Approve parses each card from the bytes it reads in the lane and checks them unchanged right before
+  writing; the scan's copy is not used. Tested with an edit after the scan (kept) and during the approve (refused).
+- **Reject question.** It is an `alertdialog` labelled "Reject" and described by its question. Escape closes it from
+  anywhere, focus stays inside (Tab wraps, outside focus returns to Cancel), and after cancelling or a refusal focus goes
+  back to Reject. Delete is `aria-disabled` while busy so it keeps focus. Client tests changed the role query from
+  `group` to `alertdialog`; no assertion was weakened.
+- **E2E Enter vs click.** Root cause is e2e timing, not product. The chat's draft pane opens with
+  `focusOnOpen={shown.focus}` and does not take the composer's focus. The CI trace of the failing run shows the second
+  chat's `fill` taking 6 ms (8777.265 to 8783.806) against 72 ms in the first chat (8179 to 8251): the text went into
+  the previous chat's composer, which is still on screen and editable until the new chat replaces it. The helper now
+  waits for the open chat's `data-chat` to change before filling, and keeps the Send click.
+- **Tests.** `draft-review.test.ts` was split into `draft-review-fixture.ts` plus approve, reject, rollback, scope and
+  branches files. The rebase test now expects the rebase refusal exactly (the mid-operation check runs first); it
+  accepted either message before. Added: paths with a space, master, detached HEAD, a failing reset, a story not in the
+  draft.
+
+### STORY-51 e2e timeout on Windows, run 42783817510 attempt 1 (2026-11-10)
+
+- **Evidence.** The trace (artifact `e2e-windows-traces`) shows the first test of the run: launch 1.3 s, New chat and
+  Dev Lead, fill 13 ms, Send, the message in the log, then `expect(FEAT-2 pane).toBeVisible()` failing at its 5 s
+  default. Nothing is recorded after that until After Hooks at 60 s. So the 60 s "timeout" was the cleanup, not the test:
+  the spec closed the app only on success, and the repo's `rm` on Windows waited on files the still-running app held.
+- **Cause, as far as it can be proved.** The helper's own wait ran fine (no swap wait on the first chat; the fill went
+  to a fresh composer). The draft pane did not appear within 5 s on the cold first test. The trace has no app logs, so
+  whether the delay was the MCP process starting or something else is not proved. The rerun passed, and Gate and the
+  Ubuntu run were green. The new git calls (default branch) run once per scan on a repo without `baseBranch`, which is
+  tens of milliseconds, not seconds.
+- **Fix.** The spec now closes the app in `finally`, so a failing step reports itself within its own timeout, and waits
+  for the tool's answer ("Tool said: Drafted FEAT-N") in the log before looking for the pane, so a slow agent turn and a
+  missing pane fail at different steps. No timeout was lengthened. If it recurs, the failing step will now be named.
+
+## 2026-11-10 — FEAT-4 accepted
+
+- The user accepted STORY-8, STORY-49, STORY-50, STORY-51 and FEAT-4 ("Accept and merge") without a hands-on check;
+  a true UAT comes later. FEAT-4 merges to main.

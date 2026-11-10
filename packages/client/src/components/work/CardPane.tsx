@@ -3,6 +3,9 @@ import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
 import { InlineText } from "../controls/InlineText.tsx";
 import { CloseIcon } from "../icons.tsx";
+import { DraftReview } from "./DraftReview.tsx";
+import { SendBack } from "./SendBack.tsx";
+import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
 import { AcSection, Evidence, TaskSection, TextSection, type SaveEdit } from "./CardSections.tsx";
 
@@ -14,7 +17,17 @@ export interface CardPaneProps {
   /** In CSS px: chosen by the handle beside it, fitted to the work area. */
   width: number;
   onClose: () => void;
+  /** Opens another card in the pane: a feature's stories, and the way back (STORY-49). Left out, they aren't offered. */
+  onOpen?: (id: string) => void;
+  /** The card this one was opened from, which a way back leads to. */
+  openedFrom?: string;
+  /** Take focus on open (default). A pane that opens beside a chat being typed in leaves it. */
+  focusOnOpen?: boolean;
+  /** Whether the project still has a chat. Send back is off for a draft whose chat is gone; default: it has. */
+  hasChat?: (chat: string) => boolean;
 }
+
+const anyChat = () => true;
 
 // A null parent goes through the dropdown as "", since its values are strings.
 const toChoice = (v: string | null) => v ?? "";
@@ -25,14 +38,27 @@ const fromChoice = (v: string) => (v === "" ? null : v);
  * and parent are chosen from what the rules allow, and every save goes to the owner copy. Escape closes it unless a
  * field or list inside is using Escape itself.
  */
-export function CardPane({ work, dir, id, paneId, width, onClose }: CardPaneProps) {
+export function CardPane({
+  work,
+  dir,
+  id,
+  paneId,
+  width,
+  onClose,
+  onOpen,
+  openedFrom,
+  focusOnOpen = true,
+  hasChat = anyChat,
+}: CardPaneProps) {
   const card = useCard(work, dir, id);
   const pane = useRef<HTMLElement>(null);
   const [error, setError] = useState<string | null>(null);
   const { view, setView } = card;
 
   // Mounted once per card (keyed by id), so focus moves in each time a story is opened.
-  useEffect(() => pane.current?.focus(), []);
+  useEffect(() => {
+    if (focusOnOpen) pane.current?.focus();
+  }, [focusOnOpen]);
 
   const send = async (edit: CardEdit) => {
     const r = await work.updateCard(dir, id, edit);
@@ -95,6 +121,23 @@ export function CardPane({ work, dir, id, paneId, width, onClose }: CardPaneProp
           </div>
           <Evidence evidence={view.evidence} />
           <p className="meta">{view.readOnly ?? CARD_COPY.owner(view.owner)}</p>
+          {view.draftChat && !readOnly && (
+            <div className="draft-actions">
+              <SendBack
+                key={id}
+                unavailable={hasChat(view.draftChat) ? null : CARD_COPY.sendBackGone}
+                onSend={(reason) => work.sendBack(dir, id, reason)}
+              />
+              <DraftReview
+                key={`review-${id}`}
+                id={id}
+                stories={view.draftStories ?? view.stories.length}
+                onApprove={() => work.approve(dir, id)}
+                onReject={() => work.reject(dir, id)}
+                onRejected={onClose}
+              />
+            </div>
+          )}
           {error && (
             <p className="card-error" role="alert">
               {error}
@@ -108,6 +151,7 @@ export function CardPane({ work, dir, id, paneId, width, onClose }: CardPaneProp
           title={CARD_COPY.story}
           placeholder={CARD_COPY.storyEmpty}
         />
+        {onOpen && <StoriesSection stories={view.stories} onOpen={onOpen} />}
         <AcSection view={view} save={save} />
         <TaskSection view={view} save={save} />
         <TextSection view={view} save={save} field="notes" title={CARD_COPY.notes} placeholder={CARD_COPY.notesEmpty} />
@@ -133,6 +177,11 @@ export function CardPane({ work, dir, id, paneId, width, onClose }: CardPaneProp
     >
       <div className="card-bar">
         <span className="card-id">{id}</span>
+        {onOpen && openedFrom && (
+          <button type="button" className="card-link" onClick={() => onOpen(openedFrom)}>
+            {CARD_COPY.backTo(openedFrom)}
+          </button>
+        )}
         <button
           type="button"
           className="card-close"

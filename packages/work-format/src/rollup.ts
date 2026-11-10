@@ -1,3 +1,4 @@
+import { baselineOf } from "./card-approval.ts";
 import { stageCategory } from "./config.ts";
 import { createdMs, existsAt, parentAt, statusAt } from "./history.ts";
 import { CANCELLED, type Card, type CardType, type Origin, type ProgressMode, type ProjectConfig } from "./types.ts";
@@ -73,10 +74,12 @@ function memberAt(card: Card, featureId: string, t: number): boolean {
 }
 
 /**
- * The scope baseline: the first moment an item of this feature left the not-started stages.
- * Null until work starts. Once set it never moves, even if that item later goes back.
+ * The scope baseline: when the feature was approved (STORY-51), else, for a feature with none stored, the first moment
+ * an item of it left the not-started stages. Null until then. Once set it never moves, even if that item goes back.
  */
 export function scopeBaseline(featureId: string, cards: readonly Card[], config: ProjectConfig): string | null {
+  const stored = baselineOf(cards.find((c) => c.id === featureId && c.type === "feature") ?? { extra: {} });
+  if (stored) return stored.at;
   let best: number | null = null;
   for (const c of everUnder(featureId, cards)) {
     for (const e of c.history) {
@@ -123,11 +126,14 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
   const baseline = scopeBaseline(featureId, cards, config);
   const items = itemsOf(featureId, cards);
   const added: AddedItem[] = [];
+  // With a stored baseline (STORY-51), added scope is whatever isn't in its list: no clock to tie on. Without one, an
+  // item added is one that joined after the computed baseline.
+  const stored = baselineOf(cards.find((c) => c.id === featureId && c.type === "feature") ?? { extra: {} });
   if (baseline !== null) {
     for (const c of items) {
       const at = joinedAt(c, featureId);
-      if (at !== null && ms(at) > ms(baseline))
-        added.push({ id: c.id, title: c.title, type: c.type, origin: c.origin, at });
+      const isAdded = stored ? !stored.stories.includes(c.id) : at !== null && ms(at) > ms(baseline);
+      if (isAdded) added.push({ id: c.id, title: c.title, type: c.type, origin: c.origin, at: at ?? baseline });
     }
   }
   const bugs = items.filter((c) => c.type === "bug");

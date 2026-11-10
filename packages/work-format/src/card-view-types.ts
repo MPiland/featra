@@ -34,6 +34,13 @@ export interface CardEvidence {
   accepted: boolean;
 }
 
+/** A story under a feature: what the pane lists so each can be opened. */
+export interface CardChild {
+  id: string;
+  title: string;
+  status: string;
+}
+
 export interface CardView {
   id: string;
   type: "epic" | "feature" | "story" | "bug";
@@ -51,8 +58,14 @@ export interface CardView {
   tasks: CardViewTask[];
   notes: string;
   pr: string | null;
+  /** A feature's stories, in order, without the Cancelled ones; empty for any other card. */
+  stories: CardChild[];
   /** Where the card is read from and written to, as a label. */
   owner: string;
+  /** The chat that drafted this feature, while the draft waits on review; absent otherwise (STORY-50 Send back). */
+  draftChat?: string;
+  /** With `draftChat`: every story under the draft, Cancelled ones too. Reject deletes all of them (STORY-51). */
+  draftStories?: number;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -119,6 +132,12 @@ export function cardUpdateParams(params: unknown): { dir: string; id: string; ed
   return p && edit ? { ...p, edit } : null;
 }
 
+/** The `{ dir, id, reason }` params of `draft.sendBack`, or null. An empty reason is the method's to refuse. */
+export function sendBackParams(params: unknown): { dir: string; id: string; reason: string } | null {
+  const p = cardParams(params);
+  return p && isRecord(params) && typeof params.reason === "string" ? { ...p, reason: params.reason } : null;
+}
+
 const option = (r: Record<string, unknown>): CardOption => ({ value: textOrNull(r.value), label: text(r.label) });
 
 /** A view from the socket, read defensively; null when there is no card. */
@@ -149,8 +168,11 @@ export function normalizeCardView(raw: unknown): CardView | null {
     tasks: list(raw.tasks, (t) => ({ text: text(t.text), done: t.done === true })),
     notes: text(raw.notes),
     pr: textOrNull(raw.pr),
+    stories: list(raw.stories, (s) => ({ id: text(s.id), title: text(s.title), status: text(s.status) })),
     owner: text(raw.owner),
     readOnly: textOrNull(raw.readOnly),
+    ...(typeof raw.draftChat === "string" && raw.draftChat ? { draftChat: raw.draftChat } : {}),
+    ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
   };
 }
 

@@ -47,6 +47,11 @@ export interface RepoGit {
   worktrees: (top: string) => Promise<WorktreeInfo[]>;
   branches: (top: string, base: string) => Promise<BranchInfo[]>;
   /**
+   * The repository's default branch when the config doesn't name one (STORY-51): the local branch `origin/HEAD` points
+   * at, else `main`, else `master`; in a repository with no commits, the branch HEAD is on. Null when none of those.
+   */
+  defaultBranch: (top: string) => Promise<string | null>;
+  /**
    * The card files in `.featra/cards/` at each commit or branch of `revs`, by rev. One `git cat-file --batch` reads
    * the trees, then the blobs `cache` doesn't have (BUG-6).
    */
@@ -105,6 +110,17 @@ export function createRepoGit(command = "git"): RepoGit {
       // No base branch yet (no commits): nothing is in it.
       const inBase = new Set(merged.code === 0 ? merged.stdout.split("\n") : []);
       return all.filter(Boolean).map((name) => ({ name, inBase: inBase.has(name) }));
+    },
+    async defaultBranch(top) {
+      const listed = await run(top, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]);
+      const local = new Set(listed.stdout.split(/\r?\n/).filter(Boolean));
+      const origin = await run(top, ["symbolic-ref", "--short", "-q", "refs/remotes/origin/HEAD"]);
+      const named = origin.code === 0 ? origin.stdout.trim().replace(/^origin\//, "") : "";
+      if (named && local.has(named)) return named;
+      for (const name of ["main", "master"]) if (local.has(name)) return name;
+      if (local.size) return null;
+      const unborn = await run(top, ["symbolic-ref", "--short", "-q", "HEAD"]);
+      return unborn.code === 0 && unborn.stdout.trim() ? unborn.stdout.trim() : null;
     },
     async committedCards(top, revs, cache) {
       const byRev = new Map<string, CommittedFile[]>();

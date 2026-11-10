@@ -4,10 +4,11 @@
  */
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
+import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { evidenceState } from "./evidence.ts";
 import { locationLabel, sameLocation } from "./ownership.ts";
 import type { OwnedCard } from "./owner-copies.ts";
-import type { Card } from "./types.ts";
+import { CANCELLED, type Card } from "./types.ts";
 
 /**
  * Why the card can't be edited, or null when it can. Edits go to the owner's copy only (ADR 0002), on disk, so the
@@ -27,11 +28,21 @@ function proofOf(card: Card, provenAcs: readonly number[]) {
   };
 }
 
+/** A feature's stories in order, without the Cancelled ones. */
+const storiesOf = (card: Card, cards: readonly Card[]) =>
+  card.type !== "feature"
+    ? []
+    : cards
+        .filter((c) => c.type === "story" && c.parent === card.id && c.status !== CANCELLED)
+        .toSorted((a, b) => a.order - b.order || a.id.localeCompare(b.id, undefined, { numeric: true }))
+        .map((c) => ({ id: c.id, title: c.title, status: c.status }));
+
 /** The pane's view of `owned`; `checkedOut` says whether the owner's location has a working tree. */
 export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEditContext): CardView {
   const { card } = owned;
   const ev = evidenceState(card);
   const proof = proofOf(card, ev.provenAcs);
+  const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   return {
     id: card.id,
     type: card.type,
@@ -46,7 +57,11 @@ export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEd
     tasks: card.tasks.map((t) => ({ text: t.text, done: t.done })),
     notes: card.notes,
     pr: card.pr,
+    stories: storiesOf(card, ctx.cards),
     owner: locationLabel(owned.owner),
     readOnly: readOnlyReason(owned, checkedOut, ctx.config.baseBranch),
+    ...(draftChat === null
+      ? {}
+      : { draftChat, draftStories: ctx.cards.filter((c) => c.type === "story" && c.parent === card.id).length }),
   };
 }

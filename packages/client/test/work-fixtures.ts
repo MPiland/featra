@@ -53,8 +53,14 @@ export function cardOf(spec: CardSpec): Card {
 
 const owned = (card: Card): OwnedCard => ({ card, owner: MAIN, shownFrom: MAIN, path: `.featra/cards/${card.id}.md` });
 
-export function workList(specs: CardSpec[], stale: StaleCopy[] = [], problems: string[] = []): WorkList {
-  return buildWorkList({ cards: specs.map(cardOf).map(owned), stale, problems }, DEFAULT_CONFIG);
+/** The list for `specs` and for `more`: cards that are already whole, such as a draft the real planner made. */
+export function workList(
+  specs: CardSpec[],
+  stale: StaleCopy[] = [],
+  problems: string[] = [],
+  more: Card[] = [],
+): WorkList {
+  return buildWorkList({ cards: [...specs.map(cardOf), ...more].map(owned), stale, problems }, DEFAULT_CONFIG);
 }
 
 /** A small project: one epic with three features in different states, and a loose story. */

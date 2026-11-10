@@ -22,6 +22,7 @@ beforeAll(async () => {
     chats: {
       info: (id) => (id === "chat-1" ? { dir: "/work/demo", session: "Developer chat 1" } : null),
       report: (chat, event) => void reported.push({ chat, type: event.type }),
+      retitle: () => {},
     },
     writer: createLogWriter({
       fs: { read: async (f) => disk.get(f) ?? null, write: async (f, t) => void disk.set(f, t) },

@@ -48,6 +48,10 @@ export interface FeatureRow {
   title: string;
   /** The feature's status (draft, approved, active, done, cancelled); null for the no-feature row. */
   status: string | null;
+  /** The chat that drafted the feature (STORY-8), for a review to open. Left out for a card nobody drafted. */
+  draftedBy?: string;
+  /** A draft an agent made, waiting on the user: the row shows a Review badge. Left out otherwise. */
+  review?: true;
   tone: Tone;
   filters: WorkFilter[];
   progress: ProgressCount;
@@ -119,6 +123,8 @@ const feature = (r: Record<string, unknown>): FeatureRow => {
     id: textOrNull(r.id),
     title: text(r.title),
     status: textOrNull(r.status),
+    draftedBy: typeof r.draftedBy === "string" ? r.draftedBy : undefined,
+    review: r.review === true ? true : undefined,
     tone: tone(r.tone),
     filters: Array.isArray(r.filters) ? r.filters.filter((f): f is WorkFilter => isOneOf(WORK_FILTERS, f)) : [],
     progress: progress(r.progress),
