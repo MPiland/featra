@@ -11,8 +11,8 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
-pr: null
+branch: claude/story-8-draft-cards
+pr: "20"
 created: 2026-11-04T23:00:00Z
 history:
   - at: 2026-11-04T23:00:00Z
