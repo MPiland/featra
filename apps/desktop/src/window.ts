@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import { BrowserWindow, nativeTheme } from "electron";
 import { IPC, type WindowState } from "@featra/client/bridge";
+import { appIconPath } from "./app-icon.ts";
 
 /** `FEATRA_CLIENT_URL` loads the Vite dev server; otherwise the built client next to this app in the workspace. */
 const clientUrl = process.env.FEATRA_CLIENT_URL;
@@ -17,6 +18,7 @@ export function createWindow(): BrowserWindow {
     minWidth: 720,
     minHeight: 480,
     title: "Featra",
+    icon: appIconPath(process.platform),
     show: false,
     backgroundColor: windowBackground(),
     // The title bar is drawn by the client. macOS keeps its traffic lights; elsewhere the client draws the controls.
