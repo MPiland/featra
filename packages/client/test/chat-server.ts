@@ -13,9 +13,21 @@ import {
   type ProviderInfo,
   type Role,
 } from "@featra/work-format";
+import type { ChatControls, ChatSettings } from "@featra/work-format/chat-controls";
 import type { ModeInfo } from "@featra/work-format/modes";
 import type { ChatBridge, ChatListUpdate, ChatUpdate } from "../src/chats.ts";
 import { fakeInboxServer } from "./inbox-server.ts";
+
+/** What the fake server's agent offers: Claude's own names, as its adapter lists them. */
+export const CLAUDE_CONTROLS: ChatControls = {
+  models: ["sonnet", "opus", "haiku"].map((value) => ({ value, label: value })),
+  efforts: ["low", "medium", "high"].map((value) => ({ value, label: value })),
+  modes: [
+    { value: "default", label: "default (Ask)" },
+    { value: "plan", label: "plan" },
+    { value: "bypassPermissions", label: "bypassPermissions", fullAccess: true },
+  ],
+};
 
 /** Claude, installed: what the server reports on a machine with `claude` on the PATH. */
 export const CLAUDE_INSTALLED: ProviderInfo = { id: "claude", name: "Claude Code", installed: true };
@@ -35,6 +47,8 @@ export interface ChatHost {
   undoError?: string;
   /** What `chat.answer` refuses with, if anything. */
   answerError?: string;
+  /** What `chat.configure` refuses with, if anything. */
+  configureError?: string;
   /** The providers `chat.list` reports. Default: Claude, installed. */
   providers?: ProviderInfo[];
   /** The mode the server reports a chat started in, from the provider's settings. Default: none (Ask). */
@@ -90,6 +104,17 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     row.summary = next.summary;
     listChanged(row.dir);
   };
+  // Each chat's settings, as the server keeps them: its role's, then what `chat.configure` changed.
+  const settings = new Map<string, ChatSettings>();
+  const settingsOf = (id: string): ChatSettings | null => {
+    const kept = settings.get(id);
+    if (kept) return kept;
+    const role = rows.get(id)?.summary.role;
+    if (!role) return null;
+    const fresh = { role: role.id, model: role.model, effort: role.effort, mode: "default" };
+    settings.set(id, fresh);
+    return fresh;
+  };
   const bridge: ChatBridge = {
     roles: async () => host.roles ?? [...BUILT_IN_ROLES],
     start: async (dir, role, card = host.chatCards?.[role]) => {
@@ -131,6 +156,22 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     undoLog: async (id, entry) => {
       calls.push(`chat.undoLog:${id}:${entry}`);
       return host.undoError ?? null;
+    },
+    controls: async (id) => {
+      calls.push(`chat.controls:${id}`);
+      const kept = settingsOf(id);
+      return kept
+        ? { ok: true, state: { controls: CLAUDE_CONTROLS, settings: kept } }
+        : { ok: false, error: "No chat." };
+    },
+    configure: async (id, change) => {
+      calls.push(`chat.configure:${id}:${JSON.stringify(change)}`);
+      if (host.configureError) return { ok: false, error: host.configureError };
+      const was = settingsOf(id);
+      if (!was) return { ok: false, error: "No chat." };
+      const next = { ...was, ...change };
+      settings.set(id, next);
+      return { ok: true, state: { controls: CLAUDE_CONTROLS, settings: next } };
     },
     list: (dir, listener) => {
       const watcher = { dir, listener };

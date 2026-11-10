@@ -72,6 +72,10 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Ask** — the permission mode where every tool that needs approval asks first: the call waits in the chat until the
   user answers **Allow**, **Allow for this chat** or **Deny** (with an optional reason the agent is sent). Allow for
   this chat lasts while the chat's agent runs: a shell command by its exact command, any other tool by its name.
+- **Composer controls** — Role, Model, Effort and Mode, picked from the composer in the provider's own names. A change
+  applies from the next turn. Full access is offered only to a chat that started in it.
+- **Context meter** — the tokens a chat uses of its model's window, read from the session's own events (no extra
+  tokens). Without a window from the provider it shows the tokens alone; hidden until the first turn reports usage.
 - **Approval** — a tool request the chat waits on; the chat shows the waiting dot. One left unanswered (Stop, the chat
   closing, a restart) is cancelled, never denied.
 - **Question** — the agent asks the user to choose in the middle of a turn (Claude's AskUserQuestion): a card on the

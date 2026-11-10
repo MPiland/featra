@@ -2,7 +2,7 @@
 id: STORY-22
 type: story
 title: Composer controls and context meter
-status: New
+status: In Progress
 parent: FEAT-3
 order: 9
 origin: planned
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-22-composer
 pr: null
 created: 2026-11-05T17:13:05Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-09T23:02:11Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:story-22
 ---
 
 ## Description
@@ -34,7 +39,13 @@ As a builder, I change the agent's role, model, effort and permission mode from 
 
 ## Tasks
 
-- [ ] Break down when picked up
+- [ ] work-format: chat-controls (choices, settings, usage, token format), usage event and state
+- [ ] Claude adapter: controls, settings, apply on next turn by restarting the session with resume
+- [ ] Claude adapter: read usage and window from the session own messages (assistant usage, result modelUsage), also from history
+- [ ] Session manager and protocol: chat.controls and chat.configure, role change updates the row
+- [ ] Client: composer controls (Role, Model, Effort, Mode) and the context meter
+- [ ] Tests: work-format, server, client component, e2e/composer.spec.ts with the fake SDK
+- [ ] ADR, decisions, open questions, CONTEXT, full gate, PR and green CI
 
 ## Notes
 

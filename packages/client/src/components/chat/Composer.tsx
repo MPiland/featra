@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useState, type KeyboardEvent, type ReactNode } from "react";
 import { FULL_ACCESS_WARNING } from "@featra/work-format/modes";
 import { CHAT_COPY } from "../../chats.ts";
 
@@ -9,10 +9,12 @@ interface ComposerProps {
   /** Sends the message; resolves with why it wasn't sent, or null. */
   onSend: (text: string) => Promise<string | null>;
   onStop: () => void;
+  /** The controls and the context meter, over the box (STORY-22). */
+  above?: ReactNode;
 }
 
 /** Enter sends, Shift+Enter adds a line; while a turn runs, Stop interrupts it. */
-export function Composer({ running, fullAccess, onSend, onStop }: ComposerProps) {
+export function Composer({ running, fullAccess, onSend, onStop, above }: ComposerProps) {
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const blank = !text.trim();
@@ -40,6 +42,7 @@ export function Composer({ running, fullAccess, onSend, onStop }: ComposerProps)
         void send();
       }}
     >
+      {above && <div className="composer-above">{above}</div>}
       <textarea
         aria-label={CHAT_COPY.composer}
         placeholder={CHAT_COPY.placeholder}

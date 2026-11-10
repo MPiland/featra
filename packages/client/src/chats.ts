@@ -14,6 +14,7 @@ import {
   type ChatState,
 } from "@featra/work-format/chat";
 import { normalizeChatEvent, normalizeChatSnapshot, type ChatEvent } from "@featra/work-format/chat-events";
+import { normalizeControlState, type ChatControlState, type SettingsChange } from "@featra/work-format/chat-controls";
 import { EMPTY_CHAT_LIST, normalizeChatList, type ChatList, type ChatRoleRef } from "@featra/work-format/chat-list";
 import { assertNever, errorMessage, isRecord } from "@featra/work-format/guards";
 import type { ModeInfo } from "@featra/work-format/modes";
@@ -40,6 +41,9 @@ export interface ChatListUpdate {
 
 export type ChatStart = { ok: true; id: string } | { ok: false; error: string };
 
+/** A chat's controls and settings, or why they couldn't be had (STORY-22). */
+export type ChatControlsResult = { ok: true; state: ChatControlState } | { ok: false; error: string };
+
 export interface ChatBridge {
   /** The roles a chat in the project can start from. */
   roles: (dir: string) => Promise<Role[]>;
@@ -57,6 +61,10 @@ export interface ChatBridge {
   answer: (id: string, tool: string, answers: Answers) => Promise<string | null>;
   /** Takes back an entry the agent logged (STORY-47); resolves with why it couldn't, or null. */
   undoLog: (id: string, entry: string) => Promise<string | null>;
+  /** What the composer can change for the chat, and what it runs with now. */
+  controls: (id: string) => Promise<ChatControlsResult>;
+  /** Changes the chat's role, model, effort or mode from the next turn; answers the settings now, or why not. */
+  configure: (id: string, change: SettingsChange) => Promise<ChatControlsResult>;
   /** Calls back with the project's chat list now and on every change; returns the stop. */
   list: (dir: string, listener: (update: ChatListUpdate) => void) => () => void;
 }
@@ -103,7 +111,20 @@ export const CHAT_COPY = {
   loggedTo: "Logged to",
   undo: "Undo",
   undone: "Undone",
+  role: "Role",
+  model: "Model",
+  effort: "Effort",
+  mode: "Mode",
+  context: "Context",
+  fullAccess: "full access",
 } as const;
+
+/** The state a server answered, read; or why it was unusable. */
+function controlsResult(raw: unknown): ChatControlsResult {
+  const state = normalizeControlState(raw);
+  return state ? { ok: true, state } : { ok: false, error: "No settings." };
+}
+const controlsFailed = (err: unknown): ChatControlsResult => ({ ok: false, error: errorMessage(err) });
 
 /** The one line a notice shows. */
 export function noticeText(notice: ChatNotice): string {
@@ -186,6 +207,8 @@ export function serverChats(server: ServerClient): ChatBridge {
     approve: (id, tool, answer) => server.call("chat.approve", { id, tool, ...answer }).then(() => null, errorMessage),
     answer: (id, tool, answers) => server.call("chat.answer", { id, tool, answers }).then(() => null, errorMessage),
     undoLog: (id, entry) => server.call("chat.undoLog", { id, entry }).then(() => null, errorMessage),
+    controls: (id) => server.call("chat.controls", { id }).then(controlsResult, controlsFailed),
+    configure: (id, change) => server.call("chat.configure", { id, change }).then(controlsResult, controlsFailed),
     list(dir, listener) {
       let list = EMPTY_CHAT_LIST;
       return server.watch(
@@ -217,6 +240,8 @@ export function noChats(error: string): ChatBridge {
     approve: async () => error,
     answer: async () => error,
     undoLog: async () => error,
+    controls: async () => ({ ok: false, error }),
+    configure: async () => ({ ok: false, error }),
     // No chats is the whole truth here, not an out-of-date list.
     list(_dir, listener) {
       listener({ list: EMPTY_CHAT_LIST, error: null });

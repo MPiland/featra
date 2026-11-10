@@ -11,6 +11,7 @@ import {
   newSummary,
   reduceRow,
   savedChat,
+  type ChatControlState,
   type ChatEvent,
   type ChatSummary,
   type ProviderId,
@@ -18,6 +19,7 @@ import {
 } from "@featra/work-format";
 import { projectKey } from "./allowed-projects.ts";
 import { createApprovalDesk } from "./approval-desk.ts";
+import { changedSettings } from "./chat-configure.ts";
 import { ChatError } from "./chat-error.ts";
 import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
@@ -124,6 +126,8 @@ export function createChatManager({
   function agentFor(c: Chat, adapter: ProviderAdapter, role: Role): ProviderSession {
     // The session reaches the chat only through `emit`, so the chat's own fields are current when it is called.
     const emit = (event: ChatEvent) => record(c, event);
+    c.role = role;
+    c.settings = adapter.settings(role);
     c.mode = role.mode ?? null;
     c.note = role.note ?? null;
     return adapter.start({
@@ -156,6 +160,21 @@ export function createChatManager({
     if (adapter && role && !gone) c.agent = agentFor(c, adapter, role);
   }
 
+  /** The chat's controls and settings; refused for a chat with no agent (its role or provider is missing). */
+  function controlState(c: Chat): ChatControlState {
+    const adapter = provider(c.summary.provider);
+    if (!adapter || !c.role || !c.settings) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
+    return { controls: adapter.controls(c.role), settings: c.settings };
+  }
+
+  async function open(id: string) {
+    await saver.loaded;
+    const c = chat(id);
+    if (c.events !== null) return;
+    c.opening ??= load(c);
+    await c.opening;
+  }
+
   /** Ends the chat's agent and forgets its log; the chat itself is kept, to open again. */
   function end(c: Chat) {
     c.listeners.clear();
@@ -164,6 +183,8 @@ export function createChatManager({
     inbox.ended(c.id);
     c.agent?.close();
     c.agent = null;
+    c.role = null;
+    c.settings = null;
     c.events = null;
     c.opening = null;
     c.running = false;
@@ -186,13 +207,7 @@ export function createChatManager({
       listChanged(dir);
       return id;
     },
-    async open(id) {
-      await saver.loaded;
-      const c = chat(id);
-      if (c.events !== null) return;
-      c.opening ??= load(c);
-      await c.opening;
-    },
+    open,
     watch(id, listener) {
       const c = chat(id);
       c.listeners.add(listener);
@@ -202,6 +217,34 @@ export function createChatManager({
         note: c.note,
         stop: () => c.listeners.delete(listener),
       };
+    },
+    async controls(id) {
+      await open(id);
+      return controlState(chat(id));
+    },
+    async configure(id, change) {
+      await open(id);
+      const c = chat(id);
+      const adapter = provider(c.summary.provider);
+      const before = controlState(c);
+      if (!adapter || !c.role || !c.agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
+      const { role, settings } = await changedSettings(
+        adapter,
+        { role: c.role, settings: before.settings },
+        change,
+        (rid) => roles.get(c.dir, rid),
+      );
+      c.role = role;
+      c.settings = settings;
+      c.mode = role.mode ?? null;
+      c.note = role.note ?? null;
+      c.agent.configure(role, settings);
+      if (role.id !== c.summary.role.id) {
+        c.summary = { ...c.summary, role: { id: role.id, name: role.name, model: role.model, effort: role.effort } };
+        save();
+        listChanged(c.dir);
+      }
+      return controlState(c);
     },
     send(id, text) {
       const c = chat(id);

@@ -1,5 +1,13 @@
 /** The state the session manager keeps for each chat (ADR 0018). */
-import { idleSummary, type Ask, type ChatEvent, type ChatSummary, type ModeInfo } from "@featra/work-format";
+import {
+  idleSummary,
+  type Ask,
+  type ChatEvent,
+  type ChatSettings,
+  type ChatSummary,
+  type ModeInfo,
+  type Role,
+} from "@featra/work-format";
 import type { ProviderSession } from "./provider.ts";
 
 export type { Chat };
@@ -25,6 +33,9 @@ interface Chat {
   /** Why it can't take a message without an agent: its role or provider is missing. */
   refusal: string | null;
   running: boolean;
+  /** The role its agent runs as now, and what the composer last chose (STORY-22); null before its agent is made. */
+  role: Role | null;
+  settings: ChatSettings | null;
   /** The mode and note its role gave it when its agent was made (STORY-6): what the composer shows. */
   mode: ModeInfo | null;
   note: string | null;
@@ -46,6 +57,8 @@ const restored = (id: string, dir: string, summary: ChatSummary, session: string
   agent: null,
   refusal: null,
   running: false,
+  role: null,
+  settings: null,
   mode: null,
   note: null,
   closed: false,

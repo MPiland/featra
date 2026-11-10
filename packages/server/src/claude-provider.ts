@@ -4,7 +4,16 @@
  * role's model and effort. `settingSources` keeps the SDK default, so CLAUDE.md, skills and hooks load as usual.
  */
 import type { CanUseTool, Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
-import { errorMessage, type ChatEvent, type PermissionMode, type Role } from "@featra/work-format";
+import {
+  EFFORTS,
+  errorMessage,
+  isOneOf,
+  type ChatEvent,
+  type ChatSettings,
+  type PermissionMode,
+  type Role,
+} from "@featra/work-format";
+import { claudeControls, claudeSettings, sdkMode } from "./claude-controls.ts";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
 import { claudeQuestions, questionResult } from "./claude-question.ts";
 import { sessionRules, suggestedRule } from "./claude-rules.ts";
@@ -41,25 +50,11 @@ export function agentEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 
 /**
  * The SDK's permission mode for each of a role's modes. Ask is the SDK's default: the user's own Claude rules apply,
- * and every other tool that needs approval goes to `canUseTool` (ADR 0018). STORY-22 adds the other modes.
+ * and every other tool that needs approval goes to `canUseTool` (ADR 0018). The modes the composer switches between are in `claude-controls.ts` (ADR 0020).
  */
 export const SDK_PERMISSION_MODES: Record<PermissionMode, NonNullable<Options["permissionMode"]>> = { ask: "default" };
 
-/**
- * The SDK mode a role's chat starts in: the one Claude's own settings name (STORY-6), else Ask's. Bypass needs the SDK's
- * second opt-in; Featra only passes on what the user's own settings already allow.
- */
-function startMode(role: Role): Pick<Options, "permissionMode" | "allowDangerouslySkipPermissions"> {
-  const { mode } = role;
-  const named = mode?.provider === "claude" && mode.level !== null ? mode.name : null;
-  if (named === "bypassPermissions")
-    return { permissionMode: "bypassPermissions", allowDangerouslySkipPermissions: true };
-  if (named === "acceptEdits" || named === "plan" || named === "auto" || named === "dontAsk")
-    return { permissionMode: named };
-  return { permissionMode: SDK_PERMISSION_MODES[role.permission] };
-}
-
-/** The query options for a role's chat. */
+/** The query options for a role's chat, with the model, effort and mode the composer last chose (default: the role's). */
 export function claudeOptions(
   role: Role,
   cwd: string,
@@ -68,14 +63,15 @@ export function claudeOptions(
   env: NodeJS.ProcessEnv,
   resume: string | null,
   mcp: McpServerSpec | null = null,
+  settings: ChatSettings = claudeSettings(role),
 ): Options {
   return {
     cwd,
-    model: role.model,
-    effort: role.effort,
+    model: settings.model,
+    effort: isOneOf(EFFORTS, settings.effort) ? settings.effort : role.effort,
     systemPrompt: { type: "preset", preset: "claude_code", append: role.prompt },
     pathToClaudeCodeExecutable: claude,
-    ...startMode(role),
+    ...sdkMode(settings.mode),
     includePartialMessages: true,
     canUseTool,
     env,
@@ -109,13 +105,15 @@ export function createClaudeProvider({
     id: "claude",
     name: CLAUDE_NAME,
     installed: async () => (await locate()) !== null,
+    controls: claudeControls,
+    settings: claudeSettings,
     start: (options) => startSession(options, { loadQuery, locate, env }),
     history: async (session, cwd) => claudeHistory(await loadSessions(), session, cwd),
   };
 }
 
 function startSession(
-  { cwd, role, approve, ask, emit, resume, mcp }: SessionOptions,
+  { cwd, role: startRole, approve, ask, emit, resume, mcp }: SessionOptions,
   { loadQuery, locate, env }: Omit<Required<ClaudeDeps>, "loadSessions">,
 ): ProviderSession {
   // A restored chat resumes its session; the agent's own report of its session id takes over once it starts.
@@ -124,6 +122,12 @@ function startSession(
   let query: ClaudeQuery | null = null;
   let closed = false;
   let turn = new AbortController();
+  // What the next turn runs with: the composer's changes land here, and a running agent is replaced before the next
+  // message if it was started with something else (the SDK takes the prompt, model, effort and mode when it starts).
+  let role = startRole;
+  let settings = claudeSettings(role);
+  let startedWith = "";
+  const configKey = () => JSON.stringify([role.prompt, settings]);
   /** A turn is open from its message until its turn-end. */
   let open = false;
 
@@ -178,7 +182,17 @@ function startSession(
     let running: ClaudeQuery;
     try {
       const attached = (await mcp?.()) ?? null;
-      const options = claudeOptions(role, cwd, claude, canUseTool, agentEnv(env), translator.sessionId(), attached);
+      startedWith = configKey();
+      const options = claudeOptions(
+        role,
+        cwd,
+        claude,
+        canUseTool,
+        agentEnv(env),
+        translator.sessionId(),
+        attached,
+        settings,
+      );
       const queryFn = await loadQuery();
       if (closed || stoppedEarly()) return;
       running = queryFn({ prompt: queue.iterable, options });
@@ -210,6 +224,12 @@ function startSession(
       turn = new AbortController();
       open = true;
       translator.newTurn();
+      // The agent was started with other settings: end it quietly, and the next one resumes the same session.
+      if (input && startedWith !== configKey()) {
+        input.close();
+        input = null;
+        query = null;
+      }
       const queue = input ?? createInputQueue<SDKUserMessage>();
       queue.push(userMessage(text, translator.sessionId()));
       if (input) return;
@@ -218,6 +238,10 @@ function startSession(
         // Finding `claude` failed, or telling the chat did: end the turn, never leave the rejection loose.
         if (!closed && input === queue) fail([failed(errorMessage(err)), END_FAILED]);
       });
+    },
+    configure(next, nextSettings) {
+      role = next;
+      settings = nextSettings;
     },
     async interrupt() {
       if (!open) return;

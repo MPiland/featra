@@ -31,6 +31,7 @@ export * from "./role-edit.ts";
 export * from "./approvals.ts";
 export * from "./questions.ts";
 export * from "./chat-rules.ts";
+export * from "./chat-controls.ts";
 export * from "./chat-events.ts";
 export * from "./chat-state.ts";
 export * from "./chat-list.ts";

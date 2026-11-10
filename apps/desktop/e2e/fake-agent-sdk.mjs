@@ -13,6 +13,10 @@
  * - "slow": starts a reply and waits for interrupt().
  * - anything else: streams "You said: <text>".
  *
+ * Every assistant message reports its token use as the SDK does, growing by a thousand per user message (the first turn
+ * uses 1234 tokens, the second 2234), and each result names the model's window (200000), except for the model
+ * "haiku", whose result names none (STORY-22: the meter then shows tokens without a total).
+ *
  * With CLAUDE_CONFIG_DIR set (STORY-44), each turn is also written to a session file there, as Claude writes it, so
  * the SDK's real reader can read it back after a restart. A resumed session (`options.resume`) goes on in that file,
  * and its reply names the earlier prompts it kept: "You said: <text>, after: <earlier>".
@@ -25,6 +29,9 @@ import { createInterface } from "node:readline";
 
 const MAIN = { parent_tool_use_id: null };
 let seq = 0;
+/** The user messages answered so far, across agents: what the reported token use grows with. */
+let turns = 0;
+let sessionModel = "";
 
 const start = (id) => ({ ...MAIN, type: "stream_event", event: { type: "message_start", message: { id } } });
 const delta = (text) => ({
@@ -32,13 +39,24 @@ const delta = (text) => ({
   type: "stream_event",
   event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
 });
-const assistant = (id, content) => ({ ...MAIN, type: "assistant", message: { id, content } });
+const assistant = (id, content) => ({
+  ...MAIN,
+  type: "assistant",
+  message: { id, content, usage: { input_tokens: 1000 * turns, output_tokens: 234 } },
+});
 const toolResult = (id, content, isError) => ({
   ...MAIN,
   type: "user",
   message: { role: "user", content: [{ type: "tool_result", tool_use_id: id, content, is_error: isError }] },
 });
-const success = (text) => ({ ...MAIN, type: "result", subtype: "success", is_error: false, result: text });
+const success = (text) => ({
+  ...MAIN,
+  type: "result",
+  subtype: "success",
+  is_error: false,
+  result: text,
+  ...(sessionModel === "haiku" ? {} : { modelUsage: { [sessionModel]: { contextWindow: 200000 } } }),
+});
 
 /** A streamed text reply: deltas, then the full message the SDK sends after them. */
 function* say(...parts) {
@@ -248,6 +266,8 @@ export function query({ prompt, options }) {
   async function* run() {
     for await (const message of prompt) {
       const text = String(message.message.content);
+      turns += 1;
+      sessionModel = String(options.model);
       yield { ...MAIN, type: "system", subtype: "init", session_id: session.id, model: options.model };
       turn = new AbortController();
       if (text.includes("decide")) {

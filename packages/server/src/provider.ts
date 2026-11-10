@@ -2,7 +2,7 @@
  * The provider adapter seam (ADR 0018): how the session manager runs an agent without knowing which one. The Claude
  * adapter is the only one in M1; Codex and ACP agents (M2) implement the same interface.
  */
-import type { Answers, ChatEvent, ProviderId, Question, Role } from "@featra/work-format";
+import type { Answers, ChatControls, ChatEvent, ChatSettings, ProviderId, Question, Role } from "@featra/work-format";
 
 /**
  * A rule the provider suggests for Allow for this chat (ADR 0018): an optional adapter capability. The provider applies
@@ -101,6 +101,12 @@ export interface SessionOptions {
 export interface ProviderSession {
   /** Sends the user's message, starting the agent first if it isn't running. */
   send: (text: string) => void;
+  /**
+   * Changes what the agent runs as from its next turn (STORY-22): the role (its prompt), and the provider's own names
+   * for model, effort and permission mode. A turn already running goes on as it was. How the provider applies it is its
+   * own: the Claude adapter replaces the agent and resumes the session.
+   */
+  configure: (role: Role, settings: ChatSettings) => void;
   /** Ends the running turn; the agent keeps its conversation for the next message. */
   interrupt: () => Promise<void>;
   /** Ends the agent. */
@@ -116,6 +122,10 @@ export interface ProviderAdapter {
   /** Whether the user has the provider's agent installed: the chat list shows a group for each one that is. */
   installed: () => Promise<boolean>;
   start: (options: SessionOptions) => ProviderSession;
+  /** What the composer can pick for a chat from `role`, under the provider's own names (STORY-22). */
+  controls: (role: Role) => ChatControls;
+  /** The settings a chat from `role` starts with. */
+  settings: (role: Role) => ChatSettings;
   /**
    * A session's transcript as chat events, read from the provider's own record of it without running the agent (no
    * tokens), or null when the provider no longer has the session (STORY-44).

@@ -6,6 +6,7 @@
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
 import type { ApprovalChoice } from "./approvals.ts";
 import type { Answers } from "./questions.ts";
+import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
 import type { Inbox, InboxItem } from "./inbox.ts";
@@ -80,6 +81,10 @@ export interface ServerMethods {
    * names the watch.
    */
   "chat.watch": { params: { id: string }; result: ChatSnapshot };
+  /** The chat's composer controls under its provider's own names, and the settings it runs with (STORY-22). */
+  "chat.controls": { params: { id: string }; result: ChatControlState };
+  /** Changes the chat's role, model, effort or permission mode from its next turn; answers with the new state. */
+  "chat.configure": { params: { id: string; change: SettingsChange }; result: ChatControlState };
   /** Sends the user's message: starts a turn. */
   "chat.send": { params: { id: string; text: string }; result: null };
   /** Interrupts the running turn. */
@@ -177,6 +182,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "roles.edit",
   "chat.start",
   "chat.watch",
+  "chat.controls",
+  "chat.configure",
   "chat.send",
   "chat.stop",
   "chat.approve",

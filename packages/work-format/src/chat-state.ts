@@ -5,6 +5,7 @@
  */
 import type { AllowScope } from "./approvals.ts";
 import type { ChatEvent, ChatProblem } from "./chat-events.ts";
+import type { ChatUsage } from "./chat-controls.ts";
 import type { LogFile } from "./knowledge-log.ts";
 import type { Answers, Question } from "./questions.ts";
 import { assertNever } from "./utils/guards.ts";
@@ -61,9 +62,11 @@ export interface ChatState {
   running: boolean;
   /** The model the agent reported, once its session is up. */
   model: string | null;
+  /** The context in use after the last turn that reported it (STORY-22); null until one has. */
+  usage: ChatUsage | null;
 }
 
-export const EMPTY_CHAT: ChatState = { items: [], running: false, model: null };
+export const EMPTY_CHAT: ChatState = { items: [], running: false, model: null, usage: null };
 
 const key = (state: ChatState) => String(state.items.length);
 const push = (state: ChatState, item: ChatItem): ChatState => ({ ...state, items: [...state.items, item] });
@@ -154,6 +157,8 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       return { ...push(state, { kind: "user", key: key(state), text: event.text }), running: true };
     case "started":
       return { ...state, model: event.model };
+    case "usage":
+      return { ...state, usage: { used: event.used, window: event.window } };
     case "text":
       return event.delta ? appendText(state, event.block, event.delta) : state;
     case "tool":
