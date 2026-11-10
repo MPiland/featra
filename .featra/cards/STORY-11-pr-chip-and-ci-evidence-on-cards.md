@@ -29,6 +29,7 @@ PR chip and CI evidence on cards.
 ## Acceptance criteria
 
 - [ ] A story's PR (opened via the user's `gh`) shows on the card as a chip linking to the PR with state and checks
+- [ ] The chip's label is the PR number (`#14`), never the raw URL; the full URL shows on hover
 - [ ] Passing required checks marks the story Verified; passing AC tests mark those ACs Proven
 
 ## Tasks
