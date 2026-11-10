@@ -2,7 +2,7 @@
 id: BUG-13
 type: bug
 title: New chat looks like an input
-status: In Review
+status: Done
 parent: FEAT-3
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-13-new-chat
-pr: 17
+pr: "17"
 created: 2026-11-10T03:05:28Z
 history:
   - at: 2026-11-10T03:05:28Z
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-13
+  - at: 2026-11-10T03:31:22Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T03:31:22Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -45,3 +55,5 @@ The sidebar's New chat button (STORY-5) has a thin border, left-aligned text and
 ## Tasks
 
 ## Notes
+
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.
