@@ -2,7 +2,7 @@
 id: STORY-22
 type: story
 title: Composer controls and context meter
-status: In Review
+status: Acceptance
 parent: FEAT-3
 order: 9
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-22
+  - at: 2026-11-10T02:46:22Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
