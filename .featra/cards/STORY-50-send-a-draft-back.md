@@ -2,7 +2,7 @@
 id: STORY-50
 type: story
 title: Send a draft back
-status: In Review
+status: Acceptance
 parent: FEAT-4
 order: 3
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-10T06:44:56Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

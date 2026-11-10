@@ -1168,3 +1168,6 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   accepted.
 - **Client tests** cover UI behaviour only (the fake card server answers what a test sets); ordering and validation are
   proved by the server tests. The earlier client assertions on the chat message and the history entry moved there.
+- **Dev Lead approval (2026-11-10):** the client assertions on the sent message, transcript and history entry were
+  removed because ruling 5 made the client fake thin; the same facts are proven against real code in
+  `draft-send-back.test.ts` and `draft-send-back-chat.test.ts`. Approved.
