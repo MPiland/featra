@@ -3,7 +3,8 @@ import { CHAT_COPY } from "../chats.ts";
 import { INBOX_COPY } from "../inbox.ts";
 import type { ProjectRef } from "../projects.ts";
 import { VIEWS, type ViewDef, type ViewId } from "../views.ts";
-import { ViewIcon } from "./icons.tsx";
+import { shortcutLabel } from "../shortcuts.ts";
+import { PlusIcon, ViewIcon } from "./icons.tsx";
 
 export interface SidebarProps {
   collapsed: boolean;
@@ -14,6 +15,8 @@ export interface SidebarProps {
   switcher: ReactNode;
   /** The project whose chats the list shows. */
   project: ProjectRef | null;
+  /** The host platform, for the shortcut the New chat row shows on hover. */
+  platform: string;
   /** Opens the role picker for a new chat in the project. */
   onNewChat: () => void;
   /** The project's chat list (STORY-21), between the top views and the foot. */
@@ -61,13 +64,34 @@ function NavList({
 }
 
 /** A collapsed sidebar is `inert`: out of the tab order and hidden from assistive tech, not just squeezed to 0px. */
-export function Sidebar({ collapsed, current, onOpen, switcher, project, onNewChat, chats, counts }: SidebarProps) {
+export function Sidebar({
+  collapsed,
+  current,
+  onOpen,
+  switcher,
+  project,
+  platform,
+  onNewChat,
+  chats,
+  counts,
+}: SidebarProps) {
   return (
     <nav id="sidebar" className="side" aria-label="Featra" inert={collapsed} data-collapsed={collapsed}>
       {switcher}
-      <button type="button" className="new-chat" disabled={!project} onClick={onNewChat}>
-        {CHAT_COPY.newChat}
-      </button>
+      <ul className="navlist">
+        <li>
+          <button
+            type="button"
+            className="nav new-chat"
+            disabled={!project}
+            data-shortcut={shortcutLabel("newChat", platform)}
+            onClick={onNewChat}
+          >
+            <PlusIcon />
+            {CHAT_COPY.newChat}
+          </button>
+        </li>
+      </ul>
       <NavList views={VIEWS.filter((v) => v.placement === "top")} current={current} onOpen={onOpen} counts={counts} />
       <section key={project?.dir} className="chats" aria-label={CHAT_COPY.chats} data-project={project?.dir}>
         {chats}

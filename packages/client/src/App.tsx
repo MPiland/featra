@@ -227,6 +227,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
             current={chatId === null ? view.id : null}
             onOpen={open}
             project={projects.current}
+            platform={bridge.platform}
             onNewChat={() => setDialog("newChat")}
             chats={<ChatList list={chatList} current={chatId} onOpen={openChat} />}
             counts={{ inbox: inbox.items.length }}
