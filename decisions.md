@@ -1001,3 +1001,5 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   same layers as `disableBypassPermissionsMode`: no `auto` in the controls, and a role or default mode of `auto` starts
   on Ask with the note "Claude's settings turn off auto mode: starting on Ask." Review fix.
 - **`contextTokens` includes the last turn's output tokens.** Why: the output is part of the next turn's context. Review fix.
+- 2026-11-10 — FEAT-3 accepted by the user without a hands-on check of each story (STORY-46, 6, 47, 7, 22, BUG-13);
+  a true UAT comes later. The user chose to keep moving rather than start test sessions now. FEAT-3 merges to main.

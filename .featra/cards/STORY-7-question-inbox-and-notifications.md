@@ -2,7 +2,7 @@
 id: STORY-7
 type: story
 title: Inbox and notifications
-status: Acceptance
+status: Done
 parent: FEAT-3
 order: 8
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T03:32:59Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T03:32:59Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -65,3 +75,5 @@ blocked agent doesn't sit unnoticed while I'm away.
 - Depends on: STORY-45, STORY-46.
 - Decisions 2026-11-08: the Inbox wait is 10 minutes (a sign the person is away); notifications fire at once and can
   be turned off. Logging answers moved to STORY-47.
+
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.

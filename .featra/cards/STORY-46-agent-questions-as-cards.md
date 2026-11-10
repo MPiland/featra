@@ -2,7 +2,7 @@
 id: STORY-46
 type: story
 title: Agent questions as cards
-status: Acceptance
+status: Done
 parent: FEAT-3
 order: 5
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T03:32:57Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T03:32:57Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -61,3 +71,5 @@ and keeps going.
 ## Notes
 
 - Depends on: STORY-5, STORY-21. Intercepted through `canUseTool` (docs/spike-claude-sdk.md).
+
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.

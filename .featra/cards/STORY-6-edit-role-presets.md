@@ -2,7 +2,7 @@
 id: STORY-6
 type: story
 title: Built-in, custom and provider roles
-status: Acceptance
+status: Done
 parent: FEAT-3
 order: 6
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T03:32:58Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T03:32:58Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -77,3 +87,5 @@ Codex, so every chat starts with the right prompt, model and effort.
 - Decision 2026-11-09: the composer's mode picker uses each provider's own mode names: Claude's `default`,
   `acceptEdits`, `plan`, `auto` and `bypassPermissions`; Codex's approval policy plus sandbox. It shows where the mode
   came from ("auto · from Claude settings"). There is no Featra-wide common set of modes.
+
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.

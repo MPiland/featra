@@ -2,7 +2,7 @@
 id: STORY-47
 type: story
 title: Featra MCP logs decisions and open questions
-status: Acceptance
+status: Done
 parent: FEAT-3
 order: 7
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T03:32:58Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T03:32:58Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -66,3 +76,5 @@ see what was decided and the reasons behind it.
 - Decision 2026-11-08: agents judge what to log, instead of a "Save as decision" box; each entry carries its reasoning.
 - Entries are written in the session's working folder, so they're committed with that branch's work.
 - The journey test drives the MCP over stdio with a faked SDK; the tool descriptions are real.
+
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.

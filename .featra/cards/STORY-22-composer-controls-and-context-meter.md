@@ -2,7 +2,7 @@
 id: STORY-22
 type: story
 title: Composer controls and context meter
-status: Acceptance
+status: Done
 parent: FEAT-3
 order: 9
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T03:32:59Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T03:32:59Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -60,3 +70,5 @@ As a builder, I change the agent's role, model, effort and permission mode from 
 ## Notes
 
 - Depends on: STORY-5, STORY-6.
+
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.

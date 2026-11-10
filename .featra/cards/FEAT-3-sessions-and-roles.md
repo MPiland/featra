@@ -2,7 +2,7 @@
 id: FEAT-3
 type: feature
 title: Sessions and roles
-status: approved
+status: done
 parent: EPIC-1
 order: 5
 origin: planned
@@ -12,6 +12,21 @@ history:
     field: status
     from: null
     to: approved
+    by: user
+  - at: 2026-11-10T03:33:12Z
+    field: status
+    from: approved
+    to: active
+    by: lead
+  - at: 2026-11-10T03:33:12Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T03:33:12Z
+    field: status
+    from: active
+    to: done
     by: user
 ---
 
