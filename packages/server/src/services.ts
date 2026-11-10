@@ -9,6 +9,7 @@ import { locateClaude } from "./claude-locate.ts";
 import { createClaudeProvider, type ClaudeDeps } from "./claude-provider.ts";
 import { loadAgentQuery } from "./claude-sdk.ts";
 import { createDraftActions } from "./draft-actions.ts";
+import { createDraftReview } from "./draft-review.ts";
 import { createDraftWriter } from "./draft-writer.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
@@ -115,6 +116,7 @@ export function createServices({
     copies,
     cards,
     drafts,
+    review: createDraftReview({ scan: watches.scan, now, lane, gitCommand }),
     chats,
     roles,
     roleWatches,

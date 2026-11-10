@@ -60,6 +60,8 @@ export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEd
     stories: storiesOf(card, ctx.cards),
     owner: locationLabel(owned.owner),
     readOnly: readOnlyReason(owned, checkedOut, ctx.config.baseBranch),
-    ...(draftChat === null ? {} : { draftChat }),
+    ...(draftChat === null
+      ? {}
+      : { draftChat, draftStories: ctx.cards.filter((c) => c.type === "story" && c.parent === card.id).length }),
   };
 }

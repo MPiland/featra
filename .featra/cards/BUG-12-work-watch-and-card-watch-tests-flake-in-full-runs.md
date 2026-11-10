@@ -48,3 +48,4 @@ In one other run, `card-actions.test.ts` and `copy-actions.test.ts` failed toget
 ## Notes
 
 - 2026-11-10: seen on CI (Gate, Ubuntu), run 42745135063, on STORY-22's card-only commit 3c4f6d4. Three `ws-work.test.ts` tests failed together. The first was "work.watch > answers with the list, then pushes it within 1 s of an owner file edit (STORY-3 AC5)", with "No matching frame in 2000 ms". After it, "applies a stale copy" failed with `git commit -q -m titles` exiting 1 ("On branch main"), and card.watch failed to match. The later two may cascade from the first test's leftover state in a shared repo.
+- 2026-11-10: seen again while building STORY-51 (PR #23): the pre-commit `pnpm check` failed more than 3 times in a row on one worktree, on timing tests in `ws-work.test.ts` and the watch tests (`work-watch.test.ts`). Each passed when run alone. The commit passed only after repeated retries, so the flake now costs several 80 to 110 second runs per commit.

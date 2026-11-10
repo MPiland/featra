@@ -169,3 +169,30 @@ describe("draft.sendBack (STORY-50)", () => {
     }
   });
 });
+
+describe("draft.approve and draft.reject (STORY-51)", () => {
+  it("are checked at the door: an unopened project, malformed params, and a card that isn't a draft", async () => {
+    const socket = await open();
+    try {
+      let n = 30;
+      const ask = async (method: string, params: unknown) => {
+        const id = n++;
+        socket.send({ id, method, params });
+        return socket.next((f) => f.id === id, 10_000);
+      };
+      for (const method of ["draft.approve", "draft.reject"]) {
+        expect(await ask(method, { dir: repo.root, id: "FEAT-1" })).toMatchObject({
+          ok: false,
+          error: "Not an open project.",
+        });
+        expect(await ask(method, { dir: repo.main })).toMatchObject({ ok: false, error: "Expected { dir, id }." });
+        expect(await ask(method, { dir: repo.main, id: "FEAT-1" })).toMatchObject({
+          ok: false,
+          error: "FEAT-1 isn't a draft.",
+        });
+      }
+    } finally {
+      socket.close();
+    }
+  });
+});

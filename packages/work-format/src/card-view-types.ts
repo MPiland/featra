@@ -64,6 +64,8 @@ export interface CardView {
   owner: string;
   /** The chat that drafted this feature, while the draft waits on review; absent otherwise (STORY-50 Send back). */
   draftChat?: string;
+  /** With `draftChat`: every story under the draft, Cancelled ones too. Reject deletes all of them (STORY-51). */
+  draftStories?: number;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -170,6 +172,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     owner: text(raw.owner),
     readOnly: textOrNull(raw.readOnly),
     ...(typeof raw.draftChat === "string" && raw.draftChat ? { draftChat: raw.draftChat } : {}),
+    ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
   };
 }
 

@@ -1171,3 +1171,74 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Dev Lead approval (2026-11-10):** the client assertions on the sent message, transcript and history entry were
   removed because ruling 5 made the client fake thin; the same facts are proven against real code in
   `draft-send-back.test.ts` and `draft-send-back-chat.test.ts`. Approved.
+
+## 2026-11-10 — STORY-51: approve or reject a draft (ADR 0023)
+
+- **Buttons.** Approve and Reject sit next to Send back, in the chat's draft pane and Work's card pane, on a draft
+  feature only (`CardView.draftChat`). Text is exactly "Approve" (FEAT-5 renames it). Approve asks nothing; Reject asks
+  "Delete FEAT-N and its N stories?" (Delete / Cancel, focus on Cancel, Escape closes only the question).
+- **Lane.** `draft.approve` and `draft.reject` run in the card lane and re-check draft state there. The STORY-49 guard
+  on `card.update` still refuses a status move out of draft.
+- **Baseline.** There was no stored form, so `extra.baseline = { at, stories }` on the feature, built by the pure
+  `planApproval`; `scopeBaseline` returns the stored `at` when present and otherwise the old computed value.
+- **History and stories.** Approval appends a `by: user` status event; stories stay New. Cancelled draft stories are
+  deleted, not committed (one git already tracks is kept and left out of the commit).
+- **Commit.** Pathspec-limited in main's checkout, message `FEAT-N: approved <title>`, hooks run, never pushed. Refused
+  up front when main isn't on the base branch or is mid merge/rebase/cherry-pick/revert/bisect. A failed commit restores
+  every card file byte for byte and shows the git error.
+- **Reject.** Refused if any file is tracked or staged; deletes the files; git stays clean. The chat keeps its title and
+  hears nothing. A later `draft_cards` from that chat gets the existing refusal (tested).
+- **Tests.** No existing assertion changed. The client card-server fake gained `review`; the e2e helper `project()`
+  sets a repo-local git identity so the app's server can commit.
+
+### STORY-51 review rulings (2026-11-10, PR #23)
+
+- **Draft scope.** The draft is the feature and every story under it that is untracked and owned by main, including a
+  story the user added during review. The Reject count and the Approve commit use that same set. A child in a worktree
+  or on a feature branch, or a tracked live child, refuses both actions and names the story. Tested with a user-added
+  story and a worktree-owned story.
+- **Git environment.** The global strip of `GIT_CONFIG_PARAMETERS` and `GIT_CONFIG_COUNT` in `gitEnv` is reverted; a
+  test proves product git still passes `GIT_CONFIG_COUNT` through. The hook-failure tests remove those variables from
+  `process.env` themselves (and restore them), because the pre-commit hook runs the tests under
+  `core.hooksPath=.githooks`.
+- **Default branch.** `baseBranch` from the config if set, then `origin/HEAD`, then main or master, whichever exists.
+  Detached HEAD, a repo with no commits and a missing branch each get a clear message. The scan itself resolves the
+  branch, since the main root exists only when the base branch is checked out. Tested with master, origin/HEAD, config
+  winning, detached HEAD and an empty repo.
+- **Rollback.** The index entries of the draft's paths are recorded before `git add` and restored with the checked
+  runner after a failure; if restoring fails the message says so. Tested with a path the user had staged and with a
+  failing reset (a hook that breaks the branch).
+- **Cancelled stories.** One git already tracks goes into the commit as Cancelled; an untracked one is deleted.
+- **Baseline.** For a feature with a stored baseline, added scope is the stories not in `baseline.stories`. Tested for a
+  story added after approval, one created in the same second, and an old feature with no stored baseline (same result as
+  before).
+- **Stale write.** Approve parses each card from the bytes it reads in the lane and checks them unchanged right before
+  writing; the scan's copy is not used. Tested with an edit after the scan (kept) and during the approve (refused).
+- **Reject question.** It is an `alertdialog` labelled "Reject" and described by its question. Escape closes it from
+  anywhere, focus stays inside (Tab wraps, outside focus returns to Cancel), and after cancelling or a refusal focus goes
+  back to Reject. Delete is `aria-disabled` while busy so it keeps focus. Client tests changed the role query from
+  `group` to `alertdialog`; no assertion was weakened.
+- **E2E Enter vs click.** Root cause is e2e timing, not product. The chat's draft pane opens with
+  `focusOnOpen={shown.focus}` and does not take the composer's focus. The CI trace of the failing run shows the second
+  chat's `fill` taking 6 ms (8777.265 to 8783.806) against 72 ms in the first chat (8179 to 8251): the text went into
+  the previous chat's composer, which is still on screen and editable until the new chat replaces it. The helper now
+  waits for the open chat's `data-chat` to change before filling, and keeps the Send click.
+- **Tests.** `draft-review.test.ts` was split into `draft-review-fixture.ts` plus approve, reject, rollback, scope and
+  branches files. The rebase test now expects the rebase refusal exactly (the mid-operation check runs first); it
+  accepted either message before. Added: paths with a space, master, detached HEAD, a failing reset, a story not in the
+  draft.
+
+### STORY-51 e2e timeout on Windows, run 42783817510 attempt 1 (2026-11-10)
+
+- **Evidence.** The trace (artifact `e2e-windows-traces`) shows the first test of the run: launch 1.3 s, New chat and
+  Dev Lead, fill 13 ms, Send, the message in the log, then `expect(FEAT-2 pane).toBeVisible()` failing at its 5 s
+  default. Nothing is recorded after that until After Hooks at 60 s. So the 60 s "timeout" was the cleanup, not the test:
+  the spec closed the app only on success, and the repo's `rm` on Windows waited on files the still-running app held.
+- **Cause, as far as it can be proved.** The helper's own wait ran fine (no swap wait on the first chat; the fill went
+  to a fresh composer). The draft pane did not appear within 5 s on the cold first test. The trace has no app logs, so
+  whether the delay was the MCP process starting or something else is not proved. The rerun passed, and Gate and the
+  Ubuntu run were green. The new git calls (default branch) run once per scan on a repo without `baseBranch`, which is
+  tens of milliseconds, not seconds.
+- **Fix.** The spec now closes the app in `finally`, so a failing step reports itself within its own timeout, and waits
+  for the tool's answer ("Tool said: Drafted FEAT-N") in the log before looking for the pane, so a slow agent turn and a
+  missing pane fail at different steps. No timeout was lengthened. If it recurs, the failing step will now be named.

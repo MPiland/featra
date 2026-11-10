@@ -3,6 +3,7 @@ import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
 import { InlineText } from "../controls/InlineText.tsx";
 import { CloseIcon } from "../icons.tsx";
+import { DraftReview } from "./DraftReview.tsx";
 import { SendBack } from "./SendBack.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
@@ -121,11 +122,21 @@ export function CardPane({
           <Evidence evidence={view.evidence} />
           <p className="meta">{view.readOnly ?? CARD_COPY.owner(view.owner)}</p>
           {view.draftChat && !readOnly && (
-            <SendBack
-              key={id}
-              unavailable={hasChat(view.draftChat) ? null : CARD_COPY.sendBackGone}
-              onSend={(reason) => work.sendBack(dir, id, reason)}
-            />
+            <div className="draft-actions">
+              <SendBack
+                key={id}
+                unavailable={hasChat(view.draftChat) ? null : CARD_COPY.sendBackGone}
+                onSend={(reason) => work.sendBack(dir, id, reason)}
+              />
+              <DraftReview
+                key={`review-${id}`}
+                id={id}
+                stories={view.draftStories ?? view.stories.length}
+                onApprove={() => work.approve(dir, id)}
+                onReject={() => work.reject(dir, id)}
+                onRejected={onClose}
+              />
+            </div>
           )}
           {error && (
             <p className="card-error" role="alert">

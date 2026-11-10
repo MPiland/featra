@@ -43,3 +43,4 @@ export * from "./agent-protocol.ts";
 export * from "./card-draft-guard.ts";
 export * from "./card-draft-input.ts";
 export * from "./card-draft.ts";
+export * from "./card-approval.ts";

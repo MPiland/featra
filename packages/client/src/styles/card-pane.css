@@ -413,3 +413,39 @@ button.inline-text:hover {
   display: flex;
   gap: 8px;
 }
+
+/* Approve and Reject beside Send back on a draft (STORY-51). */
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.draft-actions > form.send-back,
+.draft-actions > .draft-ask,
+.draft-actions > .card-error {
+  flex-basis: 100%;
+}
+
+.draft-review,
+.draft-ask .send-back-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.draft-ask p {
+  margin: 0 0 6px;
+}
+
+.draft-review .btn:focus-visible,
+.draft-ask .btn:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.draft-review .btn:disabled,
+.draft-ask .btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
