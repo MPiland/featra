@@ -2,7 +2,7 @@
 id: STORY-50
 type: story
 title: Send a draft back
-status: Acceptance
+status: Done
 parent: FEAT-4
 order: 3
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T13:04:49Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T13:04:49Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -58,3 +68,4 @@ As a builder, I send a draft back to the Dev Lead with a reason, so it revises t
 ## Notes
 
 - Split from the original STORY-8 on 2026-11-10 (decisions.md).
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.

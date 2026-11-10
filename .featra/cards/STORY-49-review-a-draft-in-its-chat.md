@@ -2,7 +2,7 @@
 id: STORY-49
 type: story
 title: Review a draft in its chat
-status: Acceptance
+status: Done
 parent: FEAT-4
 order: 2
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-10T13:04:48Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-10T13:04:48Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -60,3 +70,4 @@ As a builder, I review a drafted feature right in the chat that drafted it.
 ## Notes
 
 - Split from the original STORY-8 on 2026-11-10 (decisions.md).
+- 2026-11-10: accepted by the user without a hands-on check; a true UAT comes later.

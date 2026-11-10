@@ -26,22 +26,27 @@ const worktree = join(root, "worktree");
 const bin = join(root, "bin");
 const calls = join(root, "pnpm-calls.txt");
 const gatePath = join(root, "pnpm-path.txt");
+const workersPath = join(root, "pnpm-workers.txt");
 
 /**
  * The environment without git's own variables. Run from the pre-commit hook, the gate inherits GIT_DIR, GIT_INDEX_FILE
  * and the like, which would point every git call here at the repository being committed instead of the temp one.
  */
-const outsideGit = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_")));
+const outsideGit = Object.fromEntries(
+  Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_") && name !== "VITEST_MAX_WORKERS"),
+);
 /** Windows spells it `Path`; setting a second `PATH` beside it leaves which one wins to chance. */
 const pathKey = Object.keys(outsideGit).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
 
-function env(pnpmExit: number): NodeJS.ProcessEnv {
+function env(pnpmExit: number, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   return {
     ...outsideGit,
+    ...extra,
     [pathKey]: `${bin}${delimiter}${outsideGit[pathKey] ?? ""}`,
     FAKE_PNPM_EXIT: String(pnpmExit),
     FAKE_PNPM_CALLS: calls,
     FAKE_PNPM_PATH: gatePath,
+    FAKE_PNPM_WORKERS: workersPath,
     GIT_CEILING_DIRECTORIES: root,
   };
 }
@@ -49,11 +54,15 @@ function env(pnpmExit: number): NodeJS.ProcessEnv {
 const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, env: env(0), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
-function commit(cwd: string, file: string, pnpmExit: number) {
+function commit(cwd: string, file: string, pnpmExit: number, extra: NodeJS.ProcessEnv = {}) {
   writeFileSync(join(cwd, file), `${file}\n`);
   git(cwd, "add", file);
   rmSync(calls, { force: true });
-  const result = spawnSync("git", ["commit", "-m", `add ${file}`], { cwd, env: env(pnpmExit), encoding: "utf8" });
+  const result = spawnSync("git", ["commit", "-m", `add ${file}`], {
+    cwd,
+    env: env(pnpmExit, extra),
+    encoding: "utf8",
+  });
   return {
     status: result.status,
     gateArgs: existsSync(calls) ? readFileSync(calls, "utf8").trim() : null,
@@ -66,7 +75,7 @@ beforeAll(() => {
   // Git runs hooks with its own sh (Git Bash on Windows), so a sh script named `pnpm` is found first on PATH.
   writeFileSync(
     join(bin, "pnpm"),
-    '#!/bin/sh\necho "$@" >> "$FAKE_PNPM_CALLS"\nprintf %s "$PATH" > "$FAKE_PNPM_PATH"\nexit "$FAKE_PNPM_EXIT"\n',
+    '#!/bin/sh\necho "$@" >> "$FAKE_PNPM_CALLS"\nprintf %s "$PATH" > "$FAKE_PNPM_PATH"\nprintf %s "$VITEST_MAX_WORKERS" > "$FAKE_PNPM_WORKERS"\nexit "$FAKE_PNPM_EXIT"\n',
   );
   chmodSync(join(bin, "pnpm"), 0o755);
   mkdirSync(join(repo, ".githooks"), { recursive: true });
@@ -119,6 +128,13 @@ describe("AC5: a git pre-commit hook runs `pnpm check` in every worktree", () =>
     const entries = readFileSync(gatePath, "utf8").split(":");
     expect(entries).not.toContain(execPath.trim());
     expect(entries).toContain(execFileSync("sh", ["-c", 'cd "$1" && pwd', "sh", bin], { encoding: "utf8" }).trim());
+  });
+
+  it("the gate runs the unit tests with 3 workers unless the environment says otherwise (BUG-12)", () => {
+    commit(repo, "workers.txt", 0);
+    expect(readFileSync(workersPath, "utf8")).toBe("3");
+    commit(repo, "workers-more.txt", 0, { VITEST_MAX_WORKERS: "6" });
+    expect(readFileSync(workersPath, "utf8")).toBe("6");
   });
 
   it("outside a git checkout the installer does nothing and succeeds", () => {

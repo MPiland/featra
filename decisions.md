@@ -1275,7 +1275,15 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   every failing run took 53 to 76 s against a normal 27 s, and every failure was one of three waits (`card-actions-draft`
   beforeEach or "refuses a move out of draft", `work-watch` "a worktree goes", `ws-work` draft door check) that a stall
   of 20 s or more outlasts. No wait can absorb a stall longer than the 30 s test timeout.
-- **Ruling proposed.** On the dev PC (the repo cannot set these): stop or cap WSL (`wsl --shutdown`, or `memory=` in
-  `.wslconfig`), reboot to clear the kernel pools, and exclude the repo, the temp folder and `git.exe` from Defender
-  real-time scanning. Then repeat the 50-run soak and the 5 gate runs. Until then the gate may still fail on a stall; a failure
-  that names a test with "Test timed out in 30000ms" while others time out too is this, not a regression.
+- **Ruling (the user, 2026-11-10): cap the workers in the pre-commit gate.** `.githooks/pre-commit` sets
+  `VITEST_MAX_WORKERS=${VITEST_MAX_WORKERS:-3}`, so the gate runs the unit tests with 3 workers and a value in the
+  environment still wins. CI keeps vitest's default (it has not shown the stalls). `pre-commit-hook.test.ts` proves the
+  default and the override, and fails without the line. Before: full gates at default workers passed 1 of 11 on this PC
+  (150 to 185 s each); commits with 3 workers passed 2 of 2 (about 220 s). Still worth doing on the
+  PC (the repo cannot): stop or cap WSL (`wsl --shutdown`, or `memory=` in `.wslconfig`) and reboot to clear the
+  kernel pools. A failure with "Test timed out in 30000ms" in several files at once is this, not a regression.
+
+## 2026-11-10 — FEAT-4 accepted
+
+- The user accepted STORY-8, STORY-49, STORY-50, STORY-51 and FEAT-4 ("Accept and merge") without a hands-on check;
+  a true UAT comes later. FEAT-4 merges to main.

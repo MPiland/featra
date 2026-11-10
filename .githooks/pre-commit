@@ -16,4 +16,9 @@ IFS=$old_ifs
 PATH=$kept
 export PATH
 
+# Three test workers by default: with one per core a full run exhausts this PC's memory, and process creation then
+# stalls for 20 s or more, failing timed tests at random (BUG-12, decisions.md). A value in the environment wins.
+VITEST_MAX_WORKERS=${VITEST_MAX_WORKERS:-3}
+export VITEST_MAX_WORKERS
+
 exec pnpm check
