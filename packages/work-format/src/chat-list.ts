@@ -27,6 +27,10 @@ export type WaitReason = "reply" | AskReason;
 export const WAIT_REASONS: readonly WaitReason[] = ["reply", "approval", "question"];
 const isAsk = (w: WaitReason | null): w is AskReason => w !== null && w !== "reply";
 
+/** Who renamed a chat. */
+export type TitleBy = "draft" | "user";
+const TITLE_BY: readonly TitleBy[] = ["draft", "user"];
+
 /** What a chat row shows of the role it started from. */
 export type ChatRoleRef = Pick<Role, "id" | "name" | "model" | "effort">;
 
@@ -37,6 +41,8 @@ export interface ChatSummary {
   role: ChatRoleRef;
   /** The first line of the user's first message; null until there is one (`chatName` shows the role's name). */
   title: string | null;
+  /** Who set the title when it wasn't the first message: a draft (STORY-49), or the user, whose name a draft never replaces. */
+  titleBy?: TitleBy;
   /** When the chat started (ISO 8601). */
   startedAt: string;
   /** A turn is running. */
@@ -73,6 +79,16 @@ export function chatTitle(text: string): string | null {
     .find(Boolean);
   if (!line) return null;
   return line.length > CHAT_TITLE_MAX ? `${line.slice(0, CHAT_TITLE_MAX - 1).trimEnd()}…` : line;
+}
+
+/**
+ * The row renamed to `title` (cut like any title). A draft renames a chat to its feature's title (STORY-49) but never
+ * over a name the user set; the user's own name replaces anything. The same row comes back when nothing changes.
+ */
+export function retitle(summary: ChatSummary, title: string, by: TitleBy): ChatSummary {
+  const next = chatTitle(title);
+  if (next === null || (by === "draft" && summary.titleBy === "user")) return summary;
+  return next === summary.title && by === summary.titleBy ? summary : { ...summary, title: next, titleBy: by };
 }
 
 /** The events that answer a request. */
@@ -202,6 +218,7 @@ export function normalizeSummary(raw: unknown): ChatSummary | null {
     provider,
     role: { id: role.id, name: role.name, model: role.model, effort: role.effort },
     title,
+    ...(isOneOf(TITLE_BY, raw.titleBy) ? { titleBy: raw.titleBy } : {}),
     startedAt,
     running: raw.running === true,
     waiting: isOneOf(WAIT_REASONS, raw.waiting) ? raw.waiting : null,

@@ -10,6 +10,7 @@ import {
   idleSummary,
   newSummary,
   reduceRow,
+  retitle,
   savedChat,
   type ChatEvent,
   type ChatSummary,
@@ -243,6 +244,14 @@ export function createChatManager({
       });
       c.changing = done.catch(() => {});
       return done;
+    },
+    retitle(id, title, by) {
+      const c = chat(id);
+      const summary = retitle(c.summary, title, by);
+      if (summary === c.summary) return;
+      c.summary = summary;
+      save();
+      listChanged(c.dir);
     },
     send(id, text) {
       const c = chat(id);

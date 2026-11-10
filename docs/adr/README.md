@@ -53,3 +53,4 @@ What becomes easier or harder, and what we must now do.
 | [0019](0019-agent-socket-and-scoped-secrets.md)     | The Featra MCP reaches the server over a narrow agent socket      | accepted |
 | [0020](0020-composer-controls-and-context-meter.md) | Composer controls and the context meter                           | accepted |
 | [0021](0021-agents-draft-cards-through-the-mcp.md)  | Agents draft cards through the MCP; a later call updates in place | accepted |
+| [0022](0022-review-a-draft-in-its-chat.md)          | A draft is reviewed in its chat, as a docked card pane            | accepted |

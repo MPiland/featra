@@ -1086,3 +1086,22 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   "can't be written" test, whose obstruction is now a taken ID that gets a new one, now injects the disk failure.
 - **Dev Lead approval of those test changes (2026-11-10):** each one follows a ruling above and asserts the new
   behaviour as strictly or more strictly; none was weakened. Approved.
+
+## 2026-11-10 — STORY-49: review a draft in its chat
+
+- **Pane text edits now write history, for every card (AC4).** `applyCardEdit` appends a `by: user` `content` event
+  naming the part and the old value; an edit that changes nothing writes none. This is the STORY-8 review's finding
+  (pane text edits wrote no history). ADR 0022.
+- **Ruling 5 still holds, with a test that proves it:** a `draft_cards` revision after a pane edit is refused (work-format
+  and through the real card actions and draft writer). A `notes` edit does not block the agent, since a draft doesn't
+  write notes.
+- **Hand-set chat names (ambiguous in the brief, decided):** the chat summary records who set its title
+  (`titleBy`: message, draft or user). A draft replaces a message-derived or earlier draft title and never a user's.
+  There is no rename-by-hand yet, so no product path sets `user`; the rule and its test are in place for when one does.
+- **A draft feature's status list shows only its current status**, so the pane can't approve it (STORY-51).
+- **The draft is found from the Work list, not stored on the chat.** One source of truth for what a draft is.
+- **Auto-open only for a draft made while the chat is open**, without taking focus from the composer. A draft that
+  was already there is offered with Review draft in the header, and Work's Review draft opens the pane focused.
+- **Existing test changed (reason: AC4 mandates the new behaviour):** `card-edit.test.ts` "replaces the user story and
+  appends no history" now expects the content event, and the description, title and notes assertions expect it too.
+  Strictly stronger; no assertion was removed.

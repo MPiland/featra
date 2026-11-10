@@ -328,3 +328,52 @@ button.inline-text:hover {
 .ev .y {
   color: var(--ok);
 }
+
+.work-split > .chat {
+  min-width: 0;
+}
+
+.card-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--acc);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.card-link:hover {
+  text-decoration: underline;
+}
+
+.card-link:focus-visible,
+.review-draft:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.card-stories {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.review-draft {
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--acc);
+  border-radius: 4px;
+  background: none;
+  color: var(--acc);
+  font: inherit;
+  font-size: 11px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.chat-head .review-draft {
+  margin-left: auto;
+}

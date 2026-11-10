@@ -2,7 +2,7 @@
 id: STORY-49
 type: story
 title: Review a draft in its chat
-status: New
+status: In Progress
 parent: FEAT-4
 order: 2
 origin: planned
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-49-review-draft
 pr: null
 created: 2026-11-10T03:47:43Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-10T05:03:05Z
+    field: status
+    from: New
+    to: In Progress
+    by: developer
 ---
 
 ## Description
@@ -35,7 +40,12 @@ As a builder, I review a drafted feature right in the chat that drafted it.
 
 ## Tasks
 
-- [ ] Break down when picked up
+- [ ] Pane edits append a `by: user` content event (work-format); a draft revision after one is still refused
+- [ ] The feature card lists its stories; the pane opens any of them
+- [ ] Drafting renames the chat to the feature title, never over a hand-set name
+- [ ] The chat shows the draft in a docked card pane; Review draft in Work opens that chat with it
+- [ ] Add the e2e journey `review-draft.spec.ts`
+- [ ] Write ADR 0022, decisions
 
 ## Notes
 

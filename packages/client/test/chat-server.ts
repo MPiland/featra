@@ -7,7 +7,9 @@ import {
   foldChat,
   newSummary,
   reduceRow,
+  retitle,
   type ApprovalAnswer,
+  type TitleBy,
   type ChatEvent,
   type ChatRow,
   type ProviderInfo,
@@ -188,6 +190,15 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     emit: (id: string, ...events: ChatEvent[]) =>
       act(() => {
         for (const e of events) record(id, e);
+      }),
+    /** The server renames a chat (a draft names it for its feature), with work-format's real rule. */
+    retitle: (id: string, title: string, by: TitleBy) =>
+      act(() => {
+        const row = rows.get(id);
+        const summary = row && retitle(row.summary, title, by);
+        if (!row || !summary || summary === row.summary) return;
+        row.summary = summary;
+        listChanged(row.dir);
       }),
     watching: (id: string) => watchers.get(id)?.size ?? 0,
     /** How many chat lists the server has sent, so a test can wait until the list has arrived. */

@@ -11,7 +11,7 @@ import {
 } from "./bridge.ts";
 import { CHAT_COPY, type ChatRoleRef } from "./chats.ts";
 import { ChatList, useChats } from "./components/chat/ChatList.tsx";
-import { ChatPane } from "./components/chat/ChatView.tsx";
+import { ChatPane } from "./components/chat/ChatPane.tsx";
 import { NewChatDialog } from "./components/chat/NewChatDialog.tsx";
 import { InboxView } from "./components/inbox/InboxView.tsx";
 import { useInboxApp } from "./components/inbox/useInboxApp.ts";
@@ -29,7 +29,6 @@ import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import {
   canGoBack,
   canGoForward,
-  chatEntry,
   currentView,
   entryChat,
   entryView,
@@ -39,6 +38,7 @@ import {
   leaveChats,
   navigate,
 } from "./navigation.ts";
+import { useOpenChat } from "./use-open-chat.ts";
 import { firstSettingsPage, type SettingsPage } from "./settings-pages.ts";
 import { applyTheme } from "./theme.ts";
 import { viewDef, type ViewId } from "./views.ts";
@@ -78,7 +78,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     setUi((s) => ({ ...s, sidebarCollapsed: !s.sidebarCollapsed }));
   }, []);
   const open = useCallback((v: ViewId) => setNav((n) => navigate(n, v)), []);
-  const openChat = useCallback((id: string) => setNav((n) => navigate(n, chatEntry(id))), []);
+  const { reviewChat, openChat, reviewDraft } = useOpenChat(setNav);
   const setZoom = useCallback((f: (z: number) => number) => setUi((s) => ({ ...s, zoomFactor: f(s.zoomFactor) })), []);
   const setPaneWidth = useCallback((w: number) => setUi((s) => ({ ...s, cardPaneWidth: w })), []);
   const back = useCallback(() => setNav(goBack), []);
@@ -235,7 +235,14 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
           />
           <main aria-labelledby="view-title">
             {chatId !== null ? (
-              <ChatPane chats={bridge.chats} chat={chat} dir={projectDir ?? ""} onStarted={startedChat} />
+              <ChatPane
+                bridge={bridge}
+                paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
+                review={reviewChat === chatId}
+                chat={chat}
+                dir={projectDir ?? ""}
+                onStarted={startedChat}
+              />
             ) : view.id === "settings" ? (
               <SettingsView
                 bridge={bridge}
@@ -255,6 +262,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 actions={projectActions}
                 work={bridge.work}
                 paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
+                onReviewDraft={reviewDraft}
                 setupPage={setupPage}
               />
             ) : view.id === "inbox" ? (

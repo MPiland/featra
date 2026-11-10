@@ -4,6 +4,7 @@ import { featureStatusLabel, WORK_COPY } from "../../work-list.ts";
 import { ChevronRightIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
+import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
@@ -66,6 +67,7 @@ function Story({ story }: { story: StoryRow }) {
 /** A feature on the shared grid; it opens to its stories, which use the same columns. */
 export function Feature({ feature }: { feature: FeatureRow }) {
   const [open, setOpen] = useState(false);
+  const review = useReviewDraft();
   const title = feature.id === null ? WORK_COPY.noFeature : feature.title;
   return (
     <>
@@ -80,6 +82,16 @@ export function Feature({ feature }: { feature: FeatureRow }) {
             <span className="badge-review" role="img" aria-label={`${feature.id} draft, needs review`}>
               {WORK_COPY.review}
             </span>
+          )}
+          {feature.review && feature.draftedBy && (
+            <button
+              type="button"
+              className="review-draft"
+              aria-label={WORK_COPY.reviewDraftOf(feature.id ?? "")}
+              onClick={() => review(feature.draftedBy ?? "")}
+            >
+              {WORK_COPY.reviewDraft}
+            </button>
           )}
           <StaleMark id={feature.id} />
         </span>
