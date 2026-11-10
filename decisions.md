@@ -1299,3 +1299,26 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   of 50 full runs in a row. Under the cap the gate passed 4 of 5 and the soak 6 of 8; the failures are 20 s+ process
   stalls from the PC's memory pressure (WSL and kernel pools), which no repo change can fix. The product race fix and
   the cap merge now. No assertion changed.
+
+## 2026-11-10 — FEAT-5 Delegation shaped
+
+- **Start is its own action.** Approve still only commits the draft (ADR 0023). Start, by the user or the Dev Lead
+  (`start_feature`), creates `feature/N-slug` and moves the cards' ownership there.
+- **Story agents are Featra-run provider sessions that behave like subagents.** Neither Claude's SDK nor Codex documents
+  a per-subagent working directory, or stopping and messaging one child reliably. Both document starting a session in a
+  folder, streaming it, interrupting it and messaging it. So the Dev Lead (or the story row's Start) spawns a real
+  session per story through the provider interface. It nests under the feature's chat; the user watches it live,
+  read-only, and can Stop and Resume it. Messages go through the Dev Lead (`message_session`); story agents' questions go
+  to the Dev Lead first, which escalates to the user. Native subagents that a session spawns for itself show nested,
+  read-only, with Stop where the provider supports it.
+- **Story sessions inherit the Dev Lead's permission mode and always-allow rules.** Approvals they still need show in the
+  Dev Lead's chat, labelled with the story, then in the Inbox, so the user never has to open a story session to approve.
+- **Worktrees go where the provider keeps them** (Claude: `<repo>/.claude/worktrees/`, Codex: `~/.codex/worktrees/`), so
+  the user can resume the session in the provider's own tools. Featra never moves or deletes a worktree it didn't create.
+- **At most 3 story sessions run at once** (project setting); the rest queue. Stop keeps the stage and marks Stopped.
+- **`update_card` is scoped:** a story session edits only its own card (stage up to Acceptance, tasks, ACs, notes,
+  evidence), all Reported; the Dev Lead edits cards in its feature. Evidence is committed in
+  `.featra/evidence/FEAT-N/STORY-M/`, kept as small as the story allows.
+- **Claude runner only in F4.** The spawn interface is provider-neutral; the Codex runner stays on the roadmap.
+- Stories: STORY-52 Start a feature, STORY-9 Spawn a story agent, STORY-53 Watch, stop and resume, STORY-10 Agents update
+  their own card, STORY-54 Story agents report to the Dev Lead, STORY-55 Native subagents appear nested.

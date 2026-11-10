@@ -13,7 +13,7 @@ epics in `.featra/cards/`.
   for users without Tailscale. Featra never exposes a public port, and it keeps nothing hosted. It does not rely on
   vendors' own remote-control features: imported sessions are resumed in place, so they carry over to the vendor's CLI the
   way they do natively.
-- **More providers:** Codex next, then ACP agents.
+- **More providers:** Codex next (a runner behind the provider-neutral spawn interface from FEAT-5), then ACP agents.
 - **Knowledge:** a generated knowledge index, and an opt-in work protocol.
 - **Importers** for BMAD, spec-kit, OpenSpec and GSD.
 - **SSH remote compute.**
