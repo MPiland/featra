@@ -2,7 +2,7 @@
 id: STORY-22
 type: story
 title: Composer controls and context meter
-status: In Progress
+status: In Review
 parent: FEAT-3
 order: 9
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-22-composer
-pr: null
+pr: https://github.com/MPiland/featra/pull/15
 created: 2026-11-05T17:13:05Z
 history:
   - at: 2026-11-05T17:13:05Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:story-22
+  - at: 2026-11-10T02:14:39Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:story-22
 ---
 
@@ -39,13 +44,13 @@ As a builder, I change the agent's role, model, effort and permission mode from 
 
 ## Tasks
 
-- [ ] work-format: chat-controls (choices, settings, usage, token format), usage event and state
-- [ ] Claude adapter: controls, settings, apply on next turn by restarting the session with resume
-- [ ] Claude adapter: read usage and window from the session own messages (assistant usage, result modelUsage), also from history
-- [ ] Session manager and protocol: chat.controls and chat.configure, role change updates the row
-- [ ] Client: composer controls (Role, Model, Effort, Mode) and the context meter
-- [ ] Tests: work-format, server, client component, e2e/composer.spec.ts with the fake SDK
-- [ ] ADR, decisions, open questions, CONTEXT, full gate, PR and green CI
+- [x] work-format: chat-controls (choices, settings, usage, token format), usage event and state
+- [x] Claude adapter: controls, settings, apply on next turn by restarting the session with resume
+- [x] Claude adapter: read usage and window from the session own messages (assistant usage, result modelUsage), also from history
+- [x] Session manager and protocol: chat.controls and chat.configure, role change updates the row
+- [x] Client: composer controls (Role, Model, Effort, Mode) and the context meter
+- [x] Tests: work-format, server, client component, e2e/composer.spec.ts with the fake SDK
+- [x] ADR, decisions, open questions, CONTEXT, full gate, PR and green CI
 
 ## Notes
 
