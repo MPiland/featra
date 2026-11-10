@@ -176,22 +176,25 @@ function startSession(
 
   /** Starts the agent, then relays its stream until it ends. A later message starts it again, resuming. */
   async function run(queue: InputQueue<SDKUserMessage>) {
+    // What this agent starts with, taken before anything is awaited: a change made while it starts differs from this
+    // key, so the next message replaces the agent, and never relies on a message being held back.
+    const starting = { role, settings };
+    startedWith = configKey();
     const claude = await locate();
     if (closed || stoppedEarly()) return;
     if (!claude) return fail([{ type: "problem", problem: { type: "not-installed" } }, END_FAILED]);
     let running: ClaudeQuery;
     try {
       const attached = (await mcp?.()) ?? null;
-      startedWith = configKey();
       const options = claudeOptions(
-        role,
+        starting.role,
         cwd,
         claude,
         canUseTool,
         agentEnv(env),
         translator.sessionId(),
         attached,
-        settings,
+        starting.settings,
       );
       const queryFn = await loadQuery();
       if (closed || stoppedEarly()) return;

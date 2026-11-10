@@ -960,8 +960,11 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   with `resume`. A change that leaves the settings as they were keeps the agent (ADR 0020).
 - **Claude's `default` mode is labelled "default (Ask)".** Why: each provider's own names are used (earlier decision),
   and the label ties Claude's name to Featra's Ask.
-- **Full access is offered only to a chat that started in it.** Why: Featra passes on what the user's own Claude
-  settings allow; the composer never switches a chat up to a mode that runs tools without asking.
+- **Full access has a ceiling: the mode the chat started in. A chat that didn't start in full access never reaches it,
+  by a mode pick, a role change, or a saved file.** Why: a role whose settings start in `bypassPermissions` would have
+  carried full access into a chat the user was asked about. A role change into such a role leaves the chat in the
+  first mode the adapter lists (Ask for Claude). `disableBypassPermissionsMode` already downgrades such a role's start
+  mode, so the composer honours it the same way. Review fix.
 - **Changing the role resets model, effort and mode to the new role's, and the user's other choices in the same change
   apply over them; a role of another provider is refused ("That role runs on another agent.").** Why: a role is a
   prompt plus its settings, and a chat has one agent.
@@ -978,4 +981,21 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   the controls; until then it shows what it always did.
 - **The meter is hidden until the first usage, and has no `role="status"`.** Why: an empty meter says nothing, and the
   composer's full-access warning is the one status there.
-- **Settings are not persisted across a restart.** Why: they aren't in the event log; logged as an open question.
+- **The composer's settings and last window are saved with the chat in `chats.json`, only when they differ from the
+  role's start or a window is known.** Why: a reopened or restarted chat keeps its choices and its meter shows the
+  window at once; saving nothing for an untouched chat keeps old entries and tests valid. A saved mode or role that no
+  longer fits what the provider offers falls back to the role's start, within the ceiling. Review fix.
+- **The chat-list row shows the chat's effective model and effort, not the role's.** Why: it must agree with what the
+  chat runs with. Review fix.
+- **Changing the model drops the saved window; the meter shows tokens only until the next turn reports the new one.**
+  Why: the window was the old model's and Featra never guesses. The meter in an open client may show the old window
+  until then. Review fix.
+- **Composer changes to one chat run one after another.** Why: a role change waits on a role lookup, and a model or
+  effort change made meanwhile must not be overwritten by it. Review fix.
+- **The Claude adapter takes its start settings before its first await.** Why: a change made while the agent is
+  starting then differs from what it started with, so the next send replaces it, without relying on sends being blocked.
+  Review fix.
+- **`auto` mode is offered from the composer; the user picks it explicitly.** Why: unlike full access it still decides
+  per action and the user chose it. Featra's settings reader knows no `disableAutoMode` switch, so none is honoured;
+  add one beside `disableBypassPermissionsMode` if Claude's settings gain it. Review fix.
+- **`contextTokens` includes the last turn's output tokens.** Why: the output is part of the next turn's context. Review fix.

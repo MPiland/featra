@@ -58,7 +58,10 @@ export function sessionLines(dir: string, session: string = randomUUID()) {
   const self = {
     session,
     prompt: (text: string) => (add("user", { role: "user", content: text }), self),
-    reply: (id: string, content: unknown[]) => (add("assistant", { id, role: "assistant", content }), self),
+    reply: (id: string, content: unknown[], usage?: Record<string, number>) => (
+      add("assistant", { id, role: "assistant", content, ...(usage ? { usage } : {}) }),
+      self
+    ),
     toolResult: (id: string, content: string) => (
       add("user", { role: "user", content: [{ type: "tool_result", tool_use_id: id, content }] }),
       self

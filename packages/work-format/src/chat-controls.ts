@@ -54,14 +54,21 @@ function normalizeChoices(raw: unknown): ControlChoice[] {
   );
 }
 
+/** Settings read from the socket or a saved chat, or null. */
+export function normalizeSettings(raw: unknown): ChatSettings | null {
+  if (!isRecord(raw)) return null;
+  const { role, model, effort, mode } = raw;
+  return text(role) && text(model) && typeof effort === "string" && text(mode) ? { role, model, effort, mode } : null;
+}
+
 export function normalizeControlState(raw: unknown): ChatControlState | null {
-  if (!isRecord(raw) || !isRecord(raw.controls) || !isRecord(raw.settings)) return null;
-  const { role, model, effort, mode } = raw.settings;
-  if (!text(role) || !text(model) || typeof effort !== "string" || !text(mode)) return null;
+  if (!isRecord(raw) || !isRecord(raw.controls)) return null;
+  const settings = normalizeSettings(raw.settings);
+  if (!settings) return null;
   const { models, efforts, modes } = raw.controls;
   return {
     controls: { models: normalizeChoices(models), efforts: normalizeChoices(efforts), modes: normalizeChoices(modes) },
-    settings: { role, model, effort, mode },
+    settings,
   };
 }
 

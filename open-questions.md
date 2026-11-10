@@ -31,8 +31,3 @@
   keep them there and read the card's "App" as the app's settings. Non-blocking (STORY-7).
 - The placeholder test in `packages/client/test/app.test.tsx` listed Inbox among the views with no page yet; it now skips
   Inbox, as it has one, and asserts the Inbox. That is a changed filter, not a changed assertion. Non-blocking (STORY-7).
-- A chat's composer settings (model, effort, mode, role) are held while the server runs, so a restored chat starts from
-  its role again. Recommendation: keep them beside the chat's session id in the chats' store if users ask.
-  Non-blocking (STORY-22).
-- A restored chat's meter shows tokens without a window until its next turn, as the session's messages don't carry one.
-  Recommendation: keep it; the next turn fills it in. Non-blocking (STORY-22).
