@@ -12,9 +12,12 @@ import { createCardLane } from "../src/card-lane.ts";
 import { createDraftWriter, type DraftWriter } from "../src/draft-writer.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
+import { createWorkWatches, type WorkWatches } from "../src/work-watch.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 
 let scanner: ReturnType<typeof createScanner>;
+let watches: WorkWatches;
+let unwatch: () => void;
 let actions: ReturnType<typeof createCardActions>;
 let writer: DraftWriter;
 let repo: CardRepo;
@@ -23,14 +26,20 @@ let clock = new Date("2026-11-10T09:00:00Z");
 beforeEach(async () => {
   clock = new Date("2026-11-10T09:00:00Z");
   scanner = createScanner(createRepoGit());
+  watches = createWorkWatches(scanner, () => {});
+  // Scans go through a watch, as the server's do, so each runs no git unless git changed (BUG-6): a full scan is five
+  // serial git starts, and these tests make about ten.
   const lane = createCardLane();
-  actions = createCardActions({ scan: scanner.scan, now: () => clock, lane });
-  writer = createDraftWriter({ scan: scanner.scan, now: () => clock, lane });
+  actions = createCardActions({ scan: watches.scan, now: () => clock, lane });
+  writer = createDraftWriter({ scan: watches.scan, now: () => clock, lane });
   repo = await cardRepo();
   await repo.write(repo.main, card("FEAT-1", "feature", null, "done"));
   repo.commit(repo.main, "plan");
+  unwatch = (await watches.watch(repo.main, () => {})).stop;
 });
 afterEach(async () => {
+  unwatch();
+  watches.close();
   await scanner.close();
   await repo.dispose();
 });

@@ -1242,3 +1242,40 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Fix.** The spec now closes the app in `finally`, so a failing step reports itself within its own timeout, and waits
   for the tool's answer ("Tool said: Drafted FEAT-N") in the log before looking for the pane, so a slow agent turn and a
   missing pane fail at different steps. No timeout was lengthened. If it recurs, the failing step will now be named.
+
+### BUG-12: work-watch and card-watch tests flake in full runs (2026-11-10)
+
+- **Reproduced.** Three full `pnpm test:unit` runs on the unchanged branch all failed (about 132 s each). The failing
+  tests were the ones on the card: `ws-work` work.watch AC5, AC6 and card.watch, `card-actions-draft` "appends one entry
+  per edit", and `work-watch` "asks git again when a branch changes" or "a worktree goes". With 12 busy threads running beside
+  vitest on the three server files that hold them (`ws-work`, `work-watch`, `card-actions-draft`), 0 of 5 runs on the
+  old code passed.
+- **Cause: the PC, not a lost event.** The PC runs out of memory during a full run. Sampled every 2 s: available memory
+  fell from 1.3 to 2.6 GB to 200 to 500 MB and paging reached 30,000 to 95,000 pages/s. 15 GB total; before the run
+  `vmmemWSL` held 7.3 GB, Windows' paged and non-paged pools 7 and 4.5 GB (abnormal, with about 260,000 handles) and
+  MsMpEng 1.5 GB, with 49 GB of 61 GB committed. Windows then starts git slowly: the median start went from 47 ms idle
+  to 240 ms, and the slowest from 1 s to 9 to 15 s. Now and then process creation stalls for
+  20 to 40 s everywhere at once (one probe's `git --version` took 29 s while its own event loop ran). Defender's
+  MsMpEng was at 100 to 270% of a core during runs. Each stall fails one test per file, the one whose wait it falls in
+  (the last full gate showed nine files each losing one test, 30 to 36 s long). In the traces events do arrive; the
+  rescan is what waits for git.
+- **AC5, AC6 and card.watch are one failure.** AC5's first `work.watch` answer is a full scan (five serial git rounds)
+  with a 2 s default wait. When it times out, AC5 never edits, so AC6's `git commit` finds nothing to commit and
+  card.watch finds STORY-1 on main. The 1 s assertion on the push after an edit is unchanged.
+- **One product bug found and fixed.** An edit made after a watch's first scan read the files and before the watchers
+  started was heard by nobody. After a scan that starts a watcher, the watch now scans once more, disk only
+  (`work-watch.ts`, ADR 0016 amended). `work-watch-late.test.ts` writes in exactly that gap and fails before the fix.
+- **Tests changed, no assertion touched.** `FIRST_ANSWER_MS` (20 s) replaces the 2 s and 10 s waits for an answer that
+  needs a full scan: STORY-3 times only the push after an edit. The branch-change wait goes from 5 s to
+  `GIT_ASKED_MS` (20 s). `card-actions-draft` now gives its actions the same watch the server gives them, so scans
+  reuse git; that test went from 2.9 s to 0.8 s alone. The fixture turns off `maintenance.auto` so a commit doesn't start
+  a second git process (276 ms to 204 ms).
+- **Not fixed: the stalls themselves.** A worker cap did not cure them (8 workers: 7 tests failed in one gate; 4
+  workers: 9 failed in one gate), so no cap is committed. Under the CPU-load soak the fixed code passed 35 of 50 runs;
+  every failing run took 53 to 76 s against a normal 27 s, and every failure was one of three waits (`card-actions-draft`
+  beforeEach or "refuses a move out of draft", `work-watch` "a worktree goes", `ws-work` draft door check) that a stall
+  of 20 s or more outlasts. No wait can absorb a stall longer than the 30 s test timeout.
+- **Ruling proposed.** On the dev PC (the repo cannot set these): stop or cap WSL (`wsl --shutdown`, or `memory=` in
+  `.wslconfig`), reboot to clear the kernel pools, and exclude the repo, the temp folder and `git.exe` from Defender
+  real-time scanning. Then repeat the 50-run soak and the 5 gate runs. Until then the gate may still fail on a stall; a failure
+  that names a test with "Test timed out in 30000ms" while others time out too is this, not a regression.

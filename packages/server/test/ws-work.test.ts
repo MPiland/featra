@@ -3,6 +3,7 @@ import { createAllowedProjects } from "../src/allowed-projects.ts";
 import { createServices } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { card, cardPath, cardRepo, type CardRepo } from "./card-repo.ts";
+import { FIRST_ANSWER_MS } from "./until.ts";
 import { openFrames, type SocketFrame } from "./ws-frames.ts";
 
 /** The work methods over the real socket, on a real repository: answers, pushes, unwatch (ADR 0016). */
@@ -42,7 +43,7 @@ describe("work.watch", () => {
     const socket = await open();
     try {
       socket.send({ id: 1, method: "work.watch", params: { dir: repo.main } });
-      const answer = await socket.next((f) => f.id === 1);
+      const answer = await socket.next((f) => f.id === 1, FIRST_ANSWER_MS);
       expect(answer.ok).toBe(true);
       const started = Date.now();
       await repo.write(repo.main, card("STORY-1", "story", "FEAT-1", "Ready", { title: "Edited outside" }));
@@ -81,7 +82,7 @@ describe("work.watch", () => {
     try {
       await repo.write(repo.main, card("STORY-1", "story", "FEAT-1", "Ready", { title: "Edited in main" }));
       socket.send({ id: 5, method: "work.watch", params: { dir: repo.main } });
-      const answer = await socket.next((f) => f.id === 5);
+      const answer = await socket.next((f) => f.id === 5, FIRST_ANSWER_MS);
       expect(answer.result).toMatchObject({ stale: [{ key: `main|${cardPath("STORY-1")}`, cardId: "STORY-1" }] });
 
       socket.send({ id: 6, method: "work.applyCopy", params: { dir: repo.main, key: `main|${cardPath("STORY-1")}` } });
@@ -103,7 +104,7 @@ describe("card.watch and card.update (ADR 0017)", () => {
     const socket = await open();
     try {
       socket.send({ id: 10, method: "card.watch", params: { dir: repo.main, id: "STORY-1" } });
-      const answer = await socket.next((f) => f.id === 10);
+      const answer = await socket.next((f) => f.id === 10, FIRST_ANSWER_MS);
       expect(answer.result).toMatchObject({ id: "STORY-1", title: "Edited in main", owner: "worktree claude/story-1" });
 
       const started = Date.now();
@@ -141,7 +142,7 @@ describe("draft.sendBack (STORY-50)", () => {
     try {
       const ask = async (id: number, params: unknown) => {
         socket.send({ id, method: "draft.sendBack", params });
-        return socket.next((f) => f.id === id, 10_000);
+        return socket.next((f) => f.id === id, FIRST_ANSWER_MS);
       };
       expect(await ask(20, { dir: repo.root, id: "FEAT-1", reason: "x" })).toEqual({
         id: 20,
@@ -178,7 +179,7 @@ describe("draft.approve and draft.reject (STORY-51)", () => {
       const ask = async (method: string, params: unknown) => {
         const id = n++;
         socket.send({ id, method, params });
-        return socket.next((f) => f.id === id, 10_000);
+        return socket.next((f) => f.id === id, FIRST_ANSWER_MS);
       };
       for (const method of ["draft.approve", "draft.reject"]) {
         expect(await ask(method, { dir: repo.root, id: "FEAT-1" })).toMatchObject({
