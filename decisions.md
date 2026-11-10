@@ -1084,3 +1084,5 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Tests I changed because a ruling changed the behaviour:** the second-feature test (4); `from: null` in three history
   assertions (5); the agent-socket assertions on `extra` (the fingerprint) and on the doubled prefix (8); the old
   "can't be written" test, whose obstruction is now a taken ID that gets a new one, now injects the disk failure.
+- **Dev Lead approval of those test changes (2026-11-10):** each one follows a ruling above and asserts the new
+  behaviour as strictly or more strictly; none was weakened. Approved.

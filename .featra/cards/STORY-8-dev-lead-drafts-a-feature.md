@@ -2,7 +2,7 @@
 id: STORY-8
 type: story
 title: Dev Lead drafts a feature
-status: In Review
+status: Acceptance
 parent: FEAT-4
 order: 1
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-8
+  - at: 2026-11-10T04:52:07Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
