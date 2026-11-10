@@ -186,7 +186,7 @@ async function* draftTurn(options, again) {
     yield success("No Featra MCP.");
     return;
   }
-  const ids = again ? [...lastDraft.matchAll(/STORY-d+/g)].map((m) => m[0]) : null;
+  const ids = again ? [...lastDraft.matchAll(/STORY-\d+/g)].map((m) => m[0]) : null;
   const id = `toolu_mcp_${++seq}`;
   const input = draftInput(ids);
   yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "mcp__featra__draft_cards", input }]);
