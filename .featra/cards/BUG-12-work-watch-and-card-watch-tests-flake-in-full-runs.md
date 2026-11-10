@@ -2,7 +2,7 @@
 id: BUG-12
 type: bug
 title: Work-watch and card-watch tests flake in full runs
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-12-watch-flakes
-pr: null
+pr: https://github.com/MPiland/featra/pull/24
 created: 2026-11-09T12:00:00Z
 history:
   - at: 2026-11-09T12:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: developer
+  - at: 2026-11-10T13:00:00Z
+    field: status
+    from: In Progress
+    to: In Review
     by: developer
 ---
 
