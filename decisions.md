@@ -1227,3 +1227,18 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   branches files. The rebase test now expects the rebase refusal exactly (the mid-operation check runs first); it
   accepted either message before. Added: paths with a space, master, detached HEAD, a failing reset, a story not in the
   draft.
+
+### STORY-51 e2e timeout on Windows, run 42783817510 attempt 1 (2026-11-10)
+
+- **Evidence.** The trace (artifact `e2e-windows-traces`) shows the first test of the run: launch 1.3 s, New chat and
+  Dev Lead, fill 13 ms, Send, the message in the log, then `expect(FEAT-2 pane).toBeVisible()` failing at its 5 s
+  default. Nothing is recorded after that until After Hooks at 60 s. So the 60 s "timeout" was the cleanup, not the test:
+  the spec closed the app only on success, and the repo's `rm` on Windows waited on files the still-running app held.
+- **Cause, as far as it can be proved.** The helper's own wait ran fine (no swap wait on the first chat; the fill went
+  to a fresh composer). The draft pane did not appear within 5 s on the cold first test. The trace has no app logs, so
+  whether the delay was the MCP process starting or something else is not proved. The rerun passed, and Gate and the
+  Ubuntu run were green. The new git calls (default branch) run once per scan on a repo without `baseBranch`, which is
+  tens of milliseconds, not seconds.
+- **Fix.** The spec now closes the app in `finally`, so a failing step reports itself within its own timeout, and waits
+  for the tool's answer ("Tool said: Drafted FEAT-N") in the log before looking for the pane, so a slow agent turn and a
+  missing pane fail at different steps. No timeout was lengthened. If it recurs, the failing step will now be named.

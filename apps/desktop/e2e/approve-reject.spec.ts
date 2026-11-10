@@ -1,6 +1,6 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { git, project } from "./draft-project.ts";
@@ -35,6 +35,8 @@ async function draftInNewChat(page: Page, id: string) {
   await expect(send).toBeEnabled();
   await send.click();
   await expect(page.getByRole("log", { name: "Chat" })).toContainText("draft a feature");
+  // The agent's turn ends with the tool's answer; only then is there a draft to show.
+  await expect(page.getByRole("log", { name: "Chat" })).toContainText(`Tool said: Drafted ${id}`);
   const draft = pane(page, id);
   await expect(draft).toBeVisible();
   // The drafting turn has ended before the user answers it.
@@ -46,12 +48,14 @@ test("Approve commits the draft's cards to main without pushing and takes the bu
   const userData = await tempUserData();
   const repo = await project();
   const bin = await standInClaude();
+  let running: ElectronApplication | undefined;
   try {
     const { app, page } = await launch(userData.dir, {
       FEATRA_PROJECT_DIR: repo.dir,
       FEATRA_E2E_AGENT_SDK: FAKE_SDK,
       [PATH_KEY]: bin.path,
     });
+    running = app;
     const before = git(repo.dir, "rev-list", "--count", "HEAD");
     const draft = await draftInNewChat(page, "FEAT-2");
     // A draft is uncommitted: git hasn't seen its cards.
@@ -90,6 +94,8 @@ test("Approve commits the draft's cards to main without pushing and takes the bu
     await expect(page.getByRole("region", { name: "Dev Lead" })).toBeVisible();
     await app.close();
   } finally {
+    // Close the app first: a failing step must fail on its own, not hang the cleanup on files the app still holds.
+    await running?.close().catch(() => {});
     await userData.dispose();
     await repo.dispose();
     await bin.dispose();

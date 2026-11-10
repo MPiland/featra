@@ -33,10 +33,13 @@ describe("rejecting a draft", () => {
     expect(await f.files()).toEqual(before);
   });
 
-  it("is refused once the feature is approved, and a second reject finds it gone", async () => {
+  it("is refused once the feature is approved", async () => {
     const approved = await f.draft();
     await f.review.approve(f.repo.main, approved);
     await expect(f.review.reject(f.repo.main, approved)).rejects.toThrow(`${approved} is already approved.`);
+  });
+
+  it("finds the feature gone on a second reject", async () => {
     const other = (await f.writer.draft(f.repo.main, "chat-2", input)).feature;
     await f.review.reject(f.repo.main, other);
     await expect(f.review.reject(f.repo.main, other)).rejects.toThrow("That card is gone.");
