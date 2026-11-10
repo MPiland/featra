@@ -16,17 +16,24 @@ from and how it changes.
   `parseDraft` in `work-format` (the same parser the tool uses), and a draft that fails writes nothing and says why.
   The tool description teaches the card format; Featra still injects no prompt.
 - **A draft is written by the server, to main's checkout, uncommitted.** `planDraft` is pure: it takes every card of
-  the project and returns the cards to write. IDs come from `nextId` over all owner cards, the one allocator. Calls are
-  serialized, so two chats drafting at once get different IDs. New files are written together or not at all.
+  the project and returns the cards to write. IDs come from `nextId` over all owner cards, the one allocator. Every card
+  write goes through one lane in the server (drafts and card-pane edits), so two chats drafting at once get different
+  IDs. A call changes every card or none: owners are resolved and old files read before the first write, and a failure
+  restores them and removes the new ones. New files are created exclusively and an ID already on disk is allocated
+  again. A second app instance on the same project is not covered.
 - **The chat that drafted a feature is recorded on the feature** as the frontmatter key `drafted-by` (kept in
   `card.extra`, which already round-trips unknown keys). STORY-49 opens that chat from it. A feature waits for review
   when its status is `draft` and it has `drafted-by`; the Work list row carries `review` and `draftedBy`.
 - **One open draft per chat.** A call from a chat with no open draft makes a Draft feature and its stories; a call from
   a chat that has one revises it in place, keeping the feature, the files and the IDs. A story is kept by giving its
   `id` (from the answer), a story without one is new, and a story left out is Cancelled, never deleted, so history
-  keeps it. An `id` the draft doesn't have is refused. A draft that was approved or rejected is no longer open.
+  keeps it. An `id` the draft doesn't have is refused. Only stories still in the first stage can be left out or changed; a started
+  story must be sent unchanged, and the call is refused whole otherwise. Once the feature has left `draft`, a call from
+  its chat is refused and no second feature is made. A revision is also refused when the user edited a card it would
+  change since the draft last wrote it (a `by: user` history entry, or a text edit shown by the `drafted-content`
+  fingerprint the draft stores on each card); the error lists those cards so the agent can merge and call again.
 - **Changes are history events.** `HistoryField` gains `content`: `to` lists what changed (`title`, `story`,
-  `criteria`, `tasks`, or for a feature `description` and `stories`), `from` is null, `by` is `session:<chat>`. A card
+  `criteria`, `tasks`, or for a feature `description` and `stories`), `from` is the JSON of the old values of those parts (a story's `order` too), `by` is `session:<chat>`. A card
   whose text did not change gets no event and no write. Task ticks and criterion test links survive when their text
   is unchanged.
 - **The settings apply as they do for logging.** The MCP's off switch refuses a call from a running chat. A read-only

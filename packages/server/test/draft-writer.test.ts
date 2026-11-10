@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseCard, type Card, type DraftInput } from "@featra/work-format";
@@ -135,10 +135,27 @@ describe("AC1: the first call writes a Draft feature with its stories to main, u
   });
 
   it("leaves none of a draft's new cards behind when one can't be written", async () => {
-    // A folder where the first story's file belongs: the write onto it fails after the feature was written.
+    // The second new file fails after the feature was written (a full disk, say).
+    let made = 0;
+    const failing = createDraftWriter({
+      scan: scanner.scan,
+      now: () => now,
+      io: {
+        create: async (file, body) => {
+          if (++made === 2) throw new Error("disk full");
+          await writeFile(file, body, "utf8");
+        },
+      },
+    });
+    await expect(failing.draft(repo.main, "chat-1", draft())).rejects.toThrow("Can't save the draft");
+    expect(await files()).toEqual(["FEAT-1-card.md", "STORY-1-card.md"]);
+  });
+
+  it("allocates past an ID whose file is already there under another name, and keeps that file", async () => {
     await mkdir(join(repo.main, ".featra", "cards", "STORY-2-story-1.md"));
-    await expect(writer.draft(repo.main, "chat-1", draft())).rejects.toThrow("Can't save the draft");
-    expect(await files()).toEqual(["FEAT-1-card.md", "STORY-1-card.md", "STORY-2-story-1.md"]);
+    const result = await writer.draft(repo.main, "chat-1", draft());
+    expect(result.stories).toEqual(["STORY-3", "STORY-4"]);
+    expect((await files()).includes("STORY-2-story-1.md")).toBe(true);
   });
 });
 
@@ -166,7 +183,7 @@ describe("AC3: a later call from the same chat updates the draft in place", () =
     expect(byId("FEAT-2").history.at(-1)).toEqual({
       at: "2026-11-10T10:30:00Z",
       field: "content",
-      from: null,
+      from: JSON.stringify({ title: "Shaping" }),
       to: "title",
       by: "session:chat-1",
     });

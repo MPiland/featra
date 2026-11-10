@@ -25,8 +25,6 @@ export interface CardSpec {
   acs?: [number, number];
   tasks?: [number, number];
   pr?: string;
-  /** The chat that drafted a feature: it is waiting for a review. */
-  draftedBy?: string;
 }
 
 const items = (n: [number, number] | undefined) =>
@@ -50,13 +48,19 @@ export function cardOf(spec: CardSpec): Card {
     AT,
   );
   const moved = spec.status && spec.status !== start.status ? setStatus(start, spec.status, "user", LATER) : start;
-  return { ...moved, pr: spec.pr ?? null, extra: spec.draftedBy ? { "drafted-by": spec.draftedBy } : moved.extra };
+  return { ...moved, pr: spec.pr ?? null };
 }
 
 const owned = (card: Card): OwnedCard => ({ card, owner: MAIN, shownFrom: MAIN, path: `.featra/cards/${card.id}.md` });
 
-export function workList(specs: CardSpec[], stale: StaleCopy[] = [], problems: string[] = []): WorkList {
-  return buildWorkList({ cards: specs.map(cardOf).map(owned), stale, problems }, DEFAULT_CONFIG);
+/** The list for `specs` and for `more`: cards that are already whole, such as a draft the real planner made. */
+export function workList(
+  specs: CardSpec[],
+  stale: StaleCopy[] = [],
+  problems: string[] = [],
+  more: Card[] = [],
+): WorkList {
+  return buildWorkList({ cards: [...specs.map(cardOf), ...more].map(owned), stale, problems }, DEFAULT_CONFIG);
 }
 
 /** A small project: one epic with three features in different states, and a loose story. */

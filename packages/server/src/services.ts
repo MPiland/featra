@@ -2,6 +2,7 @@ import { createAgentBridge, type AgentBridge } from "./agent-bridge.ts";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { createApi, type Api } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
+import { createCardLane } from "./card-lane.ts";
 import { createChatManager } from "./chat-manager.ts";
 import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts";
 import { locateClaude } from "./claude-locate.ts";
@@ -72,7 +73,9 @@ export function createServices({
   const scanner = createScanner(repoGit);
   const watches = createWorkWatches(scanner, log);
   const copies = createCopyActions({ git: repoGit, scan: watches.scan, now });
-  const cards = createCardActions({ scan: watches.scan, now });
+  // One lane for every card write: a draft that allocates IDs and a card edit never interleave (ADR 0002).
+  const lane = createCardLane();
+  const cards = createCardActions({ scan: watches.scan, now, lane });
   const roles = createRoleRegistry({
     fs: roleFs,
     readers: [createClaudeReader(roleFs), createCodexReader(roleFs)],
@@ -96,7 +99,7 @@ export function createServices({
     log,
     chats,
     writer: createLogWriter({ now, ...logs }),
-    drafts: createDraftWriter({ scan: watches.scan, now }),
+    drafts: createDraftWriter({ scan: watches.scan, now, lane }),
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {

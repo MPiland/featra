@@ -20,11 +20,10 @@ export function createMcpServer(host: FeatraHost, tools: readonly Tool[] = TOOLS
     try {
       return reply(await tool.run(params.arguments, host), false);
     } catch (err) {
-      // A refusal is the agent's to fix; anything else (the server gone) is told plainly and is not retried here.
-      return reply(
-        err instanceof ToolRefusal ? err.message : `${tool.failed ?? "Not logged."} ${errorMessage(err)}`,
-        true,
-      );
+      // A refusal is the agent's to fix; anything else (the server gone) is told plainly and is not retried here. A tool
+      // says in `failed` how its errors start, so the prefix is added here and nowhere else.
+      const text = err instanceof ToolRefusal && !tool.failed ? err.message : errorMessage(err);
+      return reply(`${tool.failed ?? (err instanceof ToolRefusal ? "" : "Not logged.")} ${text}`.trim(), true);
     }
   });
 

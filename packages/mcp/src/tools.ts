@@ -171,7 +171,7 @@ const DRAFT_CARDS: Tool = {
   },
   async run(input, host) {
     const parsed = parseDraft(input);
-    if (!parsed.ok) throw new ToolRefusal(`Not drafted. ${parsed.error}`);
+    if (!parsed.ok) throw new ToolRefusal(parsed.error);
     return drafted(await host.draft(parsed.value));
   },
 };

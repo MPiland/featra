@@ -82,8 +82,10 @@ describe("cards.draft on the bridge", () => {
       feature: { title: "Bad", description: "d" },
       stories: [{ title: "No criteria", story: "As a builder, I x." }],
     };
-    await expect(bridge.call("chat-1", "cards.draft", bad)).rejects.toThrow(/^Not drafted\. /);
-    await expect(bridge.call("chat-1", "cards.draft", "nonsense")).rejects.toThrow(/^Not drafted\. /);
+    await expect(bridge.call("chat-1", "cards.draft", bad)).rejects.toThrow(
+      /^stories\[0\]: "criteria" needs at least 1\.$/,
+    );
+    await expect(bridge.call("chat-1", "cards.draft", "nonsense")).rejects.not.toThrow(/Not drafted/);
     expect(await files()).toEqual(before);
   });
 
@@ -113,7 +115,10 @@ describe("cards.draft on the agent socket", () => {
       );
       expect(ok).toMatchObject({ id: 1, ok: true, result: { created: true, feature: "FEAT-2" } });
       const { cards } = (await scanner.scan(repo.main))!.resolution;
-      expect(cards.find((c) => c.card.id === "FEAT-2")?.card.extra).toEqual({ "drafted-by": "chat-1" });
+      expect(cards.find((c) => c.card.id === "FEAT-2")?.card.extra).toEqual({
+        "drafted-by": "chat-1",
+        "drafted-content": expect.any(String),
+      });
       const bad = await socket.ask(request(2, "cards.draft", { feature: { title: "x" } }));
       expect(bad).toMatchObject({ id: 2, ok: false });
     } finally {

@@ -4,9 +4,22 @@
  * the server only reads, allocates nothing of its own and writes. IDs come from `nextId`, the one allocator (ADR 0002).
  */
 import { newCard } from "./card.ts";
+import {
+  DRAFTED_BY,
+  draftAuthor,
+  draftedFeature,
+  editedError,
+  leftDraftError,
+  openDraft,
+  sameContent,
+  stamped,
+  started,
+  startedError,
+  userEdited,
+} from "./card-draft-guard.ts";
 import type { DraftInput, DraftResult, DraftStory } from "./card-draft-input.ts";
 import { appendHistory, setStatus } from "./history.ts";
-import { nextId, parseId } from "./ids.ts";
+import { nextId } from "./ids.ts";
 import type { Parsed } from "./knowledge-log.ts";
 import {
   CANCELLED,
@@ -17,28 +30,6 @@ import {
   type ProjectConfig,
 } from "./types.ts";
 
-/** The frontmatter key that names the chat that drafted a feature: how a review finds its way back to that chat. */
-export const DRAFTED_BY = "drafted-by";
-
-/** The chat that drafted a feature, or null for a card nobody drafted. */
-export function draftedBy(card: Card): string | null {
-  const chat = card.extra[DRAFTED_BY];
-  return typeof chat === "string" && chat ? chat : null;
-}
-
-/** A draft feature a chat made and nobody has approved yet: the one its next `draft_cards` call revises. */
-export function openDraft(chat: string, cards: readonly Card[]): Card | null {
-  const mine = cards.filter((c) => c.type === "feature" && c.status === "draft" && draftedBy(c) === chat);
-  return mine.toSorted((a, b) => (parseId(a.id)?.n ?? 0) - (parseId(b.id)?.n ?? 0)).at(-1) ?? null;
-}
-
-/** Whether a feature waits for a review: a draft an agent made. */
-export const needsReview = (card: Pick<Card, "status" | "extra">): boolean =>
-  card.status === "draft" && typeof card.extra[DRAFTED_BY] === "string";
-
-/** Who a draft's history names: the chat's session. */
-export const draftAuthor = (chat: string) => `session:${chat}`;
-
 export interface DraftContext {
   /** Every card of the project, as its owner has it. */
   cards: readonly Card[];
@@ -47,6 +38,8 @@ export interface DraftContext {
   chat: string;
   /** Now, as an ISO timestamp. */
   at: string;
+  /** IDs to treat as used though no card shows them yet: ones another call has just made. */
+  taken?: readonly string[];
 }
 
 export interface DraftWrite {
@@ -73,7 +66,7 @@ const criteria = (old: readonly AcceptanceCriterion[], texts: readonly string[])
 const tasks = (old: readonly ChecklistItem[], texts: readonly string[]) => keep(old, texts, { text: "", done: false });
 
 /** What changed in a story, named as a history event's `to`: empty when nothing did. */
-function storyChanges(old: Card, story: DraftStory): string[] {
+function storyChanges(old: Card, story: DraftStory, order: number): string[] {
   return [
     old.title !== story.title && "title",
     old.description !== story.story && "story",
@@ -85,11 +78,25 @@ function storyChanges(old: Card, story: DraftStory): string[] {
       old.tasks.map((t) => t.text),
       story.tasks,
     ) && "tasks",
+    old.order !== order && "order",
   ].filter((part): part is string => part !== false);
 }
 
-const noted = (card: Card, parts: readonly string[], by: string, at: string): Card =>
-  parts.length ? appendHistory(card, { at, field: "content", from: null, to: parts.join(", "), by }) : card;
+/** A `content` event naming what changed in `to` and, in `from`, the values the card had before (JSON). */
+function noted(card: Card, parts: readonly string[], old: Record<string, unknown>, ctx: DraftContext): Card {
+  if (!parts.length) return card;
+  const before = Object.fromEntries(parts.filter((p) => p in old).map((p) => [p, old[p]]));
+  const from = Object.keys(before).length ? JSON.stringify(before) : null;
+  return appendHistory(card, { at: ctx.at, field: "content", from, to: parts.join(", "), by: draftAuthor(ctx.chat) });
+}
+
+const oldStory = (c: Card) => ({
+  title: c.title,
+  story: c.description,
+  criteria: c.acs.map((a) => a.text),
+  tasks: c.tasks.map((t) => t.text),
+  order: c.order,
+});
 
 /** The first stage a story can start in. */
 const firstStage = (config: ProjectConfig) =>
@@ -98,8 +105,10 @@ const firstStage = (config: ProjectConfig) =>
 /** A story as the draft has it now, from the old card when there was one; the changes it needed are in its history. */
 function reviseStory(old: Card, story: DraftStory, order: number, ctx: DraftContext): { card: Card; changed: boolean } {
   const by = draftAuthor(ctx.chat);
-  const parts = storyChanges(old, story);
+  const changes = storyChanges(old, story, order);
   const revived = old.status === CANCELLED;
+  // Merging in what the user wrote: nothing to change, but the draft takes it as its own from here.
+  const parts = !changes.length && userEdited(old, ctx.chat) ? ["merged"] : changes;
   let card: Card = {
     ...old,
     title: story.title,
@@ -109,32 +118,34 @@ function reviseStory(old: Card, story: DraftStory, order: number, ctx: DraftCont
     order,
   };
   if (revived) card = setStatus(card, firstStage(ctx.config), by, ctx.at);
-  card = noted(card, parts, by, ctx.at);
-  return { card, changed: parts.length > 0 || revived || old.order !== order };
+  card = stamped(noted(card, parts, oldStory(old), ctx));
+  return { card, changed: parts.length > 0 || revived };
 }
 
 function newStory(story: DraftStory, id: string, parent: string, order: number, ctx: DraftContext): Card {
-  return newCard(
-    {
-      id,
-      type: "story",
-      title: story.title,
-      status: firstStage(ctx.config),
-      parent,
-      order,
-      role: "developer",
-      description: story.story,
-      acs: criteria([], story.criteria),
-      tasks: tasks([], story.tasks),
-    },
-    draftAuthor(ctx.chat),
-    ctx.at,
+  return stamped(
+    newCard(
+      {
+        id,
+        type: "story",
+        title: story.title,
+        status: firstStage(ctx.config),
+        parent,
+        order,
+        role: "developer",
+        description: story.story,
+        acs: criteria([], story.criteria),
+        tasks: tasks([], story.tasks),
+      },
+      draftAuthor(ctx.chat),
+      ctx.at,
+    ),
   );
 }
 
-/** Hands out IDs from `nextId`, counting the ones it has already given. */
-function allocator(cards: readonly Card[]) {
-  const taken = new Set(cards.map((c) => c.id));
+/** Hands out IDs from `nextId`, counting the ones it has already given and the ones the caller says are taken. */
+function allocator(cards: readonly Card[], more: readonly string[] = []) {
+  const taken = new Set([...cards.map((c) => c.id), ...more]);
   return (type: CardType) => {
     const id = nextId(type, taken);
     taken.add(id);
@@ -142,15 +153,43 @@ function allocator(cards: readonly Card[]) {
   };
 }
 
+/** Why the call can't write: stories already started, or cards the user edited. Null when it can. */
+function refusal(input: DraftInput, open: Card, old: readonly Card[], ctx: DraftContext): string | null {
+  const first = firstStage(ctx.config);
+  const named = new Map(input.stories.flatMap((s) => (s.id ? [[s.id, s] as const] : [])));
+  const left = old.filter((o) => started(o, first) && !named.has(o.id));
+  const changed = old.filter((o) => {
+    const story = named.get(o.id);
+    return story && started(o, first) && !sameContent(o, story);
+  });
+  if (left.length || changed.length) return startedError(left, changed);
+
+  const { title, description } = input.feature;
+  const featureEdited = userEdited(open, ctx.chat) && (open.title !== title || open.description !== description);
+  const edited = [
+    ...(featureEdited ? [open] : []),
+    ...old.filter((o) => {
+      const story = named.get(o.id);
+      if (o.status === CANCELLED || !userEdited(o, ctx.chat)) return false;
+      return !story || !sameContent(o, story);
+    }),
+  ];
+  return edited.length ? editedError(edited) : null;
+}
+
 /**
  * The cards a call writes. The chat's open draft is revised in place: a story given with its `id` is updated, one
- * without is new, and one the call leaves out is Cancelled (a draft story is never deleted, so history keeps it).
- * Without an open draft, the call makes a new Draft feature, owned by main and not committed.
+ * without is new, and one the call leaves out is Cancelled (a draft story is never deleted, so history keeps it). A
+ * revision is refused whole when the feature has left draft, when the user edited a card it would change, or when it
+ * would leave out or change a story that has started. Without an open draft, the call makes a new Draft feature, owned
+ * by main and not committed.
  */
 export function planDraft(input: DraftInput, ctx: DraftContext): Parsed<DraftPlan> {
   const by = draftAuthor(ctx.chat);
+  const mine = draftedFeature(ctx.chat, ctx.cards);
+  if (mine && mine.status !== "draft") return { ok: false, error: leftDraftError(mine) };
   const open = openDraft(ctx.chat, ctx.cards);
-  const allocate = allocator(ctx.cards);
+  const allocate = allocator(ctx.cards, ctx.taken);
   const old = open ? ctx.cards.filter((c) => c.type === "story" && c.parent === open.id) : [];
   for (const story of input.stories) {
     if (story.id && !old.some((o) => o.id === story.id)) {
@@ -158,7 +197,10 @@ export function planDraft(input: DraftInput, ctx: DraftContext): Parsed<DraftPla
       return { ok: false, error: `${story.id} isn't ${where}. Leave "id" out for a new story.` };
     }
   }
+  const refused = open ? refusal(input, open, old, ctx) : null;
+  if (refused) return { ok: false, error: refused };
 
+  const first = firstStage(ctx.config);
   const writes: DraftWrite[] = [];
   const featureId = open?.id ?? allocate("feature");
   const ids: string[] = [];
@@ -166,7 +208,9 @@ export function planDraft(input: DraftInput, ctx: DraftContext): Parsed<DraftPla
   let storiesChanged = !open;
   for (const [at, story] of input.stories.entries()) {
     const was = old.find((o) => o.id === story.id);
-    if (was) {
+    if (was && started(was, first)) {
+      ids.push(was.id);
+    } else if (was) {
       const revised = reviseStory(was, story, at + 1, ctx);
       ids.push(was.id);
       if (revised.changed) writes.push({ card: revised.card, created: false });
@@ -182,30 +226,33 @@ export function planDraft(input: DraftInput, ctx: DraftContext): Parsed<DraftPla
   }
   const cancelled = old.filter((o) => o.status !== CANCELLED && !ids.includes(o.id));
   for (const gone of cancelled) {
-    writes.push({ card: setStatus(gone, CANCELLED, by, ctx.at), created: false });
+    writes.push({ card: stamped(setStatus(gone, CANCELLED, by, ctx.at)), created: false });
     changed.push(gone.id);
     storiesChanged = true;
   }
 
   const { title, description } = input.feature;
-  let feature: Card;
   if (open) {
     const parts = [
       open.title !== title && "title",
       open.description !== description && "description",
       storiesChanged && "stories",
     ].filter((part): part is string => part !== false);
-    feature = noted({ ...open, title, description }, parts, by, ctx.at);
-    if (parts.length > 0) {
+    const named = !parts.length && userEdited(open, ctx.chat) ? ["merged"] : parts;
+    const was = {
+      title: open.title,
+      description: open.description,
+      stories: old.filter((o) => o.status !== CANCELLED).map((o) => o.id),
+    };
+    if (named.length > 0) {
       changed.unshift(open.id);
-      writes.unshift({ card: feature, created: false });
+      writes.unshift({ card: stamped(noted({ ...open, title, description }, named, was, ctx)), created: false });
     }
   } else {
     const order = Math.max(0, ...ctx.cards.filter((c) => c.type === "feature" && !c.parent).map((c) => c.order)) + 1;
-    feature = newCard({ id: featureId, type: "feature", title, status: "draft", order, description }, by, ctx.at);
-    feature = { ...feature, extra: { [DRAFTED_BY]: ctx.chat } };
+    const feature = newCard({ id: featureId, type: "feature", title, status: "draft", order, description }, by, ctx.at);
     changed.unshift(featureId);
-    writes.unshift({ card: feature, created: true });
+    writes.unshift({ card: stamped({ ...feature, extra: { [DRAFTED_BY]: ctx.chat } }), created: true });
   }
   const result: DraftResult = {
     feature: featureId,

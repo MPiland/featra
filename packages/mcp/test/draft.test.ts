@@ -223,7 +223,7 @@ describe("AC1 and AC4: draft_cards through the Featra MCP", () => {
       arguments: { feature: { title: "t", description: "d" }, stories: [story("Other", { id: "STORY-99" })] },
     });
     expect(isError(wrongId)).toBe(true);
-    expect(text(wrongId)).toContain("STORY-99 isn't a story of FEAT-1");
+    expect(text(wrongId)).toBe(`Not drafted. STORY-99 isn't a story of FEAT-1. Leave "id" out for a new story.`);
     expect(await cardFiles()).toEqual(before);
   });
 

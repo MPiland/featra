@@ -2,7 +2,7 @@
  * Builds the Work list from the owner copies: epics, their features, the features' stories, and the counts. Every
  * count comes from the rollups (ADR 0003) at the moment the list is built; nothing here is stored.
  */
-import { draftedBy, needsReview } from "./card-draft.ts";
+import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";

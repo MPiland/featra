@@ -38,7 +38,7 @@ describe("a later call from the same chat revises the draft in place", () => {
     expect(feature?.history.at(-1)).toEqual({
       at: T2,
       field: "content",
-      from: null,
+      from: JSON.stringify({ title: "Shaping" }),
       to: "title",
       by: "session:chat-1",
     });
@@ -47,7 +47,7 @@ describe("a later call from the same chat revises the draft in place", () => {
     expect(changed?.history.at(-1)).toEqual({
       at: T2,
       field: "content",
-      from: null,
+      from: JSON.stringify({ criteria: ["The draft shows in Work"] }),
       to: "criteria",
       by: "session:chat-1",
     });

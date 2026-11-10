@@ -117,7 +117,7 @@ export function createAgentBridge({
     if (off !== null) throw new ApiError(off);
     if (!drafts) throw new ApiError(AGENT_MESSAGES.noDrafts);
     const input = parseDraft(params);
-    if (!input.ok) throw new ApiError(`Not drafted. ${input.error}`);
+    if (!input.ok) throw new ApiError(input.error);
     return drafts.draft(dir, chat, input.value);
   }
 

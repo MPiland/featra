@@ -162,14 +162,18 @@ describe("a first call makes a Draft feature with its stories", () => {
     expect(saved.acs).toEqual([{ text: "The draft shows in Work", done: false, test: null }]);
   });
 
-  it("makes a new draft for each chat, and a chat's second feature once the first is approved", () => {
+  it("makes a new draft for each chat, and makes none for a chat whose feature was approved (ruling 4)", () => {
     const a = apply(existing(), input(), "chat-a");
     const b = apply(a.cards, input([story()], "Other"), "chat-b");
     expect(b.plan.result).toMatchObject({ created: true, feature: "FEAT-5" });
     expect(a.cards.filter((c) => c.type === "feature" && c.status === "draft")).toHaveLength(1);
     const approved = patched(a.cards, a.plan.result.feature, { status: "approved" });
     expect(openDraft("chat-a", approved)).toBeNull();
-    expect(apply(approved, input(), "chat-a").plan.result).toMatchObject({ created: true, feature: "FEAT-5" });
+    const again = planDraft(input(), { cards: approved, config: DEFAULT_CONFIG, chat: "chat-a", at: T1 });
+    expect(again.ok).toBe(false);
+    expect(approved.filter((c) => c.type === "feature")).toHaveLength(
+      a.cards.filter((c) => c.type === "feature").length,
+    );
   });
 
   it("refuses an id for a story the chat has no draft of, writing nothing", () => {
