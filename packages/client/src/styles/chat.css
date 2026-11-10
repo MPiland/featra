@@ -1,22 +1,33 @@
 /* A chat (STORY-5): the role's header, the transcript with its tool rows, and the composer. */
+/* New chat (BUG-13): a nav row with a + icon; the shortcut shows on hover and focus, and a disabled row is dimmed. */
 .new-chat {
-  margin: 4px 8px 8px;
-  padding: 6px 10px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--tx);
-  text-align: left;
-  cursor: pointer;
+  margin-bottom: 4px;
 }
 
-.new-chat:hover:not(:disabled) {
-  background: var(--row);
-}
-
-.new-chat:disabled {
+/* The hint is a pseudo-element: part of the look, not of the button's name. */
+.new-chat::after {
+  content: attr(data-shortcut);
+  margin-left: auto;
   color: var(--tx3);
-  cursor: default;
+  font-size: 0.8em;
+  opacity: 0;
+}
+
+.new-chat:hover::after,
+.new-chat:focus-visible::after {
+  opacity: 1;
+}
+
+.nav.new-chat:disabled,
+.nav.new-chat:disabled:hover {
+  background: none;
+  color: var(--tx3);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.nav.new-chat:disabled::after {
+  display: none;
 }
 
 /* The sidebar's chat list (STORY-21): a group per provider, a row per chat, a dot on a chat waiting on the user. */
