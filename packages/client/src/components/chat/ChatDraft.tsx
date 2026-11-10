@@ -9,8 +9,8 @@ import { useChatDraft } from "./useChatDraft.ts";
 export interface ChatDraftProps extends ChatViewProps {
   work: WorkBridge;
   paneWidth: ChosenWidth;
-  /** Opened from Review draft in Work: show the draft, and focus it, as soon as it is known. */
-  review: boolean;
+  /** Opened from Review draft in Work: show the draft, and focus it, as soon as it is known. Called once it has. */
+  review: (() => void) | null;
 }
 
 /**
@@ -20,7 +20,7 @@ export interface ChatDraftProps extends ChatViewProps {
  */
 export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) {
   const draft = useChatDraft(work, view.dir, view.chat.id);
-  const [shown, setShown] = useState<{ id: string; focus: boolean } | null>(null);
+  const [shown, setShown] = useState<{ id: string; focus: boolean; from?: string } | null>(null);
   // What the draft was at the last render: it opening while the chat is open opens the pane (without focus).
   const [seen, setSeen] = useState<string | null | undefined>(undefined);
   const refocus = useRef(false);
@@ -33,6 +33,10 @@ export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) 
     if (draft && review) setShown({ id: draft, focus: true });
     else if (draft && seen === null) setShown({ id: draft, focus: false });
   }
+  // Once the draft is shown (or there is none), the request is used up; coming back to the chat won't open it again.
+  useEffect(() => {
+    if (review && (shown || draft === null)) review();
+  }, [review, shown, draft]);
   // After the pane closes, focus goes to the button that brings it back.
   useEffect(() => {
     if (!refocus.current) return;
@@ -64,7 +68,8 @@ export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) 
             paneId={paneId}
             width={width}
             focusOnOpen={shown.focus}
-            onOpen={(id) => setShown({ id, focus: true })}
+            openedFrom={shown.from}
+            onOpen={(id) => setShown({ id, focus: true, from: id === shown.from ? undefined : shown.id })}
             onClose={close}
           />
         </>

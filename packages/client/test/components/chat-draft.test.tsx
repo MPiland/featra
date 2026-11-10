@@ -174,5 +174,63 @@ describe("AC4: a draft card is edited in the pane; the edit saves and is recorde
     const feature = await screen.findByRole("complementary", { name: `${FEATURE} card` });
     await within(feature).findByRole("button", { name: "Title: Shaping" });
     expect(within(feature).queryByText("Approved")).toBeNull();
+    // By role: the status list holds only where the draft is now (Approve and Reject are STORY-51's).
+    await app.user.click(within(feature).getByRole("button", { name: "Status: Draft" }));
+    const options = within(screen.getByRole("listbox", { name: "Status" })).getAllByRole("option");
+    expect(options.map((o) => o.textContent)).toEqual(["Draft"]);
+  });
+});
+
+describe("which draft is the chat's", () => {
+  it("is the newest when the chat has two, the way the server revises it", async () => {
+    const first = drafted("chat-1");
+    const old = first.find((c) => c.type === "feature") as Card;
+    const newer: Card = { ...old, id: "FEAT-20", title: "Newer" };
+    const app = renderApp({ cards: { [PROJECT.dir]: [...BUILT, ...first, newer] } });
+    await app.chats.bridge.start(PROJECT.dir, "dev-lead");
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: "Review draft FEAT-20" }));
+    expect(await screen.findByRole("complementary", { name: "FEAT-20 card" })).toBeTruthy();
+    expect(pane(FEATURE)).toBeNull();
+  });
+});
+
+describe("Review draft when the chat that drafted it is gone", () => {
+  it("opens the draft in Work's card pane, with no error", async () => {
+    const app = renderApp({ cards: { [PROJECT.dir]: [...BUILT, ...drafted("deleted-chat")] } });
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: `Review draft ${FEATURE}` }));
+    const found = await screen.findByRole("complementary", { name: `${FEATURE} card` });
+    expect(found.parentElement?.contains(screen.getByRole("region", { name: "Work list" }))).toBe(true);
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(screen.queryByRole("region", { name: "Dev Lead" })).toBeNull();
+    // The stories open in the same pane.
+    await app.user.click(within(found).getByRole("button", { name: /Draft it/ }));
+    expect(await screen.findByRole("complementary", { name: /^STORY-\d+ card$/ })).toBeTruthy();
+  });
+
+  it("takes the chat path when the chat is there", async () => {
+    const app = renderApp({ cards: { [PROJECT.dir]: [...BUILT, ...drafted("chat-1")] } });
+    await app.chats.bridge.start(PROJECT.dir, "dev-lead");
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: `Review draft ${FEATURE}` }));
+    expect(await screen.findByRole("region", { name: "Dev Lead" })).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Work list" })).toBeNull();
+  });
+});
+
+describe("the review request is used up once the pane has opened", () => {
+  it("going back to the chat shows the header button, not the pane again", async () => {
+    const app = renderApp({ cards: { [PROJECT.dir]: [...BUILT, ...drafted("chat-1")] } });
+    await app.chats.bridge.start(PROJECT.dir, "dev-lead");
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: `Review draft ${FEATURE}` }));
+    await screen.findByRole("complementary", { name: `${FEATURE} card` });
+    await app.user.click(screen.getByRole("button", { name: "Back" }));
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: "Forward" }));
+    await screen.findByRole("region", { name: "Dev Lead" });
+    expect(await screen.findByRole("button", { name: "Review draft" })).toBeTruthy();
+    expect(pane(FEATURE)).toBeNull();
   });
 });

@@ -101,3 +101,32 @@ describe("a pane edit of a draft card", () => {
     ).rejects.toThrow(/The user edited these cards/);
   });
 });
+
+describe("card.update can't approve or reject a draft (STORY-51 has its own path)", () => {
+  it("refuses a move out of draft, and writes nothing", async () => {
+    const { feature } = await start();
+    const file = join(dir(), (await readdir(dir())).find((f) => f.startsWith(feature)) ?? "");
+    const before = await readFile(file, "utf8");
+    for (const to of ["approved", "active", "cancelled"]) {
+      const r = await actions.update(repo.main, feature, { field: "status", from: "draft", to });
+      expect(r).toMatchObject({ ok: false, error: expect.stringContaining("Approve") });
+    }
+    expect(await readFile(file, "utf8")).toBe(before);
+    expect((await read(feature)).status).toBe("draft");
+  });
+});
+
+describe("a revision and the user's notes", () => {
+  it("leaves the notes the user wrote on the story exactly as they were", async () => {
+    const { story } = await start();
+    await actions.update(repo.main, story, { field: "notes", from: "", to: "My own notes." });
+    const r = await writer.draft(repo.main, "chat-1", {
+      ...draft("Agent's title"),
+      stories: [{ ...draft().stories[0]!, id: story, title: "Agent's title" }],
+    });
+    expect(r.created).toBe(false);
+    const after = await read(story);
+    expect(after.title).toBe("Agent's title");
+    expect(after.notes).toBe("My own notes.");
+  });
+});

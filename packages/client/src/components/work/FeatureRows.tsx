@@ -88,7 +88,7 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               type="button"
               className="review-draft"
               aria-label={WORK_COPY.reviewDraftOf(feature.id ?? "")}
-              onClick={() => review(feature.draftedBy ?? "")}
+              onClick={() => review(feature.draftedBy ?? "", feature.id ?? "")}
             >
               {WORK_COPY.reviewDraft}
             </button>

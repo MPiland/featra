@@ -113,3 +113,15 @@ describe("card.update refuses", () => {
     });
   });
 });
+
+describe("a pane edit of a card a worktree owns (STORY-49)", () => {
+  it("appends the by:user content entry to the worktree's copy, and main's file is untouched", async () => {
+    const mainBefore = await repo.read(repo.main, "STORY-1");
+    const r = await edit("STORY-1", { field: "title", from: story1.title, to: "Renamed in the pane" });
+    expect(r).toMatchObject({ ok: true, view: { title: "Renamed in the pane", owner: "worktree story-1" } });
+    const mine = parseCard(await repo.read(tree, "STORY-1"));
+    expect(mine.history.at(-1)).toMatchObject({ field: "content", to: "title", by: "user" });
+    expect(mine.history.at(-1)?.from).toBe(JSON.stringify({ title: story1.title }));
+    expect(await repo.read(repo.main, "STORY-1")).toBe(mainBefore);
+  });
+});

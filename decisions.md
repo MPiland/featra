@@ -1105,3 +1105,26 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Existing test changed (reason: AC4 mandates the new behaviour):** `card-edit.test.ts` "replaces the user story and
   appends no history" now expects the content event, and the description, title and notes assertions expect it too.
   Strictly stronger; no assertion was removed.
+
+## 2026-11-10 — STORY-49 review: rulings 1-6
+
+- **1. A draft's status can't be edited through `card.update`.** `applyCardEdit` refuses any move out of `draft` for a
+  feature waiting on review (`needsReview`: draft with `drafted-by`), whatever the target, so every caller is refused,
+  not only the pane. STORY-51 adds the dedicated Approve and Reject path. A status edit that changes nothing is still
+  accepted. A hand-made `draft` feature without `drafted-by` is not covered (nothing drafted it). Server test through
+  the real card actions.
+- **2. Notes: a draft revision can't touch them, so the exemption stays.** `planDraft` never writes notes (the card is
+  kept with its own notes); tests at work-format and through the real writer prove a revision leaves the user's notes
+  exactly as written. A notes edit therefore doesn't count as a user edit of the draft.
+- **3. One rule for which draft a chat owns:** `newestDraft` in work-format (highest id number among the chat's
+  drafts). `draftedFeature` (the server's revision) and the client's `useChatDraft` both use it; it only counts while
+  it waits on review. Tests for two drafts at work-format and in the client.
+- **4. Review draft when the chat is gone** (deleted or not in the project's chat list): it opens the draft in Work's
+  docked card pane, which now opens a feature's stories with a way back, instead of an error.
+- **5. The review request is used up once the pane opens.** The chat tells the app, which clears `reviewChat`; going
+  back or forward to the chat shows the Review draft button and doesn't open the pane again.
+- **6. The rename after a draft is best effort.** `retitle` is a required dependency of the agent bridge; a failure is
+  logged and the draft call still answers, since the cards are already written.
+- **Tests I changed:** only fixtures: the agent-bridge fakes in server, mcp and desktop tests gained `retitle: () => {}`
+  because the dependency is now required. The "no Approved" client test gained a role-based check on the status list;
+  its old assertion stays.

@@ -146,6 +146,9 @@ export function applyCardEdit(
   if (edit.field === "status") {
     if (card.status !== edit.from) return refuse(CHANGED_ELSEWHERE);
     if (edit.to === card.status) return { ok: true, card };
+    // A draft waiting on review leaves draft only by Approve or Reject (STORY-51), never by a status edit.
+    if (needsReview(card))
+      return refuse(`Can't move to ${edit.to}: a draft is approved or rejected with Approve and Reject.`);
     const check = checkTransition(card, edit.to, ctx.config, ctx.cards);
     if (!check.ok) return refuse(`Can't move to ${edit.to}: ${check.reason}.`);
     result = { ok: true, card: setStatus(card, edit.to, by, at) };

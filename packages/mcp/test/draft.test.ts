@@ -77,6 +77,7 @@ beforeAll(async () => {
     chats: {
       info: (id) => (id === CHAT ? { dir: project, session: "Dev Lead chat 1a2b3c4d" } : null),
       report: () => {},
+      retitle: () => {},
     },
     writer: createLogWriter({
       fs: { read: async () => null, write: async () => {} },

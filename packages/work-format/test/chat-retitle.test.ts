@@ -5,7 +5,9 @@ import {
   CHAT_TITLE_MAX,
   chatName,
   newSummary,
+  normalizeSavedChats,
   normalizeSummary,
+  savedChat,
   reduceSummary,
   retitle,
   type ChatSummary,
@@ -54,5 +56,29 @@ describe("retitle", () => {
     const named = retitle(first, "Shaping", "draft");
     expect(normalizeSummary(JSON.parse(JSON.stringify(named)))).toEqual(named);
     expect(normalizeSummary(JSON.parse(JSON.stringify(first)))).toEqual(first);
+  });
+});
+
+const saved = (summary: object) =>
+  normalizeSavedChats({ version: 1, chats: [{ dir: "/p", session: null, summary }] }).chats[0]?.summary as ChatSummary;
+
+describe("saved chats (chats.json)", () => {
+  const old = JSON.parse(JSON.stringify(first)) as Record<string, unknown>;
+
+  it("keeps who set a title across a save and a load", () => {
+    for (const by of ["draft", "user"] as const) {
+      const row = retitle(first, "Named", by);
+      const back = saved(JSON.parse(JSON.stringify(savedChat("/p", null, row).summary)));
+      expect(back.titleBy).toBe(by);
+      expect(chatName(back)).toBe("Named");
+    }
+  });
+
+  it("reads a row saved before titleBy as one the first message named, which a draft may rename", () => {
+    delete old.titleBy;
+    const back = saved(old);
+    expect(back.titleBy).toBeUndefined();
+    expect(chatName(retitle(back, "Shaping", "draft"))).toBe("Shaping");
+    expect(chatName(retitle(saved({ ...old, titleBy: "user" }), "Shaping", "draft"))).toBe("let's shape a feature");
   });
 });

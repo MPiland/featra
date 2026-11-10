@@ -116,3 +116,26 @@ describe("a draft feature is approved by Approve (STORY-51), not by the status l
     expect(statusChoices(draft, { config: DEFAULT_CONFIG, cards }).map((o) => o.value)).toEqual(["draft"]);
   });
 });
+
+describe("card.update can't approve or reject a draft (STORY-51 has its own path)", () => {
+  const { cards, plan } = firstDraft();
+  const feature = get(cards, plan.result.feature);
+  const ctx = { config: DEFAULT_CONFIG, cards };
+
+  it("refuses every move out of draft, whatever the status is called", () => {
+    for (const to of ["approved", "active", "cancelled", "Cancelled"]) {
+      const r = applyCardEdit(feature, { field: "status", from: "draft", to }, ctx, "user", T3);
+      expect(r.ok, to).toBe(false);
+      expect(r.ok ? "" : r.error).toContain("Approve");
+    }
+  });
+
+  it("still takes a status edit that changes nothing, and other cards' moves", () => {
+    expect(applyCardEdit(feature, { field: "status", from: "draft", to: "draft" }, ctx, "user", T3)).toEqual({
+      ok: true,
+      card: feature,
+    });
+    const child = get(cards, plan.result.stories[0] as string);
+    expect(applyCardEdit(child, { field: "status", from: "New", to: "Cancelled" }, ctx, "user", T3).ok).toBe(true);
+  });
+});

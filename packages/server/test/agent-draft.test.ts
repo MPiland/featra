@@ -44,6 +44,7 @@ beforeAll(async () => {
     chats: {
       info: (id) => (id === "chat-1" ? { dir: repo.main, session: "Dev Lead chat 1" } : null),
       report: () => {},
+      retitle: () => {},
     },
     writer: logs(),
     drafts: createDraftWriter({ scan: scanner.scan, now: () => new Date("2026-11-10T09:00:00Z") }),
@@ -97,7 +98,7 @@ describe("cards.draft on the bridge", () => {
     const bare = createAgentBridge({
       entry: null,
       enabled: async () => true,
-      chats: { info: () => ({ dir: repo.main, session: "s" }), report: () => {} },
+      chats: { info: () => ({ dir: repo.main, session: "s" }), report: () => {}, retitle: () => {} },
       writer: logs(),
     });
     await expect(bare.call("chat-1", "cards.draft", input())).rejects.toThrow(AGENT_MESSAGES.noDrafts);

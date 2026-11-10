@@ -1,3 +1,4 @@
+import { newestDraft } from "@featra/work-format";
 import { useWorkList } from "../work/useWorkList.ts";
 import type { WorkBridge } from "../../work-list.ts";
 
@@ -8,7 +9,10 @@ import type { WorkBridge } from "../../work-list.ts";
 export function useChatDraft(work: WorkBridge, dir: string, chat: string): string | null | undefined {
   const list = useWorkList(work, dir)?.list;
   if (!list) return undefined;
-  for (const epic of list.epics)
-    for (const f of epic.features) if (f.review && f.draftedBy === chat && f.id) return f.id;
-  return null;
+  // The same rule the server revises by: the chat's newest draft, and it only counts while it waits on review.
+  const drafts = list.epics
+    .flatMap((e) => e.features)
+    .map((f) => ({ id: f.id, chat: f.draftedBy ?? null, review: f.review === true }));
+  const mine = newestDraft(chat, drafts);
+  return mine?.review ? mine.id : null;
 }

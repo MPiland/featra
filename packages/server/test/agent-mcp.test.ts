@@ -47,6 +47,7 @@ function setup({
     chats: {
       info: (id) => manager?.info(id) ?? null,
       report: (id, event) => manager?.report(id, event),
+      retitle: () => {},
     },
     writer: createLogWriter({
       fs: {
@@ -215,7 +216,7 @@ describe("a build without the bundled MCP", () => {
     const bridge = createAgentBridge({
       entry: missing,
       enabled: async () => true,
-      chats: { info: () => null, report: () => {} },
+      chats: { info: () => null, report: () => {}, retitle: () => {} },
       writer: createLogWriter(),
       log: (m) => void messages.push(m),
     });
@@ -225,7 +226,7 @@ describe("a build without the bundled MCP", () => {
     const here = createAgentBridge({
       entry: fileURLToPath(import.meta.url),
       enabled: async () => true,
-      chats: { info: () => null, report: () => {} },
+      chats: { info: () => null, report: () => {}, retitle: () => {} },
       writer: createLogWriter(),
     });
     here.setPort(1234);

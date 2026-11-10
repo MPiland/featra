@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState } from "react";
 import type { ProjectRef } from "../../projects.ts";
 import {
   filterCounts,
@@ -30,15 +30,27 @@ export function WorkList(props: {
   paneWidth: ChosenWidth;
   /** Opens the chat that drafted a feature, with the draft pane (STORY-49). */
   onReviewDraft: (chat: string) => void;
+  /** Whether the project has that chat; Review draft falls back to this pane when its chat is gone. */
+  hasChat: (chat: string) => boolean;
 }) {
-  const { work, project, paneWidth, onReviewDraft } = props;
+  const { work, project, paneWidth, onReviewDraft, hasChat } = props;
   const update = useWorkList(work, project.dir);
   const [filter, setFilter] = useState<ListFilter>("all");
   const [selected, setSelected] = useState<string | null>(null);
+  // The card the open one was reached from (a draft's feature, then one of its stories), so the pane can go back.
+  const [from, setFrom] = useState<string | undefined>(undefined);
+  const select = useCallback((id: string | null, cameFrom?: string) => {
+    setSelected(id);
+    setFrom(cameFrom);
+  }, []);
   const paneId = useId();
   const listRef = useRef<HTMLElement>(null);
   const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
-  const selection = useMemo(() => ({ selected, paneId, open: setSelected }), [selected, paneId]);
+  const reviewDraft = useCallback(
+    (chat: string, feature: string) => (hasChat(chat) ? onReviewDraft(chat) : select(feature)),
+    [hasChat, onReviewDraft, select],
+  );
+  const selection = useMemo(() => ({ selected, paneId, open: select }), [selected, paneId, select]);
   const close = () => {
     const id = selected;
     setSelected(null);
@@ -70,7 +82,7 @@ export function WorkList(props: {
         {epics.length === 0 && <p className="meta">{WORK_COPY.noMatch}</p>}
         <StaleCards value={new Set(list.stale.map((s) => s.cardId))}>
           <SelectedCard.Provider value={selection}>
-            <ReviewDraft.Provider value={onReviewDraft}>
+            <ReviewDraft.Provider value={reviewDraft}>
               {epics.map((e) => (
                 <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
               ))}
@@ -123,6 +135,8 @@ export function WorkList(props: {
             id={selected}
             paneId={paneId}
             width={width}
+            openedFrom={from}
+            onOpen={(id) => select(id, id === from ? undefined : (selected ?? undefined))}
             onClose={close}
           />
         </>

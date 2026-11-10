@@ -25,15 +25,33 @@ export function draftedBy(card: Card): string | null {
 export const needsReview = (card: Pick<Card, "status" | "extra">): boolean =>
   card.status === "draft" && typeof card.extra[DRAFTED_BY] === "string";
 
-const byNumber = (a: Card, b: Card) => (parseId(a.id)?.n ?? 0) - (parseId(b.id)?.n ?? 0);
+/**
+ * The newest of a chat's drafts, by id number (an item without an id is skipped): the one rule for which draft belongs
+ * to a chat. The server revises it, and the chat's pane shows it, so the two can't disagree.
+ */
+export function newestDraft<T extends { id: string | null; chat: string | null }>(
+  chat: string,
+  items: readonly T[],
+): T | null {
+  let newest: T | null = null;
+  let best = -1;
+  for (const item of items) {
+    const n = item.id === null ? null : (parseId(item.id)?.n ?? 0);
+    if (item.chat === chat && n !== null && n >= best) {
+      newest = item;
+      best = n;
+    }
+  }
+  return newest;
+}
 
 /** The latest feature a chat drafted, whatever its status now. */
 export function draftedFeature(chat: string, cards: readonly Card[]): Card | null {
   return (
-    cards
-      .filter((c) => c.type === "feature" && draftedBy(c) === chat)
-      .toSorted(byNumber)
-      .at(-1) ?? null
+    newestDraft(
+      chat,
+      cards.filter((c) => c.type === "feature").map((c) => ({ id: c.id, chat: draftedBy(c), card: c })),
+    )?.card ?? null
   );
 }
 

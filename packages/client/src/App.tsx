@@ -26,22 +26,11 @@ import { useShortcuts } from "./components/useShortcuts.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
-import {
-  canGoBack,
-  canGoForward,
-  currentView,
-  entryChat,
-  entryView,
-  goBack,
-  goForward,
-  initialNav,
-  leaveChats,
-  navigate,
-} from "./navigation.ts";
-import { useOpenChat } from "./use-open-chat.ts";
+import { canGoBack, canGoForward, currentView, entryChat, entryView, initialNav, leaveChats } from "./navigation.ts";
+import { useAppNav } from "./use-app-nav.ts";
 import { firstSettingsPage, type SettingsPage } from "./settings-pages.ts";
 import { applyTheme } from "./theme.ts";
-import { viewDef, type ViewId } from "./views.ts";
+import { viewDef } from "./views.ts";
 import { DEFAULT_ZOOM, zoomIn, zoomOut } from "./zoom.ts";
 
 export interface AppProps {
@@ -77,12 +66,9 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     }
     setUi((s) => ({ ...s, sidebarCollapsed: !s.sidebarCollapsed }));
   }, []);
-  const open = useCallback((v: ViewId) => setNav((n) => navigate(n, v)), []);
-  const { reviewChat, openChat, reviewDraft } = useOpenChat(setNav);
+  const { reviewChat, openChat, reviewDraft, reviewed, open, back, forward } = useAppNav(setNav);
   const setZoom = useCallback((f: (z: number) => number) => setUi((s) => ({ ...s, zoomFactor: f(s.zoomFactor) })), []);
   const setPaneWidth = useCallback((w: number) => setUi((s) => ({ ...s, cardPaneWidth: w })), []);
-  const back = useCallback(() => setNav(goBack), []);
-  const forward = useCallback(() => setNav(goForward), []);
   const showKeyboardShortcuts = useCallback(() => {
     setSettingsPage("shortcuts");
     open("settings");
@@ -238,7 +224,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
               <ChatPane
                 bridge={bridge}
                 paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
-                review={reviewChat === chatId}
+                review={reviewChat === chatId ? reviewed : null}
                 chat={chat}
                 dir={projectDir ?? ""}
                 onStarted={startedChat}
@@ -263,6 +249,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 work={bridge.work}
                 paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
                 onReviewDraft={reviewDraft}
+                hasChat={(id) => chatList.chats.some((c) => c.id === id)}
                 setupPage={setupPage}
               />
             ) : view.id === "inbox" ? (

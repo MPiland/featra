@@ -14,12 +14,23 @@ export interface WorkViewProps {
   paneWidth: ChosenWidth;
   /** Opens the chat that drafted a feature, with the draft pane (STORY-49). */
   onReviewDraft: (chat: string) => void;
+  /** Whether the project has that chat (a draft's chat may have been deleted). */
+  hasChat: (chat: string) => boolean;
   /** The page that sets the current project up, shown instead of the list when it needs it (STORY-42). */
   setupPage?: ReactNode;
 }
 
 /** Work shows the current project's features and stories; with no project, the ways to get one. */
-export function WorkView({ projects, platform, actions, work, paneWidth, onReviewDraft, setupPage }: WorkViewProps) {
+export function WorkView({
+  projects,
+  platform,
+  actions,
+  work,
+  paneWidth,
+  onReviewDraft,
+  hasChat,
+  setupPage,
+}: WorkViewProps) {
   if (projects.current && setupPage) return setupPage;
   if (projects.current)
     return (
@@ -29,6 +40,7 @@ export function WorkView({ projects, platform, actions, work, paneWidth, onRevie
         project={projects.current}
         paneWidth={paneWidth}
         onReviewDraft={onReviewDraft}
+        hasChat={hasChat}
       />
     );
   return (

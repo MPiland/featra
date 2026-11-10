@@ -15,8 +15,10 @@ export interface CardPaneProps {
   /** In CSS px: chosen by the handle beside it, fitted to the work area. */
   width: number;
   onClose: () => void;
-  /** Opens another card in the pane: a feature's stories, and a story's feature (STORY-49). Left out, they aren't offered. */
+  /** Opens another card in the pane: a feature's stories, and the way back (STORY-49). Left out, they aren't offered. */
   onOpen?: (id: string) => void;
+  /** The card this one was opened from, which a way back leads to. */
+  openedFrom?: string;
   /** Take focus on open (default). A pane that opens beside a chat being typed in leaves it. */
   focusOnOpen?: boolean;
 }
@@ -30,7 +32,17 @@ const fromChoice = (v: string) => (v === "" ? null : v);
  * and parent are chosen from what the rules allow, and every save goes to the owner copy. Escape closes it unless a
  * field or list inside is using Escape itself.
  */
-export function CardPane({ work, dir, id, paneId, width, onClose, onOpen, focusOnOpen = true }: CardPaneProps) {
+export function CardPane({
+  work,
+  dir,
+  id,
+  paneId,
+  width,
+  onClose,
+  onOpen,
+  openedFrom,
+  focusOnOpen = true,
+}: CardPaneProps) {
   const card = useCard(work, dir, id);
   const pane = useRef<HTMLElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -141,9 +153,9 @@ export function CardPane({ work, dir, id, paneId, width, onClose, onOpen, focusO
     >
       <div className="card-bar">
         <span className="card-id">{id}</span>
-        {onOpen && view?.parent && (
-          <button type="button" className="card-link" onClick={() => onOpen(view.parent ?? "")}>
-            {CARD_COPY.backTo(view.parent)}
+        {onOpen && openedFrom && (
+          <button type="button" className="card-link" onClick={() => onOpen(openedFrom)}>
+            {CARD_COPY.backTo(openedFrom)}
           </button>
         )}
         <button

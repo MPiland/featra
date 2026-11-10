@@ -78,6 +78,13 @@ test("the chat that drafts shows the draft beside it, takes the feature's name, 
     await composer(page).press("Enter");
     await expect(pane(page, "FEAT-2")).toBeVisible();
     await expect(page.getByRole("region", { name: "Dev Lead" })).toBeVisible();
+    // Full height: the pane spans the chat's height, top to bottom, and sits beside it, not over it.
+    const paneBox = await pane(page, "FEAT-2").boundingBox();
+    const chatBox = await page.getByRole("region", { name: "Dev Lead" }).boundingBox();
+    expect(paneBox && chatBox).toBeTruthy();
+    expect(Math.abs((paneBox?.y ?? 0) - (chatBox?.y ?? 99))).toBeLessThanOrEqual(1);
+    expect(Math.abs((paneBox?.height ?? 0) - (chatBox?.height ?? 99))).toBeLessThanOrEqual(1);
+    expect((paneBox?.x ?? 0) + 1).toBeGreaterThanOrEqual((chatBox?.x ?? 0) + (chatBox?.width ?? 0));
     await expect(row).toContainText("Shaping");
 
     // AC3: from Work, Review draft opens that chat with the draft pane (the chat was left, so the pane starts closed).

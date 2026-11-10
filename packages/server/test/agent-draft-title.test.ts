@@ -3,7 +3,7 @@
  * a real repository. Only the Agent SDK, the clock and the disk's chats file are faked.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { chatName, type ChatSummary, type DraftInput, type SavedChats } from "@featra/work-format";
+import { chatName, normalizeSavedChats, type ChatSummary, type DraftInput, type SavedChats } from "@featra/work-format";
 import { createAgentBridge } from "../src/agent-bridge.ts";
 import { createChatManager, type ChatManager } from "../src/chat-manager.ts";
 import { createClaudeProvider } from "../src/claude-provider.ts";
@@ -63,7 +63,12 @@ describe("a draft renames its chat", () => {
     expect(chatName(row(id))).toBe("Shaping");
     expect(heard.at(-1)?.find((c) => c.id === id)?.title).toBe("Shaping");
     await manager.flush();
-    expect(saved.at(-1)?.chats.find((c) => c.summary.id === id)?.summary.title).toBe("Shaping");
+    const kept = saved.at(-1)?.chats.find((c) => c.summary.id === id)?.summary;
+    expect(kept?.title).toBe("Shaping");
+    expect(kept?.titleBy).toBe("draft");
+    // Through the file and back: who named the chat survives a restart.
+    const loaded = normalizeSavedChats(JSON.parse(JSON.stringify(saved.at(-1)))).chats.find((c) => c.summary.id === id);
+    expect(loaded?.summary.titleBy).toBe("draft");
   });
 
   it("follows the feature's title when the draft is revised in place", async () => {
