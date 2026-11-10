@@ -2,7 +2,7 @@
 id: FEAT-4
 type: feature
 title: Shaping
-status: approved
+status: active
 parent: EPIC-1
 order: 6
 origin: planned
@@ -13,6 +13,11 @@ history:
     from: null
     to: approved
     by: user
+  - at: 2026-11-10T03:54:33Z
+    field: status
+    from: approved
+    to: active
+    by: lead
 ---
 
 ## Description

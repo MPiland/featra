@@ -22,4 +22,5 @@ export * from "./json-store.ts";
 export * from "./claude-locate.ts";
 export * from "./role-registry.ts";
 export * from "./agent-bridge.ts";
+export * from "./draft-writer.ts";
 export * from "./log-writer.ts";

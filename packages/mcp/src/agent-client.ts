@@ -1,4 +1,11 @@
-import { isRecord, LOG_FILES, parseResponse, type AgentMethod, type AgentMethods } from "@featra/work-format";
+import {
+  isRecord,
+  LOG_FILES,
+  parseDraftResult,
+  parseResponse,
+  type AgentMethod,
+  type AgentMethods,
+} from "@featra/work-format";
 import type { FeatraHost } from "./tools.ts";
 
 /** The part of a WebSocket the client uses, so a test can stand in for the socket. */
@@ -60,6 +67,11 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
         throw new Error("Featra gave an unexpected answer.");
       }
       return { entry: result.entry, file };
+    },
+    async draft(input) {
+      const result = parseDraftResult(await call("cards.draft", input));
+      if (!result) throw new Error("Featra gave an unexpected answer.");
+      return result;
     },
     close: () => socket.close(),
   };

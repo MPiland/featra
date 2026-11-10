@@ -31,3 +31,9 @@
   keep them there and read the card's "App" as the app's settings. Non-blocking (STORY-7).
 - The placeholder test in `packages/client/test/app.test.tsx` listed Inbox among the views with no page yet; it now skips
   Inbox, as it has one, and asserts the Inbox. That is a changed filter, not a changed assertion. Non-blocking (STORY-7).
+- A chat has one open draft, so an agent can't draft two features at once from one chat. Recommendation: allow an
+  optional `feature` id when someone needs it. Non-blocking (STORY-8).
+- A drafted feature has no epic. Recommendation: an optional epic id on `draft_cards`, or the user picks it when
+  reviewing. Non-blocking (STORY-8).
+- A story the agent leaves out of a revision is Cancelled and stays as a file. Recommendation: let Reject (STORY-51)
+  remove the whole draft, and keep cancelled stories until then. Non-blocking (STORY-8).

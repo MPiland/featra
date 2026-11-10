@@ -1019,3 +1019,70 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - The button is "Approve" in FEAT-4; FEAT-5 renames it "Approve and start" when approving also starts the work.
 - A later `draft_cards` call from the same chat updates that draft in place, keeping its IDs.
 - Drafts stay uncommitted on main; Approve commits them locally without pushing; Reject deletes the files.
+
+## 2026-11-10 — STORY-8: Dev Lead drafts a feature
+
+- **`draft_cards` is one tool over one agent-socket method (`cards.draft`); the server writes the cards, to main's
+  checkout, uncommitted** (ADR 0021). Why: ADR 0002 has main own a draft and the server allocate IDs, and a draft is
+  the user's to review before anything is committed. IDs come from `nextId` over all owner cards, calls are serialized,
+  and new files are all written or none.
+- **One open draft per chat.** A call without one makes a Draft feature; a call with one revises it in place, with no
+  `feature` parameter. Why: the story's rule is "a later call from the same chat updates that draft", and a parameter
+  the agent could get wrong buys nothing.
+- **A story is kept by its `id`; a story left out is Cancelled, not deleted; a story with no `id` is new.** Why: the
+  agent sends the whole draft each time, and history must keep what was dropped. An `id` the draft doesn't have is
+  refused, so a typo can't touch another card.
+- **The drafting chat is stored on the feature as the frontmatter key `drafted-by`.** Why: STORY-49 opens that chat from
+  it, and `card.extra` already round-trips unknown keys. Review is derived (status `draft` plus `drafted-by`) and shown
+  on the Work row as a "Review" badge; drafts also count under the Needs review filter.
+- **New history field `content`:** `to` names what changed (title, story, criteria, tasks; a feature's description and
+  stories), `from` is null, `by` is `session:<chat>`. Why: AC3 wants each card's history to record the change, and
+  `status` events can't. A card whose text didn't change gets no event. Ticks and test links on unchanged text are kept.
+- **Stories are created at the first not-started stage with role `developer` and no agent; a draft feature has no epic.**
+  Why: the most standard defaults; the user sets the rest when reviewing.
+- **The MCP off switch and the knowledge setting apply.** Read-only knowledge already withholds the whole MCP (tested
+  behaviour), so it withholds `draft_cards` too, and a running chat is refused ("Drafting is off: this project's
+  knowledge setting is read-only."). Why: a draft writes cards, which read-only forbids. Both are read at each call and
+  the refusal writes nothing.
+- **The tool description teaches the card format, and a refused input says what to fix.** Why: Featra injects no
+  prompt (ADR 0006); the agent reads the description and the error.
+- **Two existing assertions grew by `draft_cards`:** the MCP's tool list in `packages/mcp/test/stdio.test.ts` and
+  `apps/desktop/test/mcp-bundle.test.ts`. Why: they assert the full list of tools, and the story adds one. Nothing was
+  weakened. `FeatureRow.draftedBy` and `review` are optional, so the normalizer's existing test is unchanged.
+
+## 2026-11-10 — STORY-8 review: rulings 1-9
+
+- **A revision is atomic (ruling 1).** The writer resolves every card's owner root and reads every file it will
+  replace before the first write; any failure restores the old files and removes the new ones. A card owned by a branch
+  that isn't checked out refuses the call before anything is written. Why: a half-applied revision leaves a draft that
+  no call produced.
+- **Only stories in the first stage can be left out or changed (rulings 2, 3).** A started story must be sent
+  unchanged; leaving it out or changing it refuses the whole call, naming each story and its stage. A started story
+  keeps its order, and a change of order alone doesn't touch it. Why: the agent must not cancel or rewrite work that
+  has begun.
+- **A feature that has left `draft` is not revised (ruling 4).** The call is refused ("FEAT-N is already <status>;
+  drafts can't be changed after approval. Ask the user to add scope in Work."); the brief's `update_card` doesn't
+  exist, so the message points at Work. No second feature is made silently. This replaces my first-pass behaviour of
+  starting a new draft after approval; the test that asserted it was rewritten.
+- **The user's edits are not overwritten (ruling 5).** Two signals: a `by: user` history entry after the draft's last
+  entry (status, evidence and acceptance moves don't count, they aren't the draft's text), and a fingerprint
+  (`drafted-content`, a hash of title, description, criteria and tasks) stored on each card the draft writes. The
+  fingerprint is needed because card-pane text edits write no history. A call that only repeats what the user wrote is
+  let through and recorded as a `merged` event, so the draft takes the text as its own and isn't blocked for good. The
+  error lists each such card with its title, criteria and tasks. Each revision's history entry now records the old
+  values in `from`.
+- **A change of order is a history entry (ruling 6):** part `order`, with the old order in `from`.
+- **One serialised lane for every card write, and exclusive creation (ruling 7).** Drafts and card-pane edits share the
+  server's card lane. A new card file is created with an exclusive link, and an ID that exists on disk under any name
+  is taken; the call allocates again (up to ten tries). Known limit: a second app instance on the same project is out
+  of scope, and nothing here serialises it.
+- **"Not drafted." is added in one place (ruling 8):** the MCP server, from the tool's `failed` prefix. The bridge, the
+  writer and the tool throw bare messages.
+- **The Review badge is named for its feature and uses a token that meets contrast (ruling 9):** `role="img"` and
+  `aria-label="FEAT-N draft, needs review"`; `--warn` is at least 4.5:1 on the row surfaces in both themes, asserted
+  from the shipped CSS in `apps/desktop/test/badge-contrast.test.ts`.
+- **Tests I changed because a ruling changed the behaviour:** the second-feature test (4); `from: null` in three history
+  assertions (5); the agent-socket assertions on `extra` (the fingerprint) and on the doubled prefix (8); the old
+  "can't be written" test, whose obstruction is now a taken ID that gets a new one, now injects the disk failure.
+- **Dev Lead approval of those test changes (2026-11-10):** each one follows a ruling above and asserts the new
+  behaviour as strictly or more strictly; none was weakened. Approved.

@@ -76,6 +76,11 @@ export function Feature({ feature }: { feature: FeatureRow }) {
             <ChevronRightIcon />
             <span>{title}</span>
           </button>
+          {feature.review && (
+            <span className="badge-review" role="img" aria-label={`${feature.id} draft, needs review`}>
+              {WORK_COPY.review}
+            </span>
+          )}
           <StaleMark id={feature.id} />
         </span>
         <span role="cell">
