@@ -63,6 +63,10 @@ beforeAll(async () => {
   await mkdir(join(project, ".featra", "cards"), { recursive: true });
   git(project, "init", "-q", "-b", "main");
   git(project, "config", "core.autocrlf", "false");
+  // The start commits as the repository's own user, as Approve does; a CI machine has no global one.
+  git(project, "config", "user.name", "Test");
+  git(project, "config", "user.email", "test@example.invalid");
+  git(project, "config", "commit.gpgsign", "false");
   await writeFile(join(project, ".featra", "config.yaml"), "version: 1\n");
   for (const c of [feature("FEAT-1", "Delegation", "approved"), feature("FEAT-2", "Not yet", "draft")]) {
     await writeFile(join(project, ".featra", "cards", `${c.id}-card.md`), serializeCard(c));
