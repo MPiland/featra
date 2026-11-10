@@ -248,7 +248,8 @@ describe("AC4: the File menu's project commands, and their shortcuts", () => {
   it("uses Cmd on macOS", async () => {
     const { user } = renderApp({ platform: "darwin" });
     await openPath(user, "File");
-    expect(labels(menuAt(1)).slice(0, 3)).toEqual(["New Project…⇧⌘N", "Open Folder…⌘O", "Project Settings…⇧⌘,"]);
+    expect(labels(menuAt(1))[0]).toBe("New Chat⌘N");
+    expect(labels(menuAt(1)).slice(1, 4)).toEqual(["New Project…⇧⌘N", "Open Folder…⌘O", "Project Settings…⇧⌘,"]);
     await user.keyboard("{Escape}{Escape}{Meta>}{Shift>}N{/Shift}{/Meta}");
     expect(document.activeElement).toBe(field("Name"));
   });

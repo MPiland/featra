@@ -37,6 +37,7 @@ export class ConfigError extends Error {}
 
 const BOOLEAN_KEYS = ["requireAccept", "worktrees", "mcp", "autoMerge", "uat"] as const;
 const KNOWLEDGE: readonly KnowledgePermission[] = ["edit", "propose", "read-only"];
+export const isKnowledgePermission = (value: unknown): value is KnowledgePermission => isOneOf(KNOWLEDGE, value);
 const PROGRESS: readonly ProgressMode[] = ["stories", "tasks"];
 
 /**
@@ -114,6 +115,31 @@ export function setConfigValue<K extends keyof ProjectConfig>(
   const out = doc.toString();
   configOverrides(out);
   return out;
+}
+
+/** The project's own value for a work setting, when its config sets one and can be read. */
+function ownSetting<K extends keyof ProjectConfig>(configText: string | null, key: K): ProjectConfig[K] | undefined {
+  try {
+    return configText === null ? undefined : configOverrides(configText)[key];
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether a project's agents get the Featra MCP (ADR 0006): the project's own `mcp`, else the app-wide default, else
+ * on. A config that can't be read sets nothing, so the default applies, and Settings shows the error.
+ */
+export function mcpEnabled(configText: string | null, appDefault: boolean | undefined): boolean {
+  return ownSetting(configText, "mcp") ?? appDefault ?? DEFAULT_CONFIG.mcp;
+}
+
+/** What agents may do to the project's knowledge files: the project's own `knowledge`, else the app default, else propose. */
+export function knowledgePermission(
+  configText: string | null,
+  appDefault: KnowledgePermission | undefined,
+): KnowledgePermission {
+  return ownSetting(configText, "knowledge") ?? appDefault ?? DEFAULT_CONFIG.knowledge;
 }
 
 /** A new project's config file: only the version, so every work setting follows the app-wide defaults. */

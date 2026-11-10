@@ -1,0 +1,77 @@
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+
+export interface JsonStore<T> {
+  readonly file: string;
+  /** The stored state; anything unreadable reads as `normalize(undefined)`. */
+  load: () => Promise<T>;
+  /**
+   * The stored state, for a file whose loss would cost the user's work: a missing file is empty, one that isn't JSON
+   * is kept as `<name>.bad` and read as empty, and any other failure (locked, no access) rejects, so nothing is
+   * saved over a file that may still be good.
+   */
+  read: () => Promise<T>;
+  save: (state: T) => Promise<void>;
+  /** Deletes the file (Reset App Data), after any save already queued. */
+  remove: () => Promise<void>;
+  /** Resolves once every save issued so far is on disk. */
+  flush: () => Promise<void>;
+  readonly pending: boolean;
+}
+
+/**
+ * A small JSON file in the app's data folder (Electron's userData): the desktop's own stores, and the server's saved
+ * chats (STORY-44). Reads are defensive (`normalize` repairs anything stored);
+ * writes are serialised and atomic (temp file + rename), so a crash mid-write never leaves a torn file.
+ */
+export function createJsonStore<T>(dir: string, name: string, normalize: (raw: unknown) => T): JsonStore<T> {
+  const file = join(dir, name);
+  let queue: Promise<void> = Promise.resolve();
+  let inFlight = 0;
+
+  const write = async (state: T) => {
+    await mkdir(dir, { recursive: true });
+    const tmp = `${file}.tmp`;
+    await writeFile(tmp, `${JSON.stringify(normalize(state), null, 2)}\n`, "utf8");
+    await rename(tmp, file);
+  };
+
+  const enqueue = (op: () => Promise<void>) => {
+    inFlight++;
+    const next = queue.then(op).finally(() => inFlight--);
+    queue = next.catch(() => {});
+    return next;
+  };
+
+  return {
+    file,
+    async load() {
+      try {
+        return normalize(JSON.parse(await readFile(file, "utf8")));
+      } catch {
+        return normalize(undefined);
+      }
+    },
+    async read() {
+      let text: string;
+      try {
+        text = await readFile(file, "utf8");
+      } catch (err) {
+        if (err instanceof Error && "code" in err && err.code === "ENOENT") return normalize(undefined);
+        throw err;
+      }
+      try {
+        return normalize(JSON.parse(text));
+      } catch {
+        await rename(file, `${file}.bad`);
+        return normalize(undefined);
+      }
+    },
+    save: (state) => enqueue(() => write(state)),
+    remove: () => enqueue(() => rm(file, { force: true })),
+    flush: () => queue,
+    get pending() {
+      return inFlight > 0;
+    },
+  };
+}

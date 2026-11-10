@@ -24,8 +24,8 @@ test("app window: title bar, menu, sidebar; close to tray and reopen; Ctrl+B col
     await expect(bar.getByRole("heading", { level: 1 })).toHaveText("Work");
     await expect(page).toHaveTitle("Featra · Work");
 
-    // Sidebar: the project switcher (STORY-19), then every entry, which opens its view.
-    await expect(sidebar.getByRole("button")).toHaveText([/No project$/, ...ENTRIES]);
+    // Sidebar: the project switcher (STORY-19), New chat (STORY-5), then every entry, which opens its view.
+    await expect(sidebar.getByRole("button")).toHaveText([/No project$/, "New chat", ...ENTRIES]);
     await expect(sidebar.getByRole("button").first()).toHaveAccessibleName("Switch project: No project");
     await sidebar.getByRole("button", { name: "Inbox" }).click();
     await expect(bar.getByRole("heading", { level: 1 })).toHaveText("Inbox");
@@ -82,6 +82,7 @@ test("app window: title bar, menu, sidebar; close to tray and reopen; Ctrl+B col
     await toggle2.click();
     await expect(page.getByRole("navigation", { name: "Featra" }).getByRole("button")).toHaveText([
       /No project$/,
+      "New chat",
       ...ENTRIES,
     ]);
     await app.close();

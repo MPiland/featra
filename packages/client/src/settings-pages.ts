@@ -6,7 +6,7 @@ import type { ChoiceDef, CloseButton, CloseToTraySupport, SettingsSnapshot, Work
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 
 /** Settings' pages. App pages hold the user's own settings; the Project page holds one project's overrides. */
-export type SettingsPage = "general" | "appearance" | "workDefaults" | "shortcuts" | "project";
+export type SettingsPage = "general" | "appearance" | "workDefaults" | "shortcuts" | "project" | "roles";
 export type SettingsScope = "app" | "project";
 
 export interface PageDef {
@@ -26,6 +26,7 @@ const PAGES: readonly PageDef[] = [
   { id: "workDefaults", title: WORK_PAGE_TITLE, scope: "app" },
   { id: "shortcuts", title: "Keyboard shortcuts", scope: "app" },
   { id: "project", title: WORK_PAGE_TITLE, scope: "project" },
+  { id: "roles", title: "Roles", scope: "project" },
 ];
 
 /** General holds only the close button, which a browser tab doesn't have: there the page is left out. */
@@ -40,7 +41,7 @@ export function firstSettingsPage(snapshot: SettingsSnapshot): SettingsPage {
 /** Work settings, in titled groups. Both Workflow pages show them so. */
 export const WORK_GROUPS: readonly { title: string; keys: readonly WorkSettingKey[] }[] = [
   { title: "Progress and review", keys: ["progress", "requireAccept"] },
-  { title: "Agents", keys: ["worktrees", "knowledge"] },
+  { title: "Agents", keys: ["worktrees", "mcp", "knowledge"] },
 ];
 
 const THEME_LABELS: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };
@@ -61,3 +62,24 @@ export function closeButtonOptions(support: NonNullable<CloseToTraySupport>): re
 /** The wording of a project override: the app default it replaces, and its Reset button's name. */
 export const appDefaultText = (defaultLabel: string) => `App default: ${defaultLabel}`;
 export const resetLabel = (settingLabel: string) => `Reset ${settingLabel} to the app default`;
+
+/** The Inbox waits Settings offers, in minutes; the wait the user has now is added when it isn't one of them. */
+const WAIT_PRESETS: readonly number[] = [1, 2, 5, 10, 15, 30, 60];
+
+/** A wait as the dropdown words it: "10 minutes", "1 hour", "3 seconds". */
+export function waitLabel(minutes: number): string {
+  if (minutes < 1) {
+    const s = Math.round(minutes * 60);
+    return `${s} ${s === 1 ? "second" : "seconds"}`;
+  }
+  if (minutes >= 60 && minutes % 60 === 0) {
+    const h = minutes / 60;
+    return `${h} ${h === 1 ? "hour" : "hours"}`;
+  }
+  return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`;
+}
+
+export function inboxWaitOptions(current: number): readonly ChoiceDef<string>[] {
+  const minutes = WAIT_PRESETS.includes(current) ? WAIT_PRESETS : [...WAIT_PRESETS, current].toSorted((a, b) => a - b);
+  return minutes.map((m) => ({ value: String(m), label: waitLabel(m) }));
+}

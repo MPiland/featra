@@ -11,12 +11,24 @@
     "./setup-plan": "./src/setup-plan.ts",
     "./setup-items": "./src/setup-items.ts",
     "./work-list": "./src/work-list-types.ts",
-    "./card-view": "./src/card-view-types.ts"
+    "./card-view": "./src/card-view-types.ts",
+    "./roles": "./src/roles.ts",
+    "./modes": "./src/modes.ts",
+    "./role-edit": "./src/role-edit.ts",
+    "./chat": "./src/chat-state.ts",
+    "./chat-controls": "./src/chat-controls.ts",
+    "./chat-events": "./src/chat-events.ts",
+    "./chat-list": "./src/chat-list.ts",
+    "./inbox": "./src/inbox.ts",
+    "./approvals": "./src/approvals.ts",
+    "./questions": "./src/questions.ts",
+    "./tool-summary": "./src/tool-summary.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"
   },
   "dependencies": {
+    "smol-toml": "^1.9.1",
     "yaml": "^2.8.1"
   }
 }

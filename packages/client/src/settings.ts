@@ -6,6 +6,7 @@
  */
 import type { KnowledgePermission, ProgressMode, ProjectConfig } from "@featra/work-format";
 import { isOneOf, isRecord } from "@featra/work-format/guards";
+import { DEFAULT_INBOX_WAIT_MINUTES, normalizeWaitMinutes } from "@featra/work-format/inbox";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 
 /** What the window's close button (and Alt+F4) does. */
@@ -13,7 +14,7 @@ export type CloseButton = "tray" | "quit";
 export const CLOSE_BUTTON_CHOICES: readonly CloseButton[] = ["tray", "quit"];
 
 /** Project settings that also have an app-wide default. Featra's own defaults match work-format's DEFAULT_CONFIG. */
-export type WorkSettings = Pick<ProjectConfig, "progress" | "requireAccept" | "worktrees" | "knowledge">;
+export type WorkSettings = Pick<ProjectConfig, "progress" | "requireAccept" | "worktrees" | "mcp" | "knowledge">;
 export type WorkSettingKey = keyof WorkSettings;
 export type WorkOverrides = Partial<WorkSettings>;
 
@@ -21,17 +22,28 @@ export const DEFAULT_WORK_SETTINGS: WorkSettings = {
   progress: "stories",
   requireAccept: true,
   worktrees: true,
+  mcp: true,
   knowledge: "propose",
 };
 
 export interface AppSettings {
   theme: ThemeChoice;
   closeButton: CloseButton;
+  /** A desktop notification when an approval or question arrives and Featra isn't focused (STORY-7). */
+  notifications: boolean;
+  /** Minutes an approval or question waits in its chat before it is also in the Inbox (STORY-7). */
+  inboxWaitMinutes: number;
   /** The defaults every project gets unless its own config overrides them. */
   work: WorkSettings;
 }
 
-export const DEFAULT_APP_SETTINGS: AppSettings = { theme: "system", closeButton: "tray", work: DEFAULT_WORK_SETTINGS };
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  theme: "system",
+  closeButton: "tray",
+  notifications: true,
+  inboxWaitMinutes: DEFAULT_INBOX_WAIT_MINUTES,
+  work: DEFAULT_WORK_SETTINGS,
+};
 
 /** One option of a choice setting. */
 export interface ChoiceDef<V> {
@@ -47,7 +59,7 @@ export type WorkSettingDef =
       help?: string;
       choices: readonly ChoiceDef<KnowledgePermission>[];
     }
-  | { key: "requireAccept" | "worktrees"; kind: "toggle"; label: string; help?: string };
+  | { key: "requireAccept" | "worktrees" | "mcp"; kind: "toggle"; label: string; help?: string };
 
 /** Work settings in the order Settings shows them, with their wording. */
 export const WORK_SETTINGS: readonly WorkSettingDef[] = [
@@ -62,6 +74,12 @@ export const WORK_SETTINGS: readonly WorkSettingDef[] = [
   },
   { key: "requireAccept", kind: "toggle", label: "Require acceptance before Done" },
   { key: "worktrees", kind: "toggle", label: "Use a worktree per story" },
+  {
+    key: "mcp",
+    kind: "toggle",
+    label: "Featra MCP",
+    help: "Lets agents log decisions and open questions. Turning it off also stops running chats.",
+  },
   {
     key: "knowledge",
     kind: "choice",
@@ -107,6 +125,8 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
   return {
     theme: isOneOf(THEME_CHOICES, r.theme) ? r.theme : DEFAULT_APP_SETTINGS.theme,
     closeButton: isOneOf(CLOSE_BUTTON_CHOICES, r.closeButton) ? r.closeButton : DEFAULT_APP_SETTINGS.closeButton,
+    notifications: typeof r.notifications === "boolean" ? r.notifications : DEFAULT_APP_SETTINGS.notifications,
+    inboxWaitMinutes: normalizeWaitMinutes(r.inboxWaitMinutes),
     work: { ...DEFAULT_WORK_SETTINGS, ...normalizeWorkOverrides(r.work) },
   };
 }

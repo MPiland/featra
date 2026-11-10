@@ -6,6 +6,7 @@ import { SCOPE_TITLES, settingsPages, type SettingsPage, type SettingsScope } fr
 import { AppearancePage } from "./AppearancePage.tsx";
 import { GeneralPage } from "./GeneralPage.tsx";
 import { PageHeader } from "./PageHeader.tsx";
+import { RolesPage } from "./RolesPage.tsx";
 import { ProjectPage } from "./ProjectPage.tsx";
 import { ShortcutsPage } from "./ShortcutsPage.tsx";
 import { WorkDefaultsPage } from "./WorkDefaultsPage.tsx";
@@ -69,6 +70,8 @@ export function SettingsView(props: SettingsViewProps) {
               title={current.title}
               onSetUp={onSetUp}
             />
+          ) : current?.id === "roles" ? (
+            <RolesPage key={projectKey} bridge={bridge} projects={projects} title={current.title} />
           ) : (
             current && (
               <>
@@ -90,21 +93,13 @@ function AppPage({
   onAppChange,
   shortcuts,
 }: Pick<SettingsViewProps, "snapshot" | "onAppChange" | "shortcuts"> & {
-  id: Exclude<SettingsPage, "project">;
+  id: Exclude<SettingsPage, "project" | "roles">;
 }) {
   const app = snapshot.app;
   const setApp = (patch: Partial<AppSettings>) => onAppChange({ ...app, ...patch });
   switch (id) {
     case "general":
-      return (
-        snapshot.closeToTray && (
-          <GeneralPage
-            app={app}
-            support={snapshot.closeToTray}
-            onCloseButton={(closeButton) => setApp({ closeButton })}
-          />
-        )
-      );
+      return snapshot.closeToTray && <GeneralPage app={app} support={snapshot.closeToTray} onChange={setApp} />;
     case "appearance":
       return <AppearancePage theme={app.theme} onTheme={(theme) => setApp({ theme })} />;
     case "workDefaults":

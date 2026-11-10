@@ -63,6 +63,25 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Session** — one running agent conversation inside Featra (e.g. a Claude Code session via the Agent SDK).
 - **Role preset** — an editable prompt template plus agent, model and reasoning choice: Researcher, Analyst/Refiner,
   Dev Lead, Developer, QA.
+- **Role** — what a chat starts from: a prompt appended to the agent's own, a model, an effort and a permission mode.
+  The five built-in roles are the role presets; all start in Ask.
+- **Chat** — a conversation with one agent, started from a role in a project. Its transcript is an event log; a
+  **tool row** is one tool call in it, collapsed to the tool and a short summary. Featra keeps a chat's row and its
+  provider **session** id in the app's data; the transcript stays in the provider's own session, so a **restored**
+  chat reads it back when opened and goes on in the same session. A chat whose session is gone says so.
+- **Ask** — the permission mode where every tool that needs approval asks first: the call waits in the chat until the
+  user answers **Allow**, **Allow for this chat** or **Deny** (with an optional reason the agent is sent). Allow for
+  this chat lasts while the chat's agent runs: a shell command by its exact command, any other tool by its name.
+- **Composer controls** — Role, Model, Effort and Mode, picked from the composer in the provider's own names. A change
+  applies from the next turn. Full access is offered only to a chat that started in it.
+- **Context meter** — the tokens a chat uses of its model's window, read from the session's own events (no extra
+  tokens). Without a window from the provider it shows the tokens alone; hidden until the first turn reports usage.
+- **Approval** — a tool request the chat waits on; the chat shows the waiting dot. One left unanswered (Stop, the chat
+  closing, a restart) is cancelled, never denied.
+- **Question** — the agent asks the user to choose in the middle of a turn (Claude's AskUserQuestion): a card on the
+  call's row with each question's options (several at once where the agent allows it) and an **Other** field. The chat
+  shows the waiting dot until it is answered; the answers go back as the tool's result and the same turn goes on. An
+  answered card collapses to the chosen answers.
 - **Orchestrator** — a session using the Dev Lead role. Shapes features with the user, drafts cards, spawns story
   sessions, reviews and merges.
 - **Agent instructions** — the user's own `CLAUDE.md` / `AGENTS.md`. Featra never edits them. Not the same as project

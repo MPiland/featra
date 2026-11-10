@@ -33,9 +33,15 @@ importers:
 
   apps/desktop:
     dependencies:
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: 0.3.318
+        version: 0.3.318(@anthropic-ai/sdk@1.4.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(zod@4.6.7))(zod@4.6.7)
       '@featra/client':
         specifier: workspace:*
         version: link:../../packages/client
+      '@featra/mcp':
+        specifier: workspace:*
+        version: link:../../packages/mcp
       '@featra/server':
         specifier: workspace:*
         version: link:../../packages/server
@@ -90,8 +96,24 @@ importers:
         specifier: 8.3.5
         version: 8.3.5(@types/node@26.6.6)(yaml@2.9.1)
 
+  packages/mcp:
+    dependencies:
+      '@featra/work-format':
+        specifier: workspace:*
+        version: link:../work-format
+      '@modelcontextprotocol/sdk':
+        specifier: 1.32.2
+        version: 1.32.2(zod@4.6.7)
+    devDependencies:
+      '@featra/server':
+        specifier: workspace:*
+        version: link:../server
+
   packages/server:
     dependencies:
+      '@anthropic-ai/claude-agent-sdk':
+        specifier: 0.3.318
+        version: 0.3.318(@anthropic-ai/sdk@1.4.0(zod@4.6.7))(@modelcontextprotocol/sdk@1.32.2(zod@4.6.7))(zod@4.6.7)
       '@featra/work-format':
         specifier: workspace:*
         version: link:../work-format
@@ -105,6 +127,9 @@ importers:
 
   packages/work-format:
     dependencies:
+      smol-toml:
+        specifier: ^1.9.1
+        version: 1.9.1
       yaml:
         specifier: ^2.8.1
         version: 2.9.1
@@ -1507,6 +1532,10 @@ packages:
     resolution: {integrity: sha512-6x6dK6zJdpTzF4sQeNYxwtvBzf6Eg4GtlesS94HOvTudUeyK2WXAaIfmDgsyslYrRBeFIlsi54AYsFGUuhmvrQ==}
     engines: {node: '>= 0.4'}
 
+  smol-toml@1.9.1:
+    resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
+    engines: {node: '>= 18'}
+
   source-map-js@1.2.2:
     resolution: {integrity: sha512-KGj/8Y43x35aZVDtt+J4mK1hoLGHULMYfSkODJNQjNDC3oW1PqPoxMwo0pLUsWM/UEGzON/NxeHywEfNXNP3Vw==}
     engines: {node: '>=0.10.0'}
@@ -2856,6 +2885,8 @@ snapshots:
       side-channel-list: 1.0.1
       side-channel-map: 1.0.1
       side-channel-weakmap: 1.0.2
+
+  smol-toml@1.9.1: {}
 
   source-map-js@1.2.2: {}
 
