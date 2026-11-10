@@ -1011,3 +1011,11 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   model for every provider, not a Claude or Codex special case. FEAT-3 keeps its scope.
 - 2026-11-10 — STORY-11: the PR chip's label is the PR number (`#14`), with the full URL on hover, never the raw URL.
   Why: the user's review of FEAT-3 found the Work list's PR column printing raw URLs.
+
+## 2026-11-10 FEAT-4 Shaping split into four stories
+
+- STORY-8 (Dev Lead drafts a feature), STORY-49 (review a draft in its chat), STORY-50 (send a draft back) and
+  STORY-51 (approve or reject a draft), built in that order. Why: each is a vertical slice the user can try on its own.
+- The button is "Approve" in FEAT-4; FEAT-5 renames it "Approve and start" when approving also starts the work.
+- A later `draft_cards` call from the same chat updates that draft in place, keeping its IDs.
+- Drafts stay uncommitted on main; Approve commits them locally without pushing; Reject deletes the files.
