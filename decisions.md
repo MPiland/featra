@@ -1292,3 +1292,10 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 
 - The user accepted STORY-8, STORY-49, STORY-50, STORY-51 and FEAT-4 ("Accept and merge") without a hands-on check;
   a true UAT comes later. FEAT-4 merges to main.
+
+## 2026-11-10 — BUG-12 AC2 relaxed
+
+- The user ruled "Relax AC2, merge": AC2 becomes green CI plus a passing capped pre-commit gate (3 workers), instead
+  of 50 full runs in a row. Under the cap the gate passed 4 of 5 and the soak 6 of 8; the failures are 20 s+ process
+  stalls from the PC's memory pressure (WSL and kernel pools), which no repo change can fix. The product race fix and
+  the cap merge now. No assertion changed.

@@ -2,7 +2,7 @@
 id: BUG-12
 type: bug
 title: Work-watch and card-watch tests flake in full runs
-status: In Review
+status: Acceptance
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-10T16:33:45Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
@@ -48,13 +53,13 @@ In one other run, `card-actions.test.ts` and `copy-actions.test.ts` failed toget
 ## Acceptance criteria
 
 - [x] Each failure is reproduced under load and its cause is recorded in Notes. If it is a product bug, a regression test fails before the fix.
-- [ ] Each test passes 50 full runs in a row under that load (under the capped gate: 3 workers), with its assertions unchanged. Any time limit that changes is justified in Notes.
+- [x] CI is green and the capped pre-commit gate (3 workers) passes on this branch, with assertions unchanged. Any time limit that changes is justified in Notes. (Relaxed from "50 full runs in a row" by the user, 2026-11-10: the remaining failures are the PC's memory stalls, which the repo cannot fix.)
 
 ## Tasks
 
 - [x] Reproduce under load and keep the output
 - [x] Find the cause of each failure and fix what the repo can fix (one product race, test waits, test wiring)
-- [ ] Soak each test 50 full runs in a row under load: not met, see Notes (a host stall outlasts any wait)
+- [x] Soak under the capped gate and record the counts (50-in-a-row dropped by the AC2 ruling)
 
 ## Notes
 
@@ -65,3 +70,4 @@ In one other run, `card-actions.test.ts` and `copy-actions.test.ts` failed toget
 - 2026-11-10: changed time limits, no assertion changed. `FIRST_ANSWER_MS` 20 s (was 2 s default or 10 s) on the three first-scan answers in `ws-work` and the draft door checks: STORY-3 times only the push after an edit. The branch-change wait 5 s to 20 s (`GIT_ASKED_MS`, no criterion times it). Unchanged: AC5's 1 s wait and its `< 1000` assertion, and the AC6 and card push waits.
 - 2026-11-10: not met. Second AC: the fixed code passed 35 of 50 runs of the harness. All 15 failures were in runs of 53 to 76 s (normal 27 s) and were one of three waits (`card-actions-draft` beforeEach or "refuses a move out of draft", `work-watch` "a worktree goes", `ws-work` draft door check) that a stall of 20 s or more outlasts. A full gate still lost one test in each of nine files at once (30 to 36 s each). Worker caps of 8 and 4 did not cure it, so none is committed. Ruling (the user): the pre-commit gate caps vitest at 3 workers (`VITEST_MAX_WORKERS`, overridable); the PC's memory pressure is the underlying cause and remains. Counts under the capped gate follow below. See decisions.md. Gate runs on the fixed code (the pre-commit hook script): run 1 passed in 156 s, run 2 failed in 185 s (card-actions-draft, card-actions, copy-actions), run 3 failed in 163 s (ws-work card.watch on its 20 s first answer, and the pre-commit-hook test hook timeout), both on the same stall; before the fix 3 of 3 failed at about 132 s.
 - 2026-11-10: capped results (3 workers). Gate: 4 of 5 runs passed (261, 233, 231, 257 s); the fifth (271 s) failed on one multi-file stall. Soak: stopped after 8 runs with 6 passing; failures were 20 s or longer process-creation stalls (run 8: card.watch "No matching frame in 2000 ms", 59.5 s run). AC2 stays unticked; the underlying cause is the PC's memory pressure (WSL 7.3 GB, kernel pools 11.5 GB of 15 GB).
+- 2026-11-10: ruling (the user): AC2 relaxed to green CI plus the capped gate, and the fix merges now. The PC's memory pressure stays as a known environment limit; freeing it (WSL cap, reboot) is the user's call. See decisions.md.
