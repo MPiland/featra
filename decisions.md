@@ -409,3 +409,5 @@ the whole unit suite too (`soak/windows/unit/50`), stops at the first failing ru
 - Subagents a chat starts (Claude's Agent tool, Codex subagents, any provider that reports them) show nested under that
   chat, read-only. New STORY-48 in FEAT-15; STORY-32's import ACs are now provider-neutral too. Why: the user wants one
   model for every provider, not a Claude or Codex special case. FEAT-3 keeps its scope.
+- 2026-11-10 — STORY-11: the PR chip's label is the PR number (`#14`), with the full URL on hover, never the raw URL.
+  Why: the user's review of FEAT-3 found the Work list's PR column printing raw URLs.
