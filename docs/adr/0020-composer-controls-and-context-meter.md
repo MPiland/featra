@@ -21,8 +21,10 @@ no such control and the composer hides it. Claude labels its `default` mode "def
 chat is never offered it, and a role change into a role whose settings start in it leaves the chat in the first mode the
 adapter lists (Ask). The ceiling is saved with the chat and checked again when it is reopened. Claude's
 `disableBypassPermissionsMode` is honoured by the role's start mode, so a chat from such a role has no full access to
-keep. `auto` is offered: the user picks it explicitly and it still decides per action. Featra's settings reader knows no
-switch that disables `auto`, so none is honoured; one would be handled like `disableBypassPermissionsMode`.
+keep. `auto` is offered: the user picks it explicitly and it still decides per action. Claude's `permissions.disableAutoMode:
+"disable"` (Claude Code's docs; also read at the top level, as the settings index lists it) removes it. It is read in
+every settings layer like `disableBypassPermissionsMode`: the composer then doesn't offer `auto`, and a role or
+Claude default mode of `auto` starts on Ask with a note.
 
 **A change applies from the next turn, by restarting the agent.** `chat.configure` stores the new role and settings on
 the chat and its provider session (`configure`). A running turn is left alone. On the next send, if the settings differ

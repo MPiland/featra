@@ -995,7 +995,9 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **The Claude adapter takes its start settings before its first await.** Why: a change made while the agent is
   starting then differs from what it started with, so the next send replaces it, without relying on sends being blocked.
   Review fix.
-- **`auto` mode is offered from the composer; the user picks it explicitly.** Why: unlike full access it still decides
-  per action and the user chose it. Featra's settings reader knows no `disableAutoMode` switch, so none is honoured;
-  add one beside `disableBypassPermissionsMode` if Claude's settings gain it. Review fix.
+- **`auto` mode is offered from the composer; the user picks it explicitly, unless Claude's `disableAutoMode` is set.**
+  Why: unlike full access it still decides per action and the user chose it. Claude's docs give
+  `permissions.disableAutoMode: "disable"` (the settings index lists it top-level; both are read), honoured through the
+  same layers as `disableBypassPermissionsMode`: no `auto` in the controls, and a role or default mode of `auto` starts
+  on Ask with the note "Claude's settings turn off auto mode: starting on Ask." Review fix.
 - **`contextTokens` includes the last turn's output tokens.** Why: the output is part of the next turn's context. Review fix.

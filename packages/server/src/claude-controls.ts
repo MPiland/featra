@@ -41,7 +41,8 @@ export const claudeSettings = (role: Role): ChatSettings => ({
 
 /**
  * What a chat from `role` can pick. Full access is offered only to a chat that already started in it: Featra passes on
- * what the user's own Claude settings allow, so the composer never switches a chat up to it.
+ * what the user's own Claude settings allow, so the composer never switches a chat up to it. `auto` is offered unless
+ * Claude's settings remove it (`disableAutoMode`).
  */
 export function claudeControls(role: Role): ChatControls {
   const models = MODELS.includes(role.model) ? MODELS : [...MODELS, role.model];
@@ -49,13 +50,13 @@ export function claudeControls(role: Role): ChatControls {
   return {
     models: models.map(choice),
     efforts: EFFORTS.map(choice),
-    modes: CLAUDE_MODES.filter((m) => m !== CLAUDE_FULL_ACCESS || start === CLAUDE_FULL_ACCESS).map(
-      (m): ControlChoice => {
-        const mode: ControlChoice = { value: m, label: MODE_LABELS[m] ?? m };
-        if (m === CLAUDE_FULL_ACCESS) mode.fullAccess = true;
-        return mode;
-      },
-    ),
+    modes: CLAUDE_MODES.filter(
+      (m) => (m !== CLAUDE_FULL_ACCESS || start === CLAUDE_FULL_ACCESS) && (m !== "auto" || role.autoOff !== true),
+    ).map((m): ControlChoice => {
+      const mode: ControlChoice = { value: m, label: MODE_LABELS[m] ?? m };
+      if (m === CLAUDE_FULL_ACCESS) mode.fullAccess = true;
+      return mode;
+    }),
   };
 }
 

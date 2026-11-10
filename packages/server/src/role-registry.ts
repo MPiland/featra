@@ -7,6 +7,7 @@
 import { join } from "node:path";
 import {
   BUILT_IN_ROLES,
+  AUTO_DISABLED_NOTE,
   BYPASS_DISABLED_NOTE,
   errorMessage,
   fitModel,
@@ -113,12 +114,20 @@ async function readRoleFiles(fs: RoleFs, dir: string): Promise<RoleFiles> {
 function runnable(role: Role, read: ModeRead): Role {
   const { model, note: modelNote } = fitModel(role.model);
   const { mode: own, note: roleNote, ...rest } = role;
-  const blocked = own?.fullAccess === true && read.bypassOff === true;
+  const noBypass = own?.fullAccess === true && read.bypassOff === true;
+  const noAuto = own?.name === "auto" && read.autoOff === true;
+  const blocked = noBypass || noAuto;
   const mode = blocked ? null : (own ?? read.mode);
-  const modeNote = blocked ? BYPASS_DISABLED_NOTE : own ? null : (read.note ?? null);
+  const modeNote = noBypass ? BYPASS_DISABLED_NOTE : noAuto ? AUTO_DISABLED_NOTE : own ? null : (read.note ?? null);
   const note = [roleNote, modelNote, modeNote].filter(Boolean).join(" ");
   // With no mode the role starts on Ask, which is how an absent mode reads.
-  return { ...rest, model, ...(mode && mode.level !== null ? { mode } : {}), ...(note ? { note } : {}) };
+  return {
+    ...rest,
+    model,
+    ...(mode && mode.level !== null ? { mode } : {}),
+    ...(read.autoOff === true ? { autoOff: true } : {}),
+    ...(note ? { note } : {}),
+  };
 }
 
 const BUILT_INS_ONLY: RoleRegistry = {

@@ -71,6 +71,9 @@ export function normalizeMode(raw: unknown): ModeInfo | null {
 /** Why a role starts on Ask when its mode is bypassPermissions but Claude's settings switch full access off. */
 export const BYPASS_DISABLED_NOTE = "Claude's settings turn off full access: starting on Ask.";
 
+/** Why a role starts on Ask when its mode is auto but Claude's settings remove auto mode. */
+export const AUTO_DISABLED_NOTE = "Claude's settings turn off auto mode: starting on Ask.";
+
 /** The mode for a value of Claude's `permissionMode` or `permissions.defaultMode`, or null when it isn't one of them. */
 export function claudeModeInfo(name: unknown, level: SettingsLevel): ModeInfo | null {
   if (!isOneOf(CLAUDE_MODES, name)) return null;

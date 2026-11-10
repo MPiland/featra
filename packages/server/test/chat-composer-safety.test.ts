@@ -35,11 +35,12 @@ const NO_BYPASS = JSON.stringify({ permissions: { disableBypassPermissionsMode: 
 const bypassAgent = "---\nname: bypassPermissions\npermissionMode: bypassPermissions\n---\nGo.";
 
 /** A project with a role that starts in full access, and a chat manager over it. */
-async function app(opts: { noBypass?: boolean; claude?: ReturnType<typeof fakeClaude> } = {}) {
+async function app(opts: { noBypass?: boolean; noAuto?: string; claude?: ReturnType<typeof fakeClaude> } = {}) {
   const w = await roleWorld();
   worlds.push(w);
   await w.put(w.dir, ".claude/agents/bypassPermissions.md", bypassAgent);
   if (opts.noBypass) await writeFile(w.managedFile, NO_BYPASS, "utf8");
+  if (opts.noAuto) await writeFile(w.managedFile, opts.noAuto, "utf8");
   const claude = opts.claude ?? fakeClaude();
   const manager = createChatManager({ providers: [createClaudeProvider(claude.deps)], roles: w.registry });
   managers.push(manager);
@@ -119,6 +120,55 @@ describe("full access is capped by the mode the chat started in", () => {
     await a.w.put(a.w.home, ".claude/settings.json", settings("plan"));
     const id = await a.start("qa");
     expect(await modes(a, id)).not.toContain("bypassPermissions");
+  });
+});
+
+describe("auto mode is offered, unless Claude's settings disable it (disableAutoMode)", () => {
+  const nested = JSON.stringify({ permissions: { disableAutoMode: "disable" } });
+  const topLevel = JSON.stringify({ disableAutoMode: "disable" });
+
+  it("is offered from the composer, and the user may pick it", async () => {
+    const a = await app();
+    const id = await a.start("qa");
+    expect(await modes(a, id)).toContain("auto");
+    expect((await a.manager.configure(id, { mode: "auto" })).settings.mode).toBe("auto");
+  });
+
+  it.each([
+    ["permissions.disableAutoMode", nested],
+    ["a top-level disableAutoMode", topLevel],
+  ])("is not offered or accepted when %s is set", async (_name, file) => {
+    const a = await app({ noAuto: file });
+    const id = await a.start("qa");
+    expect(await modes(a, id)).not.toContain("auto");
+    await expect(a.manager.configure(id, { mode: "auto" })).rejects.toThrow(CHAT_MESSAGES.badSetting);
+    // A role change doesn't bring it back either.
+    await a.manager.configure(id, { role: "developer" });
+    expect(await modes(a, id)).not.toContain("auto");
+  });
+
+  it("starts a role whose agent asks for auto in Ask, with a note", async () => {
+    const a = await app({ noAuto: nested });
+    await a.w.put(
+      a.w.dir,
+      ".claude/agents/autopilot.md",
+      ["---", "name: autopilot", "permissionMode: auto", "---", "Go."].join("\n"),
+    );
+    const role = await a.w.registry.get(a.w.dir, "claude:project:autopilot");
+    expect(role?.mode).toBeUndefined();
+    expect(role?.note).toContain("auto");
+    const id = await a.start("claude:project:autopilot");
+    expect((await a.manager.controls(id)).settings.mode).toBe("default");
+  });
+
+  it("starts in Ask, with a note, when Claude's own default mode is auto", async () => {
+    const a = await app({ noAuto: nested });
+    await a.w.put(a.w.home, ".claude/settings.json", settings("auto"));
+    const role = await a.w.registry.get(a.w.dir, "qa");
+    expect(role?.mode).toBeUndefined();
+    expect(role?.note).toContain("auto");
+    const id = await a.start("qa");
+    expect((await a.manager.controls(id)).settings.mode).toBe("default");
   });
 });
 
