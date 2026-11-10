@@ -1,8 +1,11 @@
 import { join } from "node:path";
+import { IPC } from "@featra/client/bridge";
 import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
+import { applyDockIcon } from "./app-icon.ts";
 import { allowedDirs, registerIpc } from "./ipc.ts";
 import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog } from "./log.ts";
+import { createNotifier } from "./notifier.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
 import { createServerProcess } from "./server-process.ts";
@@ -49,14 +52,17 @@ if (!app.requestSingleInstanceLock()) {
   // The local server makes every project write (ADR 0012, ADR 0015). It runs on Electron's own Node.
   const server = createServerProcess({
     script: join(app.getAppPath(), "dist", "server.cjs"),
+    mcpEntry: join(app.getAppPath(), "dist", "mcp.cjs"),
     execPath: process.execPath,
     log: (message) => log.info(message),
+    dataDir: app.getPath("userData"),
   });
   let win: BrowserWindow | undefined;
   let tray: Tray | undefined;
 
   void app.whenReady().then(async () => {
     if (process.platform === "win32") app.setAppUserModelId("dev.featra.app"); // notifications need it on Windows
+    applyDockIcon(app.dock, process.platform);
     setNativeMenu();
     const [remembered, hasTray, stored] = await Promise.all([
       appState.load(),
@@ -88,7 +94,39 @@ if (!app.requestSingleInstanceLock()) {
         tray = undefined;
       }
     };
+    // Desktop notifications for the requests that arrive (STORY-7). Held until closed, so none is collected early.
+    const shown = new Set<Notification>();
+    const inFront = () => !!win && !win.isDestroyed() && win.isVisible() && win.isFocused();
+    const notifier = createNotifier({
+      enabled: () => appSettings.notifications,
+      focused: () => (e2e ? (testHooks.focused ?? inFront()) : inFront()),
+      show: ({ title, body, click }) => {
+        if (e2e) {
+          const shownToast = { title, body, click };
+          testHooks.notifications.push(shownToast);
+          return {
+            close() {
+              const at = testHooks.notifications.indexOf(shownToast);
+              if (at >= 0) testHooks.notifications.splice(at, 1);
+            },
+          };
+        }
+        if (!Notification.isSupported()) return undefined;
+        const n = new Notification({ title, body });
+        shown.add(n);
+        n.on("click", click);
+        n.on("close", () => shown.delete(n));
+        n.show();
+        return { close: () => n.close() };
+      },
+      open: (chat, projectDir) => {
+        if (!win || win.isDestroyed()) return;
+        lifecycle.reveal(win);
+        win.webContents.send(IPC.notificationsOpenChat, { chat, project: projectDir });
+      },
+    });
     registerIpc({
+      notifier,
       store,
       lifecycle,
       log,

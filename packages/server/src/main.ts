@@ -6,6 +6,7 @@
 import { errorMessage } from "@featra/work-format";
 import { createAllowedProjects } from "./allowed-projects.ts";
 import { parseHostMessage, type ServerMessage } from "./host-messages.ts";
+import { nodeRoleFs } from "./role-fs.ts";
 import { createServices } from "./services.ts";
 import { startServer, type RunningServer } from "./ws-server.ts";
 
@@ -13,8 +14,16 @@ const send = (message: ServerMessage) => process.send?.(message);
 const log = (message: string) => send({ type: "log", message });
 
 const allowed = createAllowedProjects();
-const services = createServices({ allowed, log });
-const { api } = services;
+// The host names the app's data folder, where chats are saved (STORY-44).
+const services = createServices({
+  allowed,
+  log,
+  dataDir: process.env.FEATRA_DATA_DIR || undefined,
+  roleFs: nodeRoleFs(),
+  // The host names the Featra MCP's script, and runs it with the same runtime as this process (STORY-47).
+  mcpEntry: process.env.FEATRA_MCP_ENTRY || undefined,
+});
+const { api, agents } = services;
 let server: RunningServer | undefined;
 
 process.on("message", (raw) => {
@@ -26,9 +35,10 @@ process.on("message", (raw) => {
   switch (message.type) {
     case "start":
       if (server) return;
-      startServer({ token: message.token, api, log }).then(
+      startServer({ token: message.token, api, agents, log }).then(
         (running) => {
           server = running;
+          agents.setPort(running.port);
           send({ type: "listening", port: running.port });
         },
         (err: unknown) => send({ type: "failed", error: errorMessage(err) }),

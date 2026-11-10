@@ -92,12 +92,12 @@ describe("AC2: collapsing the sidebar", () => {
 });
 
 describe("AC3: sidebar entries", () => {
-  it("lists Work, Inbox, Artifacts, Plugins and Settings, under the project switcher (STORY-19)", () => {
+  it("lists New chat (STORY-5), then Work, Inbox, Artifacts, Plugins and Settings, under the project switcher (STORY-19)", () => {
     renderApp();
     const names = within(sidebar())
       .getAllByRole("button")
       .map((b) => b.getAttribute("aria-label") ?? b.textContent);
-    expect(names).toEqual(["Switch project: manager", ...ENTRIES]);
+    expect(names).toEqual(["Switch project: manager", "New chat", ...ENTRIES]);
   });
 
   it("reaches and opens every entry with Tab and Enter", async () => {
@@ -122,9 +122,9 @@ describe("AC3: sidebar entries", () => {
     expect(viewTitle().textContent).toBe("Artifacts");
   });
 
-  it("shows a placeholder for each view not built yet; Settings shows its pages (STORY-20), Work its list (STORY-3)", async () => {
+  it("shows a placeholder only for the views not built yet; Settings, Work and Inbox show their own pages: Settings its pages (STORY-20), Work its list (STORY-3), Inbox its empty state (STORY-7)", async () => {
     const { user } = renderApp();
-    for (const name of ENTRIES.filter((e) => e !== "Settings" && e !== "Work")) {
+    for (const name of ENTRIES.filter((e) => e !== "Settings" && e !== "Work" && e !== "Inbox")) {
       await user.click(within(sidebar()).getByRole("button", { name }));
       expect(within(screen.getByRole("main")).getByText(/will show here/)).toBeTruthy();
     }
@@ -134,5 +134,8 @@ describe("AC3: sidebar entries", () => {
     await user.click(within(sidebar()).getByRole("button", { name: "Work" }));
     expect(within(screen.getByRole("main")).queryByText(/will show here/)).toBeNull();
     expect(within(screen.getByRole("main")).getByRole("region", { name: "Work list" })).toBeTruthy();
+    await user.click(within(sidebar()).getByRole("button", { name: "Inbox" }));
+    expect(within(screen.getByRole("main")).queryByText(/will show here/)).toBeNull();
+    expect(within(screen.getByRole("main")).getByText("Nothing is waiting for you.")).toBeTruthy();
   });
 });

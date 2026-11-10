@@ -7,17 +7,27 @@ import { resolve } from "node:path";
 export interface AllowedProjects {
   set: (dirs: readonly string[]) => void;
   has: (dir: string) => boolean;
+  /** Calls `listener` after every change of the list; returns the stop. */
+  onChange: (listener: () => void) => () => void;
 }
 
-/** Folder names compare without case on Windows and macOS, as the project list does. */
+/** A project folder as it compares: resolved, and without case on Windows and macOS, as the project list does. */
+export const projectKey = (dir: string, platform: string = process.platform) =>
+  platform === "win32" || platform === "darwin" ? resolve(dir).toLowerCase() : resolve(dir);
+
 export function createAllowedProjects(platform: string = process.platform): AllowedProjects {
-  const caseless = platform === "win32" || platform === "darwin";
-  const key = (dir: string) => (caseless ? resolve(dir).toLowerCase() : resolve(dir));
+  const key = (dir: string) => projectKey(dir, platform);
   let dirs = new Set<string>();
+  const listeners = new Set<() => void>();
   return {
     set: (next) => {
       dirs = new Set(next.map(key));
+      for (const listener of listeners) listener();
     },
     has: (dir) => dirs.has(key(dir)),
+    onChange: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
   };
 }

@@ -25,13 +25,15 @@ import {
 import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
 import type { Card } from "@featra/work-format";
 import { fakeCardServer } from "./card-server.ts";
+import { fakeChatServer, type ChatHost } from "./chat-server.ts";
+import { fakeRolesServer, type RolesHost } from "./roles-server.ts";
 import type { CopyActionResult } from "@featra/work-format/protocol";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
 /** Where New Project… suggests a folder by default. */
 export const LOCATION = "/home/me";
 
-export interface HostOptions {
+export interface HostOptions extends ChatHost, RolesHost {
   closeToTray?: CloseToTraySupport;
   /** The current project, or null for none. Default: PROJECT. */
   project?: ProjectRef | null;
@@ -100,6 +102,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   let windowState: WindowState = { ...DEFAULT_WINDOW_STATE };
   const listeners = new Set<(s: WindowState) => void>();
   let releaseWrites: () => void = noop;
+  let openChat: (chat: string, project?: string) => void = noop;
   const writesReleased = new Promise<void>((r) => (releaseWrites = r));
   // The project folders on disk, as the server sees them: git init and Featra init move a folder to the next state.
   const setupOnDisk = new Map(Object.entries(host.setup ?? {}));
@@ -110,6 +113,8 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   const cards = fakeCardServer(host.cards ?? {}, calls, (dir, next) => {
     for (const l of watchers.get(dir) ?? []) l({ list: next, error: null });
   });
+  const chats = fakeChatServer(calls, host);
+  const roles = fakeRolesServer(calls, host);
   const listOf = (dir: string) => cards.listOf(dir) ?? workLists.get(dir) ?? EMPTY_WORK_LIST;
   const bridge: FeatraBridge = {
     platform,
@@ -207,6 +212,16 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       ...cards.bridge,
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.
+    chats: chats.bridge,
+    roles: roles.bridge,
+    inbox: chats.inbox.bridge,
+    notifications: {
+      asked: (item) => void calls.push(`notify:${item.chat}:${item.request.id}`),
+      onOpenChat: (listener) => {
+        openChat = listener;
+        return () => void (openChat = noop);
+      },
+    },
     edit: (command) => void calls.push(`edit:${command}:${(document.activeElement as HTMLElement | null)?.id ?? ""}`),
     app: {
       info: async () => ({ name: "Featra", version: "1.2.3" }),
@@ -237,6 +252,8 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     bridge,
     pushWork,
     pushCard,
+    chats,
+    roles,
     cardsIn: cards.cardsIn,
     watchingCards: cards.watching,
     /** How many watches are open on `dir`. */
@@ -248,6 +265,8 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     list,
     setWindowState,
     releaseWrites: () => act(async () => releaseWrites()),
+    /** The user clicks a desktop notification: the host tells the page which chat it named. */
+    clickNotification: (chat: string, dir?: string) => act(() => openChat(chat, dir)),
   };
 }
 

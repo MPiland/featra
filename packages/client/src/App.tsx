@@ -9,6 +9,12 @@ import {
   type UiState,
   type WindowState,
 } from "./bridge.ts";
+import { CHAT_COPY, type ChatRoleRef } from "./chats.ts";
+import { ChatList, useChats } from "./components/chat/ChatList.tsx";
+import { ChatPane } from "./components/chat/ChatView.tsx";
+import { NewChatDialog } from "./components/chat/NewChatDialog.tsx";
+import { InboxView } from "./components/inbox/InboxView.tsx";
+import { useInboxApp } from "./components/inbox/useInboxApp.ts";
 import { Dialog } from "./components/Dialog.tsx";
 import { ProjectSwitcher } from "./components/ProjectSwitcher.tsx";
 import { SettingsView } from "./components/settings/SettingsView.tsx";
@@ -16,12 +22,24 @@ import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { useProjects } from "./components/useProjects.tsx";
 import { useProjectSetup } from "./components/useProjectSetup.tsx";
+import { useShortcuts } from "./components/useShortcuts.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
-import { canGoBack, canGoForward, currentView, goBack, goForward, initialNav, navigate } from "./navigation.ts";
+import {
+  canGoBack,
+  canGoForward,
+  chatEntry,
+  currentView,
+  entryChat,
+  entryView,
+  goBack,
+  goForward,
+  initialNav,
+  leaveChats,
+  navigate,
+} from "./navigation.ts";
 import { firstSettingsPage, type SettingsPage } from "./settings-pages.ts";
-import { matchShortcut, type AppShortcut } from "./shortcuts.ts";
 import { applyTheme } from "./theme.ts";
 import { viewDef, type ViewId } from "./views.ts";
 import { DEFAULT_ZOOM, zoomIn, zoomOut } from "./zoom.ts";
@@ -33,10 +51,7 @@ export interface AppProps {
   initialProjects: ProjectsSnapshot;
 }
 
-type OpenDialog = "about" | "resetAppData" | null;
-
-/** Shortcuts a plain browser tab keeps for itself: it has no window to close and no folders to open. */
-const WEB_KEEPS: ReadonlySet<AppShortcut> = new Set(["fullScreen", "closeWindow", "newProject", "openFolder"]);
+type OpenDialog = "about" | "resetAppData" | "newChat" | null;
 
 const sameUiState = (a: UiState, b: UiState) =>
   a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor && a.cardPaneWidth === b.cardPaneWidth;
@@ -50,7 +65,9 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   const [settings, setSettings] = useState(initialSettings);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>(() => firstSettingsPage(initialSettings));
   const saved = useRef(initialUiState);
-  const view = viewDef(currentView(nav));
+  const entry = currentView(nav);
+  const chatId = entryChat(entry);
+  const view = viewDef(entryView(entry) ?? "work");
   const collapsed = ui.sidebarCollapsed;
 
   const toggleSidebar = useCallback(() => {
@@ -61,6 +78,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     setUi((s) => ({ ...s, sidebarCollapsed: !s.sidebarCollapsed }));
   }, []);
   const open = useCallback((v: ViewId) => setNav((n) => navigate(n, v)), []);
+  const openChat = useCallback((id: string) => setNav((n) => navigate(n, chatEntry(id))), []);
   const setZoom = useCallback((f: (z: number) => number) => setUi((s) => ({ ...s, zoomFactor: f(s.zoomFactor) })), []);
   const setPaneWidth = useCallback((w: number) => setUi((s) => ({ ...s, cardPaneWidth: w })), []);
   const back = useCallback(() => setNav(goBack), []);
@@ -81,7 +99,19 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     actions: projectActions,
     dialog: projectDialog,
   } = useProjects(bridge, initialProjects, projectSettings);
-  const { setupPage, openSetup } = useProjectSetup(bridge, projects.current?.dir ?? null, settings.app.work);
+  const projectDir = projects.current?.dir ?? null;
+  const { setupPage, openSetup } = useProjectSetup(bridge, projectDir, settings.app.work);
+  const { list: chatList, chat, remember } = useChats(bridge.chats, projectDir, chatId, () => setNav(leaveChats));
+  // Requests of every open project that have waited past the Inbox wait (STORY-7), and a notification for each as it
+  // arrives. Opening one switches to its project first.
+  const inbox = useInboxApp(bridge, settings.app.inboxWaitMinutes, projectDir, projectActions.switchTo, openChat);
+  const startedChat = (id: string, role: ChatRoleRef) => {
+    setDialog(null);
+    remember(id, role);
+    openChat(id);
+  };
+  const title = chatId === null ? view.title : (chat?.role.name ?? CHAT_COPY.transcript);
+  const hasProject = projects.current !== null;
   // Project settings > Set up project: the page shows in Work, on that project.
   const reopenSetup = useCallback(
     (dir: string) => {
@@ -103,6 +133,8 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   const actions: MenuActions = useMemo(
     () => ({
       ...projectActions,
+      // Without a project there is nowhere to start a chat: Work offers to open or create one.
+      newChat: () => (hasProject ? setDialog("newChat") : open("work")),
       openSettings: () => open("settings"),
       showKeyboardShortcuts,
       closeWindow: () => bridge.window.close(),
@@ -123,7 +155,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
       resetAppData: () => setDialog("resetAppData"),
       showAbout: () => setDialog("about"),
     }),
-    [bridge, projectActions, open, showKeyboardShortcuts, toggleSidebar, setZoom, back, forward],
+    [bridge, projectActions, hasProject, open, showKeyboardShortcuts, toggleSidebar, setZoom, back, forward],
   );
   const menu = useMemo(
     () =>
@@ -167,44 +199,18 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     if (dialog === "about" && !info) void bridge.app.info().then(setInfo);
   }, [bridge, dialog, info]);
 
-  useEffect(() => {
-    const run: Record<AppShortcut, () => void> = {
-      settings: actions.openSettings,
-      keyboardShortcuts: actions.showKeyboardShortcuts,
-      newProject: actions.newProject,
-      openFolder: actions.openFolder,
-      projectSettings: actions.projectSettings,
-      closeWindow: actions.closeWindow,
-      toggleSidebar: actions.toggleSidebar,
-      zoomReset: actions.zoomReset,
-      zoomIn: actions.zoomIn,
-      zoomOut: actions.zoomOut,
-      fullScreen: actions.toggleFullScreen,
-      reload: actions.reload,
-      back: actions.back,
-      forward: actions.forward,
-    };
-    const onKey = (e: KeyboardEvent) => {
-      const shortcut = matchShortcut(e, bridge.platform);
-      if (!shortcut) return;
-      if (bridge.platform === "web" && WEB_KEEPS.has(shortcut)) return;
-      e.preventDefault();
-      run[shortcut]();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [bridge, actions]);
+  useShortcuts(bridge.platform, actions);
 
   useEffect(() => {
-    document.title = `Featra · ${view.title}`;
-  }, [view.title]);
+    document.title = `Featra · ${title}`;
+  }, [title]);
 
   return (
     <>
       <div className="shell" inert={dialog !== null || projectDialog !== null}>
         <TitleBar
           bridge={bridge}
-          title={view.title}
+          title={title}
           project={projects.current?.name}
           sidebarCollapsed={collapsed}
           onToggleSidebar={toggleSidebar}
@@ -218,13 +224,19 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
         <div className={collapsed ? "app collapsed" : "app"}>
           <Sidebar
             collapsed={collapsed}
-            current={view.id}
+            current={chatId === null ? view.id : null}
             onOpen={open}
             project={projects.current}
+            platform={bridge.platform}
+            onNewChat={() => setDialog("newChat")}
+            chats={<ChatList list={chatList} current={chatId} onOpen={openChat} />}
+            counts={{ inbox: inbox.items.length }}
             switcher={<ProjectSwitcher projects={projects} platform={bridge.platform} actions={projectActions} />}
           />
           <main aria-labelledby="view-title">
-            {view.id === "settings" ? (
+            {chatId !== null ? (
+              <ChatPane chats={bridge.chats} chat={chat} dir={projectDir ?? ""} onStarted={startedChat} />
+            ) : view.id === "settings" ? (
               <SettingsView
                 bridge={bridge}
                 snapshot={settings}
@@ -245,6 +257,13 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
                 setupPage={setupPage}
               />
+            ) : view.id === "inbox" ? (
+              <InboxView
+                items={inbox.items}
+                projects={projects.projects}
+                chats={bridge.chats}
+                onOpenChat={inbox.openChatIn}
+              />
             ) : (
               <ViewPlaceholder view={view} />
             )}
@@ -252,6 +271,14 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
         </div>
       </div>
       {projectDialog}
+      {dialog === "newChat" && projects.current && (
+        <NewChatDialog
+          chats={bridge.chats}
+          dir={projects.current.dir}
+          onClose={() => setDialog(null)}
+          onStarted={startedChat}
+        />
+      )}
       {dialog === "about" && (
         <Dialog title="About Featra" onClose={() => setDialog(null)}>
           <p className="about-name">{info?.name ?? "Featra"}</p>

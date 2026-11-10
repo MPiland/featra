@@ -4,6 +4,14 @@
  * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
  */
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
+import type { ApprovalChoice } from "./approvals.ts";
+import type { Answers } from "./questions.ts";
+import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
+import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
+import type { ChatList } from "./chat-list.ts";
+import type { Inbox, InboxItem } from "./inbox.ts";
+import type { Role } from "./roles.ts";
+import type { RoleEdit, RoleEditResult, RoleList } from "./role-edit.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 import type { WorkList } from "./work-list-types.ts";
@@ -57,6 +65,64 @@ export interface ServerMethods {
   "card.watch": { params: { dir: string; id: string }; result: CardView | null };
   /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
+  /** The roles a chat in this project can start from (ADR 0018). */
+  "chat.roles": { params: { dir: string }; result: Role[] };
+  /**
+   * The project's roles with the files that couldn't be read (STORY-6); then, until `work.unwatch`, a `roles.list`
+   * push each time a role file or a provider's agent file or settings change. The request's id names the watch.
+   */
+  "roles.watch": { params: { dir: string }; result: RoleList };
+  /** Applies one edit to the project's roles, writing only `.featra/roles/`; answers with the role it made or why not. */
+  "roles.edit": { params: { dir: string; edit: RoleEdit }; result: RoleEditResult };
+  /** Starts a chat from a role in the project folder; answers with its id. Its agent starts with the first message. */
+  "chat.start": { params: { dir: string; role: string; card?: string }; result: { id: string } };
+  /**
+   * The chat's event log so far; then, until `work.unwatch`, a `chat.event` push for each new event. The request's id
+   * names the watch.
+   */
+  "chat.watch": { params: { id: string }; result: ChatSnapshot };
+  /** The chat's composer controls under its provider's own names, and the settings it runs with (STORY-22). */
+  "chat.controls": { params: { id: string }; result: ChatControlState };
+  /** Changes the chat's role, model, effort or permission mode from its next turn; answers with the new state. */
+  "chat.configure": { params: { id: string; change: SettingsChange }; result: ChatControlState };
+  /** Sends the user's message: starts a turn. */
+  "chat.send": { params: { id: string; text: string }; result: null };
+  /** Interrupts the running turn. */
+  "chat.stop": { params: { id: string }; result: null };
+  /**
+   * Answers the tool request the chat waits on (STORY-45): Allow, Allow for this chat, or Deny with an optional
+   * reason the agent is sent. Refused when the request isn't waiting.
+   */
+  "chat.approve": {
+    params: { id: string; tool: string; choice: ApprovalChoice; reason?: string };
+    result: null;
+  };
+  /**
+   * Answers the question the chat waits on (STORY-46): for each question's text, what the user chose. Refused when the
+   * question isn't waiting, or the answers don't answer each question as it asks.
+   */
+  "chat.answer": { params: { id: string; tool: string; answers: Answers }; result: null };
+  /**
+   * Takes an entry an agent logged (STORY-47) back out of its file: only that entry, whatever was logged since. Refused
+   * when the entry is already removed or the user has edited it.
+   */
+  "chat.undoLog": { params: { id: string; entry: string }; result: null };
+  /**
+   * The project's chats and the providers they group under (STORY-21); then, until `work.unwatch`, a `chat.list` push
+   * each time a row changes. The request's id names the watch.
+   */
+  "chat.list": { params: { dir: string }; result: ChatList };
+  /**
+   * The approvals and questions (of one project, or of every open one without `dir`) that have waited on the user at least `waitMs` on the server's clock, oldest
+   * first (STORY-7); then, until `work.unwatch`, an `inbox.list` push each time that set changes. The request's id names
+   * the watch.
+   */
+  "inbox.watch": { params: { dir?: string; waitMs: number }; result: Inbox };
+  /**
+   * Nothing, then until `work.unwatch` an `inbox.asked` push as soon as a chat of the project asks for an approval or an
+   * answer, whatever the wait (STORY-7): what a desktop notification is made from. The request's id names the watch.
+   */
+  "inbox.asked": { params: { dir?: string }; result: null };
 }
 
 /** Frames the server sends unasked, and the data each carries. */
@@ -65,10 +131,28 @@ export interface ServerPushes {
   "work.list": WorkList;
   /** The watched card changed: the whole new view, or null when the card is gone. */
   "card.view": CardView | null;
+  /** A watched chat has a new event. */
+  "chat.event": ChatEvent;
+  /** A role file or a provider's agent file or settings changed: the whole new list. */
+  "roles.list": RoleList;
+  /** A row of the watched chat list changed, or a chat came or went: the whole new list. */
+  "chat.list": ChatList;
+  /** The Inbox changed: the whole new Inbox, for the watch the frame names. */
+  "inbox.list": Inbox;
+  /** A chat asked for an approval or an answer just now. */
+  "inbox.asked": InboxItem;
 }
 
 export type PushEvent = keyof ServerPushes;
-const PUSH_EVENTS: readonly PushEvent[] = ["work.list", "card.view"];
+const PUSH_EVENTS: readonly PushEvent[] = [
+  "work.list",
+  "card.view",
+  "chat.event",
+  "chat.list",
+  "roles.list",
+  "inbox.list",
+  "inbox.asked",
+];
 
 /**
  * A pushed frame: `{ event, watch, data }`. It never has an `id`, so neither end can take it for an answer, and a
@@ -93,6 +177,21 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "work.discardCopy",
   "card.watch",
   "card.update",
+  "chat.roles",
+  "roles.watch",
+  "roles.edit",
+  "chat.start",
+  "chat.watch",
+  "chat.controls",
+  "chat.configure",
+  "chat.send",
+  "chat.stop",
+  "chat.approve",
+  "chat.answer",
+  "chat.undoLog",
+  "chat.list",
+  "inbox.watch",
+  "inbox.asked",
 ];
 
 export interface ServerRequest {

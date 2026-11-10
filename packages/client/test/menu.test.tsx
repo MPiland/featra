@@ -14,6 +14,7 @@ describe("AC5: app menu", () => {
 
     await user.hover(item("File"));
     expect(labels(menuAt(1))).toEqual([
+      "New ChatCtrl+N",
       "New Project…Ctrl+Shift+N",
       "Open Folder…Ctrl+O",
       "Project Settings…Ctrl+Shift+,",
@@ -79,6 +80,7 @@ describe("AC5: app menu", () => {
     const { user } = renderApp({ platform: "darwin" });
     await openPath(user, "File");
     expect(labels(menuAt(1))).toEqual([
+      "New Chat⌘N",
       "New Project…⇧⌘N",
       "Open Folder…⌘O",
       "Project Settings…⇧⌘,",
@@ -107,6 +109,7 @@ describe("AC5: app menu", () => {
     const { user } = renderApp({ platform: "linux" });
     await openPath(user, "File");
     expect(labels(menuAt(1))).toEqual([
+      "New ChatCtrl+N",
       "New Project…Ctrl+Shift+N",
       "Open Folder…Ctrl+O",
       "Project Settings…Ctrl+Shift+,",
@@ -180,8 +183,8 @@ describe("AC5: app menu", () => {
   it("runs an item with Enter and with Space", async () => {
     const { user } = renderApp();
     menuButton().focus();
-    // File > Settings…, after New Project…, Open Folder… and Project Settings… (the separator is skipped).
-    await user.keyboard("{ArrowDown}{ArrowRight}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}");
+    // File > Settings…, after New Chat, New Project…, Open Folder… and Project Settings… (separators are skipped).
+    await user.keyboard("{ArrowDown}{ArrowRight}{ArrowDown}{ArrowDown}{ArrowDown}{ArrowDown}{Enter}");
     expect(viewTitle().textContent).toBe("Settings");
     expect(menus()).toHaveLength(0);
     expect(document.activeElement).toBe(menuButton());

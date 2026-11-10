@@ -95,7 +95,7 @@ test.describe("STORY-19: switch, create and open projects", () => {
       await page.getByRole("button", { name: "Menu" }).click();
       await page.getByRole("menuitem", { name: "File", exact: true }).hover();
       const file = page.getByRole("menu").nth(1);
-      expect((await menuLabels(file)).slice(0, 4)).toEqual([
+      expect((await menuLabels(file)).slice(1, 5)).toEqual([
         "New Project…Ctrl+Shift+N",
         "Open Folder…Ctrl+O",
         "Project Settings…Ctrl+Shift+,",

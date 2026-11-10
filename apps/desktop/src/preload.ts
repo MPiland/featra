@@ -10,6 +10,9 @@ import {
   normalizeSettingsSnapshot,
   normalizeUiState,
   normalizeWindowState,
+  serverChats,
+  serverInbox,
+  serverRoles,
   serverSetup,
   serverWork,
   type FeatraBridge,
@@ -65,6 +68,20 @@ const bridge: FeatraBridge = {
   },
   setup: serverSetup(server),
   work: serverWork(server),
+  chats: serverChats(server),
+  roles: serverRoles(server),
+  inbox: serverInbox(server),
+  notifications: {
+    asked: (item) => ipcRenderer.send(IPC.notificationsAsked, item),
+    onOpenChat: (listener) => {
+      const handler = (_e: unknown, target: unknown) => {
+        const { chat, project } = (target ?? {}) as { chat?: unknown; project?: unknown };
+        if (typeof chat === "string") listener(chat, typeof project === "string" ? project : undefined);
+      };
+      ipcRenderer.on(IPC.notificationsOpenChat, handler);
+      return () => void ipcRenderer.removeListener(IPC.notificationsOpenChat, handler);
+    },
+  },
   edit: (command) => ipcRenderer.send(IPC.edit, command),
   app: {
     info: () => ipcRenderer.invoke(IPC.appInfo),
