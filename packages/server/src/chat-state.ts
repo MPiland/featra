@@ -1,5 +1,14 @@
 /** The state the session manager keeps for each chat (ADR 0018). */
-import { idleSummary, type Ask, type ChatEvent, type ChatSummary, type ModeInfo } from "@featra/work-format";
+import {
+  idleSummary,
+  type Ask,
+  type ChatEvent,
+  type ChatSettings,
+  type ChatSummary,
+  type ModeInfo,
+  type Role,
+  type SavedComposer,
+} from "@featra/work-format";
 import type { ProviderSession } from "./provider.ts";
 
 export type { Chat };
@@ -25,6 +34,17 @@ interface Chat {
   /** Why it can't take a message without an agent: its role or provider is missing. */
   refusal: string | null;
   running: boolean;
+  /** The role its agent runs as now, and what the composer last chose (STORY-22); null before its agent is made. */
+  role: Role | null;
+  settings: ChatSettings | null;
+  /** The chat started in full access, so the composer may offer it again; never true for a chat that didn't. */
+  fullAccess: boolean;
+  /** The model's window the last turn reported (null: none, or the model changed since); saved with the chat. */
+  window: number | null;
+  /** What the chat was saved with, until its agent is made from it. */
+  kept: SavedComposer | null;
+  /** Composer changes run one after another, so a change made while another waits on a role lookup is not overwritten. */
+  changing: Promise<unknown>;
   /** The mode and note its role gave it when its agent was made (STORY-6): what the composer shows. */
   mode: ModeInfo | null;
   note: string | null;
@@ -33,7 +53,13 @@ interface Chat {
 }
 
 /** A chat not yet opened: a saved one, or a new one before its log and agent are made. */
-const restored = (id: string, dir: string, summary: ChatSummary, session: string | null): Chat => ({
+const restored = (
+  id: string,
+  dir: string,
+  summary: ChatSummary,
+  session: string | null,
+  kept: SavedComposer | null = null,
+): Chat => ({
   id,
   dir,
   summary: idleSummary(summary),
@@ -46,6 +72,12 @@ const restored = (id: string, dir: string, summary: ChatSummary, session: string
   agent: null,
   refusal: null,
   running: false,
+  role: null,
+  settings: null,
+  fullAccess: false,
+  window: kept?.window ?? null,
+  kept,
+  changing: Promise.resolve(),
   mode: null,
   note: null,
   closed: false,

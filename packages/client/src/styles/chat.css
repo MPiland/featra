@@ -322,3 +322,41 @@
 .chat-log-row .chat-error {
   flex-basis: 100%;
 }
+
+/* STORY-22: the composer's controls and the context meter, in a row over the box. */
+.composer-above {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.composer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.context-meter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--tx3);
+  font-size: 12px;
+}
+
+.context-bar {
+  width: 80px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--row);
+  overflow: hidden;
+}
+
+.context-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--tx2);
+}

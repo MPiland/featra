@@ -88,3 +88,46 @@ describe("the chat calls", () => {
     expect(await started).toEqual({ ok: false, error: "No such role." });
   });
 });
+
+describe("chat.controls and chat.configure over the client", () => {
+  const state = {
+    controls: { models: [{ value: "opus", label: "opus" }], efforts: [], modes: [] },
+    settings: { role: "qa", model: "opus", effort: "high", mode: "default" },
+  };
+
+  it("reads the controls and the settings a change answers", async () => {
+    const s = setup();
+    const chats = serverChats(s.client);
+    const controls = chats.controls("c9");
+    const ws = await s.socket();
+    ws.open();
+    await expect.poll(() => ws.sent.length).toBe(1);
+    ws.answer({ id: 1, ok: true, result: state });
+    expect(await controls).toEqual({ ok: true, state });
+
+    const changed = chats.configure("c9", { model: "opus" });
+    await expect.poll(() => ws.sent.length).toBe(2);
+    ws.answer({ id: 2, ok: true, result: state });
+    expect(await changed).toEqual({ ok: true, state });
+    expect(ws.sent.map((f) => [f.method, f.params])).toEqual([
+      ["chat.controls", { id: "c9" }],
+      ["chat.configure", { id: "c9", change: { model: "opus" } }],
+    ]);
+  });
+
+  it("turns a refusal, or an answer without settings, into a message", async () => {
+    const s = setup();
+    const chats = serverChats(s.client);
+    const refused = chats.configure("c9", { model: "gpt-5" });
+    const ws = await s.socket();
+    ws.open();
+    await expect.poll(() => ws.sent.length).toBe(1);
+    ws.answer({ id: 1, ok: false, error: "The agent doesn't offer that." });
+    expect(await refused).toEqual({ ok: false, error: "The agent doesn't offer that." });
+
+    const empty = chats.controls("c9");
+    await expect.poll(() => ws.sent.length).toBe(2);
+    ws.answer({ id: 2, ok: true, result: {} });
+    expect(await empty).toEqual({ ok: false, error: "No settings." });
+  });
+});

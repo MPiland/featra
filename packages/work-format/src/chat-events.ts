@@ -4,6 +4,7 @@
  * neutral, so a Codex or ACP adapter (M2) feeds the same view.
  */
 import type { AllowScope } from "./approvals.ts";
+import { normalizeUsage } from "./chat-controls.ts";
 import { LOG_FILES, type LogFile } from "./log-files.ts";
 import { normalizeMode, type ModeInfo } from "./modes.ts";
 import { isStrings, normalizeQuestions, type Answers, type Question } from "./questions.ts";
@@ -59,6 +60,11 @@ export type ChatEvent =
   | { type: "logged"; entry: string; file: LogFile; summary: string }
   /** The user took a logged entry back out of its file. */
   | { type: "log-undone"; entry: string }
+  /**
+   * The context in use after a turn (STORY-22), read from the agent session's own events, never asked of the model.
+   * `window` is the model's window when the provider reported it, else null: Featra doesn't guess one.
+   */
+  | { type: "usage"; used: number; window: number | null }
   | { type: "turn-end"; outcome: TurnOutcome }
   | { type: "problem"; problem: ChatProblem };
 
@@ -156,6 +162,10 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
       return nonEmpty(raw.id) && str(raw.output)
         ? { type: "tool-result", id: raw.id, output: raw.output, isError: raw.isError === true }
         : null;
+    case "usage": {
+      const usage = normalizeUsage(raw.used, raw.window);
+      return usage ? { type: "usage", ...usage } : null;
+    }
     case "turn-end":
       return isOneOf(OUTCOMES, raw.outcome) ? { type: "turn-end", outcome: raw.outcome } : null;
     case "problem": {
@@ -214,6 +224,10 @@ export const CHAT_MESSAGES = {
   noEntry: "That entry is already removed.",
   /** Undo of an entry the user changed in the file: it stays, as the user left it. */
   editedEntry: "That entry was edited. Remove it from the file yourself.",
+  /** A setting the composer changed that its provider doesn't offer. */
+  badSetting: "The agent doesn't offer that.",
+  /** A role change to a role that runs on another agent. */
+  otherAgent: "That role runs on another agent.",
   /** An answer to a tool request that isn't waiting: already answered, cancelled, or never asked. */
   noRequest: "This request isn't waiting for an answer.",
   /** Allow for this chat, for a call the agent says may only be allowed once. */

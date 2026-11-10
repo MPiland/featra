@@ -49,6 +49,8 @@ export interface Role {
   description?: string;
   /** The mode a chat from it starts in, read live from the provider's settings (STORY-6); Ask when absent. */
   mode?: ModeInfo;
+  /** Claude's settings remove auto mode, so a chat from this role is not offered it (`disableAutoMode`). */
+  autoOff?: boolean;
   /** One line on how the role was adjusted to run, such as a model Claude doesn't have. */
   note?: string;
 }

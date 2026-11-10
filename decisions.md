@@ -952,3 +952,52 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   an object on every platform), so General, with Inbox wait and Notifications, is always reachable there. It is hidden
   only in a plain browser tab, which has no desktop notifications. When remote control (M2) brings the client to a
   browser, the Inbox wait must get a page of its own there.
+
+## 2026-11-09 — STORY-22: composer controls and context meter
+
+- **A change restarts the agent on the next send, resuming the same session; a running turn is untouched.** Why: the
+  SDK takes model, effort and permission mode when the agent starts, so the supported way to change them is a new agent
+  with `resume`. A change that leaves the settings as they were keeps the agent (ADR 0020).
+- **Claude's `default` mode is labelled "default (Ask)".** Why: each provider's own names are used (earlier decision),
+  and the label ties Claude's name to Featra's Ask.
+- **Full access has a ceiling: the mode the chat started in. A chat that didn't start in full access never reaches it,
+  by a mode pick, a role change, or a saved file.** Why: a role whose settings start in `bypassPermissions` would have
+  carried full access into a chat the user was asked about. A role change into such a role leaves the chat in the
+  first mode the adapter lists (Ask for Claude). `disableBypassPermissionsMode` already downgrades such a role's start
+  mode, so the composer honours it the same way. Review fix.
+- **Changing the role resets model, effort and mode to the new role's, and the user's other choices in the same change
+  apply over them; a role of another provider is refused ("That role runs on another agent.").** Why: a role is a
+  prompt plus its settings, and a chat has one agent.
+- **The server refuses a model, effort or mode the adapter doesn't list ("The agent doesn't offer that.").** Why: the
+  adapter's controls are the one source of what is valid.
+- **Usage is the last main-thread assistant message's input, cache and output tokens; the window is the result's
+  `modelUsage` entry for the session's model, else the only entry, else null.** Why: the last message holds the context
+  the next turn starts from; a subagent's or a second model's numbers aren't the chat's. Featra never guesses a window.
+- **A `usage` event comes before `turn-end`; a restored chat reads usage from its history, without a window.** Why: the
+  meter updates as the turn ends, and history has no `modelUsage`.
+- **`chat.controls` and `chat.configure` are their own methods, not part of `chat.watch`.** Why: the watch snapshot is
+  the event log (a test asserts it), and settings are not events.
+- **The header shows what the chat runs with once a setting has been changed in the composer.** Why: it must agree with
+  the controls; until then it shows what it always did.
+- **The meter is hidden until the first usage, and has no `role="status"`.** Why: an empty meter says nothing, and the
+  composer's full-access warning is the one status there.
+- **The composer's settings and last window are saved with the chat in `chats.json`, only when they differ from the
+  role's start or a window is known.** Why: a reopened or restarted chat keeps its choices and its meter shows the
+  window at once; saving nothing for an untouched chat keeps old entries and tests valid. A saved mode or role that no
+  longer fits what the provider offers falls back to the role's start, within the ceiling. Review fix.
+- **The chat-list row shows the chat's effective model and effort, not the role's.** Why: it must agree with what the
+  chat runs with. Review fix.
+- **Changing the model drops the saved window; the meter shows tokens only until the next turn reports the new one.**
+  Why: the window was the old model's and Featra never guesses. The meter in an open client may show the old window
+  until then. Review fix.
+- **Composer changes to one chat run one after another.** Why: a role change waits on a role lookup, and a model or
+  effort change made meanwhile must not be overwritten by it. Review fix.
+- **The Claude adapter takes its start settings before its first await.** Why: a change made while the agent is
+  starting then differs from what it started with, so the next send replaces it, without relying on sends being blocked.
+  Review fix.
+- **`auto` mode is offered from the composer; the user picks it explicitly, unless Claude's `disableAutoMode` is set.**
+  Why: unlike full access it still decides per action and the user chose it. Claude's docs give
+  `permissions.disableAutoMode: "disable"` (the settings index lists it top-level; both are read), honoured through the
+  same layers as `disableBypassPermissionsMode`: no `auto` in the controls, and a role or default mode of `auto` starts
+  on Ask with the note "Claude's settings turn off auto mode: starting on Ask." Review fix.
+- **`contextTokens` includes the last turn's output tokens.** Why: the output is part of the next turn's context. Review fix.

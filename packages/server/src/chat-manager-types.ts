@@ -2,12 +2,14 @@
 import type {
   Answers,
   ApprovalAnswer,
+  ChatControlState,
   ChatEvent,
   ChatSummary,
   Inbox,
   InboxItem,
   ModeInfo,
   ProviderInfo,
+  SettingsChange,
 } from "@featra/work-format";
 import type { ChatStore } from "./chat-store.ts";
 import type { Timers } from "./inbox.ts";
@@ -34,6 +36,14 @@ export interface ChatManager {
     id: string,
     listener: (event: ChatEvent) => void,
   ) => { events: ChatEvent[]; mode: ModeInfo | null; note: string | null; stop: () => void };
+  /** The chat's composer controls under its provider's own names, and the settings it runs with (STORY-22). */
+  controls: (id: string) => Promise<ChatControlState>;
+  /**
+   * Changes the chat's role, model, effort or permission mode from its next turn: a turn that is running goes on as it
+   * was. A new role brings its own model, effort and mode, and the rest of the change is applied over them. Refused
+   * for a value the chat's provider doesn't offer.
+   */
+  configure: (id: string, change: SettingsChange) => Promise<ChatControlState>;
   send: (id: string, text: string) => void;
   /** Interrupts the running turn, if any. */
   stop: (id: string) => Promise<void>;

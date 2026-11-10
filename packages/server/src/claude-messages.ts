@@ -15,6 +15,11 @@ export interface ClaudeTranslator {
   newTurn: () => void;
   /** The user pressed Stop during the running turn: its result reads as stopped, not failed. */
   interrupted: () => void;
+  /**
+   * The context the last assistant message of the turn put in use, as a `usage` event with no window (history has no
+   * result to name one); null when the turn had none. Read from the messages' own `usage`: no tokens are spent.
+   */
+  turnUsage: () => ChatEvent | null;
   /** The session id the agent reported, once it has. */
   sessionId: () => string | null;
 }
@@ -46,6 +51,35 @@ function toolResults(message: Record<string, unknown>): ChatEvent[] {
   );
 }
 
+const count = (value: unknown): number =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? value : 0;
+
+/**
+ * The tokens an assistant message's `usage` puts in the context: what the model read (new input, cache reads and
+ * cache writes) and wrote. The last main-conversation message of a turn is the context the next turn starts from.
+ */
+function contextTokens(usage: unknown): number | null {
+  if (!isRecord(usage)) return null;
+  const total =
+    count(usage.input_tokens) +
+    count(usage.cache_read_input_tokens) +
+    count(usage.cache_creation_input_tokens) +
+    count(usage.output_tokens);
+  return total > 0 ? total : null;
+}
+
+/**
+ * The model's context window, from the result's `modelUsage` (keyed by model id): the entry for the session's model, or
+ * the only entry. Anything else (several models, none named like the session's) gives null: Featra doesn't guess.
+ */
+function contextWindow(modelUsage: unknown, model: string): number | null {
+  if (!isRecord(modelUsage)) return null;
+  const entries = Object.entries(modelUsage).filter((e): e is [string, Record<string, unknown>] => isRecord(e[1]));
+  const own = entries.find(([name]) => name === model) ?? (entries.length === 1 ? entries[0] : undefined);
+  const window = own?.[1].contextWindow;
+  return typeof window === "number" && window > 0 ? window : null;
+}
+
 /** `session` is the session a resumed chat goes on with, until the agent reports its own. */
 export function createClaudeTranslator(session: string | null = null): ClaudeTranslator {
   let stopping = false;
@@ -53,6 +87,9 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
   /** Assistant messages whose text came as deltas, so their full copy adds no text. */
   const streamed = new Set<string>();
   let current = "";
+  /** The model the agent reported at start, and the context its last assistant message used this turn. */
+  let model = "";
+  let used: number | null = null;
 
   const logout = (): ChatEvent[] => {
     if (loggedOut) return [];
@@ -79,6 +116,7 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
   function assistant(message: Record<string, unknown>, error: unknown): ChatEvent[] {
     if (error === "authentication_failed") return logout();
     const id = text(message.id);
+    used = contextTokens(message.usage) ?? used;
     return records(message.content).flatMap((block, i): ChatEvent[] => {
       if (block.type === "text" && !streamed.has(id)) {
         const t = text(block.text);
@@ -91,7 +129,19 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
     });
   }
 
+  /** The turn's context for the meter, once, before the turn's end. */
+  const usageEvents = (window: number | null): ChatEvent[] => {
+    const now = used;
+    used = null;
+    return now === null ? [] : [{ type: "usage", used: now, window }];
+  };
+
   function result(message: Record<string, unknown>): ChatEvent[] {
+    const usage = usageEvents(contextWindow(message.modelUsage, model));
+    return [...usage, ...ended(message)];
+  }
+
+  function ended(message: Record<string, unknown>): ChatEvent[] {
     const wasStopped = stopping;
     const wasLoggedOut = loggedOut;
     stopping = false;
@@ -115,6 +165,8 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
         case "system":
           if (message.subtype !== "init") return [];
           session = text(message.session_id) || session;
+          model = text(message.model);
+          used = null;
           return [{ type: "started", model: text(message.model) }];
         case "stream_event":
           return isRecord(message.event) ? streamEvent(message.event) : [];
@@ -135,6 +187,7 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
     interrupted: () => {
       stopping = true;
     },
+    turnUsage: () => usageEvents(null)[0] ?? null,
     sessionId: () => session,
   };
 }

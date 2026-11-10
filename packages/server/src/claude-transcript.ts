@@ -5,7 +5,7 @@
  * as the live stream.
  */
 import { isRecord, type ChatEvent } from "@featra/work-format";
-import { createClaudeTranslator } from "./claude-messages.ts";
+import { createClaudeTranslator, type ClaudeTranslator } from "./claude-messages.ts";
 
 /** The SDK's session reader, narrowed to what Featra asks of it. Tests use the real one on a folder of their own. */
 export interface SessionReader {
@@ -16,6 +16,12 @@ export interface SessionReader {
 }
 
 const DONE: ChatEvent = { type: "turn-end", outcome: "done" };
+
+/** A turn's end: the context it used, when its messages said, then the end itself. */
+const turnEnd = (translator: ClaudeTranslator): ChatEvent[] => {
+  const usage = translator.turnUsage();
+  return usage ? [usage, DONE] : [DONE];
+};
 
 /** What the user typed, when a user message is a prompt: text, not the tool results the agent is handed. */
 function promptText(content: unknown): string | null {
@@ -41,11 +47,11 @@ export function transcriptEvents(messages: readonly unknown[]): ChatEvent[] {
       events.push(...translator.translate(message));
       continue;
     }
-    if (open) events.push(DONE);
+    if (open) events.push(...turnEnd(translator));
     events.push({ type: "user", text: prompt });
     open = true;
   }
-  if (open) events.push(DONE);
+  if (open) events.push(...turnEnd(translator));
   return events;
 }
 

@@ -18,6 +18,8 @@ import {
 } from "@featra/work-format";
 import { projectKey } from "./allowed-projects.ts";
 import { createApprovalDesk } from "./approval-desk.ts";
+import { applyState, composerOf, configureChat, controlState } from "./chat-composer.ts";
+import { restoredState } from "./chat-configure.ts";
 import { ChatError } from "./chat-error.ts";
 import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
@@ -87,16 +89,23 @@ export function createChatManager({
     (saved) => {
       const dirs = new Set<string>();
       for (const s of saved.filter((c) => !chats.has(c.summary.id))) {
-        chats.set(s.summary.id, restored(s.summary.id, s.dir, s.summary, s.session));
+        chats.set(s.summary.id, restored(s.summary.id, s.dir, s.summary, s.session, s.composer ?? null));
         dirs.add(s.dir);
       }
       for (const dir of dirs) listChanged(dir);
     },
-    () => [...chats.values()].map((c) => savedChat(c.dir, c.session, c.summary)),
+    () =>
+      [...chats.values()].map((c) =>
+        savedChat(c.dir, c.session, c.summary, composerOf(c, provider(c.summary.provider))),
+      ),
   );
   const save = () => saver.save();
 
   function record(c: Chat, event: ChatEvent) {
+    if (event.type === "usage" && event.window !== c.window) {
+      c.window = event.window;
+      save();
+    }
     if (event.type === "user") c.running = true;
     if (event.type === "turn-end") c.running = false;
     c.events?.push(event);
@@ -124,9 +133,12 @@ export function createChatManager({
   function agentFor(c: Chat, adapter: ProviderAdapter, role: Role): ProviderSession {
     // The session reaches the chat only through `emit`, so the chat's own fields are current when it is called.
     const emit = (event: ChatEvent) => record(c, event);
-    c.mode = role.mode ?? null;
-    c.note = role.note ?? null;
-    return adapter.start({
+    // A reopened chat goes on with what the composer last set, while the provider still offers it.
+    const state = restoredState(adapter, role, c.kept);
+    if (c.kept && state.settings.model !== c.kept.settings.model) c.window = null;
+    c.kept = null;
+    const rowChanged = applyState(c, adapter, role, state);
+    const agent = adapter.start({
       chat: c.id,
       cwd: c.dir,
       role,
@@ -136,6 +148,9 @@ export function createChatManager({
       approve: (request, signal) => decide({ ...request, chat: c.id, cwd: c.dir }, signal),
       ask: (request, signal) => desk.ask({ ...request, chat: c.id }, signal),
     });
+    agent.configure(role, state.settings);
+    if (rowChanged && c.events !== null) listChanged(c.dir);
+    return agent;
   }
 
   /** Reads a restored chat's transcript and makes its agent session; a chat whose session is gone gets neither. */
@@ -145,7 +160,10 @@ export function createChatManager({
     const role = gone || !adapter ? null : await roles.get(c.dir, c.summary.role.id);
     // Closed while reading: the chat is opened afresh when its project is back.
     if (c.events !== null || c.closed) return;
-    c.events = events;
+    // The history carries no window: the last one the chat reported stands in for it.
+    c.events = events.map((e) =>
+      e.type === "usage" && e.window === null && c.window !== null ? Object.assign({}, e, { window: c.window }) : e,
+    );
     c.refusal = gone
       ? CHAT_MESSAGES.gone
       : !adapter
@@ -156,14 +174,25 @@ export function createChatManager({
     if (adapter && role && !gone) c.agent = agentFor(c, adapter, role);
   }
 
+  async function open(id: string) {
+    await saver.loaded;
+    const c = chat(id);
+    if (c.events !== null) return;
+    c.opening ??= load(c);
+    await c.opening;
+  }
+
   /** Ends the chat's agent and forgets its log; the chat itself is kept, to open again. */
   function end(c: Chat) {
     c.listeners.clear();
     mcp?.release(c.id);
     desk.forget(c.id);
     inbox.ended(c.id);
+    c.kept = composerOf(c, provider(c.summary.provider));
     c.agent?.close();
     c.agent = null;
+    c.role = null;
+    c.settings = null;
     c.events = null;
     c.opening = null;
     c.running = false;
@@ -186,13 +215,7 @@ export function createChatManager({
       listChanged(dir);
       return id;
     },
-    async open(id) {
-      await saver.loaded;
-      const c = chat(id);
-      if (c.events !== null) return;
-      c.opening ??= load(c);
-      await c.opening;
-    },
+    open,
     watch(id, listener) {
       const c = chat(id);
       c.listeners.add(listener);
@@ -202,6 +225,24 @@ export function createChatManager({
         note: c.note,
         stop: () => c.listeners.delete(listener),
       };
+    },
+    async controls(id) {
+      await open(id);
+      const c = chat(id);
+      return controlState(c, provider(c.summary.provider));
+    },
+    async configure(id, change) {
+      const c = chat(id);
+      // One change at a time: a change made while another waits on its role lookup applies after it, never under it.
+      const done = c.changing.then(async () => {
+        await open(id);
+        const rowChanged = await configureChat(c, provider(c.summary.provider), change, (rid) => roles.get(c.dir, rid));
+        save();
+        if (rowChanged) listChanged(c.dir);
+        return controlState(c, provider(c.summary.provider));
+      });
+      c.changing = done.catch(() => {});
+      return done;
     },
     send(id, text) {
       const c = chat(id);

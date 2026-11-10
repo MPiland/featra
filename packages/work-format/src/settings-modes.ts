@@ -6,6 +6,7 @@
  */
 import { parse as parseToml } from "smol-toml";
 import {
+  AUTO_DISABLED_NOTE,
   BYPASS_DISABLED_NOTE,
   claudeModeInfo,
   CODEX_APPROVALS,
@@ -23,6 +24,8 @@ export interface ModeRead {
   note?: string;
   /** Claude's settings switch full access off: a role's own bypass mode is no longer honoured either. */
   bypassOff?: boolean;
+  /** Claude's settings remove auto mode: a role's own auto mode is no longer honoured, and the composer doesn't offer it. */
+  autoOff?: boolean;
 }
 
 /** A settings file's text (null when the file isn't there) and where it sits. */
@@ -40,11 +43,18 @@ function bypassDisabled(settings: unknown): boolean {
   return (permissions.disableBypassPermissionsMode ?? settings.disableBypassPermissionsMode) === "disable";
 }
 
+/** Whether a settings object removes auto mode: `permissions.disableAutoMode: "disable"` (also read at the top level). */
+function autoDisabled(settings: unknown): boolean {
+  if (!isRecord(settings)) return false;
+  const permissions = isRecord(settings.permissions) ? settings.permissions : {};
+  return (permissions.disableAutoMode ?? settings.disableAutoMode) === "disable";
+}
+
 /**
  * Claude's starting mode: the first layer, highest precedence first (managed, local, project, user), that names a
  * `permissions.defaultMode`. A mode Featra doesn't know stops the search on Ask with a note, so a typo in a higher
  * layer never lets a lower layer's bypass through. A layer that switches full access off (in any layer) turns a
- * bypass mode into Ask, with a note.
+ * bypass mode into Ask, with a note; one that removes auto mode does the same for an auto mode.
  */
 export function claudeStartMode(layers: readonly SettingsLayer[]): ModeRead {
   const problems: string[] = [];
@@ -57,8 +67,11 @@ export function claudeStartMode(layers: readonly SettingsLayer[]): ModeRead {
       problems.push(`Can't read ${layer.file}: ${errorMessage(e)}`);
     }
   }
-  const off = read.some(({ settings }) => bypassDisabled(settings)) ? { bypassOff: true } : {};
-  const bypassOff = "bypassOff" in off;
+  const off = {
+    ...(read.some(({ settings }) => bypassDisabled(settings)) ? { bypassOff: true } : {}),
+    ...(read.some(({ settings }) => autoDisabled(settings)) ? { autoOff: true } : {}),
+  };
+  const bypassOff = off.bypassOff === true;
   for (const { layer, settings } of read) {
     const permissions = isRecord(settings) ? settings.permissions : undefined;
     const set = isRecord(permissions) ? permissions.defaultMode : undefined;
@@ -69,6 +82,7 @@ export function claudeStartMode(layers: readonly SettingsLayer[]): ModeRead {
       return { mode: null, problems: [...problems, problem], note: `${problem} Starting on Ask.`, ...off };
     }
     if (mode.fullAccess && bypassOff) return { mode: null, problems, note: BYPASS_DISABLED_NOTE, ...off };
+    if (mode.name === "auto" && off.autoOff === true) return { mode: null, problems, note: AUTO_DISABLED_NOTE, ...off };
     return { mode, problems, ...off };
   }
   return { mode: null, problems, ...off };

@@ -3,6 +3,7 @@ import {
   cardParams,
   cardUpdateParams,
   CHAT_MESSAGES,
+  chatConfigureParams,
   chatParams,
   chatAnswerParams,
   chatApproveParams,
@@ -184,6 +185,13 @@ export function createApi({ git, allowed, watches, copies, cards, chats, roles, 
         });
         connection.keep(id, stop);
         return chatSnapshot(events, mode, note);
+      }
+      case "chat.controls":
+        return chats.controls(chat(params));
+      case "chat.configure": {
+        const p = chatConfigureParams(params);
+        if (!p) throw new ApiError("Expected { id, change }.");
+        return chats.configure(chat(params), p.change);
       }
       case "chat.send": {
         const p = chatSendParams(params);

@@ -122,10 +122,10 @@ export const sdk = {
     type: "stream_event",
     event: { type: "content_block_delta", index, delta: { type: "text_delta", text } },
   }),
-  assistant: (id: string, content: unknown[], extra: Record<string, unknown> = {}) => ({
+  assistant: (id: string, content: unknown[], extra: Record<string, unknown> = {}, usage?: Record<string, number>) => ({
     ...MAIN,
     type: "assistant",
-    message: { id, content },
+    message: { id, content, ...(usage ? { usage } : {}) },
     ...extra,
   }),
   text: (text: string) => ({ type: "text", text }),
@@ -135,7 +135,14 @@ export const sdk = {
     type: "user",
     message: { role: "user", content: [{ type: "tool_result", tool_use_id: id, content, is_error: isError }] },
   }),
-  success: (result = "") => ({ ...MAIN, type: "result", subtype: "success", is_error: false, result }),
+  success: (result = "", extra: Record<string, unknown> = {}) => ({
+    ...MAIN,
+    type: "result",
+    subtype: "success",
+    is_error: false,
+    result,
+    ...extra,
+  }),
   failure: (extra: Record<string, unknown> = {}) => ({
     ...MAIN,
     type: "result",
