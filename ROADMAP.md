@@ -34,3 +34,5 @@ epics in `.featra/cards/`.
 - A trademark and registrar check on the name "Featra".
 - **Help menu links** that need a public repo and a release channel: Featra Docs (F1), View Changelog, Get Support,
   Send Feedback, and Check for Updates.
+- **Logo and app icon.** A real Featra logo to replace the placeholder "F" icon (BUG-14). The icon is generated from
+  `tooling/icon/icon.svg`, so the new mark replaces that file.
