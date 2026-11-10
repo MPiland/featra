@@ -2,7 +2,7 @@
 id: STORY-50
 type: story
 title: Send a draft back
-status: In Progress
+status: In Review
 parent: FEAT-4
 order: 3
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-50-send-back
-pr: null
+pr: https://github.com/MPiland/featra/pull/22
 created: 2026-11-10T03:47:43Z
 history:
   - at: 2026-11-10T03:47:43Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: developer
+  - at: 2026-11-10T07:00:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: developer
 ---
 
 ## Description
@@ -33,9 +38,9 @@ As a builder, I send a draft back to the Dev Lead with a reason, so it revises t
 
 ## Acceptance criteria
 
-- [ ] Send back… asks for a reason and can't be sent without one
-- [ ] The reason is sent to the Dev Lead as the user's message in that chat
-- [ ] The send-back is recorded in the feature's history
+- [x] Send back… asks for a reason and can't be sent without one
+- [x] The reason is sent to the Dev Lead as the user's message in that chat
+- [x] The send-back is recorded in the feature's history
 
 ## Tasks
 
