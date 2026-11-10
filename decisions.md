@@ -1019,3 +1019,33 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - The button is "Approve" in FEAT-4; FEAT-5 renames it "Approve and start" when approving also starts the work.
 - A later `draft_cards` call from the same chat updates that draft in place, keeping its IDs.
 - Drafts stay uncommitted on main; Approve commits them locally without pushing; Reject deletes the files.
+
+## 2026-11-10 — STORY-8: Dev Lead drafts a feature
+
+- **`draft_cards` is one tool over one agent-socket method (`cards.draft`); the server writes the cards, to main's
+  checkout, uncommitted** (ADR 0021). Why: ADR 0002 has main own a draft and the server allocate IDs, and a draft is
+  the user's to review before anything is committed. IDs come from `nextId` over all owner cards, calls are serialized,
+  and new files are all written or none.
+- **One open draft per chat.** A call without one makes a Draft feature; a call with one revises it in place, with no
+  `feature` parameter. Why: the story's rule is "a later call from the same chat updates that draft", and a parameter
+  the agent could get wrong buys nothing.
+- **A story is kept by its `id`; a story left out is Cancelled, not deleted; a story with no `id` is new.** Why: the
+  agent sends the whole draft each time, and history must keep what was dropped. An `id` the draft doesn't have is
+  refused, so a typo can't touch another card.
+- **The drafting chat is stored on the feature as the frontmatter key `drafted-by`.** Why: STORY-49 opens that chat from
+  it, and `card.extra` already round-trips unknown keys. Review is derived (status `draft` plus `drafted-by`) and shown
+  on the Work row as a "Review" badge; drafts also count under the Needs review filter.
+- **New history field `content`:** `to` names what changed (title, story, criteria, tasks; a feature's description and
+  stories), `from` is null, `by` is `session:<chat>`. Why: AC3 wants each card's history to record the change, and
+  `status` events can't. A card whose text didn't change gets no event. Ticks and test links on unchanged text are kept.
+- **Stories are created at the first not-started stage with role `developer` and no agent; a draft feature has no epic.**
+  Why: the most standard defaults; the user sets the rest when reviewing.
+- **The MCP off switch and the knowledge setting apply.** Read-only knowledge already withholds the whole MCP (tested
+  behaviour), so it withholds `draft_cards` too, and a running chat is refused ("Drafting is off: this project's
+  knowledge setting is read-only."). Why: a draft writes cards, which read-only forbids. Both are read at each call and
+  the refusal writes nothing.
+- **The tool description teaches the card format, and a refused input says what to fix.** Why: Featra injects no
+  prompt (ADR 0006); the agent reads the description and the error.
+- **Two existing assertions grew by `draft_cards`:** the MCP's tool list in `packages/mcp/test/stdio.test.ts` and
+  `apps/desktop/test/mcp-bundle.test.ts`. Why: they assert the full list of tools, and the story adds one. Nothing was
+  weakened. `FeatureRow.draftedBy` and `review` are optional, so the normalizer's existing test is unchanged.

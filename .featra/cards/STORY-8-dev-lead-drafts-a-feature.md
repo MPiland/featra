@@ -2,7 +2,7 @@
 id: STORY-8
 type: story
 title: Dev Lead drafts a feature
-status: New
+status: In Progress
 parent: FEAT-4
 order: 1
 origin: planned
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-10T03:54:33Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:story-8
 ---
 
 ## Description
@@ -35,7 +40,14 @@ As a builder, I talk a feature through with the Dev Lead, and it drafts the feat
 
 ## Tasks
 
-- [ ] Break down when picked up
+- [x] Parse and plan a draft in work-format (`parseDraft`, `planDraft`, `content` history field)
+- [x] Write drafts to main uncommitted in the server (`draft-writer`, serialized IDs)
+- [x] Add `cards.draft` to the agent socket and bridge (MCP off, knowledge, validation)
+- [x] Add the `draft_cards` MCP tool whose description teaches the card format
+- [x] Show the Review badge in the Work list
+- [x] Record the drafting chat (`drafted-by`) for STORY-49
+- [x] Add the E2E journey `draft.spec.ts` with a scripted draft turn
+- [x] Write ADR 0021, decisions and open questions
 
 ## Notes
 

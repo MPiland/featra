@@ -28,7 +28,11 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Stale copy** — any non-owner copy of a card. Never displayed; an uncommitted edit to it is flagged, to apply to
   the owner or discard (ADR 0016).
 - **History event** — an append-only entry in a card's `history[]` (`at`, `from`, `to`, `by`) recording a status or
-  scope change. Burn-up charts are built from these.
+  scope change (`content` marks an edit to a card's text, with what changed in `to`). Burn-up charts are built from
+  these.
+- **Draft** — a feature an agent made with `draft_cards`: status `draft`, owned by main, uncommitted, with its stories.
+  It names the chat that drafted it (`drafted-by`) and shows in Work with a **Review** badge until it is approved or
+  rejected. A later call from that chat updates it in place (ADR 0021).
 
 ## Progress
 

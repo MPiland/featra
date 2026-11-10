@@ -25,6 +25,8 @@ export interface CardSpec {
   acs?: [number, number];
   tasks?: [number, number];
   pr?: string;
+  /** The chat that drafted a feature: it is waiting for a review. */
+  draftedBy?: string;
 }
 
 const items = (n: [number, number] | undefined) =>
@@ -48,7 +50,7 @@ export function cardOf(spec: CardSpec): Card {
     AT,
   );
   const moved = spec.status && spec.status !== start.status ? setStatus(start, spec.status, "user", LATER) : start;
-  return { ...moved, pr: spec.pr ?? null };
+  return { ...moved, pr: spec.pr ?? null, extra: spec.draftedBy ? { "drafted-by": spec.draftedBy } : moved.extra };
 }
 
 const owned = (card: Card): OwnedCard => ({ card, owner: MAIN, shownFrom: MAIN, path: `.featra/cards/${card.id}.md` });

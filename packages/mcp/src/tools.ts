@@ -1,13 +1,18 @@
 /**
  * The Featra MCP's tools (STORY-47). Each is a name, a description and a JSON schema (what an agent reads), and a
  * `run` that checks the agent's input and acts through the host. The descriptions are product copy: they are what
- * teaches an agent when to log, since Featra injects no system prompt (ADR 0006). A later tool (`draft_cards`,
- * FEAT-4) is one more entry in `TOOLS` and, if it needs the server, one more method on `FeatraHost`.
+ * teaches an agent when to log, since Featra injects no system prompt (ADR 0006). `draft_cards` (STORY-8) is the third:
+ * its description teaches the card format, so Featra still injects nothing. A new tool is one more entry in `TOOLS` and,
+ * if it needs the server, one more method on `FeatraHost`.
  */
 import {
+  DRAFT_LIMITS,
   LOG_FILES,
   parseDecision,
+  parseDraft,
   parseQuestion,
+  type DraftInput,
+  type DraftResult,
   type LoggedEntry,
   type LogInput,
   type Parsed,
@@ -17,6 +22,8 @@ import {
 export interface FeatraHost {
   /** Adds an entry to the chat's `decisions.md` or `open-questions.md`. */
   log: (input: LogInput) => Promise<LoggedEntry>;
+  /** Drafts a feature and its stories, or revises the chat's open draft in place (STORY-8). */
+  draft: (input: DraftInput) => Promise<DraftResult>;
 }
 
 export interface Tool {
@@ -26,6 +33,8 @@ export interface Tool {
   inputSchema: { type: "object"; properties: Record<string, unknown>; required: string[] };
   /** Runs the call; throws a `ToolRefusal` for input to fix. Resolves with the line the agent is told. */
   run: (input: unknown, host: FeatraHost) => Promise<string>;
+  /** What a failure that isn't a refusal (the server said no, or is gone) starts with. Default: "Not logged." */
+  failed?: string;
 }
 
 /** A call that can't be done as given: the message tells the agent what to fix. */
@@ -92,5 +101,80 @@ const DEFER_QUESTION: Tool = {
   run: (input, host) => log(parseQuestion(input), host),
 };
 
+/** What the agent is told a draft did: the IDs, so a later call can name the stories it keeps. */
+function drafted(result: DraftResult): string {
+  const { feature, stories, created, cancelled } = result;
+  const head = created ? `Drafted ${feature}` : `Updated ${feature} in place`;
+  const left = cancelled.length ? ` Left out and cancelled: ${cancelled.join(", ")}.` : "";
+  return `${head} with ${stories.join(", ")}.${left} Not committed: the user reviews the draft in Work.`;
+}
+
+const DRAFT_CARDS: Tool = {
+  name: "draft_cards",
+  failed: "Not drafted.",
+  description: [
+    "Draft a feature and its stories as cards the user reviews in Featra's Work view, once you have talked the feature through with them.",
+    "Nothing is committed: the cards are a Draft the user reads, and Featra allocates every ID.",
+    "A feature is one user-facing capability (title, and a description of what it gives the user and why).",
+    "A story is a vertical slice: one behavior the user can see, working end to end, never a layer such as 'backend first'.",
+    "Each story has a title; a user story in the form 'As a <who>, I <do what> so that <why>'; acceptance criteria,",
+    "each one observable and testable, written as a plain statement of what the user sees or what happens; and tasks,",
+    "the steps to build it. Keep the stories few and small enough to build one at a time.",
+    "Call it again from this chat to revise the draft: it updates the same feature and the same cards in place, and records the change in each card's history.",
+    "Send the whole draft each time. Give a story's id (from the answer) to keep it; a story without an id is new,",
+    "and a story you leave out is cancelled. The input is checked, and a draft that is refused writes nothing: read the error and call again.",
+  ].join(" "),
+  inputSchema: {
+    type: "object",
+    properties: {
+      feature: {
+        type: "object",
+        description: "The feature.",
+        properties: {
+          title: { type: "string", description: `A short name, at most ${DRAFT_LIMITS.title} characters.` },
+          description: {
+            type: "string",
+            description: "What it gives the user and why, in plain text without headings.",
+          },
+        },
+        required: ["title", "description"],
+      },
+      stories: {
+        type: "array",
+        description: `The feature's stories, in build order (at most ${DRAFT_LIMITS.stories}).`,
+        items: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description:
+                "The story's card id, such as STORY-12, to keep and revise it. Leave it out for a new story.",
+            },
+            title: { type: "string", description: "A short name." },
+            story: { type: "string", description: "The user story: 'As a builder, I ... so that ...'." },
+            criteria: {
+              type: "array",
+              items: { type: "string" },
+              description: "Acceptance criteria: what must be true, one testable statement each. At least one.",
+            },
+            tasks: {
+              type: "array",
+              items: { type: "string" },
+              description: "The steps to build the story, one line each.",
+            },
+          },
+          required: ["title", "story", "criteria"],
+        },
+      },
+    },
+    required: ["feature", "stories"],
+  },
+  async run(input, host) {
+    const parsed = parseDraft(input);
+    if (!parsed.ok) throw new ToolRefusal(`Not drafted. ${parsed.error}`);
+    return drafted(await host.draft(parsed.value));
+  },
+};
+
 /** Every tool the server offers, in the order an agent lists them. */
-export const TOOLS: readonly Tool[] = [LOG_DECISION, DEFER_QUESTION];
+export const TOOLS: readonly Tool[] = [LOG_DECISION, DEFER_QUESTION, DRAFT_CARDS];

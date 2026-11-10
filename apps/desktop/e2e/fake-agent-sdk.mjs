@@ -10,6 +10,8 @@
  * - "decide": starts the Featra MCP from options.mcpServers over stdio, as Claude does, and calls its log_decision tool
  *   (STORY-47). Without the MCP (it is off in the project) the reply says so. The tool call is real; only the agent is
  *   faked.
+ * - "draft": calls the Featra MCP's draft_cards tool (STORY-8) to draft a feature with two stories. With "again" in the
+ *   text it calls it a second time, giving back the IDs the first answer named, with the first story changed.
  * - "slow": starts a reply and waits for interrupt().
  * - anything else: streams "You said: <text>".
  *
@@ -154,6 +156,47 @@ async function* decideTurn(options) {
   yield success("Done.");
 }
 
+/** The draft the fake Dev Lead makes; the second call keeps the stories it was given IDs for, with a change. */
+const draftInput = (ids) => ({
+  feature: { title: "Shaping", description: "Talk a feature through with the Dev Lead, then review it." },
+  stories: [
+    {
+      ...(ids ? { id: ids[0] } : {}),
+      title: "Draft a feature",
+      story: "As a builder, I get a drafted feature, so that I can review it.",
+      criteria: ids ? ["The draft shows in Work", "The draft says Review"] : ["The draft shows in Work"],
+      tasks: ["Write the draft"],
+    },
+    {
+      ...(ids ? { id: ids[1] } : {}),
+      title: "Review the draft",
+      story: "As a builder, I review the draft, so that I can approve it.",
+      criteria: ["The review opens"],
+      tasks: [],
+    },
+  ],
+});
+let lastDraft = "";
+
+/** Drafts cards through the Featra MCP the way an agent would, when Featra gave it one. */
+async function* draftTurn(options, again) {
+  const spec = options.mcpServers?.featra;
+  if (!spec) {
+    yield* say("No Featra MCP.");
+    yield success("No Featra MCP.");
+    return;
+  }
+  const ids = again ? [...lastDraft.matchAll(/STORY-d+/g)].map((m) => m[0]) : null;
+  const id = `toolu_mcp_${++seq}`;
+  const input = draftInput(ids);
+  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "mcp__featra__draft_cards", input }]);
+  const result = await callMcpTool(spec, "draft_cards", input);
+  lastDraft = result.text;
+  yield toolResult(id, result.text, result.isError);
+  yield* say(`Tool said: ${result.text}`);
+  yield success("Done.");
+}
+
 const QUESTIONS = [
   {
     question: "Which colour do you prefer?",
@@ -272,6 +315,8 @@ export function query({ prompt, options }) {
       turn = new AbortController();
       if (text.includes("decide")) {
         yield* decideTurn(options);
+      } else if (text.includes("draft")) {
+        yield* draftTurn(options, text.includes("again"));
       } else if (text.includes("tool")) {
         yield* toolTurn(options, turn.signal, text.includes("twice"));
       } else if (text.includes("question")) {

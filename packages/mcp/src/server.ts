@@ -21,7 +21,10 @@ export function createMcpServer(host: FeatraHost, tools: readonly Tool[] = TOOLS
       return reply(await tool.run(params.arguments, host), false);
     } catch (err) {
       // A refusal is the agent's to fix; anything else (the server gone) is told plainly and is not retried here.
-      return reply(err instanceof ToolRefusal ? err.message : `Not logged. ${errorMessage(err)}`, true);
+      return reply(
+        err instanceof ToolRefusal ? err.message : `${tool.failed ?? "Not logged."} ${errorMessage(err)}`,
+        true,
+      );
     }
   });
 

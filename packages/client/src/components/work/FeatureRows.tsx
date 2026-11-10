@@ -76,6 +76,7 @@ export function Feature({ feature }: { feature: FeatureRow }) {
             <ChevronRightIcon />
             <span>{title}</span>
           </button>
+          {feature.review && <span className="badge-review">{WORK_COPY.review}</span>}
           <StaleMark id={feature.id} />
         </span>
         <span role="cell">

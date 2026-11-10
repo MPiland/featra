@@ -246,6 +246,16 @@
   color: var(--warn);
 }
 
+.badge-review {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--warn);
+  border-radius: 4px;
+  color: var(--warn);
+  font-size: 11px;
+  line-height: 16px;
+}
+
 .scope-bugs {
   color: var(--bad);
 }

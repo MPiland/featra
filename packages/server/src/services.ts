@@ -7,6 +7,7 @@ import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts"
 import { locateClaude } from "./claude-locate.ts";
 import { createClaudeProvider, type ClaudeDeps } from "./claude-provider.ts";
 import { loadAgentQuery } from "./claude-sdk.ts";
+import { createDraftWriter } from "./draft-writer.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createLogWriter, type LogWriterDeps } from "./log-writer.ts";
@@ -95,6 +96,7 @@ export function createServices({
     log,
     chats,
     writer: createLogWriter({ now, ...logs }),
+    drafts: createDraftWriter({ scan: watches.scan, now }),
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
