@@ -34,6 +34,7 @@ As the user or the Dev Lead, I start a story's agent in its own worktree, with t
 - [ ] The story goes In Progress; its row shows the agent, model and a link to the session; the session nests in the sidebar under the feature's chat, or under a group named after the feature if that chat is gone
 - [ ] At most N story sessions run at once (project setting, default 3); further spawns show Queued and start in order
 - [ ] Spawning goes through the provider interface; a provider with no runner refuses with a clear message
+- [ ] `spawn_session` needs no confirmation that only the desktop window can give: it follows the Dev Lead's permissions, and any approval it needs reaches every connected client and the Inbox
 
 ## Tasks
 
@@ -42,3 +43,4 @@ As the user or the Dev Lead, I start a story's agent in its own worktree, with t
 ## Notes
 
 - 2026-11-10 (dev-lead): Reshaped with the user: story agents are Featra-run provider sessions that behave like subagents (see decisions.md).
+- 2026-11-10 (dev-lead): added the remote-safe criterion with the user, so a Dev Lead prompted from a remote client (M2) can still spawn stories.
