@@ -2,7 +2,7 @@
 id: BUG-14
 type: bug
 title: Taskbar shows Electron's default icon
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -11,8 +11,8 @@ agent: null
 model: null
 reasoning: null
 sessions: []
-branch: null
-pr: null
+branch: claude/bug-14-app-icon
+pr: "16"
 created: 2026-11-10T03:06:00Z
 history:
   - at: 2026-11-10T03:06:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: session:bug-14
+  - at: 2026-11-10T03:13:53Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:bug-14
 ---
 
 ## Description
@@ -33,12 +38,12 @@ Featra sets no app or window icon, so the Windows and Linux taskbar and the macO
 
 ## Acceptance criteria
 
-- [ ] The taskbar, window and dock show Featra's placeholder icon, not Electron's.
-- [ ] The icon is generated from a committed source by a script.
+- [x] The taskbar, window and dock show Featra's placeholder icon, not Electron's.
+- [x] The icon is generated from a committed source by a script.
 
 ## Tasks
 
-- [ ] Commit the SVG source and the generator script
-- [ ] Set the window icon and the macOS dock icon
+- [x] Commit the SVG source and the generator script
+- [x] Set the window icon and the macOS dock icon
 
 ## Notes
