@@ -1152,3 +1152,19 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Tests changed:** none weakened. The e2e helpers (`project`, `git`, `cardFile`) moved from `draft.spec.ts` and
   `review-draft.spec.ts` into `e2e/draft-project.ts` for reuse; their assertions are untouched. The client fake card
   server gained `sendBack`.
+
+### STORY-50 review rulings
+
+- **A history write that fails after the send.** The server retries the write once. If it still fails, `draft.sendBack`
+  succeeds with `{ recorded: false }` instead of an error, and the client closes the form and says "Sent. Couldn't
+  record it in history." The message is never sent twice: a retry only repeats the write. Tested with an injected disk
+  failure.
+- **Reason limit.** 2,000 characters (`SEND_BACK_MAX`, trimmed length on the server). The server refuses more, and the
+  textarea stops at the limit and shows a counter from 1,800 characters.
+- **Lane scope.** `chats.open` runs before the card lane; the lane covers only the send and the history write.
+- **No stale write.** After the send, the owner's copy of the card is read again inside the lane and the entry is
+  appended to that, so an edit made outside Featra in between is kept. The trailing rescan is gone.
+- **Work's Send back is reachable only when the chat is gone** (its feature rows open a card pane only then). That is
+  accepted.
+- **Client tests** cover UI behaviour only (the fake card server answers what a test sets); ordering and validation are
+  proved by the server tests. The earlier client assertions on the chat message and the history entry moved there.

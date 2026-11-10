@@ -26,7 +26,7 @@ let claude: ReturnType<typeof fakeClaude>;
 let chat = "";
 let events: ChatEvent[];
 let feature = "";
-let sendBack: (reason: string) => Promise<null>;
+let sendBack: (reason: string) => Promise<unknown>;
 
 beforeEach(async () => {
   scanner = createScanner(createRepoGit());

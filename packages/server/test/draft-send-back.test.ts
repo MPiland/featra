@@ -3,17 +3,19 @@
  * history. Real repository, scanner, card actions and draft writer; only the chat manager (a platform) and the clock
  * are fakes, and the fake keeps the real manager's refusals.
  */
+import { readFileSync, writeFileSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CHAT_MESSAGES, parseCard, type Card, type DraftInput } from "@featra/work-format";
+import { CHAT_MESSAGES, parseCard, serializeCard, type Card, type DraftInput } from "@featra/work-format";
 import { ChatError } from "../src/chat-manager.ts";
-import { createCardActions } from "../src/card-actions.ts";
+import { createCardActions, writeAtomic } from "../src/card-actions.ts";
 import { createCardLane } from "../src/card-lane.ts";
 import { createDraftActions, SEND_BACK_MESSAGES, type DraftActions } from "../src/draft-actions.ts";
 import { createDraftWriter, type DraftWriter } from "../src/draft-writer.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
+import { until } from "./until.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 
 let scanner: ReturnType<typeof createScanner>;
@@ -21,6 +23,11 @@ let writer: DraftWriter;
 let actions: ReturnType<typeof createCardActions>;
 let sendBack: DraftActions;
 let repo: CardRepo;
+let lane: ReturnType<typeof createCardLane>;
+/** The disk write a send-back makes, so a test can fail it. */
+let diskWrite: (file: string, text: string) => Promise<void>;
+/** What happens while the chat takes the message (an edit outside Featra, say). */
+let whileSending: () => void;
 let sent: { chat: string; text: string }[];
 let known: Set<string>;
 let refuse: Error | null;
@@ -31,9 +38,11 @@ beforeEach(async () => {
   sent = [];
   opened = [];
   refuse = null;
+  diskWrite = writeAtomic;
+  whileSending = () => {};
   known = new Set(["chat-1"]);
   scanner = createScanner(createRepoGit());
-  const lane = createCardLane();
+  lane = createCardLane();
   writer = createDraftWriter({ scan: scanner.scan, now: () => clock, lane });
   actions = createCardActions({ scan: scanner.scan, now: () => clock, lane });
   repo = await cardRepo();
@@ -43,12 +52,14 @@ beforeEach(async () => {
     scan: scanner.scan,
     now: () => clock,
     lane,
+    write: (file, text) => diskWrite(file, text),
     chats: {
       dirOf: (id) => (known.has(id) ? repo.main : null),
       open: async (id) => void opened.push(id),
       send: (chat, text) => {
         if (refuse) throw refuse;
         sent.push({ chat, text });
+        whileSending();
       },
     },
   });
@@ -144,5 +155,84 @@ describe("sending a draft back", () => {
         stories: input.stories.map((s) => Object.assign({}, s, { id: "STORY-1" })),
       }),
     ).rejects.toThrow(/edited/);
+  });
+
+  it("answers that it recorded the send-back", async () => {
+    const feature = await draftFeature();
+    await expect(sendBack.sendBack(repo.main, feature, "Rename it.")).resolves.toEqual({ recorded: true });
+  });
+});
+
+/** Fails the first `times` history writes; the attempts made. */
+const failing = (times: number) => {
+  const attempts: number[] = [];
+  diskWrite = async (file, text) => {
+    attempts.push(attempts.length);
+    if (attempts.length <= times) throw new Error("disk full");
+    await writeAtomic(file, text);
+  };
+  return attempts;
+};
+
+describe("a history write that fails after the message was sent", () => {
+  it("retries the write once, so one failure still records the send-back, and the message goes once", async () => {
+    const feature = await draftFeature();
+    const attempts = failing(1);
+    await expect(sendBack.sendBack(repo.main, feature, "Rename it.")).resolves.toEqual({ recorded: true });
+    expect(attempts).toHaveLength(2);
+    expect(sent).toHaveLength(1);
+    expect((await read(feature)).history.at(-1)).toMatchObject({ field: "sent-back", to: "Rename it.", by: "user" });
+  });
+
+  it("succeeds with recorded:false, not an error, when the retry fails too; the message went once and nothing is recorded", async () => {
+    const feature = await draftFeature();
+    const before = await kinds(feature);
+    const attempts = failing(2);
+    await expect(sendBack.sendBack(repo.main, feature, "Rename it.")).resolves.toEqual({ recorded: false });
+    expect(attempts).toHaveLength(2);
+    expect(sent).toHaveLength(1);
+    expect(await kinds(feature)).toEqual(before);
+  });
+});
+
+describe("the reason's limit", () => {
+  it("takes 2,000 characters and refuses more, sending nothing and recording nothing", async () => {
+    const feature = await draftFeature();
+    const before = await kinds(feature);
+    await expect(sendBack.sendBack(repo.main, feature, "x".repeat(2001))).rejects.toThrow(SEND_BACK_MESSAGES.tooLong);
+    expect(sent).toEqual([]);
+    expect(await kinds(feature)).toEqual(before);
+    await expect(sendBack.sendBack(repo.main, feature, `  ${"x".repeat(2000)}  `)).resolves.toEqual({
+      recorded: true,
+    });
+    expect(sent).toHaveLength(1);
+  });
+});
+
+describe("what the card lane covers", () => {
+  it("opens the chat before taking the lane, so a slow open never holds up card writes", async () => {
+    const feature = await draftFeature();
+    const gate: { open: () => void } = { open: Function.prototype as () => void };
+    const held = lane.exclusive(() => new Promise<void>((resolve) => (gate.open = resolve)));
+    const pending = sendBack.sendBack(repo.main, feature, "Rename it.");
+    await until(() => opened.length > 0);
+    expect(sent).toEqual([]);
+    gate.open();
+    await held;
+    await pending;
+    expect(sent).toHaveLength(1);
+  });
+
+  it("writes onto the card as it is after the send, so an edit made outside Featra in between is kept", async () => {
+    const feature = await draftFeature();
+    const name = (await readdir(dir())).find((f) => f.startsWith(`${feature}-`)) ?? "";
+    whileSending = () => {
+      const file = join(dir(), name);
+      writeFileSync(file, serializeCard({ ...parseCard(readFileSync(file, "utf8")), title: "Edited elsewhere" }));
+    };
+    await sendBack.sendBack(repo.main, feature, "Rename it.");
+    const after = await read(feature);
+    expect(after.title).toBe("Edited elsewhere");
+    expect(after.history.at(-1)).toMatchObject({ field: "sent-back", by: "user" });
   });
 });

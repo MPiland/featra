@@ -3,10 +3,6 @@ import {
   applyCardEdit,
   buildCardView,
   buildWorkList,
-  draftedBy,
-  needsReview,
-  recordSentBack,
-  sendBackMessage,
   DEFAULT_CONFIG,
   MAIN,
   type Card,
@@ -30,8 +26,8 @@ export function fakeCardServer(
   given: Record<string, Card[]>,
   calls: string[],
   listChanged: (dir: string, list: WorkList) => void,
-  /** The chat server's send: what the server hands the drafting chat. Answers with why not, or null. */
-  sendToChat: (chat: string, text: string) => Promise<string | null> = async () => null,
+  /** What the server answers to Send back. */
+  sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -76,17 +72,11 @@ export function fakeCardServer(
       changed(dir, r.card);
       return { ok: true, view: viewOf(dir, id) as CardView };
     },
-    // What the server does: send the message to the chat first, record history only once the chat has it.
+    // Send back is the server's to prove (ordering, validation, history): the fake only records the call and answers
+    // what the test sets, by default that the chat has it and history does too.
     sendBack: async (dir, id, reason) => {
       calls.push(`sendBack:${dir}:${id}:${reason}`);
-      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const chat = card && card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
-      if (!card || chat === null) return `${id} isn't a draft.`;
-      if (!reason.trim()) return "Say why you're sending it back.";
-      const failed = await sendToChat(chat, sendBackMessage(id, reason));
-      if (failed !== null) return failed;
-      changed(dir, recordSentBack(card, reason, "user", EDIT_AT));
-      return null;
+      return sendBack(dir, id, reason);
     },
   };
   return {

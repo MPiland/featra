@@ -1,10 +1,10 @@
 /**
- * STORY-50: Send back on a draft. The real App over a fake host: the card server sends to the chat server and records
- * history with work-format's own functions, and the draft is the real planner's.
+ * STORY-50: Send back on a draft, as the user sees it. The real App over a fake host whose card server only records the
+ * call and answers what the test sets. The send-then-record order and the validation are proved by the server's tests.
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, planDraft, sendBackMessage, type Card } from "@featra/work-format";
+import { DEFAULT_CONFIG, planDraft, SEND_BACK_MAX, type Card } from "@featra/work-format";
 import { PROJECT, renderApp } from "../harness.tsx";
 import { cardOf } from "../work-fixtures.ts";
 
@@ -73,30 +73,89 @@ describe("AC1: Send back… asks for a reason and can't be sent without one", ()
   });
 });
 
-describe("AC2 and AC3: the reason goes to the chat as the user's message, and the history records it", () => {
-  it("sends the prefixed reason in the chat, shows it in the transcript, and records a by:user entry", async () => {
-    const { app, pane } = await chatWithDraft();
-    await app.user.click(await within(pane).findByRole("button", { name: "Send back…" }));
-    await app.user.type(within(pane).getByRole("textbox", { name: "Reason" }), "  Split the second story.  ");
+/** Opens the form on the chat's draft and types `text` as the reason. */
+async function fillReason(host: Parameters<typeof renderApp>[0], text: string) {
+  const { app, pane } = await chatWithDraft(host);
+  await app.user.click(await within(pane).findByRole("button", { name: "Send back…" }));
+  await app.user.type(within(pane).getByRole("textbox", { name: "Reason" }), text);
+  return { app, pane };
+}
+
+describe("AC2 and AC3: the reason goes to the server, which sends it to the chat and records it", () => {
+  it("sends the reason to the server's send-back method and closes the form", async () => {
+    const { app, pane } = await fillReason({}, "Split the second story.");
     await app.user.click(within(pane).getByRole("button", { name: "Send" }));
-    const text = sendBackMessage(FEATURE, "Split the second story.");
-    expect(text).toBe(`Sent back ${FEATURE}: Split the second story.`);
-    await waitFor(() => expect(app.calls).toContain(`chat.send:chat-1:${text}`));
-    await waitFor(() =>
-      expect(history(app).at(-1)).toMatchObject({ field: "sent-back", to: "Split the second story.", by: "user" }),
-    );
-    expect(within(pane).queryByRole("form", { name: "Send back" })).toBeNull();
-    expect((await screen.findByText(text, { selector: ".chat-msg.user" })).textContent).toBe(text);
+    await waitFor(() => expect(app.calls).toContain(`sendBack:${PROJECT.dir}:${FEATURE}:Split the second story.`));
+    await waitFor(() => expect(within(pane).queryByRole("form", { name: "Send back" })).toBeNull());
+    expect(within(pane).queryByRole("status")).toBeNull();
+    // The client never writes history or talks to the chat itself.
+    expect(app.calls.some((c) => c.startsWith("chat.send:") || c.startsWith("updateCard:"))).toBe(false);
+    expect(history(app).some((e) => e.field === "sent-back")).toBe(false);
   });
 
-  it("shows the refusal and writes no history when the chat doesn't take the message; the reason is kept", async () => {
-    const { app, pane } = await chatWithDraft({ sendError: "Wait for the reply, or stop it." });
-    await app.user.click(await within(pane).findByRole("button", { name: "Send back…" }));
-    await app.user.type(within(pane).getByRole("textbox", { name: "Reason" }), "Too big");
+  it("shows the refusal, keeps the reason, and puts focus back in the reason field", async () => {
+    const { app, pane } = await fillReason(
+      { sendBack: async () => ({ ok: false, error: "Wait for the reply, or stop it." }) },
+      "Too big",
+    );
     await app.user.click(within(pane).getByRole("button", { name: "Send" }));
     expect((await within(pane).findByRole("alert")).textContent).toBe("Wait for the reply, or stop it.");
-    expect(within(pane).getByRole<HTMLTextAreaElement>("textbox", { name: "Reason" }).value).toBe("Too big");
-    expect(history(app).some((e) => e.field === "sent-back")).toBe(false);
+    const reason = within(pane).getByRole<HTMLTextAreaElement>("textbox", { name: "Reason" });
+    expect(reason.value).toBe("Too big");
+    expect(document.activeElement).toBe(reason);
+  });
+
+  it("closes the form and says so, as a notice and not an error, when the chat has it but history doesn't", async () => {
+    const { app, pane } = await fillReason({ sendBack: async () => ({ ok: true, recorded: false }) }, "Too big");
+    await app.user.click(within(pane).getByRole("button", { name: "Send" }));
+    expect((await within(pane).findByRole("status")).textContent).toBe("Sent. Couldn't record it in history.");
+    expect(within(pane).queryByRole("form", { name: "Send back" })).toBeNull();
+    expect(within(pane).queryByRole("alert")).toBeNull();
+  });
+
+  it("shows a thrown error in the alert and lets Send be used again", async () => {
+    let calls = 0;
+    const { app, pane } = await fillReason(
+      {
+        sendBack: async () => {
+          if (++calls === 1) throw new Error("Socket closed.");
+          return { ok: true, recorded: true };
+        },
+      },
+      "Too big",
+    );
+    const send = within(pane).getByRole<HTMLButtonElement>("button", { name: "Send" });
+    await app.user.click(send);
+    expect((await within(pane).findByRole("alert")).textContent).toBe("Socket closed.");
+    expect(send.disabled).toBe(false);
+    await app.user.click(send);
+    await waitFor(() => expect(within(pane).queryByRole("form", { name: "Send back" })).toBeNull());
+    expect(calls).toBe(2);
+  });
+});
+
+describe("the reason's limit", () => {
+  it("stops at 2,000 characters and shows a counter near the limit, not before", async () => {
+    const { app, pane } = await fillReason({}, "short");
+    expect(within(pane).queryByText(/ \/ /)).toBeNull();
+    const reason = within(pane).getByRole<HTMLTextAreaElement>("textbox", { name: "Reason" });
+    await app.user.clear(reason);
+    await app.user.click(reason);
+    await app.user.paste("x".repeat(SEND_BACK_MAX + 100));
+    expect(reason.value).toHaveLength(SEND_BACK_MAX);
+    expect(within(pane).getByText("2,000 / 2,000")).toBeTruthy();
+    expect(within(pane).getByRole<HTMLButtonElement>("button", { name: "Send" }).disabled).toBe(false);
+  });
+});
+
+describe("Escape in the send-back form", () => {
+  it("closes only the form, from any control in it, and the pane stays open", async () => {
+    const { app, pane } = await fillReason({}, "x");
+    within(pane).getByRole<HTMLButtonElement>("button", { name: "Cancel" }).focus();
+    await app.user.keyboard("{Escape}");
+    expect(within(pane).queryByRole("form", { name: "Send back" })).toBeNull();
+    expect(screen.getByRole("complementary", { name: `${FEATURE} card` })).toBeTruthy();
+    expect(document.activeElement).toBe(within(pane).getByRole("button", { name: "Send back…" }));
   });
 });
 

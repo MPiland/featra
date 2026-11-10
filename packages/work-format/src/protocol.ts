@@ -69,7 +69,7 @@ export interface ServerMethods {
    * Sends a draft feature back to the chat that drafted it with the user's reason, then records it in the feature's
    * history (STORY-50). Refused without a reason, for a feature that isn't a draft, or when its chat is gone.
    */
-  "draft.sendBack": { params: { dir: string; id: string; reason: string }; result: null };
+  "draft.sendBack": { params: { dir: string; id: string; reason: string }; result: { recorded: boolean } };
   /** The roles a chat in this project can start from (ADR 0018). */
   "chat.roles": { params: { dir: string }; result: Role[] };
   /**

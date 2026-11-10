@@ -1,24 +1,32 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
-import { CARD_COPY } from "../../card-pane.ts";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { SEND_BACK_MAX } from "@featra/work-format";
+import { CARD_COPY, type SendBackResult } from "../../card-pane.ts";
 
 export interface SendBackProps {
-  /** Sends the reason; answers with why not, or null once the chat has it. */
-  onSend: (reason: string) => Promise<string | null>;
+  /** Sends the reason; answers with why not, or that the chat has it (and whether history recorded it). */
+  onSend: (reason: string) => Promise<SendBackResult>;
   /** Why Send back can't be used now (its chat is gone), or null. The button is disabled and says so. */
   unavailable: string | null;
 }
 
+/** The counter shows once the reason is this close to the limit. */
+const COUNT_FROM = SEND_BACK_MAX - 200;
+const count = (n: number) => `${n.toLocaleString("en-US")} / ${SEND_BACK_MAX.toLocaleString("en-US")}`;
+
 /**
  * Send back… on a draft (STORY-50): a button that opens a small form for the reason. It can't be sent while the reason
- * is empty or only spaces, and a refusal is shown with the reason kept so it can be sent again.
+ * is empty or only spaces, or past the limit. A refusal is shown with the reason kept and focus back in the field, so it
+ * can be sent again; if the chat has the message but history couldn't record it, the form closes and says so.
  */
 export function SendBack({ onSend, unavailable }: SendBackProps) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
+  const form = useRef<HTMLFormElement>(null);
   const hint = useId();
   const refocus = useRef(false);
 
@@ -29,28 +37,48 @@ export function SendBack({ onSend, unavailable }: SendBackProps) {
       opener.current?.focus();
     }
   }, [open]);
+  useEffect(() => {
+    if (error) field.current?.focus();
+  }, [error]);
 
-  const close = () => {
+  const close = useCallback(() => {
     refocus.current = true;
     setOpen(false);
     setError(null);
-  };
+  }, []);
+  // Escape anywhere in the form closes the form, and stops there: not the pane around it.
+  useEffect(() => {
+    const el = form.current;
+    if (!open || !el) return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    };
+    el.addEventListener("keydown", onKey);
+    return () => el.removeEventListener("keydown", onKey);
+  }, [open, close]);
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!reason.trim() || sending) return;
     setSending(true);
-    const failed = await onSend(reason);
-    setSending(false);
-    if (failed === null) {
+    setError(null);
+    try {
+      const result = await onSend(reason);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setNotice(result.recorded ? null : CARD_COPY.sendBackUnrecorded);
       setReason("");
       close();
-    } else setError(failed);
-  };
-  // Escape here cancels the form, not the pane around it.
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key !== "Escape") return;
-    e.preventDefault();
-    close();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSending(false);
+    }
   };
 
   if (!open)
@@ -62,7 +90,10 @@ export function SendBack({ onSend, unavailable }: SendBackProps) {
           className="btn"
           disabled={unavailable !== null}
           aria-describedby={unavailable ? hint : undefined}
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setNotice(null);
+            setOpen(true);
+          }}
         >
           {CARD_COPY.sendBack}
         </button>
@@ -71,10 +102,15 @@ export function SendBack({ onSend, unavailable }: SendBackProps) {
             {unavailable}
           </span>
         )}
+        {notice && (
+          <p className="meta" role="status">
+            {notice}
+          </p>
+        )}
       </div>
     );
   return (
-    <form className="send-back" aria-label={CARD_COPY.sendBackForm} onSubmit={(e) => void submit(e)}>
+    <form ref={form} className="send-back" aria-label={CARD_COPY.sendBackForm} onSubmit={(e) => void submit(e)}>
       <label className="sh" htmlFor={`${hint}-reason`}>
         {CARD_COPY.sendBackReason}
       </label>
@@ -83,10 +119,14 @@ export function SendBack({ onSend, unavailable }: SendBackProps) {
         ref={field}
         rows={3}
         value={reason}
+        maxLength={SEND_BACK_MAX}
+        aria-describedby={`${hint}-count`}
         onChange={(e) => setReason(e.target.value)}
-        onKeyDown={onKey}
         placeholder={CARD_COPY.sendBackHint}
       />
+      <span id={`${hint}-count`} className="meta" aria-live="polite">
+        {reason.length >= COUNT_FROM ? count(reason.length) : ""}
+      </span>
       {error && (
         <p className="card-error" role="alert">
           {error}
