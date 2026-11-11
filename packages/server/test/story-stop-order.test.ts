@@ -6,7 +6,7 @@
  */
 import { join } from "node:path";
 import type * as FsPromises from "node:fs/promises";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi, type MockInstance } from "vitest";
 import { RESUME_MESSAGE, type ChatSummary } from "@featra/work-format";
 import { sdk } from "./fake-query.ts";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
@@ -23,11 +23,27 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   };
 });
 
+/**
+ * The interrupt's bound is a timer of this length and no other timer here has it. The test takes that timer over, so
+ * the bound expires when the test says, not after real time that a loaded machine can overrun (BUG-18).
+ */
+const BOUND_MS = 1_234_567;
+const bound: (() => void)[] = [];
+let timers: MockInstance<typeof setTimeout>;
 let w: StoryWorld;
 beforeAll(async () => {
-  w = await storyWorld({ config: "maxStoryAgents: 5\n", interruptMs: 1500 });
+  const real = globalThis.setTimeout;
+  timers = vi.spyOn(globalThis, "setTimeout").mockImplementation(((fn: () => void, ms?: number, ...rest: unknown[]) => {
+    if (ms !== BOUND_MS) return real(fn, ms, ...rest);
+    bound.push(fn);
+    return real(() => {}, 0);
+  }) as typeof setTimeout);
+  w = await storyWorld({ config: "maxStoryAgents: 5\n", interruptMs: BOUND_MS });
 });
-afterAll(() => w.close());
+afterAll(() => {
+  timers.mockRestore();
+  return w.close();
+});
 
 const folder = (name: string) => join(w.repo.main, ".claude", "worktrees", name);
 const ask = (method: string, id: string) => w.window.ask(method, { dir: w.repo.main, id });
@@ -87,6 +103,7 @@ describe("the interrupt", () => {
     const stuck = await started("STORY-9", "session-9");
     const other = await started("STORY-10", "session-10");
     stuck.onInterrupt = () => new Promise<void>(() => {});
+    bound.length = 0;
     let settled = false;
     const first = ask("story.stop", "STORY-9").then((r) => {
       settled = true;
@@ -96,7 +113,10 @@ describe("the interrupt", () => {
     expect(await ask("story.stop", "STORY-10")).toMatchObject({ ok: true });
     expect(other.interrupts).toBe(1);
     expect(settled).toBe(false);
-    // The wait for the provider is bounded: Stop answers, the story is Stopped, and the turn ends when it does.
+    // The wait for the provider is bounded: when its time is up (the first Stop's own timer), Stop answers, the story is
+    // Stopped, and the turn ends when it does.
+    expect(bound).toHaveLength(2);
+    bound[0]!();
     expect(await first).toMatchObject({ ok: true });
     expect(await stoppedEvents("STORY-9", "STORY-9-spawn-9")).toHaveLength(1);
   });

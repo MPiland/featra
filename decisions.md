@@ -1383,3 +1383,11 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - Plugins can bundle role presets and provider parts.
 - Install from git, URLs and marketplace lists, and later a curated registry too.
 - Designed now, built after M1. Provider plugins stay as planned.
+
+## 2026-11-11 — BUG-18: card-write and Stop tests that fail under load (developer)
+
+- The ordering test "both land, whatever order they arrive in" is timing: card writes share one lane and every run
+  passed its assertions; ten writes take 13 to 19 s, and a loaded machine passes the 30 s limit (24 of 24 copies
+  failed together before, passed after). It has its own 120 s limit.
+- The Stop test "does not hold the card lane" no longer waits on real time: it takes the interrupt's bound timer over
+  and fires it when it says. No assertion changed.

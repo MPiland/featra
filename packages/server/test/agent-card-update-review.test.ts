@@ -9,6 +9,7 @@ import { type Card } from "@featra/work-format";
 import { openFrames } from "./ws-frames.ts";
 import { storyWorld, type Client, type StoryWorld } from "./story-fixture.ts";
 
+const LANE_TEST_MS = 120_000;
 const folder = (story: string) => `.featra/evidence/FEAT-2/${story}/`;
 let w: StoryWorld;
 let lead: Client;
@@ -95,7 +96,9 @@ describe("who is calling", () => {
 });
 
 describe("an agent's report beside the user's edit of the same card", () => {
-  it("both land, whatever order they arrive in", async () => {
+  // Ten card writes through one lane, each a scan and a write: about 1.3 s apiece with one test running, over 2 s with a
+  // few more (BUG-18), so the run-wide 30 s limit is too close. The limit is the only thing that changes.
+  it("both land, whatever order they arrive in", { timeout: LANE_TEST_MS }, async () => {
     const session = await w.agentOf((await w.sessions()).find((s) => s.story?.id === "STORY-6")?.id ?? "");
     let title = (await w.card("STORY-6", at("STORY-6"))).title;
     for (let i = 0; i < 5; i++) {
