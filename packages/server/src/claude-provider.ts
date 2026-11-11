@@ -152,6 +152,8 @@ function startSession(
   const configKey = () => JSON.stringify([role.prompt, settings]);
   /** A turn is open from its message until its turn-end. */
   let open = false;
+  /** Settles when the agent of the latest `send` is running, or its start ended without one. */
+  let started: Promise<void> = Promise.resolve();
 
   const canUseTool: CanUseTool = async (name, toolInput, options) => {
     const { signal, toolUseID, suppressAlwaysAllowRule, suggestions } = options;
@@ -197,7 +199,7 @@ function startSession(
   };
 
   /** Starts the agent, then relays its stream until it ends. A later message starts it again, resuming. */
-  async function run(queue: InputQueue<SDKUserMessage>) {
+  async function run(queue: InputQueue<SDKUserMessage>, began: () => void) {
     // What this agent starts with, taken before anything is awaited: a change made while it starts differs from this
     // key, so the next message replaces the agent, and never relies on a message being held back.
     const starting = { role, settings };
@@ -226,6 +228,7 @@ function startSession(
       return fail([failed(errorMessage(err)), END_FAILED]);
     }
     query = running;
+    began();
     let mid = false;
     try {
       for await (const message of running) {
@@ -260,11 +263,16 @@ function startSession(
       queue.push(userMessage(text, translator.sessionId()));
       if (input) return;
       input = queue;
-      run(queue).catch((err: unknown) => {
-        // Finding `claude` failed, or telling the chat did: end the turn, never leave the rejection loose.
-        if (!closed && input === queue) fail([failed(errorMessage(err)), END_FAILED]);
+      started = new Promise<void>((began) => {
+        run(queue, began)
+          .catch((err: unknown) => {
+            // Finding `claude` failed, or telling the chat did: end the turn, never leave the rejection loose.
+            if (!closed && input === queue) fail([failed(errorMessage(err)), END_FAILED]);
+          })
+          .finally(began);
       });
     },
+    started: () => started,
     configure(next, nextSettings) {
       role = next;
       settings = nextSettings;

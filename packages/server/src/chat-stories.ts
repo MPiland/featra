@@ -165,6 +165,8 @@ export function createStoryRunner(host: StoryHost): StoryRunner {
     host.listChanged(c.dir);
     host.record(c, { type: "user", text: first });
     c.agent.send(first);
+    // "Started" means the provider's session is running (BUG-15), not only asked for.
+    await c.agent.started?.();
   }
 
   function pump(dir: string) {
