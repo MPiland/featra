@@ -14,7 +14,7 @@ export const provenEvent = (ac: number) => `proven:${ac}`;
 export const unprovenEvent = (ac: number) => `unproven:${ac}`;
 
 export interface EvidenceState {
-  /** The latest status change was made by an agent session: it is the agent's claim, not proof. */
+  /** The latest status move or progress report was an agent session's: it is the agent's claim, not proof. */
   reported: boolean;
   /** CI passed on the PR. */
   verified: boolean;
@@ -43,10 +43,11 @@ export function evidenceState(card: Card): EvidenceState {
       accepted = e.to === "accepted";
     }
   }
-  const lastStatus = card.history.findLast((e) => e.field === "status");
+  // A card's creation (no `from`) isn't progress: an agent that drafted a story hasn't reported on it.
+  const lastClaim = card.history.findLast((e) => (e.field === "status" && e.from !== null) || e.field === "report");
   const provenAcs = [...proven].filter((n) => n >= 1 && n <= card.acs.length).toSorted((a, b) => a - b);
   return {
-    reported: !!lastStatus && lastStatus.by.startsWith("session:"),
+    reported: !!lastClaim && lastClaim.by.startsWith("session:"),
     verified,
     provenAcs,
     proven: card.acs.length > 0 && provenAcs.length === card.acs.length,

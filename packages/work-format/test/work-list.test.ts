@@ -164,3 +164,35 @@ describe("buildWorkList", () => {
     });
   });
 });
+
+const rowOf = (card: Card) => {
+  const list = buildWorkList(resolution([feature("FEAT-1", "active", null), card]), config);
+  return list.epics[0]?.features[0]?.stories[0];
+};
+const reportedBy = (by: string) => ({
+  ...story("STORY-1", "FEAT-1"),
+  history: [
+    ...story("STORY-1", "FEAT-1").history,
+    { at: at(3), field: "report" as const, from: "{}", to: "tasks", by },
+  ],
+});
+
+describe("a story row's Reported mark (STORY-10)", () => {
+  it("is on the row when an agent's report is the latest word, and survives the socket", () => {
+    const row = rowOf(reportedBy("session:abc"));
+    expect(row?.reported).toBe(true);
+    const wire = normalizeWorkList(
+      JSON.parse(
+        JSON.stringify(
+          buildWorkList(resolution([feature("FEAT-1", "active", null), reportedBy("session:abc")]), config),
+        ),
+      ),
+    );
+    expect(wire.epics[0]?.features[0]?.stories[0]?.reported).toBe(true);
+  });
+
+  it("is left off a story nobody reported on, and one the user moved after", () => {
+    expect(rowOf(story("STORY-1", "FEAT-1"))).not.toHaveProperty("reported");
+    expect(rowOf(moves(reportedBy("session:abc"), [9, "In Review", "user"]))).not.toHaveProperty("reported");
+  });
+});

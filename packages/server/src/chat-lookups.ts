@@ -33,8 +33,10 @@ export function chatLookups(
       if (!c || c.closed || c.events === null) return null;
       return {
         dir: c.dir,
+        cwd: c.cwd,
         session: `${c.summary.role.name} chat ${c.id.slice(0, 8)}`,
         story: c.summary.story !== undefined,
+        ...(c.summary.story ? { storyId: c.summary.story.id, lead: c.summary.story.parent } : {}),
       };
     },
     providers: () =>

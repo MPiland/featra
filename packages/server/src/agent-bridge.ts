@@ -11,6 +11,7 @@ import {
   assertNever,
   parseDraft,
   parseLogInput,
+  parseReportInput,
   parseSpawnInput,
   parseStartInput,
   starter,
@@ -23,6 +24,7 @@ import {
 import { ApiError } from "./api-error.ts";
 import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
+import type { CardReport } from "./card-report.ts";
 import type { DraftWriter } from "./draft-writer.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
@@ -43,9 +45,13 @@ export const AGENT_MESSAGES = {
   noStart: "Starting a feature isn't available.",
   spawnReadOnly: "Starting a story is off: this project's knowledge setting is read-only.",
   noSpawn: "Starting a story isn't available.",
+  updateReadOnly: "Updating cards is off: this project's knowledge setting is read-only.",
+  noUpdate: "Updating cards isn't available.",
   /** A story session is a worker: only the Dev Lead's chat puts agents on stories. */
   sessionSpawn: "A story session can't start other story sessions. Ask the Dev Lead.",
 } as const;
+
+type ChatInfo = NonNullable<ReturnType<Pick<ChatManager, "info">["info"]>>;
 
 export interface AgentBridgeDeps {
   /** The MCP's script (`dist/mcp.cjs` in the app). Without it no agent gets the MCP. */
@@ -67,6 +73,8 @@ export interface AgentBridgeDeps {
   starts?: FeatureStart;
   /** Starts story sessions (STORY-9). Without it `story.spawn` is refused. */
   spawns?: StorySpawn;
+  /** Writes agents' reports on cards (STORY-10). Without it `card.update` is refused. */
+  reports?: CardReport;
   newToken?: () => string;
 }
 
@@ -97,6 +105,7 @@ export function createAgentBridge({
   drafts,
   starts,
   spawns,
+  reports,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -120,12 +129,13 @@ export function createAgentBridge({
     return (await mcpRefusal(dir)) ?? ((await knowledge(dir)) === "read-only" ? readOnly : null);
   }
 
-  async function appendLog(chat: string, dir: string, session: string, params: unknown) {
+  /** Logs go where the agent works (a story session's worktree), never into the user's own checkout. */
+  async function appendLog(chat: string, dir: string, cwd: string, session: string, params: unknown) {
     const off = await refusal(dir);
     if (off !== null) throw new ApiError(off);
     const input = parseLogInput(isRecord(params) ? params.kind : undefined, params);
     if (!input.ok) throw new ApiError(input.error);
-    const { entry: id, file, summary } = await writer.append(dir, chat, input.value, session);
+    const { entry: id, file, summary } = await writer.append(cwd, chat, input.value, session);
     chats.report(chat, { type: "logged", entry: id, file, summary });
     return { entry: id, file };
   }
@@ -164,6 +174,15 @@ export function createAgentBridge({
     const input = parseSpawnInput(params);
     if (!input.ok) throw new ApiError(input.error);
     return spawns.spawn(dir, input.value, chat);
+  }
+
+  async function update(chat: string, info: ChatInfo, params: unknown) {
+    const off = await refusal(info.dir, AGENT_MESSAGES.updateReadOnly);
+    if (off !== null) throw new ApiError(off);
+    if (!reports) throw new ApiError(AGENT_MESSAGES.noUpdate);
+    const input = parseReportInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return reports.report(info.dir, { chat, story: info.storyId ?? null }, info.session, input.value, info.cwd);
   }
 
   return {
@@ -214,8 +233,10 @@ export function createAgentBridge({
           return start(chat, info.dir, params);
         case "story.spawn":
           return spawn(chat, info.dir, info.story, params);
+        case "card.update":
+          return update(chat, info, params);
         case "log.append":
-          return appendLog(chat, info.dir, info.session, params);
+          return appendLog(chat, info.dir, info.cwd ?? info.dir, info.session, params);
         default:
           return assertNever(method);
       }

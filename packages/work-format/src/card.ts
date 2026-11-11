@@ -147,7 +147,7 @@ export function serializeCard(card: Card): string {
 }
 
 function formatAc(ac: AcceptanceCriterion): string {
-  return `- [${ac.done ? "x" : " "}] ${ac.text}${ac.test ? ` (test: ${ac.test})` : ""}`;
+  return `- [${ac.done ? "x" : " "}] ${ac.text}${ac.test ? ` (test: ${ac.test})` : ""}${ac.evidence ? ` (evidence: ${ac.evidence})` : ""}`;
 }
 
 interface ParsedBody {
@@ -205,10 +205,12 @@ function parseChecklist(content: string): ChecklistItem[] {
   return items;
 }
 
+/** An AC's trailing references: `(test: <ref>)`, then `(evidence: <path>)`, each optional. */
 function splitTestRef(item: ChecklistItem): AcceptanceCriterion {
-  const m = /^(.*?)\s*\(test: ([^)]+)\)\s*$/.exec(item.text);
-  const [, text, test] = m ?? [];
-  return text !== undefined && test ? { ...item, text, test: test.trim() } : { ...item, test: null };
+  const m = /^(.*?)(?:\s*\(test: ([^)]+)\))?(?:\s*\(evidence: ([^)]+)\))?\s*$/.exec(item.text);
+  const [, text, test, evidence] = m ?? [];
+  if (text === undefined || (!test && !evidence)) return { ...item, test: null };
+  return { ...item, text, test: test?.trim() || null, ...(evidence?.trim() ? { evidence: evidence.trim() } : {}) };
 }
 
 function parseHistory(raw: unknown, source?: string): HistoryEvent[] {

@@ -73,6 +73,7 @@ export const WORK_COPY = {
   start: "Start",
   startOf: (id: string) => `Start ${id}`,
   queued: "Queued",
+  reported: "Reported",
   stopped: "Stopped",
   stop: "Stop",
   resume: "Resume",

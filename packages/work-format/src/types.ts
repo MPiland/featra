@@ -18,7 +18,8 @@ export type HistoryField =
   | "content"
   | "sent-back"
   | "stopped"
-  | "queued";
+  | "queued"
+  | "report";
 export const HISTORY_FIELDS: readonly HistoryField[] = [
   "status",
   "parent",
@@ -26,6 +27,7 @@ export const HISTORY_FIELDS: readonly HistoryField[] = [
   "accepted",
   "content",
   "sent-back",
+  "report",
   "stopped",
   "queued",
 ];
@@ -48,6 +50,8 @@ export interface ChecklistItem {
 export interface AcceptanceCriterion extends ChecklistItem {
   /** Reference to the test that proves this AC, e.g. `packages/x/test/y.test.ts > name`. */
   test: string | null;
+  /** The evidence file an agent linked for this AC, inside the story's evidence folder (STORY-10). Absent when none. */
+  evidence?: string;
 }
 
 export interface BodySection {

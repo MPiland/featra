@@ -1341,6 +1341,26 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Story sessions can't start story sessions;** only the Dev Lead and the user spawn.
 - **Queued sessions are kept in memory only** for now; saving the queue across a restart is on the roadmap.
 
+## 2026-11-11 - STORY-10 build choices (story agent, for the Dev Lead to confirm)
+
+- **`update_card` is new, and only ever Reported** (ADR 0027). One `report` history event per call, a `status` event for a
+  stage move; both `by: session:<chat>`.
+- **`evidenceState.reported` no longer counts a card's creation** (an agent-drafted story is not Reported); it counts a
+  session's status move after creation, or a `report`. Regression tests added.
+- **The Dev Lead may update stories and bugs of a feature it drafted, but not while the feature is still a review-pending
+  draft.** The stage ceiling is the last stage before Done.
+- **Evidence:** a plain file of at most 1 MB under the story's evidence folder, one link per criterion, newest wins.
+  The card pane does not show the link yet.
+
+## 2026-11-11 — STORY-10 review rulings (dev-lead)
+
+- The story agent's build choices above are confirmed.
+- **Spec correction:** the Dev Lead that spawned a story may update that story's card, in addition to cards in features it
+  drafted.
+- `report` history events store only what changed, as JSON, not the whole card.
+- `update_card` is refused once the story's worktree is gone, and only the story's latest session may update it.
+- Done and Cancelled cards are refused.
+
 ## 2026-11-11 — STORY-53 Stop and Resume rulings (user)
 
 - **Story sessions are watch-only:** the live transcript, read-only, no composer; the Dev Lead steers them (STORY-54).

@@ -15,6 +15,10 @@ epics in `.featra/cards/`.
   way they do natively.
 - **Keep queued story sessions across a restart** (FEAT-5 keeps the queue in memory), or tell the Dev Lead the
   queue was cleared.
+- **Evidence in the card pane:** show an acceptance criterion's evidence link there (STORY-10 writes it to the card;
+  the pane does not show it yet).
+- **Agents link tests to criteria** through `update_card` (today a criterion's `test:` link is written by hand, not by
+  an agent's report).
 - **More providers:** Codex next (a runner behind the provider-neutral spawn interface from FEAT-5), then ACP agents.
 - **Agents from different providers in one room:** for example ChatGPT as UX and Claude as developer working the
   same project. First step is free once a Codex runner exists: the Dev Lead relays through `message_session`. The
