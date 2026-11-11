@@ -1380,3 +1380,14 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   rename over the card is the one step that fails on Windows alone, when a scan or a scanner has the card open. One
   helper (`busy-retry.ts`) serves `writeAtomic` and the log writer. Not seen in a trace: the cause is by elimination, so
   a further sighting should open the trace first.
+
+## 2026-11-11 — Featra plugins (user)
+
+- Anyone can build Featra plugins that others install; a plugin can add a full pane, a modal, views and actions with its
+  own buttons (ADR 0029, proposed).
+- Plugin UI is sandboxed and reaches Featra through a permissioned API the user approves at install.
+- An opt-in tier lets a plugin run local programs.
+- Featra's components and theme are offered, not forced.
+- Plugins can bundle role presets and provider parts.
+- Install from git, URLs and marketplace lists, and later a curated registry too.
+- Designed now, built after M1. Provider plugins stay as planned.
