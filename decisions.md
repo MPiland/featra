@@ -1420,6 +1420,14 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   per-call gate added nothing. Flagged for the Dev Lead to confirm.
 - Messaging a restored, unopened story session works as ADR 0028 says: proved with a restart test.
 
+### BUG-16: update-card journey flakes on Windows (2026-11-11)
+
+- **A card write retries a rename Windows refuses (EPERM, EBUSY), five tries, as the log writer already did.** Why: the
+  failing run's row showed the story's turn ending without the card changing, so the update was lost, not late. The
+  rename over the card is the one step that fails on Windows alone, when a scan or a scanner has the card open. One
+  helper (`busy-retry.ts`) serves `writeAtomic` and the log writer. Not seen in a trace: the cause is by elimination, so
+  a further sighting should open the trace first.
+
 ## 2026-11-11 — Featra plugins (user)
 
 - Anyone can build Featra plugins that others install; a plugin can add a full pane, a modal, views and actions with its
