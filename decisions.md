@@ -1395,8 +1395,6 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 
 ## 2026-11-11 — BUG-17 and BUG-18 review rulings (dev-lead)
 
-- BUG-17 has no regression test: the failure needs a cold runner where `chat.start` takes over 5 s; the helper is test
-  code and the product path is unchanged. A shared `startChat(page, role)` e2e helper goes on the roadmap, not done here.
 - BUG-18: the ordering test's cost was re-measured with no other load (0.65 s a write); the root cause is the unwatched
   world, and the world now watches. A load time-out can't be a deterministic test, so the 24-copy repro and the 20 ms
   Stop repro stand in for one.
