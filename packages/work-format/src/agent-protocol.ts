@@ -7,6 +7,7 @@
 import type { DraftInput, DraftResult } from "./card-draft-input.ts";
 import type { LogFile, LogInput } from "./knowledge-log.ts";
 import type { ReportInput } from "./card-report.ts";
+import type { MessageInput } from "./story-notice.ts";
 import type { SpawnInput } from "./story-start.ts";
 import { isRecord } from "./utils/guards.ts";
 
@@ -30,6 +31,8 @@ export interface AgentMethods {
   "story.spawn": { params: SpawnInput; result: { chat: string; queued: boolean } };
   /** Reports progress on a card: a story session's own, or one of the Dev Lead's feature (STORY-10). `card` is the card's id. */
   "card.update": { params: ReportInput; result: { card: string; changes: string[] } };
+  /** The Dev Lead tells a story's session something, which goes on its next turn; refused for any other chat (STORY-54). */
+  "session.message": { params: MessageInput; result: { story: string } };
 }
 export type AgentMethod = keyof AgentMethods;
 export const AGENT_METHODS = [
@@ -38,6 +41,7 @@ export const AGENT_METHODS = [
   "feature.start",
   "story.spawn",
   "card.update",
+  "session.message",
 ] as const satisfies readonly AgentMethod[];
 
 export interface AgentRequest {

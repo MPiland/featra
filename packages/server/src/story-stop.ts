@@ -14,7 +14,6 @@ import {
   resumedStory,
   resumeRefusal,
   serializeCard,
-  stageTone,
   STOP_MESSAGES,
   stopRefusal,
   stoppedIn,
@@ -24,9 +23,10 @@ import {
   type StoryTurn,
 } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
-import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
+import { writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import type { ChatManager } from "./chat-manager.ts";
+import { storyCardIn } from "./story-card.ts";
 import type { Scan } from "./work-scan.ts";
 
 export interface StoryStopDeps {
@@ -59,17 +59,7 @@ export function createStoryStop({
   chats,
   interruptMs = 10_000,
 }: StoryStopDeps) {
-  /** The story's card as its owner has it, where to write it, and the tone of its stage. */
-  async function cardOf(dir: string, id: string) {
-    const scan = await scanDir(dir);
-    const found = ownedIn(scan, id);
-    const card = found?.owned.card;
-    return {
-      card,
-      file: found?.root ? fileIn(found.root, found.owned.path) : null,
-      tone: card && scan ? stageTone(card.status, scan.collected.config) : ("idle" as const),
-    };
-  }
+  const cardOf = async (dir: string, id: string) => storyCardIn(await scanDir(dir), id);
 
   /** What the session's row says of its turn. */
   function turnOf(dir: string, chat: string | null): StoryTurn {

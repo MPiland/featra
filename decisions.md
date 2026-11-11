@@ -1373,6 +1373,61 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   later turn can be stopped.
 - **No confirmation, any client:** Stop and Resume are the user's own action and work remotely.
 
+## 2026-11-11 — STORY-54 rulings (dev-lead)
+
+- **The Dev Lead for a story is the chat that spawned it** (the scope STORY-10 uses). If that chat is gone, it is not told.
+- **`message_session` to a Stopped story is refused:** "STORY-N is stopped. Only the user can resume it." Proved by a test.
+- **Notices are short app-written text** (story id, outcome ended/stopped/failed/asks, one-line summary) with no token
+  cost, delivered as a clearly labelled user-role message from Featra. If the Dev Lead is mid-turn they are queued and sent
+  as one message when its turn ends.
+- **A story's `ask_user` does not reach the user directly;** the Dev Lead gets a notice. The user's own Stop still
+  produces a "stopped" notice.
+
+### Build choices (story agent)
+
+- `ask_user` is the provider's own `AskUserQuestion`: refused with a message that has the session end its turn (not
+  interrupted), then an "asks" notice at turn end. The Dev Lead answers with `message_session` or asks the user itself.
+- **With no Dev Lead, a story's question still asks the user** (the old path and the Inbox). Completion, stop and failure
+  notices are not sent at all then: the Inbox holds only approvals and questions, so the ruling "notices go to the Inbox
+  for the user" is only partly met. Flagged for the Dev Lead.
+- `message_session` is also refused while the session is working or waiting for a slot, from any chat but the spawner
+  (a story session included), and for a card that is gone or no story.
+- A story the user takes off the queue before it started gets a "stopped" notice.
+- `packages/mcp/test/stdio.test.ts` gained `message_session` in its expected tool list (additive, as STORY-10 did).
+
+### Review rulings (dev-lead, round 2)
+
+- **No live Dev Lead: ended/stopped/failed notices are shown nowhere for now;** a question still goes to the user. This
+  relaxes the earlier "notices go to the Inbox" ruling. Roadmap: story notices in the Inbox when no Dev Lead is open.
+- **Unbounded lead-to-story ping-pong is accepted for now;** roadmap: a per-story notice budget or back-off.
+- A queued story that fails to start (its worktree or launch throws) posts a "failed" notice with the reason.
+- A Dev Lead whose own turn the user stopped is not given waiting notices; they are held and delivered when its next turn
+  that is not a stop ends.
+- "asks" notices carry each question with its option labels, every question the turn asked (none overwritten), and may
+  run to 600 characters (other notices stay at 160). The ask-summary format therefore changed in
+  `story-notices-ask.test.ts` and `story-notice.test.ts`: the old assertions did not hold the options.
+- A chat that ends forgets the questions and notices it held. A held question whose Dev Lead is gone by the end of the
+  turn asks the user in the story's chat (the no-Dev-Lead path), and the user's answer is sent to the session.
+- Delivery errors drop notices only when they can never succeed (the Dev Lead is closed or can't take a message); a
+  transient error keeps them for the next idle. Notices held in memory are lost across an app restart: accepted, on the
+  roadmap with "keep queued story sessions across a restart". Found while testing: a failed send also dropped them,
+  because they were removed before sending; now removed after.
+- `message_session` and Resume cannot both put a message in one turn: each claims the session's next turn first
+  (`chat-send.ts`), and the second is refused as busy. Proved with a deterministic race test.
+- **`message_session` is not gated by the read-only knowledge setting,** only by the MCP's off switch. The precedent
+  (the MCP off switch and the knowledge setting apply, decisions of STORY-8) is a ruling about `draft_cards`, because
+  drafting writes cards; it was not a ruling about messaging. A read-only project withholds the whole MCP at attach, so a
+  per-call gate added nothing. Flagged for the Dev Lead to confirm.
+- Messaging a restored, unopened story session works as ADR 0028 says: proved with a restart test.
+
+### BUG-16: update-card journey flakes on Windows (2026-11-11)
+
+- **A card write retries a rename Windows refuses (EPERM, EBUSY), five tries, as the log writer already did.** Why: the
+  failing run's row showed the story's turn ending without the card changing, so the update was lost, not late. The
+  rename over the card is the one step that fails on Windows alone, when a scan or a scanner has the card open. One
+  helper (`busy-retry.ts`) serves `writeAtomic` and the log writer. Not seen in a trace: the cause is by elimination, so
+  a further sighting should open the trace first.
+
 ## 2026-11-11 — Featra plugins (user)
 
 - Anyone can build Featra plugins that others install; a plugin can add a full pane, a modal, views and actions with its
