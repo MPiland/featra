@@ -16,6 +16,10 @@
  *   STORY-N"). Writes a small evidence file into the story's folder in its worktree, then calls the Featra MCP's
  *   update_card tool: ticks the drafted task and criterion with that evidence, adds a task, moves the story to In
  *   Review and notes it. The tool call is real; only the agent is faked.
+ * - "subagent" (STORY-55): the agent spawns a background subagent (an Agent call, `task_started`, and the subagent's own
+ *   messages, tagged as the SDK tags them). The subagent says something, then asks to run a Bash `npm test` through
+ *   canUseTool as itself (`agentID`), and when that is answered says more and waits for `stopTask`, which ends it with
+ *   a stopped `task_notification`; the session's turn then finishes.
  * - "slow": starts a reply and waits for interrupt().
  * - with FEATRA_E2E_STORY_TURN=slow, a story session's first message ("You are working on ...") is a slow turn that
  *   thinks first (STORY-53): it shows its thinking, then its reply, and waits for interrupt().
@@ -190,6 +194,47 @@ async function* reportTurn(options, text) {
   yield success("Done.");
 }
 
+const SUB_CALL = "toolu_agent_1";
+const SUB_TASK = "task_sub_1";
+/** A message of the subagent's own conversation, tagged with the call that started it and its task. */
+const inSub = (message) => ({ ...message, parent_tool_use_id: SUB_CALL, agent_id: SUB_TASK });
+
+/** The agent spawns a background subagent; its Bash needs approval (as itself), and it runs until stopTask ends it. */
+async function* subagentTurn(options, signal, waitForStop) {
+  yield assistant(`msg_${++seq}`, [
+    { type: "tool_use", id: SUB_CALL, name: "Agent", input: { description: "Review the diff" } },
+  ]);
+  yield {
+    ...MAIN,
+    type: "system",
+    subtype: "task_started",
+    task_id: SUB_TASK,
+    tool_use_id: SUB_CALL,
+    description: "Review the diff",
+    subagent_type: "reviewer",
+    task_type: "local_agent",
+    is_backgrounded: true,
+    prompt: "Review the diff.",
+  };
+  yield inSub(assistant(`msg_${++seq}`, [{ type: "text", text: "Reading the diff." }]));
+  const id = `toolu_sub_bash_${++seq}`;
+  const input = { command: "npm test" };
+  yield inSub(assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "Bash", input }]));
+  const decision = await options.canUseTool("Bash", input, {
+    signal,
+    toolUseID: id,
+    requestId: `request_${seq}`,
+    agentID: SUB_TASK,
+  });
+  const allowed = decision.behavior === "allow";
+  yield inSub(toolResult(id, allowed ? "ok" : decision.message, !allowed));
+  yield inSub(assistant(`msg_${++seq}`, [{ type: "text", text: "Tests ran, still reviewing." }]));
+  await waitForStop;
+  yield { ...MAIN, type: "system", subtype: "task_notification", task_id: SUB_TASK, status: "stopped", summary: "" };
+  yield* say("Subagent stopped.");
+  yield success("Done.");
+}
+
 const QUESTIONS = [
   {
     question: "Which colour do you prefer?",
@@ -232,6 +277,8 @@ async function* questionTurn(options, signal) {
   yield success("Done.");
 }
 
+const nothing = () => {};
+
 export function query({ prompt, options }) {
   const log = process.env.FEATRA_E2E_AGENT_LOG;
   if (log) {
@@ -242,6 +289,8 @@ export function query({ prompt, options }) {
     appendFileSync(log, `${JSON.stringify(seen)}\n`);
   }
   let release = null;
+  let releaseTask = nothing;
+  const taskStopped = new Promise((resolve) => (releaseTask = resolve));
   const stopped = () => new Promise((resolve) => (release = resolve));
   // Aborted on interrupt(), as the SDK aborts a permission request when its turn is interrupted.
   let turn = new AbortController();
@@ -272,6 +321,8 @@ export function query({ prompt, options }) {
         yield* reportTurn(options, text);
       } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {
         yield* slow(["The worktree is clean."], "Starting the story.");
+      } else if (said.includes("subagent")) {
+        yield* subagentTurn(options, turn.signal, taskStopped);
       } else if (said.includes("decide")) {
         yield* decideTurn(options);
       } else if (said.includes("draft")) {
@@ -298,5 +349,7 @@ export function query({ prompt, options }) {
       turn.abort();
       release?.();
     },
+    // Ends the subagent's task, as the SDK's Query.stopTask does; the subagent turn then reports it stopped.
+    stopTask: async () => releaseTask(),
   });
 }

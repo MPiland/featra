@@ -2,7 +2,7 @@
 id: STORY-55
 type: story
 title: Native subagents appear nested
-status: New
+status: In Review
 parent: FEAT-5
 order: 6
 origin: planned
@@ -20,6 +20,16 @@ history:
     from: null
     to: New
     by: session:dev-lead
+  - at: 2026-11-11T23:00:00Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:story-55
+  - at: 2026-11-12T00:30:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-55
 ---
 
 ## Description
@@ -28,12 +38,27 @@ As the user, I see the subagents any session spawns for itself, nested under it,
 
 ## Acceptance criteria
 
-- [ ] A subagent spawned by a session appears nested under that session in the sidebar with its live transcript, read-only
-- [ ] Stop on a nested subagent stops only that subagent where the provider supports it (Claude background subagents); otherwise no Stop is shown
-- [ ] Tool approvals and questions from a subagent are labelled with that subagent
+- [x] A subagent spawned by a session appears nested under that session in the sidebar with its live transcript, read-only (tests: packages/server/test/chat-subagents.test.ts, packages/client/test/components/chat-subagent.test.tsx, apps/desktop/e2e/nested-subagents.spec.ts)
+- [x] Stop on a nested subagent stops only that subagent where the provider supports it (Claude background subagents); otherwise no Stop is shown (tests: chat-subagents.test.ts "AC2", claude-subagents.test.ts "Stop", chat-subagent.test.tsx "AC2", nested-subagents.spec.ts)
+- [x] Tool approvals and questions from a subagent are labelled with that subagent (tests: chat-subagents.test.ts "AC3", packages/work-format/test/chat-subagent.test.ts, chat-subagent.test.tsx "AC3", nested-subagents.spec.ts)
 
 ## Tasks
 
-- [ ] Break down when picked up
+- [x] Provider seam: `SubagentEvent`, `SessionOptions.subagent`, `ProviderSession.stopSubagent`, request labels (test: packages/server/test/claude-subagents.test.ts)
+- [x] Claude adapter: forward subagent text, route task and subagent messages to their own transcript, label approvals and questions, stop one task (test: packages/server/test/claude-subagents.test.ts)
+- [x] Session manager: a read-only subagent chat nested under its parent, Stop on it, gone with its parent (test: packages/server/test/chat-subagents.test.ts)
+- [x] Pure rules in work-format: summary ref, nesting, event labels (test: packages/work-format/test/chat-subagent.test.ts)
+- [x] Sidebar nesting, read-only transcript with Stop, labelled approvals and questions (test: packages/client/test/components/chat-subagent.test.tsx)
+- [x] ADR 0030, CONTEXT.md term, decisions.md build choices, and the Playwright journey (written, run in CI only)
 
 ## Notes
+
+AC2 is supported by the SDK, so Stop is offered for a Claude background subagent. Evidence from the SDK types
+(`@anthropic-ai/claude-agent-sdk` sdk.d.ts): `Query.stopTask(taskId: string): Promise<void>` ends one task; `Options.forwardSubagentText`
+tags a subagent's messages with `parent_tool_use_id` and `agent_id`; `task_started` carries `task_id`, `tool_use_id`,
+`task_type` (`local_agent`) and `is_backgrounded` (true when registered in the background, false when the spawning call
+blocks on it; a later move arrives as `task_updated.patch.is_backgrounded`); `canUseTool`'s options carry `agentID`. A
+foreground subagent is ended only with its turn, so it shows no Stop. Build choices and the unverified-shape risk are in
+decisions.md ("STORY-55 build choices") and ADR 0030. Restoring subagents after a restart is on the roadmap.
+
+The Playwright journey (`apps/desktop/e2e/nested-subagents.spec.ts`) is written and runs in CI only.

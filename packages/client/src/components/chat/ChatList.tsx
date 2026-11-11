@@ -31,7 +31,12 @@ export function useChats(chats: ChatBridge, dir: string | null, id: string | nul
   }
   const listed = list.chats.find((c) => c.id === id);
   const chat: OpenChat | null = listed
-    ? { id: listed.id, role: listed.role, story: listed.story?.id }
+    ? {
+        id: listed.id,
+        role: listed.role,
+        story: listed.story?.id,
+        ...(listed.subagent ? { subagent: { stoppable: listed.subagent.stoppable } } : {}),
+      }
     : id
       ? (started[id] ?? null)
       : null;
@@ -48,10 +53,16 @@ interface ChatListProps {
 
 type Chat = Chats["chats"][number];
 
-/** The sidebar's chats, one group per provider the user has installed; a chat waiting on the user has a dot. */
-export function ChatList({ list, current, onOpen }: ChatListProps) {
-  const row = (chat: Chat, nested = false) => (
-    <li key={chat.id}>
+interface RowProps {
+  chat: Chat;
+  current: string | null;
+  nested?: boolean;
+  onOpen: (id: string) => void;
+}
+
+function ChatRow({ chat, current, nested = false, onOpen }: RowProps) {
+  return (
+    <li>
       <button
         type="button"
         className={chat.id === current ? "nav chat-row on" : "nav chat-row"}
@@ -70,10 +81,40 @@ export function ChatList({ list, current, onOpen }: ChatListProps) {
       </button>
     </li>
   );
+}
+
+/** The subagents a session spawned (STORY-55), under its row. */
+function Subagents({
+  of,
+  subagents,
+  current,
+  onOpen,
+}: Pick<RowProps, "current" | "onOpen"> & { of: Chat; subagents: Chat[] | undefined }) {
+  if (!subagents?.length) return null;
+  return (
+    <li role="none">
+      <ul className="navlist chat-children" aria-label={CHAT_COPY.subagentsOf(chatName(of))}>
+        {subagents.map((s) => (
+          <ChatRow key={s.id} chat={s} current={current} nested onOpen={onOpen} />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+/** The sidebar's chats, one group per provider the user has installed; a chat waiting on the user has a dot. */
+export function ChatList({ list, current, onOpen }: ChatListProps) {
   const listed = new Set(list.chats.map((c) => c.id));
   return groupChats(list).map(({ provider, chats }) => {
     // A story session sits under its Dev Lead's chat, or under a group named after its feature when that chat is gone.
-    const { branches, groups } = nestChats(chats, listed);
+    // A subagent a session spawned sits under that session, wherever the session is.
+    const { branches, groups, subagents } = nestChats(chats, listed);
+    const row = (chat: Chat, nested = false) => (
+      <Fragment key={chat.id}>
+        <ChatRow chat={chat} current={current} nested={nested} onOpen={onOpen} />
+        <Subagents of={chat} subagents={subagents.get(chat.id)} current={current} onOpen={onOpen} />
+      </Fragment>
+    );
     return (
       <div key={provider.id} className="chat-group" role="group" aria-labelledby={`chat-group-${provider.id}`}>
         <h2 id={`chat-group-${provider.id}`} className="chat-group-name">

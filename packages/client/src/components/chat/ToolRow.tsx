@@ -35,6 +35,7 @@ export function ToolRow({
           forChat={item.approval.forChat}
           covers={item.approval.covers ?? null}
           story={item.approval.story ?? null}
+          subagent={item.approval.subagent ?? null}
           onAnswer={(answer) => onAnswer(item.id, answer)}
         />
       )}

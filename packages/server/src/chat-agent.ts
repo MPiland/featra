@@ -4,7 +4,14 @@ import { applyState } from "./chat-composer.ts";
 import { restoredState } from "./chat-configure.ts";
 import type { ChatManagerDeps } from "./chat-manager-types.ts";
 import type { Chat } from "./chat-state.ts";
-import type { ApprovalHandler, ProviderAdapter, ProviderSession, QuestionRequest, Refusal } from "./provider.ts";
+import type {
+  ApprovalHandler,
+  ProviderAdapter,
+  ProviderSession,
+  QuestionRequest,
+  Refusal,
+  SubagentEvent,
+} from "./provider.ts";
 
 export interface AgentFactoryHost {
   mcp: ChatManagerDeps["mcp"];
@@ -14,10 +21,12 @@ export interface AgentFactoryHost {
   listChanged: (dir: string) => void;
   /** A story session's question that its Dev Lead takes instead of the user (STORY-54): the refusal the agent is told. */
   asked: (c: Chat, request: Omit<QuestionRequest, "chat">) => Refusal | null;
+  /** A subagent the session spawned for itself (STORY-55): shown as a read-only chat nested under it. */
+  subagent: (c: Chat, event: SubagentEvent) => void;
 }
 
 /** Makes a chat's agent session, through its provider; the session starts its agent with the first message. */
-export function createAgentFactory({ mcp, decide, desk, record, listChanged, asked }: AgentFactoryHost) {
+export function createAgentFactory({ mcp, decide, desk, record, listChanged, asked, subagent }: AgentFactoryHost) {
   return function agentFor(
     c: Chat,
     adapter: ProviderAdapter,
@@ -36,6 +45,7 @@ export function createAgentFactory({ mcp, decide, desk, record, listChanged, ask
       cwd: c.cwd,
       role,
       emit,
+      subagent: (event) => subagent(c, event),
       resume: c.session,
       ...(inherited.length > 0 ? { inherited } : {}),
       ...(mcp ? { mcp: () => mcp.attach({ id: c.id, dir: c.dir }) } : {}),

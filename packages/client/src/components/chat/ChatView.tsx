@@ -15,6 +15,8 @@ export interface OpenChat {
   role: ChatRoleRef;
   /** The story this chat is the session of: its transcript is shown read-only (STORY-53). */
   story?: string;
+  /** A subagent the session spawned: its transcript is read-only, and Stop ends it alone where the provider can (STORY-55). */
+  subagent?: { stoppable: boolean };
 }
 
 export interface ChatViewProps {
@@ -45,6 +47,7 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
   const fullAccess = modeChoice ? modeChoice.fullAccess === true : mode.fullAccess;
   const roleName = controls.roles.find((r) => r.id === mine("role"))?.name ?? chat.role.name;
   const error = update.error ?? actionError;
+  const readOnly = chat.story !== undefined || chat.subagent !== undefined;
   const gone = items.some((item) => item.kind === "notice" && item.notice.type === "gone");
   const newChat = async () => {
     const started = await chats.start(dir, chat.role.id);
@@ -55,13 +58,28 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
     <section className="chat" aria-label={roleName} data-chat={chat.id}>
       <header className="chat-head">
         <span className="chat-role">{roleName}</span>
-        <span className="chat-meta">
-          {mine("model") ?? model ?? chat.role.model} · {mine("effort") ?? chat.role.effort} ·{" "}
-          <span className="chat-mode" title={modeChoice ? undefined : (modeWhere(mode) ?? undefined)}>
-            {modeChoice ? modeChoice.label : modeLabel(mode)}
+        {!chat.subagent && (
+          <span className="chat-meta">
+            {mine("model") ?? model ?? chat.role.model} · {mine("effort") ?? chat.role.effort} ·{" "}
+            <span className="chat-mode" title={modeChoice ? undefined : (modeWhere(mode) ?? undefined)}>
+              {modeChoice ? modeChoice.label : modeLabel(mode)}
+            </span>
           </span>
-        </span>
+        )}
         {headerExtra}
+        {chat.subagent?.stoppable && (
+          <button
+            type="button"
+            className="review-draft"
+            aria-label={CHAT_COPY.stopSubagent(roleName)}
+            onClick={() => {
+              setActionError(null);
+              void chats.stop(chat.id).then(setActionError);
+            }}
+          >
+            {CHAT_COPY.stop}
+          </button>
+        )}
         {chat.story && story && (
           <StoryStop
             id={chat.story}
@@ -86,12 +104,12 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
           onUndoLog: (entry) => chats.undoLog(chat.id, entry),
         }}
       />
-      {chat.story && (
+      {readOnly && (
         <p className="chat-note" role="note">
-          {CHAT_COPY.watching}
+          {chat.subagent ? CHAT_COPY.watchingSubagent : CHAT_COPY.watching}
         </p>
       )}
-      {!gone && !chat.story && (
+      {!gone && !readOnly && (
         <Composer
           running={running}
           fullAccess={fullAccess}

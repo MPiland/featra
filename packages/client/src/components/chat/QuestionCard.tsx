@@ -132,6 +132,9 @@ export function QuestionCard({
           {question.status === "pending" ? CHAT_COPY.needsAnswer : CHAT_COPY.answered}
         </span>
       </div>
+      {question.status === "pending" && question.subagent && (
+        <p className="meta">{CHAT_COPY.askedBySubagent(question.subagent)}</p>
+      )}
       {question.status === "pending" ? (
         <QuestionForm questions={question.questions} onAnswer={(answers) => onAnswer(item.id, answers)} />
       ) : (

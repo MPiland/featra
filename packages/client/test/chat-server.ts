@@ -223,6 +223,29 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       act(() => listChanged(dir));
       return { chat: id, queued };
     },
+    /** The server lists a subagent the session `parent` spawned: a running, read-only chat nested under it (STORY-55). */
+    addSubagent: (parent: string, label: string, stoppable: boolean) => {
+      const under = rows.get(parent);
+      if (!under) throw new Error("No session.");
+      const id = `subagent-${logs.size + 1}`;
+      logs.set(id, []);
+      const role = { ...under.summary.role, id: "subagent", name: "Subagent" };
+      const row = newSummary(id, under.summary.provider, role, now());
+      rows.set(id, {
+        dir: under.dir,
+        summary: { ...row, title: label, running: true, subagent: { parent, stoppable } },
+        asks: [],
+      });
+      act(() => listChanged(under.dir));
+      return id;
+    },
+    /** The subagent ends: its row stops running and loses Stop. */
+    endSubagent: (id: string) => {
+      const row = rows.get(id);
+      if (!row?.summary.subagent) return;
+      row.summary = { ...row.summary, running: false, subagent: { ...row.summary.subagent, stoppable: false } };
+      act(() => listChanged(row.dir));
+    },
     /** What the server's row says of a story session's turn: the rules for Resume read it. */
     storyTurn: (dir: string, story: string) => {
       const row = [...rows.values()].find((r) => r.dir === dir && r.summary.story?.id === story)?.summary;

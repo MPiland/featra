@@ -1438,3 +1438,26 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - Plugins can bundle role presets and provider parts.
 - Install from git, URLs and marketplace lists, and later a curated registry too.
 - Designed now, built after M1. Provider plugins stay as planned.
+
+## 2026-11-11 — STORY-55 build choices (story agent, for the Dev Lead to confirm)
+
+- **A subagent is an in-memory, read-only chat, never saved.** Why: it reuses the chat log, watch and list row, so the
+  sidebar, the transcript and `chat.stop` needed no new protocol; saving one would copy what the provider owns. It is
+  removed when its session ends or its project closes (ADR 0030).
+- **Stop is offered only for a background subagent with a known task.** Why: the SDK's `Query.stopTask(taskId)` ends one
+  task, but a foreground subagent holds its tool call open and ends only with the turn, so a Stop there would stop the
+  session. The row's `stoppable` flips when `task_updated` moves a subagent to the background, and is false once it ends.
+  Evidence for the card: sdk.d.ts `Query.stopTask`, `forwardSubagentText`, `task_started.is_backgrounded` and
+  `canUseTool` options' `agentID`.
+- **Approvals and questions stay in the session's chat, labelled `Asked by the subagent <label>`.** Why: one place to
+  answer, one waiting dot, one Inbox path. The label is on the `approval` and `question` events and rides the Dev Lead's
+  copy of a story session's request unchanged.
+- **Nesting is flat:** a subagent of a subagent sits at the same level under the session (`spawn_depth` and
+  `parent_task_id` are ignored). Why: the sidebar stays one level deeper than a story session, not a tree.
+- **Subagents are not restored after a restart.** Roadmap: restore from `listSubagents` and `getSubagentMessages`.
+- **A resumed subagent with the same task id is ignored after it ends.** Why: the SDK re-registers resumed subagents in the
+  background, and showing a second chat for one task would mislead; rare, so not worth a rule yet.
+- **The header's model, effort and mode line is hidden for a subagent.** Why: it runs with its session's settings, which
+  the subagent chat cannot change or truthfully report.
+- **Risk: message shapes are unverified against a real `claude`.** The adapter follows the SDK's types and is proved with
+  the fake `query` and the e2e fake SDK (CI), as every other adapter path is (ADR 0013). A first real run may need a fix.
