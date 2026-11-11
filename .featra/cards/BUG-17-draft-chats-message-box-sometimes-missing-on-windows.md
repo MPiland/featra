@@ -2,7 +2,7 @@
 id: BUG-17
 type: bug
 title: Draft chat's Message box sometimes missing on Windows
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 9
 origin: bug
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-17
+  - at: 2026-11-11T23:23:14Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
