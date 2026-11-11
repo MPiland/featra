@@ -2,7 +2,7 @@
 id: BUG-12
 type: bug
 title: Work-watch and card-watch tests flake in full runs
-status: Acceptance
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-11T22:59:01Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-11T22:59:01Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
