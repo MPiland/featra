@@ -2,7 +2,10 @@
 import {
   applyCardEdit,
   notStartableReason,
+  notSpawnableReason,
   startedFeature,
+  startedStory,
+  storyBranchName,
   buildCardView,
   buildWorkList,
   DEFAULT_CONFIG,
@@ -33,7 +36,12 @@ export function fakeCardServer(
   /** What the server answers to Send back. */
   sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
   /** What the server answers to Approve and Reject; left out, the fake does what the server does to the cards. */
-  review: Partial<Pick<CardBridge, "approve" | "reject" | "start">> = {},
+  review: Partial<Pick<CardBridge, "approve" | "reject" | "start" | "startStory">> = {},
+  /** The chat the server starts for a story, and whether it waits for a slot: what a Start makes besides the card change. */
+  storySession: (dir: string, story: Card, feature: Card) => { chat: string; queued: boolean } = () => ({
+    chat: "story-chat",
+    queued: false,
+  }),
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -120,6 +128,36 @@ export function fakeCardServer(
       if (why !== null || !feature) return { ok: false, error: why ?? "That card is gone." };
       changed(dir, startedFeature(feature, "user", EDIT_AT));
       return { ok: true };
+    },
+    // Starting a story is the server's to prove (git, the worktree, the queue): the fake records the call and, unless a
+    // test sets the answer, applies work-format's rules and the story's card as started.
+    startStory: async (dir, id) => {
+      calls.push(`startStory:${dir}:${id}`);
+      if (review.startStory) return review.startStory(dir, id);
+      const cards = cardSets.get(dir) ?? [];
+      const story = cards.find((c) => c.id === id);
+      const feature = cards.find((c) => c.id === story?.parent);
+      const why = notSpawnableReason(story, feature, feature ? `feature/${feature.id}` : null, id);
+      if (why !== null || !story || !feature) return { ok: false, error: why ?? "That card is gone." };
+      const session = storySession(dir, story, feature);
+      if (!session.queued) {
+        changed(
+          dir,
+          startedStory(
+            story,
+            {
+              agent: "developer",
+              model: "opus",
+              reasoning: "high",
+              session: session.chat,
+              branch: storyBranchName(story),
+            },
+            "user",
+            EDIT_AT,
+          ),
+        );
+      }
+      return { ok: true, ...session };
     },
     reject: async (dir, id) => {
       calls.push(`reject:${dir}:${id}`);

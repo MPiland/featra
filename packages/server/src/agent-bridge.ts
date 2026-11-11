@@ -11,6 +11,7 @@ import {
   assertNever,
   parseDraft,
   parseLogInput,
+  parseSpawnInput,
   parseStartInput,
   starter,
   SERVER_HOST,
@@ -24,6 +25,7 @@ import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { DraftWriter } from "./draft-writer.ts";
 import type { FeatureStart } from "./feature-start.ts";
+import type { StorySpawn } from "./story-spawn.ts";
 import type { LogWriter } from "./log-writer.ts";
 import type { McpServerSpec } from "./provider.ts";
 import { sameSecret } from "./secret.ts";
@@ -39,6 +41,8 @@ export const AGENT_MESSAGES = {
   noDrafts: "Drafting cards isn't available.",
   startReadOnly: "Starting is off: this project's knowledge setting is read-only.",
   noStart: "Starting a feature isn't available.",
+  spawnReadOnly: "Starting a story is off: this project's knowledge setting is read-only.",
+  noSpawn: "Starting a story isn't available.",
 } as const;
 
 export interface AgentBridgeDeps {
@@ -59,6 +63,8 @@ export interface AgentBridgeDeps {
   drafts?: DraftWriter;
   /** Starts approved features (STORY-52). Without it `feature.start` is refused. */
   starts?: FeatureStart;
+  /** Starts story sessions (STORY-9). Without it `story.spawn` is refused. */
+  spawns?: StorySpawn;
   newToken?: () => string;
 }
 
@@ -88,6 +94,7 @@ export function createAgentBridge({
   writer,
   drafts,
   starts,
+  spawns,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -147,6 +154,15 @@ export function createAgentBridge({
     return starts.start(dir, input.id, starter(chat));
   }
 
+  async function spawn(chat: string, dir: string, params: unknown) {
+    const off = await refusal(dir, AGENT_MESSAGES.spawnReadOnly);
+    if (off !== null) throw new ApiError(off);
+    if (!spawns) throw new ApiError(AGENT_MESSAGES.noSpawn);
+    const input = parseSpawnInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return spawns.spawn(dir, input.value, chat);
+  }
+
   return {
     setPort: (next) => {
       port = next;
@@ -193,6 +209,8 @@ export function createAgentBridge({
           return draft(chat, info.dir, params);
         case "feature.start":
           return start(chat, info.dir, params);
+        case "story.spawn":
+          return spawn(chat, info.dir, params);
         case "log.append":
           return appendLog(chat, info.dir, info.session, params);
         default:

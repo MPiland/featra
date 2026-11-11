@@ -63,7 +63,7 @@ function WorkSettingRow(props: {
           <SegmentedControl
             name={id}
             value={String(value)}
-            options={def.choices}
+            options={def.choices.map((c) => ({ value: String(c.value), label: c.label }))}
             onChange={(v) => {
               const choices: readonly ChoiceDef<WorkValue>[] = def.choices;
               const choice = choices.find((c) => String(c.value) === v);

@@ -5,6 +5,7 @@ import {
   isKnowledgePermission,
   isRecord,
   knowledgePermission,
+  maxStoryAgents,
   mcpEnabled,
   type KnowledgePermission,
 } from "@featra/work-format";
@@ -56,5 +57,17 @@ export function readKnowledge(dataDir: string | undefined): (dir: string) => Pro
     const { config, settings } = await settingsText(dataDir, dir);
     const fallback = appDefault(settings, "knowledge");
     return knowledgePermission(config, isKnowledgePermission(fallback) ? fallback : undefined);
+  };
+}
+
+/** The most story sessions a project runs at once (STORY-9): its `maxStoryAgents`, else the app default, else 3. */
+export function readMaxStoryAgents(dataDir: string | undefined): (dir: string) => Promise<number> {
+  return async (dir) => {
+    const { config, settings } = await settingsText(dataDir, dir);
+    const fallback = appDefault(settings, "maxStoryAgents");
+    return maxStoryAgents(
+      config,
+      typeof fallback === "number" && Number.isInteger(fallback) && fallback >= 1 ? fallback : undefined,
+    );
   };
 }

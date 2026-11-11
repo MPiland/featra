@@ -371,3 +371,16 @@
   height: 100%;
   background: var(--tx2);
 }
+
+/* Story sessions (STORY-9): nested under their Dev Lead's chat, or under a group named after their feature. */
+.chat-children {
+  margin-left: 12px;
+}
+
+.chat-children .chat-group-name {
+  padding-left: 10px;
+}
+
+.story-agent {
+  margin-left: 8px;
+}

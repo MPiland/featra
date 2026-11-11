@@ -35,7 +35,12 @@ export interface CardBridge {
   reject: (dir: string, id: string) => Promise<ReviewResult>;
   /** Starts an approved feature: the server makes its branch and the feature is active there (STORY-52). */
   start: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Starts a story's agent in its own worktree; it is queued when the project is at its limit of story agents (STORY-9). */
+  startStory: (dir: string, id: string) => Promise<StartStoryResult>;
 }
+
+/** The chat the story's agent runs in, and whether it waits for a free slot; or why it didn't start. */
+export type StartStoryResult = { ok: true; chat: string; queued: boolean } | { ok: false; error: string };
 
 /** Whether Approve or Reject went through, or why not. */
 export type ReviewResult = { ok: true } | { ok: false; error: string };
@@ -122,6 +127,14 @@ export function serverCards(server: ServerClient): CardBridge {
     approve: (dir, id) => review(server.call("draft.approve", { dir, id })),
     reject: (dir, id) => review(server.call("draft.reject", { dir, id })),
     start: (dir, id) => review(server.call("feature.start", { dir, id })),
+    startStory: (dir, id) =>
+      server.call("story.start", { dir, id }).then(
+        (r): StartStoryResult =>
+          isRecord(r) && typeof r.chat === "string"
+            ? { ok: true, chat: r.chat, queued: r.queued === true }
+            : { ok: false, error: errorMessage(new Error("Featra gave an unexpected answer.")) },
+        (err: unknown): StartStoryResult => ({ ok: false, error: errorMessage(err) }),
+      ),
   };
 }
 
@@ -137,5 +150,6 @@ export function noCards(error: string): CardBridge {
     approve: async () => ({ ok: false, error }),
     reject: async () => ({ ok: false, error }),
     start: async () => ({ ok: false, error }),
+    startStory: async () => ({ ok: false, error }),
   };
 }

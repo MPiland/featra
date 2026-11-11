@@ -51,6 +51,21 @@ export interface ChatSummary {
   waiting: WaitReason | null;
   /** The card the chat was started to work on (STORY-7), when there is one. */
   card?: string;
+  /** A story session (STORY-9): who it belongs to, for the sidebar to nest it. Absent for any other chat. */
+  story?: StoryRef;
+  /** A story session waiting for a free slot: its agent hasn't started (STORY-9). Absent once it runs. */
+  queued?: true;
+}
+
+/** What a story session's row says of the story it works on. */
+export interface StoryRef {
+  /** The story's id. */
+  id: string;
+  /** The Dev Lead's chat it nests under; the sidebar uses a group named after the feature when that chat isn't listed. */
+  parent: string | null;
+  /** The feature's id and title: the group's name when the parent chat is gone. */
+  feature: string;
+  featureTitle: string;
 }
 
 /** A provider the list can group by: its name, and whether the user has its agent installed. */
@@ -167,6 +182,8 @@ export function newSummary(
   role: ChatRoleRef,
   startedAt: string,
   card?: string,
+  story?: StoryRef,
+  queued = false,
 ): ChatSummary {
   return {
     id,
@@ -177,6 +194,8 @@ export function newSummary(
     running: false,
     waiting: null,
     ...(card ? { card } : {}),
+    ...(story ? { story } : {}),
+    ...(queued ? { queued: true as const } : {}),
   };
 }
 
@@ -210,6 +229,7 @@ const str = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 export function normalizeSummary(raw: unknown): ChatSummary | null {
   if (!isRecord(raw) || !isRecord(raw.role)) return null;
   const { id, provider, title, startedAt, role } = raw;
+  const story = normalizeStory(raw.story);
   if (!str(id) || !isOneOf(PROVIDERS, provider) || !str(startedAt)) return null;
   if (title !== null && !str(title)) return null;
   if (!str(role.id) || !str(role.name) || !str(role.model) || !isOneOf(EFFORTS, role.effort)) return null;
@@ -223,6 +243,18 @@ export function normalizeSummary(raw: unknown): ChatSummary | null {
     running: raw.running === true,
     waiting: isOneOf(WAIT_REASONS, raw.waiting) ? raw.waiting : null,
     ...(str(raw.card) ? { card: raw.card } : {}),
+    ...(story ? { story } : {}),
+    ...(raw.queued === true ? { queued: true as const } : {}),
+  };
+}
+
+function normalizeStory(raw: unknown): StoryRef | null {
+  if (!isRecord(raw) || !str(raw.id) || !str(raw.feature)) return null;
+  return {
+    id: raw.id,
+    parent: str(raw.parent) ? raw.parent : null,
+    feature: raw.feature,
+    featureTitle: typeof raw.featureTitle === "string" ? raw.featureTitle : raw.feature,
   };
 }
 

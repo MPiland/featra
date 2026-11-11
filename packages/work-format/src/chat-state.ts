@@ -21,7 +21,7 @@ export interface ToolResult {
 
 /** Where a tool row's approval stands: waiting on the user, or allowed (by the user, or by an earlier Allow for this chat). */
 export type ToolApproval =
-  | { status: "pending"; forChat: boolean; covers?: string }
+  | { status: "pending"; forChat: boolean; covers?: string; story?: string }
   | { status: "allowed"; scope: AllowScope };
 
 /** Where a question stands: waiting on the user, or answered with what they chose. */
@@ -165,7 +165,12 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       return upsertTool(state, event.id, event.name, event.input);
     case "approval":
       return upsertTool(state, event.id, event.name, event.input, () => ({
-        approval: { status: "pending", forChat: event.forChat, ...(event.covers ? { covers: event.covers } : {}) },
+        approval: {
+          status: "pending",
+          forChat: event.forChat,
+          ...(event.covers ? { covers: event.covers } : {}),
+          ...(event.story ? { story: event.story } : {}),
+        },
       }));
     case "question":
       return upsertTool(state, event.id, event.name, { questions: event.questions }, () => ({

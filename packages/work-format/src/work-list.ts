@@ -84,6 +84,9 @@ function storyRow(card: Card, added: ReadonlySet<string>, config: ProjectConfig)
     criteria: ticked(card.acs),
     tasks: ticked(card.tasks),
     pr: card.pr,
+    agent: card.agent,
+    model: card.model,
+    session: card.sessions.at(-1) ?? null,
   };
 }
 

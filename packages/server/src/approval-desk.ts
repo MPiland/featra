@@ -73,6 +73,11 @@ export interface ApprovalDesk {
   answer: (chat: string, tool: string, answer: ApprovalAnswer) => void;
   /** The user's answers to a question the chat waits on; refused when it isn't waiting, or isn't fully answered. */
   reply: (chat: string, tool: string, answers: Answers) => void;
+  /**
+   * Gives `to` the Allow for this chat rules `from` has (STORY-9): Featra's own are copied, and the provider's own
+   * rules, which its session applies, are returned for the new session to start with.
+   */
+  inherit: (from: string, to: string) => unknown[];
   /** The chat's agent ended: its requests end unanswered, quietly, and its Allow for this chat is forgotten. */
   forget: (chat: string) => void;
 }
@@ -81,6 +86,8 @@ export interface ApprovalDesk {
 export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => void): ApprovalDesk {
   const waiting = new Map<string, Map<string, Waiting>>();
   const rules = new Map<string, Set<string>>();
+  /** The provider's own rules the user allowed for the chat: the provider applies them, Featra keeps them to hand on. */
+  const provided = new Map<string, unknown[]>();
 
   const requestsOf = (chat: string) => {
     let found = waiting.get(chat);
@@ -164,6 +171,8 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         }
       }
       const rule = choice === "allow-chat" && offer && "suggested" in offer ? offer.suggested.rule : undefined;
+      if (rule !== undefined)
+        provided.set(chat, [...(provided.get(chat) ?? []), ...(Array.isArray(rule) ? rule : [rule])]);
       entry.settle(rule === undefined ? { allow: true, input } : { allow: true, input, rule }, {
         type: "tool-allowed",
         id,
@@ -180,8 +189,16 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
       if (!answers) throw new ChatError(CHAT_MESSAGES.badAnswer);
       entry.settle({ allow: true, answers }, { type: "question-answered", id: entry.request.id, answers });
     },
+    inherit(from, to) {
+      const own = rules.get(from);
+      if (own && own.size > 0) rules.set(to, new Set(own));
+      const given = [...(provided.get(from) ?? [])];
+      if (given.length > 0) provided.set(to, [...given]);
+      return given;
+    },
     forget(chat) {
       rules.delete(chat);
+      provided.delete(chat);
       const requests = waiting.get(chat);
       waiting.delete(chat);
       for (const entry of requests?.values() ?? []) entry.settle(CANCELLED, null);

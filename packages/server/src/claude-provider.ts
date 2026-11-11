@@ -3,11 +3,13 @@
  * user's own `claude` in the project folder, with the role's prompt appended to Claude Code's system prompt and the
  * role's model and effort. `settingSources` keeps the SDK default, so CLAUDE.md, skills and hooks load as usual.
  */
+import { join } from "node:path";
 import type { CanUseTool, Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import {
   EFFORTS,
   errorMessage,
   isOneOf,
+  isRecord,
   type ChatEvent,
   type ChatSettings,
   type PermissionMode,
@@ -64,7 +66,9 @@ export function claudeOptions(
   resume: string | null,
   mcp: McpServerSpec | null = null,
   settings: ChatSettings = claudeSettings(role),
+  inherited: readonly unknown[] = [],
 ): Options {
+  const allowed = [...(mcp ? [`mcp__${mcp.name}`] : []), ...inheritedTools(inherited)];
   return {
     cwd,
     model: settings.model,
@@ -77,15 +81,27 @@ export function claudeOptions(
     env,
     ...(resume ? { resume } : {}),
     ...(mcp ? mcpOptions(mcp) : {}),
+    ...(allowed.length > 0 ? { allowedTools: allowed } : {}),
   };
+}
+
+/** The tool rules of the allow rules a parent chat was given (`addRules` updates), as `allowedTools` writes them. */
+function inheritedTools(inherited: readonly unknown[]): string[] {
+  return inherited.flatMap((u) =>
+    isRecord(u) && u.type === "addRules" && u.behavior === "allow" && Array.isArray(u.rules)
+      ? u.rules
+          .filter((r): r is { toolName: string; ruleContent?: string } => isRecord(r) && typeof r.toolName === "string")
+          .map((r) => (r.ruleContent ? `${r.toolName}(${r.ruleContent})` : r.toolName))
+      : [],
+  );
 }
 
 /**
  * Featra's own MCP as Claude takes it: a stdio server, with its tools allowed without asking. Only these tools: the
  * user's own allow and deny rules, and Ask for everything else, stand as before (ADR 0018, ADR 0019).
  */
-function mcpOptions({ name, command, args, env }: McpServerSpec): Pick<Options, "mcpServers" | "allowedTools"> {
-  return { mcpServers: { [name]: { type: "stdio", command, args, env } }, allowedTools: [`mcp__${name}`] };
+function mcpOptions({ name, command, args, env }: McpServerSpec): Pick<Options, "mcpServers"> {
+  return { mcpServers: { [name]: { type: "stdio", command, args, env } } };
 }
 
 const userMessage = (text: string, session: string | null): SDKUserMessage => ({
@@ -108,12 +124,16 @@ export function createClaudeProvider({
     controls: claudeControls,
     settings: claudeSettings,
     start: (options) => startSession(options, { loadQuery, locate, env }),
+    worktrees: {
+      folder: (repo, name) => join(repo, ".claude", "worktrees", name),
+      ignore: ".claude/worktrees/",
+    },
     history: async (session, cwd) => claudeHistory(await loadSessions(), session, cwd),
   };
 }
 
 function startSession(
-  { cwd, role: startRole, approve, ask, emit, resume, mcp }: SessionOptions,
+  { cwd, role: startRole, approve, ask, emit, resume, mcp, inherited }: SessionOptions,
   { loadQuery, locate, env }: Omit<Required<ClaudeDeps>, "loadSessions">,
 ): ProviderSession {
   // A restored chat resumes its session; the agent's own report of its session id takes over once it starts.
@@ -195,6 +215,7 @@ function startSession(
         translator.sessionId(),
         attached,
         starting.settings,
+        inherited,
       );
       const queryFn = await loadQuery();
       if (closed || stoppedEarly()) return;

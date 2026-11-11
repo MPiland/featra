@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { ChatSummary } from "@featra/work-format";
 import type { ProjectMenuActions } from "../project-menu.ts";
 import { PROJECT_LABELS, type ProjectsSnapshot } from "../projects.ts";
 import type { WorkBridge } from "../work-list.ts";
@@ -16,6 +17,9 @@ export interface WorkViewProps {
   onReviewDraft: (chat: string) => void;
   /** Whether the project has that chat (a draft's chat may have been deleted). */
   hasChat: (chat: string) => boolean;
+  /** The project's chats and how to open one, for a story row's Start, Queued and session link (STORY-9). */
+  chats?: readonly ChatSummary[];
+  onOpenChat?: (chat: string) => void;
   /** The page that sets the current project up, shown instead of the list when it needs it (STORY-42). */
   setupPage?: ReactNode;
 }
@@ -29,6 +33,8 @@ export function WorkView({
   paneWidth,
   onReviewDraft,
   hasChat,
+  chats,
+  onOpenChat,
   setupPage,
 }: WorkViewProps) {
   if (projects.current && setupPage) return setupPage;
@@ -41,6 +47,8 @@ export function WorkView({
         paneWidth={paneWidth}
         onReviewDraft={onReviewDraft}
         hasChat={hasChat}
+        chats={chats}
+        onOpenChat={onOpenChat}
       />
     );
   return (

@@ -9,6 +9,7 @@ import {
   reduceRow,
   retitle,
   type ApprovalAnswer,
+  type Card,
   type TitleBy,
   type ChatEvent,
   type ChatRow,
@@ -200,6 +201,28 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
         row.summary = summary;
         listChanged(row.dir);
       }),
+    /** The server starts (or queues) a story's session under its feature: a row of the list with the story it works on. */
+    addStory: (dir: string, story: Card, feature: Card, queued: boolean) => {
+      const id = `story-chat-${logs.size + 1}`;
+      const dev = (host.roles ?? BUILT_IN_ROLES).find((r) => r.id === "developer");
+      logs.set(id, []);
+      if (dev) {
+        // The Dev Lead is the chat that drafted the feature: here, the project's Dev Lead chat if it has one.
+        const lead = [...rows].find(([, r]) => r.dir === dir && r.summary.role.id === "dev-lead")?.[0] ?? null;
+        const ref = { id: story.id, parent: lead, feature: feature.id, featureTitle: feature.title };
+        rows.set(id, {
+          dir,
+          summary: retitle(
+            newSummary(id, dev.provider, dev, now(), story.id, ref, queued),
+            `${story.id} ${story.title}`,
+            "draft",
+          ),
+          asks: [],
+        });
+      }
+      act(() => listChanged(dir));
+      return { chat: id, queued };
+    },
     watching: (id: string) => watchers.get(id)?.size ?? 0,
     /** How many chat lists the server has sent, so a test can wait until the list has arrived. */
     listsSent: () => listsSent,

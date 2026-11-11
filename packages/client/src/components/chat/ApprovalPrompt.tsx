@@ -9,6 +9,8 @@ interface ApprovalPromptProps {
   forChat: boolean;
   /** What Allow for this chat covers, as its button's description. */
   covers: string | null;
+  /** The story whose session asked, when this is the Dev Lead's copy of a story session's request (STORY-9). */
+  story?: string | null;
   /** Sends the answer; resolves with why it wasn't taken, or null. */
   onAnswer: (answer: ApprovalAnswer) => Promise<string | null>;
 }
@@ -19,7 +21,7 @@ export const showInput = (input: unknown) => (typeof input === "string" ? input 
  * A tool call waiting on the user (STORY-45): its input, Allow, Allow for this chat and Deny, with an optional reason
  * for Deny that the agent is sent. Native controls in reading order, so Tab reaches each; Enter in the reason denies.
  */
-export function ApprovalPrompt({ name, input, forChat, covers, onAnswer }: ApprovalPromptProps) {
+export function ApprovalPrompt({ name, input, forChat, covers, story = null, onAnswer }: ApprovalPromptProps) {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +37,7 @@ export function ApprovalPrompt({ name, input, forChat, covers, onAnswer }: Appro
 
   return (
     <div className="chat-approval" role="group" aria-label={`${CHAT_COPY.approve} ${name}`}>
+      {story && <p className="meta">{CHAT_COPY.askedFor(story)}</p>}
       <h3>{CHAT_COPY.input}</h3>
       <pre>{showInput(input)}</pre>
       <div className="chat-approval-actions">

@@ -73,7 +73,7 @@ describe("the MCP bundle", () => {
 
       const listed = await call("tools/list", {});
       const names = ((listed.result as { tools: { name: string }[] }).tools ?? []).map((t) => t.name);
-      expect(names).toEqual(["log_decision", "defer_question", "draft_cards", "start_feature"]);
+      expect(names).toEqual(["log_decision", "defer_question", "draft_cards", "start_feature", "spawn_session"]);
 
       const logged = await call("tools/call", {
         name: "log_decision",

@@ -1,4 +1,6 @@
 import { useCallback, useId, useMemo, useRef, useState } from "react";
+import type { ChatSummary } from "@featra/work-format";
+import type { StoryRow } from "@featra/work-format/work-list";
 import type { ProjectRef } from "../../projects.ts";
 import {
   filterCounts,
@@ -13,6 +15,7 @@ import { CardPane } from "./CardPane.tsx";
 import { PaneHandle, type ChosenWidth } from "./PaneHandle.tsx";
 import { Epic } from "./Epic.tsx";
 import { ReviewDraft } from "./review-draft.tsx";
+import { StoryAgentsContext, type StoryAgents } from "./story-agents.tsx";
 import { useDockedPane } from "./useDockedPane.ts";
 import { StaleCopies } from "./StaleCopies.tsx";
 import { StaleCards } from "./stale-mark.tsx";
@@ -32,8 +35,12 @@ export function WorkList(props: {
   onReviewDraft: (chat: string) => void;
   /** Whether the project has that chat; Review draft falls back to this pane when its chat is gone. */
   hasChat: (chat: string) => boolean;
+  /** The project's chats, for a story row to say Queued (STORY-9). */
+  chats?: readonly ChatSummary[];
+  /** Opens a chat: a story row's link to its session (STORY-9). */
+  onOpenChat?: (chat: string) => void;
 }) {
-  const { work, project, paneWidth, onReviewDraft, hasChat } = props;
+  const { work, project, paneWidth, onReviewDraft, hasChat, chats = [], onOpenChat = () => {} } = props;
   const update = useWorkList(work, project.dir);
   const [filter, setFilter] = useState<ListFilter>("all");
   const [selected, setSelected] = useState<string | null>(null);
@@ -50,6 +57,19 @@ export function WorkList(props: {
     (chat: string, feature: string) => (hasChat(chat) ? onReviewDraft(chat) : select(feature)),
     [hasChat, onReviewDraft, select],
   );
+  const storyAgents = useMemo<StoryAgents>(() => {
+    const rows = new Map<string, { story: StoryRow; featureActive: boolean }>();
+    for (const epic of update?.list.epics ?? [])
+      for (const f of epic.features)
+        for (const story of f.stories) rows.set(story.id, { story, featureActive: f.status === "active" });
+    return {
+      row: (id) => rows.get(id) ?? null,
+      queued: (id) => chats.some((c) => c.story?.id === id && c.queued === true),
+      hasChat,
+      start: (id) => work.startStory(project.dir, id),
+      open: onOpenChat,
+    };
+  }, [update, chats, hasChat, work, project.dir, onOpenChat]);
   const selection = useMemo(() => ({ selected, paneId, open: select }), [selected, paneId, select]);
   const close = () => {
     const id = selected;
@@ -83,9 +103,11 @@ export function WorkList(props: {
         <StaleCards value={new Set(list.stale.map((s) => s.cardId))}>
           <SelectedCard.Provider value={selection}>
             <ReviewDraft.Provider value={reviewDraft}>
-              {epics.map((e) => (
-                <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
-              ))}
+              <StoryAgentsContext.Provider value={storyAgents}>
+                {epics.map((e) => (
+                  <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
+                ))}
+              </StoryAgentsContext.Provider>
             </ReviewDraft.Provider>
           </SelectedCard.Provider>
         </StaleCards>
@@ -126,7 +148,7 @@ export function WorkList(props: {
         {body}
       </section>
       {selected && (
-        <>
+        <StoryAgentsContext.Provider value={storyAgents}>
           <PaneHandle width={width} split={split} paneId={paneId} onMove={onMove} onChoose={choose} onClose={close} />
           <CardPane
             key={selected}
@@ -140,7 +162,7 @@ export function WorkList(props: {
             onOpen={(id) => select(id, id === from ? undefined : (selected ?? undefined))}
             onClose={close}
           />
-        </>
+        </StoryAgentsContext.Provider>
       )}
     </div>
   );

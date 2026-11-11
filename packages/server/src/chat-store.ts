@@ -78,3 +78,9 @@ export async function savedHistory(
     return { events: [{ type: "problem", problem: { type: "failed", message: errorMessage(err) } }], gone: false };
   }
 }
+
+/** The history carries no window: the last one the chat reported stands in for it. */
+export const withWindow = (events: ChatEvent[], window: number | null): ChatEvent[] =>
+  events.map((e) =>
+    e.type === "usage" && e.window === null && window !== null ? Object.assign({}, e, { window }) : e,
+  );

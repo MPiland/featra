@@ -19,6 +19,8 @@ export interface SavedComposer {
 export interface SavedChat {
   /** The project folder the chat runs in. */
   dir: string;
+  /** A story session's working folder, its worktree (STORY-9); absent when it is the project folder. */
+  cwd?: string;
   /** The provider's session id, once the agent reported one; null for a chat that never started its agent. */
   session: string | null;
   /** Its row: title, role, provider, when it started and whether it waits on the user. */
@@ -42,8 +44,10 @@ export const savedChat = (
   session: string | null,
   summary: ChatSummary,
   composer: SavedComposer | null = null,
+  cwd: string | null = null,
 ): SavedChat => ({
   dir,
+  ...(cwd && cwd !== dir ? { cwd } : {}),
   session,
   summary: idleSummary(summary),
   ...(composer ? { composer } : {}),
@@ -63,7 +67,13 @@ function normalizeSaved(raw: unknown): SavedChat | null {
   if (!isRecord(raw) || !nonEmpty(raw.dir)) return null;
   const summary = normalizeSummary(raw.summary);
   if (!summary) return null;
-  return savedChat(raw.dir, nonEmpty(raw.session) ? raw.session : null, summary, normalizeComposer(raw.composer));
+  return savedChat(
+    raw.dir,
+    nonEmpty(raw.session) ? raw.session : null,
+    summary,
+    normalizeComposer(raw.composer),
+    nonEmpty(raw.cwd) ? raw.cwd : null,
+  );
 }
 
 /** The saved chats read from the file; anything malformed in it is dropped, and a missing file is no chats. */

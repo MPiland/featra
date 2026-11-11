@@ -12,6 +12,7 @@ import type {
   SettingsChange,
   TitleBy,
 } from "@featra/work-format";
+import type { StoryStartOpts } from "./chat-stories.ts";
 import type { ChatStore } from "./chat-store.ts";
 import type { Timers } from "./inbox.ts";
 import type { ApprovalHandler, McpServerSpec, ProviderAdapter } from "./provider.ts";
@@ -25,6 +26,13 @@ export interface McpAttach {
 }
 
 export interface ChatManager {
+  /**
+   * Starts a story's agent as a chat in its worktree (STORY-9, ADR 0025), now or Queued when the project is at its
+   * limit. Refused for a role whose provider has no runner for story sessions.
+   */
+  startStory: (opts: StoryStartOpts) => Promise<{ chat: string; queued: boolean }>;
+  /** Whether a session for the story is waiting for a free slot. */
+  queuedStory: (dir: string, story: string) => boolean;
   /** Starts a chat from a role in the project folder, on a card when it is for one; its agent starts with the first message. */
   start: (dir: string, roleId: string, card?: string) => Promise<string>;
   /** Readies a chat to watch and send to: a restored chat reads its transcript from its provider, running no agent. */
@@ -110,6 +118,8 @@ export interface ChatManagerDeps {
   store?: ChatStore;
   /** The timers the Inbox waits on; the real ones by default. */
   timers?: Timers;
+  /** The most story sessions a project runs at once (STORY-9); 3 by default. */
+  storyLimit?: (dir: string) => Promise<number>;
   /** Whose rule project folders compare by (`projectKey`); this machine's by default. */
   platform?: string;
 }

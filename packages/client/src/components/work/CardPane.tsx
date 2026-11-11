@@ -6,6 +6,7 @@ import { CloseIcon } from "../icons.tsx";
 import { DraftReview } from "./DraftReview.tsx";
 import { SendBack } from "./SendBack.tsx";
 import { StartFeature } from "./StartFeature.tsx";
+import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
 import { AcSection, Evidence, TaskSection, TextSection, type SaveEdit } from "./CardSections.tsx";
@@ -137,6 +138,11 @@ export function CardPane({
                 onReject={() => work.reject(dir, id)}
                 onRejected={onClose}
               />
+            </div>
+          )}
+          {view.type === "story" && (
+            <div className="draft-actions">
+              <StoryAgent id={id} />
             </div>
           )}
           {view.startable && (

@@ -250,6 +250,8 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
                 onReviewDraft={reviewDraft}
                 hasChat={(id) => chatList.chats.some((c) => c.id === id)}
+                chats={chatList.chats}
+                onOpenChat={openChat}
                 setupPage={setupPage}
               />
             ) : view.id === "inbox" ? (

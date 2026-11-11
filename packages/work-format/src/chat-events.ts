@@ -40,9 +40,10 @@ export type ChatEvent =
   /**
    * A tool call needs the user's approval (STORY-45): the chat waits until it is answered. `forChat` is false when
    * Allow for this chat isn't offered (the agent says the call may only be allowed once, or there is no rule for it),
-   * so only Allow and Deny are. `covers` says what Allow for this chat would cover, when it is offered.
+   * so only Allow and Deny are. `covers` says what Allow for this chat would cover, when it is offered. `story` is set
+   * on the copy the Dev Lead's chat shows of a story session's approval (STORY-9): the story it is for.
    */
-  | { type: "approval"; id: string; name: string; input: unknown; forChat: boolean; covers?: string }
+  | { type: "approval"; id: string; name: string; input: unknown; forChat: boolean; covers?: string; story?: string }
   /** The call may run: the user allowed it, or an Allow for this chat already covers it (`scope: "chat"`). */
   | { type: "tool-allowed"; id: string; name: string; input: unknown; scope: AllowScope }
   /** The user denied a tool call, with the reason the agent was sent when there was one. */
@@ -134,6 +135,7 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
             input: raw.input ?? null,
             forChat: raw.forChat === true,
             ...(raw.forChat === true && nonEmpty(raw.covers) ? { covers: raw.covers } : {}),
+            ...(nonEmpty(raw.story) ? { story: raw.story } : {}),
           }
         : null;
     case "question": {
@@ -234,4 +236,8 @@ export const CHAT_MESSAGES = {
   onceOnly: "This call can only be allowed once.",
   /** An answer that doesn't answer every question the way it asks (STORY-46). */
   badAnswer: "Answer every question.",
+  /** A story session on a role whose provider has no runner for it (STORY-9). */
+  noRunner: "This role's agent can't run story sessions yet.",
+  /** A story session still waiting for a free slot: nothing can be sent to it (STORY-9). */
+  queued: "Queued. It starts when a story agent ends.",
 } as const;

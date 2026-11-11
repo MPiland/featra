@@ -29,6 +29,7 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   autoMerge: false,
   uat: false,
   knowledge: "propose",
+  maxStoryAgents: 3,
 };
 
 const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
@@ -87,6 +88,13 @@ export function configOverrides(text: string): Partial<ProjectConfig> {
     }
     out.knowledge = raw.knowledge;
   }
+  if ("maxStoryAgents" in raw) {
+    const value = raw.maxStoryAgents;
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
+      throw new ConfigError(`maxStoryAgents must be a whole number from 1, got ${toText(value)}`);
+    }
+    out.maxStoryAgents = value;
+  }
   return out;
 }
 
@@ -140,6 +148,11 @@ export function knowledgePermission(
   appDefault: KnowledgePermission | undefined,
 ): KnowledgePermission {
   return ownSetting(configText, "knowledge") ?? appDefault ?? DEFAULT_CONFIG.knowledge;
+}
+
+/** The most story sessions a project runs at once (STORY-9): its own `maxStoryAgents`, else the app default, else 3. */
+export function maxStoryAgents(configText: string | null, appDefault: number | undefined): number {
+  return ownSetting(configText, "maxStoryAgents") ?? appDefault ?? DEFAULT_CONFIG.maxStoryAgents;
 }
 
 /** A new project's config file: only the version, so every work setting follows the app-wide defaults. */

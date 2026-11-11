@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { chatName, EMPTY_CHAT_LIST, groupChats, type ChatList as Chats } from "@featra/work-format/chat-list";
+import { nestChats } from "@featra/work-format/chat-nest";
 import { CHAT_COPY, type ChatBridge, type ChatRoleRef } from "../../chats.ts";
 import type { OpenChat } from "./ChatView.tsx";
 
@@ -41,33 +42,62 @@ interface ChatListProps {
   onOpen: (id: string) => void;
 }
 
+type Chat = Chats["chats"][number];
+
 /** The sidebar's chats, one group per provider the user has installed; a chat waiting on the user has a dot. */
 export function ChatList({ list, current, onOpen }: ChatListProps) {
-  return groupChats(list).map(({ provider, chats }) => (
-    <div key={provider.id} className="chat-group" role="group" aria-labelledby={`chat-group-${provider.id}`}>
-      <h2 id={`chat-group-${provider.id}`} className="chat-group-name">
-        {provider.name}
-      </h2>
-      <ul className="navlist">
-        {chats.map((chat) => (
-          <li key={chat.id}>
-            <button
-              type="button"
-              className={chat.id === current ? "nav chat-row on" : "nav chat-row"}
-              aria-current={chat.id === current ? "page" : undefined}
-              data-chat={chat.id}
-              onClick={() => onOpen(chat.id)}
-            >
-              <span className="chat-row-title">{chatName(chat)}</span>
-              {chat.waiting && (
-                <span className="chat-dot" data-waiting={chat.waiting}>
-                  <span className="sr-only">{CHAT_COPY.waiting}</span>
-                </span>
+  const row = (chat: Chat, nested = false) => (
+    <li key={chat.id}>
+      <button
+        type="button"
+        className={chat.id === current ? "nav chat-row on" : "nav chat-row"}
+        aria-current={chat.id === current ? "page" : undefined}
+        data-chat={chat.id}
+        data-nested={nested ? "" : undefined}
+        onClick={() => onOpen(chat.id)}
+      >
+        <span className="chat-row-title">{chatName(chat)}</span>
+        {chat.queued && <span className="meta">{CHAT_COPY.queued}</span>}
+        {chat.waiting && (
+          <span className="chat-dot" data-waiting={chat.waiting}>
+            <span className="sr-only">{CHAT_COPY.waiting}</span>
+          </span>
+        )}
+      </button>
+    </li>
+  );
+  const listed = new Set(list.chats.map((c) => c.id));
+  return groupChats(list).map(({ provider, chats }) => {
+    // A story session sits under its Dev Lead's chat, or under a group named after its feature when that chat is gone.
+    const { branches, groups } = nestChats(chats, listed);
+    return (
+      <div key={provider.id} className="chat-group" role="group" aria-labelledby={`chat-group-${provider.id}`}>
+        <h2 id={`chat-group-${provider.id}`} className="chat-group-name">
+          {provider.name}
+        </h2>
+        <ul className="navlist">
+          {branches.map(({ chat, children }) => (
+            <Fragment key={chat.id}>
+              {row(chat)}
+              {children.length > 0 && (
+                <li role="none">
+                  <ul className="navlist chat-children" aria-label={CHAT_COPY.storySessions(chatName(chat))}>
+                    {children.map((c) => row(c, true))}
+                  </ul>
+                </li>
               )}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  ));
+            </Fragment>
+          ))}
+          {groups.map((g) => (
+            <li key={g.feature} role="none">
+              <div role="group" aria-label={g.title}>
+                <h3 className="chat-group-name">{g.title}</h3>
+                <ul className="navlist chat-children">{g.sessions.map((c) => row(c, true))}</ul>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  });
 }
