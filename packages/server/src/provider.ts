@@ -119,6 +119,11 @@ export interface ProviderSession {
   /** Sends the user's message, starting the agent first if it isn't running. */
   send: (text: string) => void;
   /**
+   * Resolves once the agent the last `send` asked for is running, or has failed to start (BUG-15). A story is "started"
+   * only then. Absent, the adapter's agent starts at once.
+   */
+  started?: () => Promise<void>;
+  /**
    * Changes what the agent runs as from its next turn (STORY-22): the role (its prompt), and the provider's own names
    * for model, effort and permission mode. A turn already running goes on as it was. How the provider applies it is its
    * own: the Claude adapter replaces the agent and resumes the session.
