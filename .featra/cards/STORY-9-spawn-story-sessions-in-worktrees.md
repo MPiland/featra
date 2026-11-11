@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-9-spawn-agent
-pr: null
+pr: "27"
 created: 2026-11-04T23:00:00Z
 history:
   - at: 2026-11-04T23:00:00Z
