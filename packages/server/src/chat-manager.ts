@@ -7,11 +7,12 @@ import { randomUUID } from "node:crypto";
 import {
   CHAT_MESSAGES,
   chatName,
+  DEFAULT_CONFIG,
+  errorMessage,
   idleSummary,
   newSummary,
   reduceRow,
   retitle,
-  savedChat,
   type ChatEvent,
   type ChatSummary,
   type ProviderId,
@@ -24,9 +25,13 @@ import { restoredState } from "./chat-configure.ts";
 import { ChatError } from "./chat-error.ts";
 import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
-import { chatSaver, memoryChatStore, savedHistory } from "./chat-store.ts";
+import { chatSaver, memoryChatStore, savedHistory, withWindow } from "./chat-store.ts";
+import { chatsToSave, closeProjects, restoreChats } from "./chat-projects.ts";
 import { restored, type Chat } from "./chat-state.ts";
+import { createStoryRunner } from "./chat-stories.ts";
+import { chatLookups } from "./chat-lookups.ts";
 import { createInbox } from "./inbox.ts";
+import { createStoryMirror } from "./story-mirror.ts";
 import type { ProviderAdapter, ProviderSession } from "./provider.ts";
 
 export { ChatError };
@@ -44,13 +49,17 @@ export function createChatManager({
   now = () => new Date(),
   log = () => {},
   store = memoryChatStore(),
+  storyLimit = async () => DEFAULT_CONFIG.maxStoryAgents,
   platform = process.platform,
 }: ChatManagerDeps): ChatManager {
   const chats = new Map<string, Chat>();
   // The desk tells only a chat that is open: one ended or closed has no requests left.
   const desk = createApprovalDesk((id, event) => {
     const c = chats.get(id);
-    if (c && c.events !== null && !c.closed) record(c, event);
+    if (c && c.events !== null && !c.closed) {
+      record(c, event);
+      mirror.mirror(c, event);
+    }
   });
   const decide = approve ?? desk.approve;
   // The Inbox (STORY-7) hears each request open and close, and answers nothing: the desk does, in the chat or here.
@@ -65,6 +74,7 @@ export function createChatManager({
     same: (a, b) => projectKey(a, platform) === projectKey(b, platform),
     log,
   });
+  const mirror = createStoryMirror(chats, (c, event) => record(c, event, true));
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
 
   const chat = (id: string): Chat => {
@@ -87,28 +97,23 @@ export function createChatManager({
   const saver = chatSaver(
     store,
     log,
-    (saved) => {
-      const dirs = new Set<string>();
-      for (const s of saved.filter((c) => !chats.has(c.summary.id))) {
-        chats.set(s.summary.id, restored(s.summary.id, s.dir, s.summary, s.session, s.composer ?? null));
-        dirs.add(s.dir);
-      }
-      for (const dir of dirs) listChanged(dir);
-    },
-    () =>
-      [...chats.values()].map((c) =>
-        savedChat(c.dir, c.session, c.summary, composerOf(c, provider(c.summary.provider))),
-      ),
+    (saved) => restoreChats(chats, saved, listChanged),
+    () => chatsToSave(chats, provider),
   );
   const save = () => saver.save();
 
-  function record(c: Chat, event: ChatEvent) {
+  function record(c: Chat, event: ChatEvent, mirrored = false) {
     if (event.type === "usage" && event.window !== c.window) {
       c.window = event.window;
       save();
     }
     if (event.type === "user") c.running = true;
-    if (event.type === "turn-end") c.running = false;
+    if (event.type === "turn-end") {
+      c.running = false;
+      // A story session's turn is over: what its parent shows of its requests closes with it.
+      mirror.clear(c);
+      stories.release(c);
+    }
     c.events?.push(event);
     tell(c.listeners, event);
     if (event.type === "started") c.pending = c.agent?.sessionId() ?? null;
@@ -119,7 +124,7 @@ export function createChatManager({
     const { summary, asks } = reduceRow(c, event);
     const asksChanged = asks !== c.asks;
     c.asks = asks;
-    if (event.type === "approval" || event.type === "question") inbox.opened(c.id, event);
+    if (!mirrored && (event.type === "approval" || event.type === "question")) inbox.opened(c.id, event);
     if (asksChanged) inbox.keep(c.id, asks);
     if (summary === c.summary && session === c.session) return;
     const rowChanged = summary !== c.summary;
@@ -131,7 +136,12 @@ export function createChatManager({
   }
 
   /** The chat's agent session, through its provider; it starts the agent with the first message. */
-  function agentFor(c: Chat, adapter: ProviderAdapter, role: Role): ProviderSession {
+  function agentFor(
+    c: Chat,
+    adapter: ProviderAdapter,
+    role: Role,
+    inherited: readonly unknown[] = [],
+  ): ProviderSession {
     // The session reaches the chat only through `emit`, so the chat's own fields are current when it is called.
     const emit = (event: ChatEvent) => record(c, event);
     // A reopened chat goes on with what the composer last set, while the provider still offers it.
@@ -141,12 +151,13 @@ export function createChatManager({
     const rowChanged = applyState(c, adapter, role, state);
     const agent = adapter.start({
       chat: c.id,
-      cwd: c.dir,
+      cwd: c.cwd,
       role,
       emit,
       resume: c.session,
+      ...(inherited.length > 0 ? { inherited } : {}),
       ...(mcp ? { mcp: () => mcp.attach({ id: c.id, dir: c.dir }) } : {}),
-      approve: (request, signal) => decide({ ...request, chat: c.id, cwd: c.dir }, signal),
+      approve: (request, signal) => decide({ ...request, chat: c.id, cwd: c.cwd }, signal),
       ask: (request, signal) => desk.ask({ ...request, chat: c.id }, signal),
     });
     agent.configure(role, state.settings);
@@ -157,14 +168,11 @@ export function createChatManager({
   /** Reads a restored chat's transcript and makes its agent session; a chat whose session is gone gets neither. */
   async function load(c: Chat) {
     const adapter = provider(c.summary.provider);
-    const { events, gone } = await savedHistory(adapter, c.session, c.dir);
+    const { events, gone } = await savedHistory(adapter, c.session, c.cwd);
     const role = gone || !adapter ? null : await roles.get(c.dir, c.summary.role.id);
     // Closed while reading: the chat is opened afresh when its project is back.
     if (c.events !== null || c.closed) return;
-    // The history carries no window: the last one the chat reported stands in for it.
-    c.events = events.map((e) =>
-      e.type === "usage" && e.window === null && c.window !== null ? Object.assign({}, e, { window: c.window }) : e,
-    );
+    c.events = withWindow(events, c.window);
     c.refusal = gone
       ? CHAT_MESSAGES.gone
       : !adapter
@@ -186,6 +194,9 @@ export function createChatManager({
   /** Ends the chat's agent and forgets its log; the chat itself is kept, to open again. */
   function end(c: Chat) {
     c.listeners.clear();
+    mirror.clear(c);
+    mirror.ended(c);
+    stories.dropped(c);
     mcp?.release(c.id);
     desk.forget(c.id);
     inbox.ended(c.id);
@@ -201,7 +212,28 @@ export function createChatManager({
     c.summary = idleSummary(c.summary);
   }
 
+  const stories = createStoryRunner({
+    chats,
+    provider,
+    roles,
+    desk,
+    open: (id) => open(id),
+    newId,
+    now,
+    limit: storyLimit,
+    same,
+    agentFor,
+    record: (c, event) => record(c, event),
+    setSummary: (c, summary) => void (c.summary = summary),
+    save,
+    listChanged,
+    log,
+  });
+
   return {
+    ...chatLookups(chats, chat, providers),
+    startStory: (opts) => stories.start(opts),
+    queuedStory: (dir, story) => stories.queuedFor(dir, story),
     async start(dir, roleId, card) {
       const role = await roles.get(dir, roleId);
       if (!role) throw new ChatError(CHAT_MESSAGES.unknownRole);
@@ -217,16 +249,6 @@ export function createChatManager({
       return id;
     },
     open,
-    watch(id, listener) {
-      const c = chat(id);
-      c.listeners.add(listener);
-      return {
-        events: [...(c.events ?? [])],
-        mode: c.mode,
-        note: c.note,
-        stop: () => c.listeners.delete(listener),
-      };
-    },
     async controls(id) {
       await open(id);
       const c = chat(id);
@@ -257,25 +279,30 @@ export function createChatManager({
       const c = chat(id);
       if (c.running) throw new ChatError(CHAT_MESSAGES.busy);
       if (c.events === null) throw new Error("Open the chat before sending to it.");
-      if (!c.agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
+      const agent = c.agent;
+      if (!agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
       record(c, { type: "user", text });
-      c.agent.send(text);
+      // A story session's turn, any turn, holds one of the project's story slots, or waits for one (STORY-9 AC5).
+      if (c.summary.story) {
+        stories
+          .turn(c, () => agent.send(text))
+          .catch((err: unknown) => {
+            log(`A story session's turn couldn't wait for a slot: ${errorMessage(err)}`);
+            agent.send(text);
+          });
+        return;
+      }
+      agent.send(text);
     },
     async stop(id) {
       const c = chat(id);
-      if (c.running) await c.agent?.interrupt();
+      if (!c.running) return;
+      if (await stories.cancelTurn(c)) record(c, { type: "turn-end", outcome: "stopped" });
+      else await c.agent?.interrupt();
     },
-    approve: (id, tool, answer) => desk.answer(chat(id).id, tool, answer),
+    // A story session's approval shown in its parent chat is answered from there too.
+    approve: (id, tool, answer) => desk.answer(mirror.holder(chat(id).id, tool) ?? chat(id).id, tool, answer),
     answer: (id, tool, answers) => desk.reply(chat(id).id, tool, answers),
-    dirOf: (id) => {
-      const c = chats.get(id);
-      return c && !c.closed ? c.dir : null;
-    },
-    info(id) {
-      const c = chats.get(id);
-      if (!c || c.closed || c.events === null) return null;
-      return { dir: c.dir, session: `${c.summary.role.name} chat ${c.id.slice(0, 8)}` };
-    },
     report(id, event) {
       const c = chats.get(id);
       if (c && c.events !== null && !c.closed) record(c, event);
@@ -284,23 +311,7 @@ export function createChatManager({
     watchList: (dir, listener) => lists.watch(dir, listener),
     watchInbox: inbox.watch,
     watchAsked: inbox.watchAsked,
-    providers: () =>
-      Promise.all(
-        providers.map(async (p) => ({ id: p.id, name: p.name, installed: await p.installed().catch(() => false) })),
-      ),
-    closeProjects(keep) {
-      const changed = new Set<string>();
-      for (const c of chats.values()) {
-        if (c.closed === !keep(c.dir)) continue;
-        if (c.closed) c.closed = false;
-        else {
-          end(c);
-          c.closed = true;
-        }
-        changed.add(c.dir);
-      }
-      for (const dir of changed) listChanged(dir);
-    },
+    closeProjects: (keep) => closeProjects(chats, keep, end, listChanged),
     close() {
       for (const c of chats.values()) end(c);
       lists.clear();

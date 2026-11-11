@@ -95,6 +95,23 @@ export interface SessionOptions {
   mcp?: () => Promise<McpServerSpec | null>;
   /** The provider's session to go on with (a restored chat, STORY-44); a new conversation without it. */
   resume?: string | null;
+  /**
+   * The allow rules a Dev Lead chat had when it started this story session (STORY-9, ADR 0025): the provider's own
+   * rules, as `ToolDecision.rule` gave them, applied for the whole session so it doesn't ask again for what the
+   * parent was already allowed.
+   */
+  inherited?: readonly unknown[];
+}
+
+/**
+ * Where a provider keeps the worktrees of its story sessions (STORY-9, ADR 0025): an optional adapter capability. An
+ * adapter without it has no runner for stories, and a spawn on its roles is refused.
+ */
+export interface WorktreeSpot {
+  /** The folder of the worktree named `name` for the repository at `repo`. */
+  folder: (repo: string, name: string) => string;
+  /** The pattern the repository's `.git/info/exclude` gets so the folder isn't seen as changes; null when it needs none. */
+  ignore: string | null;
 }
 
 /** One agent conversation. The agent starts with the first message. */
@@ -122,6 +139,8 @@ export interface ProviderAdapter {
   /** Whether the user has the provider's agent installed: the chat list shows a group for each one that is. */
   installed: () => Promise<boolean>;
   start: (options: SessionOptions) => ProviderSession;
+  /** Where its story sessions' worktrees live; absent when the adapter can't run story sessions (STORY-9). */
+  worktrees?: WorktreeSpot;
   /** What the composer can pick for a chat from `role`, under the provider's own names (STORY-22). */
   controls: (role: Role) => ChatControls;
   /** The settings a chat from `role` starts with. */

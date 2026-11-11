@@ -21,7 +21,7 @@ export interface ToolResult {
 
 /** Where a tool row's approval stands: waiting on the user, or allowed (by the user, or by an earlier Allow for this chat). */
 export type ToolApproval =
-  | { status: "pending"; forChat: boolean; covers?: string }
+  | { status: "pending"; forChat: boolean; covers?: string; story?: string }
   | { status: "allowed"; scope: AllowScope };
 
 /** Where a question stands: waiting on the user, or answered with what they chose. */
@@ -146,6 +146,8 @@ const endTools = (state: ChatState, stopped: boolean): ChatState => ({
   ...state,
   items: state.items.map((item) => {
     if (item.kind !== "tool" || item.result !== null || item.denied) return item;
+    // A story session's request shown here belongs to the session's turn, not this one.
+    if (item.approval?.status === "pending" && item.approval.story) return item;
     const open = unasked(item);
     return stopped ? { ...item, ...open, stopped: true } : { ...item, ...open, cancelled: !item.stopped };
   }),
@@ -165,7 +167,12 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
       return upsertTool(state, event.id, event.name, event.input);
     case "approval":
       return upsertTool(state, event.id, event.name, event.input, () => ({
-        approval: { status: "pending", forChat: event.forChat, ...(event.covers ? { covers: event.covers } : {}) },
+        approval: {
+          status: "pending",
+          forChat: event.forChat,
+          ...(event.covers ? { covers: event.covers } : {}),
+          ...(event.story ? { story: event.story } : {}),
+        },
       }));
     case "question":
       return upsertTool(state, event.id, event.name, { questions: event.questions }, () => ({

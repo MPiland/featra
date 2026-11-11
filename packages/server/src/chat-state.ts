@@ -17,6 +17,10 @@ export { restored };
 interface Chat {
   id: string;
   dir: string;
+  /** The folder its agent works in: its worktree for a story session (STORY-9), else `dir`. */
+  cwd: string;
+  /** A story session holds one of the project's story slots from its start until its turn ends or it ends (STORY-9). */
+  slot: boolean;
   /** Its row in the chat list. */
   summary: ChatSummary;
   /** The requests it waits on the user to answer (STORY-45). */
@@ -59,9 +63,12 @@ const restored = (
   summary: ChatSummary,
   session: string | null,
   kept: SavedComposer | null = null,
+  cwd: string = dir,
 ): Chat => ({
   id,
   dir,
+  cwd,
+  slot: false,
   summary: idleSummary(summary),
   asks: [],
   session,

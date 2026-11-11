@@ -93,4 +93,6 @@ export interface ProjectConfig {
   autoMerge: boolean;
   uat: boolean;
   knowledge: KnowledgePermission;
+  /** The most story sessions that run at once (STORY-9); the rest wait, Queued. */
+  maxStoryAgents: number;
 }

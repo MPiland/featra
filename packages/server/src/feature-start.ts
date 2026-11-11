@@ -8,8 +8,6 @@
  * It runs in the card lane and is all or nothing: nothing is published until the last step, an object left behind is
  * unreferenced, and a branch somebody else made is never deleted.
  */
-import { rm } from "node:fs/promises";
-import { join } from "node:path";
 import {
   errorMessage,
   existingBranchOf,
@@ -22,6 +20,7 @@ import {
   toIso,
 } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
+import { commitCard } from "./card-commit.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { failed, runGit, type GitOptions, type Run } from "./git-run.ts";
 import type { Scan } from "./work-scan.ts";
@@ -75,23 +74,6 @@ export function createFeatureStart({
   const refs = async (top: string, prefix: string, format: string) =>
     (await must(top, ["for-each-ref", `--format=${format}`, prefix])).stdout.split(/\r?\n/).filter(Boolean);
 
-  /** The commit: base's tree with the one card replaced, made in a temporary index that is gone afterwards. */
-  async function commitStarted(top: string, base: string, path: string, text: string, message: string) {
-    const baseCommit = (await must(top, ["rev-parse", "--verify", `refs/heads/${base}^{commit}`])).stdout.trim();
-    const gitDir = (await must(top, ["rev-parse", "--absolute-git-dir"])).stdout.trim();
-    const index = join(gitDir, `featra-start-${process.pid}-${Date.now()}.index`);
-    const env = { GIT_INDEX_FILE: index };
-    try {
-      const blob = (await must(top, ["hash-object", "-w", "--no-filters", "--stdin"], { input: text })).stdout.trim();
-      await must(top, ["read-tree", baseCommit], { env });
-      await must(top, ["update-index", "--cacheinfo", `100644,${blob},${path}`], { env });
-      const tree = (await must(top, ["write-tree"], { env })).stdout.trim();
-      return (await must(top, ["commit-tree", tree, "-p", baseCommit, "-m", message])).stdout.trim();
-    } finally {
-      await rm(index, { force: true, maxRetries: 20, retryDelay: 100 });
-    }
-  }
-
   async function start(dir: string, id: string, by: string): Promise<StartResult> {
     const scan = await scanDir(dir);
     const top = scan?.collected.paths.top;
@@ -122,7 +104,14 @@ export function createFeatureStart({
 
     const started = startedFeature(onBase, by, toIso(now()));
     try {
-      const commit = await commitStarted(top, base, owned.path, serializeCard(started), startMessage(started));
+      const { commit } = await commitCard(
+        must,
+        top,
+        `refs/heads/${base}`,
+        owned.path,
+        serializeCard(started),
+        startMessage(started),
+      );
       await beforeBranch?.();
       // The empty old value makes this create-only: it fails if the branch exists by now, and then it isn't ours to touch.
       await must(top, ["update-ref", `refs/heads/${branch}`, commit, ""]);

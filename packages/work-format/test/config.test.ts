@@ -4,6 +4,7 @@ import {
   configOverrides,
   DEFAULT_CONFIG,
   isKnownStatus,
+  maxStoryAgents,
   parseConfig,
   serializeConfig,
   setConfigValue,
@@ -101,5 +102,21 @@ describe("STORY-20: project overrides of the app-wide defaults", () => {
     expect(() => setConfigValue("progress: [", "worktrees", false)).toThrow(ConfigError);
     expect(() => setConfigValue("progress: effort\n", "worktrees", false)).toThrow(ConfigError);
     expect(() => setConfigValue("", "knowledge", "everything" as never)).toThrow(ConfigError);
+  });
+});
+
+describe("the limit of story agents at once (STORY-9 AC5)", () => {
+  it("is 3 by default, from the project's config, then the app default, then 3", () => {
+    expect(DEFAULT_CONFIG.maxStoryAgents).toBe(3);
+    expect(maxStoryAgents("version: 1\nmaxStoryAgents: 2\n", 5)).toBe(2);
+    expect(maxStoryAgents("version: 1\n", 5)).toBe(5);
+    expect(maxStoryAgents(null, undefined)).toBe(3);
+  });
+
+  it("is a whole number from 1; anything else is refused", () => {
+    expect(parseConfig("maxStoryAgents: 4\n").maxStoryAgents).toBe(4);
+    for (const bad of ["0", "-1", "1.5", "two"]) {
+      expect(() => parseConfig(`maxStoryAgents: ${bad}\n`)).toThrow(ConfigError);
+    }
   });
 });

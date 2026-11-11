@@ -81,6 +81,12 @@ export interface ServerMethods {
    * feature isn't approved, its branch exists, or the base branch can't be found.
    */
   "feature.start": { params: { dir: string; id: string }; result: { branch: string } };
+  /**
+   * Starts a story's agent (STORY-9, ADR 0025): a worktree off the feature's branch, the story In Progress there, and a
+   * session in it, nested under the feature's chat. Answers `queued` when the project's limit is reached: the session
+   * starts when one ends. Refused when the story can't be started or its provider has no runner.
+   */
+  "story.start": { params: { dir: string; id: string }; result: { chat: string; queued: boolean } };
   /** Rejects a draft feature: deletes its card files. Refused when git tracks any of them. */
   "draft.reject": { params: { dir: string; id: string }; result: { removed: number } };
   /** The roles a chat in this project can start from (ADR 0018). */
@@ -198,6 +204,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "draft.sendBack",
   "draft.approve",
   "feature.start",
+  "story.start",
   "draft.reject",
   "chat.roles",
   "roles.watch",
@@ -278,19 +285,7 @@ export function normalizeInitResult(raw: unknown): InitResult {
   return { ok: false, error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
 }
 
-/** The `{ dir, key }` params of the stale-copy actions, or null. */
-export function copyParams(params: unknown): { dir: string; key: string } | null {
-  const dir = dirParams(params);
-  return dir && isRecord(params) && typeof params.key === "string" && params.key ? { ...dir, key: params.key } : null;
-}
-
 /** The `{ watch }` params of `work.unwatch`, or null. */
 export function unwatchParams(params: unknown): { watch: number } | null {
   return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
-}
-
-export function normalizeCopyActionResult(raw: unknown): CopyActionResult {
-  const r = isRecord(raw) ? raw : {};
-  if (r.ok === true) return { ok: true };
-  return { ok: false, error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
 }

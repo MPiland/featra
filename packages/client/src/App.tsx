@@ -15,7 +15,7 @@ import { ChatPane } from "./components/chat/ChatPane.tsx";
 import { NewChatDialog } from "./components/chat/NewChatDialog.tsx";
 import { InboxView } from "./components/inbox/InboxView.tsx";
 import { useInboxApp } from "./components/inbox/useInboxApp.ts";
-import { Dialog } from "./components/Dialog.tsx";
+import { AppDialogs } from "./components/AppDialogs.tsx";
 import { ProjectSwitcher } from "./components/ProjectSwitcher.tsx";
 import { SettingsView } from "./components/settings/SettingsView.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
@@ -250,6 +250,8 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
                 onReviewDraft={reviewDraft}
                 hasChat={(id) => chatList.chats.some((c) => c.id === id)}
+                chats={chatList.chats}
+                onOpenChat={openChat}
                 setupPage={setupPage}
               />
             ) : view.id === "inbox" ? (
@@ -274,35 +276,12 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
           onStarted={startedChat}
         />
       )}
-      {dialog === "about" && (
-        <Dialog title="About Featra" onClose={() => setDialog(null)}>
-          <p className="about-name">{info?.name ?? "Featra"}</p>
-          <p>Version {info?.version ?? "…"}</p>
-          <p>Released under the MIT licence.</p>
-        </Dialog>
-      )}
-      {dialog === "resetAppData" && (
-        <Dialog
-          title="Reset App Data?"
-          closeLabel="Cancel"
-          onClose={() => setDialog(null)}
-          actions={
-            <button
-              type="button"
-              className="btn danger"
-              onClick={() => {
-                setDialog(null);
-                bridge.app.resetAppData();
-              }}
-            >
-              Reset and Restart
-            </button>
-          }
-        >
-          <p>Featra forgets its window layout, zoom and other stored settings, then restarts.</p>
-          <p>Your projects and their files are not touched. Logs are kept.</p>
-        </Dialog>
-      )}
+      <AppDialogs
+        dialog={dialog}
+        info={info}
+        onClose={() => setDialog(null)}
+        onReset={() => bridge.app.resetAppData()}
+      />
     </>
   );
 }

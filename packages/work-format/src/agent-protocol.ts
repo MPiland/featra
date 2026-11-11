@@ -6,6 +6,7 @@
  */
 import type { DraftInput, DraftResult } from "./card-draft-input.ts";
 import type { LogFile, LogInput } from "./knowledge-log.ts";
+import type { SpawnInput } from "./story-start.ts";
 import { isRecord } from "./utils/guards.ts";
 
 /** The path agents connect to. */
@@ -24,9 +25,16 @@ export interface AgentMethods {
   "cards.draft": { params: DraftInput; result: DraftResult };
   /** Starts an approved feature: its branch, with the feature active on it, by the chat's session (STORY-52). */
   "feature.start": { params: { feature: string }; result: { branch: string } };
+  /** Starts a story's agent in its own worktree as a session nested under the calling chat (STORY-9). */
+  "story.spawn": { params: SpawnInput; result: { chat: string; queued: boolean } };
 }
 export type AgentMethod = keyof AgentMethods;
-export const AGENT_METHODS = ["log.append", "cards.draft", "feature.start"] as const satisfies readonly AgentMethod[];
+export const AGENT_METHODS = [
+  "log.append",
+  "cards.draft",
+  "feature.start",
+  "story.spawn",
+] as const satisfies readonly AgentMethod[];
 
 export interface AgentRequest {
   id: number;

@@ -12,10 +12,11 @@ import { createDraftActions } from "./draft-actions.ts";
 import { createDraftReview } from "./draft-review.ts";
 import { createDraftWriter } from "./draft-writer.ts";
 import { createFeatureStart } from "./feature-start.ts";
+import { createStorySpawn } from "./story-spawn.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createLogWriter, type LogWriterDeps } from "./log-writer.ts";
-import { readKnowledge, readMcpEnabled } from "./mcp-enabled.ts";
+import { readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
 import { createRepoGit, type RepoGit } from "./repo-git.ts";
 import { createClaudeReader } from "./claude-reader.ts";
 import { createCodexReader } from "./codex-reader.ts";
@@ -92,9 +93,11 @@ export function createServices({
     roles,
     log,
     store,
+    storyLimit: readMaxStoryAgents(dataDir),
     mcp: { attach: (chat) => agents.attach(chat), release: (chat) => agents.release(chat) },
   });
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
+  const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,
@@ -106,6 +109,7 @@ export function createServices({
     writer: createLogWriter({ now, ...logs }),
     drafts: createDraftWriter({ scan: watches.scan, now, lane }),
     starts,
+    spawns,
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
@@ -121,6 +125,7 @@ export function createServices({
     drafts,
     review: createDraftReview({ scan: watches.scan, now, lane, gitCommand }),
     starts,
+    spawns,
     chats,
     roles,
     roleWatches,

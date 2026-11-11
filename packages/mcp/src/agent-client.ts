@@ -78,6 +78,13 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       if (!isRecord(result) || typeof result.branch !== "string") throw new Error("Featra gave an unexpected answer.");
       return { branch: result.branch };
     },
+    async spawn(input) {
+      const result = await call("story.spawn", input);
+      if (!isRecord(result) || typeof result.chat !== "string" || typeof result.queued !== "boolean") {
+        throw new Error("Featra gave an unexpected answer.");
+      }
+      return { chat: result.chat, queued: result.queued };
+    },
     close: () => socket.close(),
   };
 }

@@ -6,6 +6,7 @@ import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
+import { StoryAgent } from "./story-agents.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
 
@@ -53,6 +54,7 @@ function Story({ story }: { story: StoryRow }) {
         </button>
         {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
         <StaleMark id={story.id} />
+        <StoryAgent id={story.id} />
       </span>
       <span role="cell">
         <Status tone={story.tone} label={story.stage} />

@@ -1,0 +1,23 @@
+/* A story row's agent, model and session link (STORY-9): they wrap under the title, which keeps its ellipsis. */
+.prow .pn {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 4px;
+}
+
+.prow .pn .row-open {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.story-agent {
+  margin-left: 8px;
+}
+
+.prow .pn .story-agent {
+  white-space: normal;
+}
