@@ -69,6 +69,8 @@ test("Watch a story session, Stop it and Resume it: read-only, Stopped with the 
 
     // The Work row shows the mark too, with the stage kept.
     await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Work" }).click();
+    // The list shows its features collapsed when it comes back.
+    if ((await row.count()) === 0) await page.getByRole("button", { name: "Shaping", exact: true }).click();
     await expect(row.getByText("Stopped", { exact: true })).toBeVisible();
     await expect(row).toContainText("In Progress");
 
