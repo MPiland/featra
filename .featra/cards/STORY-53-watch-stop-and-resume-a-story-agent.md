@@ -2,7 +2,7 @@
 id: STORY-53
 type: story
 title: Watch, stop and resume a story agent
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 3
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-11T19:25:09Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
