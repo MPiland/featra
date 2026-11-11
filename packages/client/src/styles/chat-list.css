@@ -89,6 +89,21 @@
   overflow-wrap: anywhere;
 }
 
+.chat-think {
+  max-width: 72ch;
+  color: var(--muted);
+}
+
+.chat-think summary {
+  cursor: pointer;
+}
+
+.chat-think p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .chat-msg.user {
   align-self: flex-end;
   padding: 8px 12px;

@@ -75,4 +75,23 @@ describe("a mirrored approval and the Dev Lead's turn", { timeout: 30_000 }, () 
     await w.until(() => toolRow(lead.events(), "m4")?.cancelled === true);
     expect(await waiting(lead.id)).not.toBe("approval");
   });
+
+  it("closes when the user stops the session (STORY-53): the lead's copy is cancelled and nothing waits on it", async () => {
+    const lead = await w.runningLead();
+    const child = await w.spawnAs(lead, "STORY-13");
+    child.run.say(sdk.init());
+    void child.run.ask("Bash", { command: "git diff" }, "m5");
+    await w.until(() => status(lead.events(), "m5") === "pending");
+    expect(await waiting(lead.id)).toBe("approval");
+
+    expect(await w.window.ask("story.stop", { dir: w.repo.main, id: "STORY-13" })).toMatchObject({ ok: true });
+    expect(child.run.interrupts).toBe(1);
+    child.run.say(sdk.failure());
+    await w.until(() => toolRow(lead.events(), "m5")?.cancelled === true);
+    expect(await waiting(lead.id)).not.toBe("approval");
+    const inbox = (await w.window.ask("inbox.watch", { dir: w.repo.main, waitMs: 0 })).result as {
+      items: { request: { id: string } }[];
+    };
+    expect(inbox.items.some((i) => i.request.id === "m5")).toBe(false);
+  });
 });

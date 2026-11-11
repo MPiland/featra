@@ -15,7 +15,7 @@ import {
   type PermissionMode,
   type Role,
 } from "@featra/work-format";
-import { claudeControls, claudeSettings, sdkMode } from "./claude-controls.ts";
+import { claudeControls, claudeSettings, sdkMode, thinkingOption } from "./claude-controls.ts";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
 import { claudeQuestions, questionResult } from "./claude-question.ts";
 import { sessionRules, suggestedRule } from "./claude-rules.ts";
@@ -76,6 +76,7 @@ export function claudeOptions(
     systemPrompt: { type: "preset", preset: "claude_code", append: role.prompt },
     pathToClaudeCodeExecutable: claude,
     ...sdkMode(settings.mode),
+    ...thinkingOption(settings.model),
     includePartialMessages: true,
     canUseTool,
     env,
@@ -124,6 +125,7 @@ export function createClaudeProvider({
     controls: claudeControls,
     settings: claudeSettings,
     start: (options) => startSession(options, { loadQuery, locate, env }),
+    resumes: true,
     worktrees: {
       folder: (repo, name) => join(repo, ".claude", "worktrees", name),
       ignore: ".claude/worktrees/",

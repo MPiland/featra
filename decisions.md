@@ -1340,3 +1340,15 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **The cap counts every turn:** at most N story sessions run at once, including later turns; a later turn waits Queued.
 - **Story sessions can't start story sessions;** only the Dev Lead and the user spawn.
 - **Queued sessions are kept in memory only** for now; saving the queue across a restart is on the roadmap.
+
+## 2026-11-11 — STORY-53 Stop and Resume rulings (user)
+
+- **Story sessions are watch-only:** the live transcript, read-only, no composer; the Dev Lead steers them (STORY-54).
+  The assertion in `start-story.test.tsx` that a story session shows the composer is changed to the opposite, as the
+  spec requires.
+- **Stop keeps the card's stage** and marks it Stopped with a history event; the worktree and changes are untouched.
+  Resume goes on in the same provider session and clears Stopped with a history event. Stopped is derived from the
+  history, not a card field (ADR 0026).
+- **A stopped session doesn't count toward the cap;** Resume takes a slot or waits Queued like any turn. A queued
+  later turn can be stopped.
+- **No confirmation, any client:** Stop and Resume are the user's own action and work remotely.

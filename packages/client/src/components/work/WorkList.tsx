@@ -65,7 +65,13 @@ export function WorkList(props: {
     return {
       row: (id) => rows.get(id) ?? null,
       queued: (id) => chats.some((c) => c.story?.id === id && c.queued === true),
+      running: (id) => chats.some((c) => c.story?.id === id && c.running),
+      stalled: (id) => chats.some((c) => c.story?.id === id && c.stalled === true),
       hasChat,
+      stops: {
+        stop: (id) => work.stopStory(project.dir, id),
+        resume: (id) => work.resumeStory(project.dir, id),
+      },
       start: (id) => work.startStory(project.dir, id),
       open: onOpenChat,
     };

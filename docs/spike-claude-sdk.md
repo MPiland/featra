@@ -46,6 +46,19 @@ on the Claude Agent SDK" unless approved.
 - `effort` is accepted per query (`low | medium | high | xhigh | max`). The init message doesn't echo it back, so
   Featra must record the requested effort itself, on the card's `reasoning` field.
 
+## Summarized thinking for the story session view {#thinking}
+
+**Not verified on the real CLI.** STORY-53's story session view shows the agent's thinking where Claude exposes it. Featra
+asks for it with `thinking: { type: "adaptive", display: "summarized" }`, and the tests prove only what Featra does with
+the messages the SDK documents (`thinking_delta` stream events and `thinking` blocks) and which option it sends.
+
+- The option is sent only for the models known to take adaptive thinking: the `sonnet` and `opus` aliases and their
+  `[1m]` forms (`thinkingOption` in `claude-controls.ts`). Every other model (`haiku`, `default`, a role's own
+  model name) gets no `thinking` option, so its turns are as they were before.
+- It is gated, not sent everywhere, because the effect on an unsupported model is unchecked: the option could be
+  ignored or could fail the turn. Checking it means a real run per model, which spends the user's tokens, so it was
+  not done. When it is run, a model that takes the option can be added to the list.
+
 ## Local stdio MCP {#mcp}
 
 **Pass.**

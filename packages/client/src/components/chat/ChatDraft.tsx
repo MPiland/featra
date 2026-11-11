@@ -4,6 +4,7 @@ import { CardPane } from "../work/CardPane.tsx";
 import { PaneHandle, type ChosenWidth } from "../work/PaneHandle.tsx";
 import { useDockedPane } from "../work/useDockedPane.ts";
 import { ChatView, type ChatViewProps } from "./ChatView.tsx";
+import { useStoryTurn } from "./useStoryTurn.ts";
 import { useChatDraft } from "./useChatDraft.ts";
 
 export interface ChatDraftProps extends ChatViewProps {
@@ -27,7 +28,7 @@ export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) 
   const paneId = useId();
   const reopen = useRef<HTMLButtonElement>(null);
   const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
-
+  const storyTurn = useStoryTurn(work, view);
   if (draft !== seen) {
     setSeen(draft);
     if (draft && review) setShown({ id: draft, focus: true });
@@ -56,7 +57,19 @@ export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) 
     ) : null;
   return (
     <div ref={splitRef} className="work-split">
-      <ChatView {...view} headerExtra={reviewButton} />
+      <ChatView
+        {...view}
+        headerExtra={reviewButton}
+        story={
+          storyTurn && {
+            ...storyTurn,
+            actions: {
+              stop: (id) => work.stopStory(view.dir, id),
+              resume: (id) => work.resumeStory(view.dir, id),
+            },
+          }
+        }
+      />
       {shown && (
         <>
           <PaneHandle width={width} split={split} paneId={paneId} onMove={onMove} onChoose={choose} onClose={close} />

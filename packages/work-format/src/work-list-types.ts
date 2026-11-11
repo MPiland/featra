@@ -44,6 +44,8 @@ export interface StoryRow {
   agent: string | null;
   model: string | null;
   session: string | null;
+  /** The user stopped its agent (STORY-53): the row shows Stopped and offers Resume. */
+  stopped: boolean;
 }
 
 export interface FeatureRow {
@@ -122,6 +124,7 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   agent: textOrNull(r.agent),
   model: textOrNull(r.model),
   session: textOrNull(r.session),
+  stopped: r.stopped === true,
 });
 
 const feature = (r: Record<string, unknown>): FeatureRow => {

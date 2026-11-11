@@ -30,7 +30,11 @@ export function useChats(chats: ChatBridge, dir: string | null, id: string | nul
     onProjectChange();
   }
   const listed = list.chats.find((c) => c.id === id);
-  const chat: OpenChat | null = listed ? { id: listed.id, role: listed.role } : id ? (started[id] ?? null) : null;
+  const chat: OpenChat | null = listed
+    ? { id: listed.id, role: listed.role, story: listed.story?.id }
+    : id
+      ? (started[id] ?? null)
+      : null;
   const remember = (newId: string, role: ChatRoleRef) => setStarted((s) => ({ ...s, [newId]: { id: newId, role } }));
   return { list, chat, remember };
 }

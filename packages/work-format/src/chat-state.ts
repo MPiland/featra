@@ -32,6 +32,8 @@ export type ToolQuestion =
 export type ChatItem =
   | { kind: "user"; key: string; text: string }
   | { kind: "assistant"; key: string; block: string; text: string }
+  /** The agent's thinking, where the provider exposes it (STORY-53). */
+  | { kind: "thinking"; key: string; block: string; text: string }
   | {
       kind: "tool";
       key: string;
@@ -129,12 +131,12 @@ const unasked = (row: ToolItem) => ({
   question: row.question?.status === "pending" ? null : row.question,
 });
 
-function appendText(state: ChatState, block: string, delta: string): ChatState {
+function appendText(state: ChatState, kind: "assistant" | "thinking", block: string, delta: string): ChatState {
   const last = state.items.at(-1);
-  if (last?.kind === "assistant" && last.block === block) {
+  if (last?.kind === kind && last.block === block) {
     return replace(state, state.items.length - 1, { ...last, text: last.text + delta });
   }
-  return push(state, { kind: "assistant", key: key(state), block, text: delta });
+  return push(state, { kind, key: key(state), block, text: delta });
 }
 
 /**
@@ -162,7 +164,9 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "usage":
       return { ...state, usage: { used: event.used, window: event.window } };
     case "text":
-      return event.delta ? appendText(state, event.block, event.delta) : state;
+      return event.delta ? appendText(state, "assistant", event.block, event.delta) : state;
+    case "thinking":
+      return event.delta ? appendText(state, "thinking", event.block, event.delta) : state;
     case "tool":
       return upsertTool(state, event.id, event.name, event.input);
     case "approval":

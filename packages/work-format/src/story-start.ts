@@ -6,6 +6,7 @@
 import { serializeCard } from "./card.ts";
 import { setStatus } from "./history.ts";
 import { parseId, slugify } from "./ids.ts";
+import { resumedStory } from "./story-stop.ts";
 import type { Card } from "./types.ts";
 import { isRecord } from "./utils/guards.ts";
 
@@ -69,7 +70,8 @@ export interface StoryStart {
 
 /** The story as started: In Progress with the status event, and its agent (provider), role, model, reasoning, session and branch. */
 export function startedStory(story: Card, start: StoryStart, by: string, at: string): Card {
-  const moved = setStatus(story, IN_PROGRESS, by, at);
+  // A new agent is not a stopped one: a story started again leaves Stopped, with its event.
+  const moved = resumedStory(setStatus(story, IN_PROGRESS, by, at), by, at);
   return {
     ...moved,
     agent: start.agent,
