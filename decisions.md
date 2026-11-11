@@ -1383,3 +1383,10 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - Plugins can bundle role presets and provider parts.
 - Install from git, URLs and marketplace lists, and later a curated registry too.
 - Designed now, built after M1. Provider plugins stay as planned.
+
+## 2026-11-11 — BUG-17: Draft chat's Message box missing (developer)
+
+- A one-off on the first e2e test of a cold Windows run (14.1 s against 5–6 s): the New chat picker was still open, so
+  the app behind it was inert and had no Message box. The cause is slowness, not a product bug; the trace was lost, so it
+  is not proven. `draftInNewChat` now waits for the picker to close, with its own 20 s limit, before the composer check.
+  No assertion changed.
