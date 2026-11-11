@@ -13,6 +13,7 @@ import { createDraftActions } from "./draft-actions.ts";
 import { createDraftReview } from "./draft-review.ts";
 import { createDraftWriter } from "./draft-writer.ts";
 import { createFeatureStart } from "./feature-start.ts";
+import { createStoryMessage } from "./story-message.ts";
 import { createStorySpawn } from "./story-spawn.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
@@ -124,6 +125,7 @@ export function createServices({
     starts,
     spawns,
     reports,
+    messages: createStoryMessage({ scan: watches.scan, chats }),
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {

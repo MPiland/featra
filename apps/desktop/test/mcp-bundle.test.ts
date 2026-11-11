@@ -80,6 +80,7 @@ describe("the MCP bundle", () => {
         "start_feature",
         "spawn_session",
         "update_card",
+        "message_session",
       ]);
 
       const logged = await call("tools/call", {

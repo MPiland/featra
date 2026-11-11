@@ -98,6 +98,11 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       }
       return { card: result.card, changes: changes.map(String) };
     },
+    async message(input) {
+      const result = await call("session.message", input);
+      if (!isRecord(result) || typeof result.story !== "string") throw new Error("Featra gave an unexpected answer.");
+      return { story: result.story };
+    },
     close: () => socket.close(),
   };
 }

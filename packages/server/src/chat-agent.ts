@@ -4,7 +4,7 @@ import { applyState } from "./chat-composer.ts";
 import { restoredState } from "./chat-configure.ts";
 import type { ChatManagerDeps } from "./chat-manager-types.ts";
 import type { Chat } from "./chat-state.ts";
-import type { ApprovalHandler, ProviderAdapter, ProviderSession } from "./provider.ts";
+import type { ApprovalHandler, ProviderAdapter, ProviderSession, QuestionRequest, Refusal } from "./provider.ts";
 
 export interface AgentFactoryHost {
   mcp: ChatManagerDeps["mcp"];
@@ -12,10 +12,12 @@ export interface AgentFactoryHost {
   desk: ApprovalDesk;
   record: (c: Chat, event: ChatEvent) => void;
   listChanged: (dir: string) => void;
+  /** A story session's question that its Dev Lead takes instead of the user (STORY-54): the refusal the agent is told. */
+  asked: (c: Chat, request: Omit<QuestionRequest, "chat">) => Refusal | null;
 }
 
 /** Makes a chat's agent session, through its provider; the session starts its agent with the first message. */
-export function createAgentFactory({ mcp, decide, desk, record, listChanged }: AgentFactoryHost) {
+export function createAgentFactory({ mcp, decide, desk, record, listChanged, asked }: AgentFactoryHost) {
   return function agentFor(
     c: Chat,
     adapter: ProviderAdapter,
@@ -38,7 +40,10 @@ export function createAgentFactory({ mcp, decide, desk, record, listChanged }: A
       ...(inherited.length > 0 ? { inherited } : {}),
       ...(mcp ? { mcp: () => mcp.attach({ id: c.id, dir: c.dir }) } : {}),
       approve: (request, signal) => decide({ ...request, chat: c.id, cwd: c.cwd }, signal),
-      ask: (request, signal) => desk.ask({ ...request, chat: c.id }, signal),
+      ask: (request, signal) => {
+        const lead = asked(c, request);
+        return lead ? Promise.resolve(lead) : desk.ask({ ...request, chat: c.id }, signal);
+      },
     });
     agent.configure(role, state.settings);
     if (rowChanged && c.events !== null) listChanged(c.dir);

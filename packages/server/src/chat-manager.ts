@@ -8,7 +8,6 @@ import {
   CHAT_MESSAGES,
   chatName,
   DEFAULT_CONFIG,
-  errorMessage,
   idleSummary,
   newSummary,
   reduceRow,
@@ -31,6 +30,8 @@ import { createAgentFactory } from "./chat-agent.ts";
 import { chatLookups } from "./chat-lookups.ts";
 import { storyControl } from "./chat-story-control.ts";
 import { createInbox } from "./inbox.ts";
+import { createSend } from "./chat-send.ts";
+import { createStoryNotices } from "./story-notices.ts";
 import { createStoryMirror } from "./story-mirror.ts";
 
 export { ChatError };
@@ -79,6 +80,7 @@ export function createChatManager({
     desk,
     record: (c, e) => record(c, e),
     listChanged: (dir) => listChanged(dir),
+    asked: (c, request) => notices.asked(c, request),
   });
   const mirror = createStoryMirror(chats, (c, event) => record(c, event, true));
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
@@ -119,6 +121,7 @@ export function createChatManager({
       // A story session's turn is over: what its parent shows of its requests closes with it.
       mirror.clear(c);
       stories.release(c);
+      notices.turnEnded(c, event.outcome);
     }
     c.events?.push(event);
     tell(c.listeners, event);
@@ -174,6 +177,7 @@ export function createChatManager({
     mirror.clear(c);
     mirror.ended(c);
     stories.dropped(c);
+    notices.forget(c);
     mcp?.release(c.id);
     desk.forget(c.id);
     inbox.ended(c.id);
@@ -189,6 +193,14 @@ export function createChatManager({
     c.summary = idleSummary(c.summary);
   }
 
+  const notices = createStoryNotices({
+    chats,
+    open,
+    send: (id, text) => send(id, text),
+    askUser: (c, request) => desk.ask({ ...request, chat: c.id }, new AbortController().signal),
+    log,
+  });
+
   const stories = createStoryRunner({
     chats,
     provider,
@@ -201,33 +213,18 @@ export function createChatManager({
     same,
     agentFor,
     record: (c, event) => record(c, event),
+    failedStart: (c, why) => notices.failedStart(c, why),
     setSummary: (c, summary) => void (c.summary = summary),
     save,
     listChanged,
     log,
   });
 
-  function send(id: string, text: string) {
-    const c = chat(id);
-    if (c.running) throw new ChatError(CHAT_MESSAGES.busy);
-    if (c.events === null) throw new Error("Open the chat before sending to it.");
-    const agent = c.agent;
-    if (!agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
-    record(c, { type: "user", text });
-    // A story session's turn, any turn, holds one of the project's story slots, or waits for one (STORY-9 AC5).
-    if (c.summary.story) {
-      stories
-        .turn(c, () => agent.send(text))
-        .catch((err: unknown) => {
-          log(`A story session's turn couldn't wait for a slot: ${errorMessage(err)}`);
-          agent.send(text);
-        });
-      return;
-    }
-    agent.send(text);
-  }
+  const sender = createSend({ chat, record: (c, e) => record(c, e), stories, log });
+  const send = (id: string, text: string) => sender.send(id, text);
+  const claim = (c: Chat) => sender.claim(c);
 
-  const control = storyControl({ chat, open, provider, record, stories, listChanged, log });
+  const control = storyControl({ chat, open, provider, record, stories, notices, claim, listChanged, log });
 
   return {
     ...chatLookups(chats, chat, providers, same),
