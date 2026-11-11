@@ -2,7 +2,7 @@
 id: STORY-53
 type: story
 title: Watch, stop and resume a story agent
-status: In Progress
+status: In Review
 parent: FEAT-5
 order: 3
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-53-watch-stop
-pr: null
+pr: "28"
 created: 2026-11-10T18:00:00Z
 history:
   - at: 2026-11-10T18:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: developer
+  - at: 2026-11-11T18:40:00Z
+    field: status
+    from: In Progress
+    to: In Review
     by: developer
 ---
 
