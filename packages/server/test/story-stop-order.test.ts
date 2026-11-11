@@ -2,11 +2,12 @@
  * STORY-53 (review): the card is written first. Stop marks Stopped and then interrupts, so a failure after the mark
  * still leaves Resume; Resume checks everything, clears the mark and then sends, so a failed card write sends nothing.
  * The interrupt is bounded and does not hold the card lane. Real services, sockets, git and cards; only the Agent SDK,
- * the clock and the disk's rename (made to fail on demand) are faked.
+ * the clock and the disk's rename (made to fail on demand) are faked. The bound's timer is the test's to fire (below),
+ * across the whole file: a stuck interrupt in any case here waits for the test's own timeout, not for the bound.
  */
 import { join } from "node:path";
 import type * as FsPromises from "node:fs/promises";
-import { afterAll, beforeAll, describe, expect, it, vi, type MockInstance } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { RESUME_MESSAGE, type ChatSummary } from "@featra/work-format";
 import { sdk } from "./fake-query.ts";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
@@ -39,6 +40,9 @@ beforeAll(async () => {
     return real(() => {}, 0);
   }) as typeof setTimeout);
   w = await storyWorld({ config: "maxStoryAgents: 5\n", interruptMs: BOUND_MS });
+});
+beforeEach(() => {
+  bound.length = 0;
 });
 afterAll(() => {
   timers.mockRestore();
@@ -103,7 +107,6 @@ describe("the interrupt", () => {
     const stuck = await started("STORY-9", "session-9");
     const other = await started("STORY-10", "session-10");
     stuck.onInterrupt = () => new Promise<void>(() => {});
-    bound.length = 0;
     let settled = false;
     const first = ask("story.stop", "STORY-9").then((r) => {
       settled = true;

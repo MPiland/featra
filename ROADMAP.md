@@ -46,6 +46,11 @@ epics in `.featra/cards/`.
   terminals restricted, and macOS screen-recording and accessibility permissions. Linux under Wayland limits it. M1
   covers browser use only (STORY-40).
 
+- **Performance: unwatched projects pay two git scans per card write.** Reuse git state for lane writes on unwatched
+  folders, as the watched path does (ADR 0016). Not M1 scope.
+- **Test hygiene:** the ordering case in `agent-card-update-review.test.ts` needs the STORY-6 session that the "who is
+  calling" case spawns, so it fails when run alone; make each case build its own.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".

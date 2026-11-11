@@ -1387,7 +1387,19 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 ## 2026-11-11 — BUG-18: card-write and Stop tests that fail under load (developer)
 
 - The ordering test "both land, whatever order they arrive in" is timing: card writes share one lane and every run
-  passed its assertions; ten writes take 13 to 19 s, and a loaded machine passes the 30 s limit (24 of 24 copies
-  failed together before, passed after). It has its own 120 s limit.
+  passed its assertions. The test world never watched the project, so each write did two unwatched git scans (about
+  0.65 s a write, 6.6 s in all). The world now watches, as the app does: 0.9 s, and no longer needs a longer limit
+  (24 of 24 parallel copies failed at 30 s before, passed in under 5 s after).
 - The Stop test "does not hold the card lane" no longer waits on real time: it takes the interrupt's bound timer over
   and fires it when it says. No assertion changed.
+
+## 2026-11-11 — BUG-17 and BUG-18 review rulings (dev-lead)
+
+- BUG-17 has no regression test: the failure needs a cold runner where `chat.start` takes over 5 s; the helper is test
+  code and the product path is unchanged. A shared `startChat(page, role)` e2e helper goes on the roadmap, not done here.
+- BUG-18: the ordering test's cost was re-measured with no other load (0.65 s a write); the root cause is the unwatched
+  world, and the world now watches. A load time-out can't be a deterministic test, so the 24-copy repro and the 20 ms
+  Stop repro stand in for one.
+- Roadmap: reuse git state for lane writes on unwatched folders; the ordering case's dependency on "who is calling".
+- Product: the New chat picker shows no busy state while `chat.start` runs and its role button can be double-clicked into
+  two chats. Taken as BUG-19 after these two.
