@@ -2,7 +2,7 @@
 id: STORY-10
 type: story
 title: Agents update their own card
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 4
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-11T19:29:55Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

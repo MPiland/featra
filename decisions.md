@@ -1351,3 +1351,12 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   draft.** The stage ceiling is the last stage before Done.
 - **Evidence:** a plain file of at most 1 MB under the story's evidence folder, one link per criterion, newest wins.
   The card pane does not show the link yet.
+
+## 2026-11-11 — STORY-10 review rulings (dev-lead)
+
+- The story agent's build choices above are confirmed.
+- **Spec correction:** the Dev Lead that spawned a story may update that story's card, in addition to cards in features it
+  drafted.
+- `report` history events store only what changed, as JSON, not the whole card.
+- `update_card` is refused once the story's worktree is gone, and only the story's latest session may update it.
+- Done and Cancelled cards are refused.
