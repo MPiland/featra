@@ -73,6 +73,7 @@ export const WORK_COPY = {
   start: "Start",
   startOf: (id: string) => `Start ${id}`,
   queued: "Queued",
+  reported: "Reported",
   openSession: "Session",
   openSessionOf: (id: string) => `Open the session of ${id}`,
   none: "—",

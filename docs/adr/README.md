@@ -57,3 +57,4 @@ What becomes easier or harder, and what we must now do.
 | [0023](0023-approve-commits-a-draft-reject-deletes-it.md) | Approve commits a draft's cards, all or nothing; Reject deletes   | accepted |
 | [0024](0024-start-creates-the-feature-branch.md)          | Start creates the feature's branch; ownership moves to it         | accepted |
 | [0025](0025-story-sessions-in-worktrees.md)               | Story agents are Featra-run sessions, each in its own worktree    | accepted |
+| [0027](0027-agents-report-on-their-card.md)               | Agents report on their card with `update_card`; only Reported     | accepted |

@@ -6,11 +6,15 @@
  * if it needs the server, one more method on `FeatraHost`.
  */
 import {
+  DEFAULT_CONFIG,
   DRAFT_LIMITS,
   LOG_FILES,
+  REPORT_LIMITS,
+  stageCeiling,
   parseDecision,
   parseDraft,
   parseQuestion,
+  parseReportInput,
   parseSpawnInput,
   parseStartInput,
   type DraftInput,
@@ -18,6 +22,7 @@ import {
   type LoggedEntry,
   type LogInput,
   type Parsed,
+  type ReportInput,
   type SpawnInput,
 } from "@featra/work-format";
 
@@ -31,6 +36,8 @@ export interface FeatraHost {
   start: (feature: string) => Promise<{ branch: string }>;
   /** Starts a story's agent in its own worktree, nested under this chat; queued when the project is at its limit (STORY-9). */
   spawn: (input: SpawnInput) => Promise<{ chat: string; queued: boolean }>;
+  /** Reports progress on a card: the stage, ticks, tasks, a note and evidence links, all Reported (STORY-10). */
+  update: (input: ReportInput) => Promise<{ card: string; changes: string[] }>;
 }
 
 export interface Tool {
@@ -241,5 +248,75 @@ const SPAWN_SESSION: Tool = {
   },
 };
 
+const list = (description: string) => ({ type: "array", items: { type: "string" }, description });
+
+const UPDATE_CARD: Tool = {
+  name: "update_card",
+  failed: "Not updated.",
+  description: [
+    "Report progress on a story's card in Featra, as you work: the user sees it live in Work, marked Reported.",
+    "Everything you write here is your claim, never proof: Featra marks it Reported, and only CI, the linked tests and the user make a story Verified, Proven or Accepted.",
+    "A card has a stage (New, Ready, In Progress, In Review, Acceptance, Done), acceptance criteria (what must be true),",
+    "tasks (the steps) and notes. In a story session you update your own card only (`card` is optional);",
+    "a Dev Lead can name any card of its feature as `card`. Any other chat is refused.",
+    `You may move the stage forward, up to ${stageCeiling(DEFAULT_CONFIG)} (the project's last stage before Done): never to Done, Cancelled or backwards, which are the user's.`,
+    "Tick tasks and criteria by their exact text as the card has it (`tasks`, `criteria`), add tasks you discover (`addTasks`),",
+    "and append one short line to the notes (`note`): not a log, only what the next reader needs.",
+    "Nothing else on the card can be changed.",
+    "Evidence is a file that shows a criterion works, such as a screenshot. Write it in your worktree under",
+    ".featra/evidence/<FEAT-N>/<STORY-M>/ (your feature's and your story's ids), then link it in `criteria` as `evidence`;",
+    "a link anywhere else is refused. Keep evidence as small as the story allows: one screenshot per criterion at most,",
+    `each under ${REPORT_LIMITS.evidenceBytes / 1_000_000} MB, and none when a test already proves it.`,
+    "This does not commit: commit the card and its evidence with your work. The input is checked, and a call that is refused changes nothing.",
+  ].join(" "),
+  inputSchema: {
+    type: "object",
+    properties: {
+      card: { type: "string", description: "The card's id, such as STORY-10. A story session leaves it out." },
+      stage: {
+        type: "string",
+        description: "The stage to move forward to, such as In Review or Acceptance. Never Done.",
+      },
+      tasks: list("Tasks to tick, each as the card words it."),
+      addTasks: list(`New tasks to add, one line each (at most ${REPORT_LIMITS.added}).`),
+      criteria: {
+        type: "array",
+        description: "Acceptance criteria to tick.",
+        items: {
+          type: "object",
+          properties: {
+            criterion: { type: "string", description: "The criterion, as the card words it." },
+            evidence: {
+              type: "string",
+              description: "A file you wrote under .featra/evidence/<FEAT-N>/<STORY-M>/ that shows it works.",
+            },
+          },
+          required: ["criterion"],
+        },
+      },
+      note: {
+        type: "string",
+        description: `One short line for the card's notes (at most ${REPORT_LIMITS.note} characters).`,
+      },
+    },
+    required: [],
+  },
+  async run(input, host) {
+    const parsed = parseReportInput(input);
+    if (!parsed.ok) throw new ToolRefusal(parsed.error);
+    const { card: id, changes } = await host.update(parsed.value);
+    return changes.length
+      ? `Updated ${id}: ${changes.join(", ")}. Reported, not committed: commit the card and its evidence with your work.`
+      : `Nothing to change on ${id}.`;
+  },
+};
+
 /** Every tool the server offers, in the order an agent lists them. */
-export const TOOLS: readonly Tool[] = [LOG_DECISION, DEFER_QUESTION, DRAFT_CARDS, START_FEATURE, SPAWN_SESSION];
+export const TOOLS: readonly Tool[] = [
+  LOG_DECISION,
+  DEFER_QUESTION,
+  DRAFT_CARDS,
+  START_FEATURE,
+  SPAWN_SESSION,
+  UPDATE_CARD,
+];

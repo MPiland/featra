@@ -11,6 +11,7 @@ import {
   assertNever,
   parseDraft,
   parseLogInput,
+  parseReportInput,
   parseSpawnInput,
   parseStartInput,
   starter,
@@ -23,6 +24,7 @@ import {
 import { ApiError } from "./api-error.ts";
 import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
+import type { CardReport } from "./card-report.ts";
 import type { DraftWriter } from "./draft-writer.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
@@ -43,9 +45,13 @@ export const AGENT_MESSAGES = {
   noStart: "Starting a feature isn't available.",
   spawnReadOnly: "Starting a story is off: this project's knowledge setting is read-only.",
   noSpawn: "Starting a story isn't available.",
+  updateReadOnly: "Updating cards is off: this project's knowledge setting is read-only.",
+  noUpdate: "Updating cards isn't available.",
   /** A story session is a worker: only the Dev Lead's chat puts agents on stories. */
   sessionSpawn: "A story session can't start other story sessions. Ask the Dev Lead.",
 } as const;
+
+type ChatInfo = NonNullable<ReturnType<Pick<ChatManager, "info">["info"]>>;
 
 export interface AgentBridgeDeps {
   /** The MCP's script (`dist/mcp.cjs` in the app). Without it no agent gets the MCP. */
@@ -67,6 +73,8 @@ export interface AgentBridgeDeps {
   starts?: FeatureStart;
   /** Starts story sessions (STORY-9). Without it `story.spawn` is refused. */
   spawns?: StorySpawn;
+  /** Writes agents' reports on cards (STORY-10). Without it `card.update` is refused. */
+  reports?: CardReport;
   newToken?: () => string;
 }
 
@@ -97,6 +105,7 @@ export function createAgentBridge({
   drafts,
   starts,
   spawns,
+  reports,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -166,6 +175,17 @@ export function createAgentBridge({
     return spawns.spawn(dir, input.value, chat);
   }
 
+  async function update(chat: string, info: ChatInfo, params: unknown) {
+    const off = await refusal(info.dir, AGENT_MESSAGES.updateReadOnly);
+    if (off !== null) throw new ApiError(off);
+    if (!reports) throw new ApiError(AGENT_MESSAGES.noUpdate);
+    const input = parseReportInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    const card = input.value.card ?? info.storyId;
+    const changes = await reports.report(info.dir, { chat, story: info.storyId ?? null }, info.session, input.value);
+    return { card: card ?? "", changes };
+  }
+
   return {
     setPort: (next) => {
       port = next;
@@ -214,6 +234,8 @@ export function createAgentBridge({
           return start(chat, info.dir, params);
         case "story.spawn":
           return spawn(chat, info.dir, info.story, params);
+        case "card.update":
+          return update(chat, info, params);
         case "log.append":
           return appendLog(chat, info.dir, info.session, params);
         default:

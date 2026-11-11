@@ -55,6 +55,7 @@ function Story({ story }: { story: StoryRow }) {
         {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
         <StaleMark id={story.id} />
         <StoryAgent id={story.id} />
+        {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
       </span>
       <span role="cell">
         <Status tone={story.tone} label={story.stage} />

@@ -68,7 +68,7 @@ export interface ChatManager {
   /** The chat's project folder, or null when there is no such chat. */
   dirOf: (id: string) => string | null;
   /** An open chat's working folder and how its entries name it as their session, or null when it isn't open. */
-  info: (id: string) => { dir: string; session: string; story?: boolean } | null;
+  info: (id: string) => { dir: string; session: string; story?: boolean; storyId?: string } | null;
   /** Adds an event the chat's server-side tools produced (STORY-47) to an open chat's log; nothing for any other. */
   report: (id: string, event: ChatEvent) => void;
   /** The project's chats as the list shows them, oldest first. */

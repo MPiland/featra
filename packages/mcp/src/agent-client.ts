@@ -85,6 +85,19 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       }
       return { chat: result.chat, queued: result.queued };
     },
+    async update(input) {
+      const result = await call("card.update", input);
+      const changes = isRecord(result) && Array.isArray(result.changes) ? result.changes : null;
+      if (
+        !isRecord(result) ||
+        typeof result.card !== "string" ||
+        !changes ||
+        !changes.every((c) => typeof c === "string")
+      ) {
+        throw new Error("Featra gave an unexpected answer.");
+      }
+      return { card: result.card, changes: changes.map(String) };
+    },
     close: () => socket.close(),
   };
 }

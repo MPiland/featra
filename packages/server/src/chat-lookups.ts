@@ -30,6 +30,7 @@ export function chatLookups(
         dir: c.dir,
         session: `${c.summary.role.name} chat ${c.id.slice(0, 8)}`,
         story: c.summary.story !== undefined,
+        ...(c.summary.story ? { storyId: c.summary.story.id } : {}),
       };
     },
     providers: () =>

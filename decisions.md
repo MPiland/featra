@@ -1340,3 +1340,14 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **The cap counts every turn:** at most N story sessions run at once, including later turns; a later turn waits Queued.
 - **Story sessions can't start story sessions;** only the Dev Lead and the user spawn.
 - **Queued sessions are kept in memory only** for now; saving the queue across a restart is on the roadmap.
+
+## 2026-11-11 - STORY-10 build choices (story agent, for the Dev Lead to confirm)
+
+- **`update_card` is new, and only ever Reported** (ADR 0027). One `report` history event per call, a `status` event for a
+  stage move; both `by: session:<chat>`.
+- **`evidenceState.reported` no longer counts a card's creation** (an agent-drafted story is not Reported); it counts a
+  session's status move after creation, or a `report`. Regression tests added.
+- **The Dev Lead may update stories and bugs of a feature it drafted, but not while the feature is still a review-pending
+  draft.** The stage ceiling is the last stage before Done.
+- **Evidence:** a plain file of at most 1 MB under the story's evidence folder, one link per criterion, newest wins.
+  The card pane does not show the link yet.

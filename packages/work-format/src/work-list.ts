@@ -4,6 +4,7 @@
  */
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
+import { evidenceState } from "./evidence.ts";
 import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";
 import type { Resolution } from "./owner-copies.ts";
@@ -87,6 +88,7 @@ function storyRow(card: Card, added: ReadonlySet<string>, config: ProjectConfig)
     agent: card.agent,
     model: card.model,
     session: card.sessions.at(-1) ?? null,
+    ...(evidenceState(card).reported ? { reported: true as const } : {}),
   };
 }
 

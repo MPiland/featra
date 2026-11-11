@@ -44,6 +44,8 @@ export interface StoryRow {
   agent: string | null;
   model: string | null;
   session: string | null;
+  /** An agent's progress report is the latest word on it (ADR 0004): the row shows Reported. Left out otherwise. */
+  reported?: true;
 }
 
 export interface FeatureRow {
@@ -122,6 +124,7 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   agent: textOrNull(r.agent),
   model: textOrNull(r.model),
   session: textOrNull(r.session),
+  ...(r.reported === true ? { reported: true as const } : {}),
 });
 
 const feature = (r: Record<string, unknown>): FeatureRow => {

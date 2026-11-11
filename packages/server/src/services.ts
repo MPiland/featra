@@ -2,6 +2,7 @@ import { createAgentBridge, type AgentBridge } from "./agent-bridge.ts";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { createApi, type Api } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
+import { createCardReport } from "./card-report.ts";
 import { createCardLane } from "./card-lane.ts";
 import { createChatManager } from "./chat-manager.ts";
 import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts";
@@ -99,6 +100,7 @@ export function createServices({
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
+  const reports = createCardReport({ scan: watches.scan, now, lane });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,
     execPath: mcpExecPath,
@@ -110,6 +112,7 @@ export function createServices({
     drafts: createDraftWriter({ scan: watches.scan, now, lane }),
     starts,
     spawns,
+    reports,
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {

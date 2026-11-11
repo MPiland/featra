@@ -35,6 +35,21 @@ describe("evidenceState", () => {
     );
   });
 
+  it("a story an agent drafted is not Reported: its creation is not progress", () => {
+    const drafted = {
+      ...withAcs(1),
+      history: [{ at: at(0), field: "status" as const, from: null, to: "New", by: "session:abc" }],
+    };
+    expect(evidenceState(drafted).reported).toBe(false);
+  });
+
+  it("an agent's progress report is Reported, until a user's move after it", () => {
+    const report = { at: at(3), field: "report" as const, from: "{}", to: "tasks", by: "session:abc" };
+    const reported = { ...withAcs(1), history: [...withAcs(1).history, report] };
+    expect(evidenceState(reported).reported).toBe(true);
+    expect(evidenceState(moves(reported, [4, "In Review", "user"])).reported).toBe(false);
+  });
+
   it("tracks CI verification, per-AC proof and acceptance, latest event winning", () => {
     let c = withAcs(2);
     c = recordEvidence(c, VERIFIED, "system", at(1));
