@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-16-update-card-e2e-flake
-pr: PRURL
+pr: https://github.com/MPiland/featra/pull/31
 created: 2026-11-11T20:10:00Z
 history:
   - at: 2026-11-11T20:10:00Z
