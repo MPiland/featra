@@ -1419,3 +1419,14 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   drafting writes cards; it was not a ruling about messaging. A read-only project withholds the whole MCP at attach, so a
   per-call gate added nothing. Flagged for the Dev Lead to confirm.
 - Messaging a restored, unopened story session works as ADR 0028 says: proved with a restart test.
+
+## 2026-11-11 — Featra plugins (user)
+
+- Anyone can build Featra plugins that others install; a plugin can add a full pane, a modal, views and actions with its
+  own buttons (ADR 0029, proposed).
+- Plugin UI is sandboxed and reaches Featra through a permissioned API the user approves at install.
+- An opt-in tier lets a plugin run local programs.
+- Featra's components and theme are offered, not forced.
+- Plugins can bundle role presets and provider parts.
+- Install from git, URLs and marketplace lists, and later a curated registry too.
+- Designed now, built after M1. Provider plugins stay as planned.

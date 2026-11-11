@@ -8,6 +8,11 @@ epics in `.featra/cards/`.
 
 ## M2 and later
 
+- **Featra plugins** (ADR 0029): anyone builds plugins others install. A plugin can add a full pane, a modal, sidebar
+  views and actions with its own buttons (for example a UX design pane that annotates image, PDF or Figma mockups and
+  sends the notes to the story's agent), through a permissioned Featra API (cards, sessions, project files, Inbox,
+  settings, named network hosts). An opt-in tier runs local programs. Plugins can bundle role presets and provider
+  parts. Installed from git or URLs and from marketplace lists; a curated registry later.
 - **Remote control** (MVP), phone first, reusing the same React client against the local server. Over Tailscale
   (for example Tailscale Serve, reachable only inside the tailnet), with an SSH tunnel to the server as an alternative
   for users without Tailscale. Featra never exposes a public port, and it keeps nothing hosted. It does not rely on
