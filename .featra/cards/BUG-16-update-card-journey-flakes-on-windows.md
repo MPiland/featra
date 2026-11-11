@@ -2,7 +2,7 @@
 id: BUG-16
 type: bug
 title: Update-card journey flakes on Windows
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 8
 origin: bug
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-16
+  - at: 2026-11-11T20:44:53Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
@@ -41,8 +46,7 @@ the row within the expect timeout.
 
 ## Acceptance criteria
 
-- [x] The cause is found and recorded: a slow step the journey has to wait for, or the update being lost or late in the
-      product.
+- [x] The cause is found and recorded: a slow step the journey has to wait for, or the update being lost or late in the product.
 - [x] If the product loses or delays the update, it is fixed, and a regression test that fails on the old code proves it.
 - [x] The journey passes reliably on Windows CI without weakening, deleting or reordering its assertions.
 
@@ -54,6 +58,7 @@ the row within the expect timeout.
 - [x] Rerun E2E (Windows) on the PR
 
 ## Notes
+
 - 2026-11-11 (session:bug-16): the failing log shows the row went "StartNew", then "Session Stop In Progress", then
   "Session In Progress" with no Stop: the story's turn ended inside the 5 s wait, yet the card never changed. So the
   update was lost, not slow (a slow MCP start keeps Stop on). The trace was not opened.
