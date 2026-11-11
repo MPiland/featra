@@ -17,6 +17,7 @@ import {
   type CardUpdateResult,
   type CardView,
 } from "@featra/work-format";
+import { retryBusy } from "./busy-retry.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { locationKey } from "./collect.ts";
 import type { Scan } from "./work-scan.ts";
@@ -49,12 +50,20 @@ export function cardViewIn(scan: Scan | null, id: string): CardView | null {
   return scan && found ? buildCardView(found.owned, found.root !== null, contextOf(scan)) : null;
 }
 
-/** Writes `text` to `file` through a temporary file in the same folder, so no reader sees half a card. */
-export async function writeAtomic(file: string, text: string): Promise<void> {
+export interface AtomicIo {
+  rename?: typeof rename;
+  pause?: (ms: number) => Promise<unknown>;
+}
+
+/**
+ * Writes `text` to `file` through a temporary file in the same folder, so no reader sees half a card. A rename that
+ * Windows refuses because a scan or a scanner has the card open is tried again a few times (BUG-16).
+ */
+export async function writeAtomic(file: string, text: string, { rename: move = rename, pause }: AtomicIo = {}) {
   const temp = join(dirname(file), `.${randomBytes(6).toString("hex")}.featra-tmp`);
   try {
     await writeFile(temp, text, "utf8");
-    await rename(temp, file);
+    await retryBusy(() => move(temp, file), pause);
   } catch (err) {
     await rm(temp, { force: true });
     throw err;
