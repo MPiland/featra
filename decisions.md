@@ -1372,3 +1372,11 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **A stopped session doesn't count toward the cap;** Resume takes a slot or waits Queued like any turn. A queued
   later turn can be stopped.
 - **No confirmation, any client:** Stop and Resume are the user's own action and work remotely.
+
+### BUG-16: update-card journey flakes on Windows (2026-11-11)
+
+- **A card write retries a rename Windows refuses (EPERM, EBUSY), five tries, as the log writer already did.** Why: the
+  failing run's row showed the story's turn ending without the card changing, so the update was lost, not late. The
+  rename over the card is the one step that fails on Windows alone, when a scan or a scanner has the card open. One
+  helper (`busy-retry.ts`) serves `writeAtomic` and the log writer. Not seen in a trace: the cause is by elimination, so
+  a further sighting should open the trace first.
