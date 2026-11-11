@@ -13,7 +13,7 @@ export interface AgentFactoryHost {
   record: (c: Chat, event: ChatEvent) => void;
   listChanged: (dir: string) => void;
   /** A story session's question that its Dev Lead takes instead of the user (STORY-54): the refusal the agent is told. */
-  asked: (c: Chat, request: Pick<QuestionRequest, "questions">) => Refusal | null;
+  asked: (c: Chat, request: Omit<QuestionRequest, "chat">) => Refusal | null;
 }
 
 /** Makes a chat's agent session, through its provider; the session starts its agent with the first message. */

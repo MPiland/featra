@@ -36,8 +36,26 @@ the loop in both directions.
 - **The user's Stop is a notice too**, and so is a queued story the user took off the queue before it started (no turn will
   end to say so): `stopped: Taken off the queue before it started.`
 
+## Review rulings
+
+- **A story's question that the Dev Lead is gone for goes to the user.** The notice holds every question the turn asked,
+  each with its option labels, up to 600 characters; other notices stay at 160. If the Dev Lead is gone or closed by the
+  end of the turn, the held question asks the user in the story's chat (the no-Dev-Lead path), and the answer is sent to
+  the session as a message.
+- **A Dev Lead whose own turn the user stopped holds its notices** and gets them when its next turn that is not a stop
+  ends: Stop is not the time to put more in front of it.
+- **A story that waited for a slot and could not start posts a `failed` notice** with the reason.
+- **Delivery errors drop notices only when they can never succeed** (the Dev Lead is closed or can't take a message); a
+  transient error keeps them for the next idle. A chat that ends forgets the notices and questions it held.
+- **`message_session` and Resume don't race.** Each claims the session's next turn before it sends (`chat-send.ts`), so
+  one is refused as busy and a turn never starts with two messages.
+- **`message_session` is gated only by the MCP's off switch,** not the knowledge setting: it writes no card or knowledge
+  file, and a read-only project withholds the whole MCP.
+- **No live Dev Lead: no completion, stop or failure notice is shown anywhere for now;** questions still reach the user.
+  Notices held in memory are lost across a restart. Both are on the roadmap, with a per-story notice budget.
+
 ## Consequences
 
 - No new provider interface: the notice rides the existing send, and the question the existing permission callback.
-- A story session that fails to start (a problem with no turn end) gives no notice yet. The Inbox holds only approvals and
-  questions, so a story whose Dev Lead is gone gets no completion notice either; its question still reaches the user.
+- A restored story session that was not opened can be messaged: it is opened first and goes on in its saved provider
+  session (proved by a restart test).

@@ -4,7 +4,14 @@
  * git and cards; only the Agent SDK and the clock are faked.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { ASKED_LEAD, leadMessage, noticeMessage, type ChatEvent, type Question } from "@featra/work-format";
+import {
+  ASKED_LEAD,
+  askedSummary,
+  leadMessage,
+  noticeMessage,
+  type ChatEvent,
+  type Question,
+} from "@featra/work-format";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
 import { sdk } from "./fake-query.ts";
 import { finish, idleLead, noticesIn } from "./story-lead.ts";
@@ -44,8 +51,35 @@ describe("AC2: a story's question", { timeout: 30_000 }, () => {
     finish(child.run, "I need to know the colour.");
     await w.until(() => noticesIn(lead.events()).length === 1);
     expect(noticesIn(lead.events())).toEqual([
-      noticeMessage([{ story: "STORY-5", outcome: "asks", summary: COLOUR.question }]),
+      noticeMessage([{ story: "STORY-5", outcome: "asks", summary: askedSummary([[COLOUR]]) }]),
     ]);
+    // The Dev Lead can answer from the notice: it holds the question and each option.
+    expect(noticesIn(lead.events())[0]).toContain("Which colour do you prefer? (Blue / Red)");
+  });
+
+  it("holds every question the turn asked, in one notice", async () => {
+    const lead = await idleLead(w);
+    const child = await w.spawnAs(lead, "STORY-12");
+    child.run.say(sdk.init());
+    const SIZE: Question = {
+      question: "Which size?",
+      header: "Size",
+      options: [
+        { label: "Small", description: "Tidy" },
+        { label: "Large", description: "Roomy" },
+      ],
+      multiSelect: false,
+    };
+    await child.run.ask(ASK, { questions: [COLOUR] }, "q1");
+    await child.run.ask(ASK, { questions: [SIZE] }, "q2");
+    finish(child.run, "Two questions.");
+    await w.until(() => noticesIn(lead.events()).length === 1);
+    expect(noticesIn(lead.events())).toEqual([
+      noticeMessage([{ story: "STORY-12", outcome: "asks", summary: askedSummary([[COLOUR], [SIZE]]) }]),
+    ]);
+    expect(noticesIn(lead.events())[0]).toContain(
+      "Which colour do you prefer? (Blue / Red) | Which size? (Small / Large)",
+    );
   });
 
   it("is answered by the Dev Lead with message_session, which the story's session hears", async () => {

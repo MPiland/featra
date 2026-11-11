@@ -5,7 +5,7 @@
  */
 import type { ChatEvent, TurnOutcome } from "./chat-events.ts";
 import { parseId } from "./ids.ts";
-import type { Question } from "./questions.ts";
+import type { Answers, Question } from "./questions.ts";
 import { stoppedIn } from "./story-stop.ts";
 import type { Card } from "./types.ts";
 import { isRecord } from "./utils/guards.ts";
@@ -29,6 +29,8 @@ export const NOTICE_ASKS_HINT = "Answer a story's question with message_session,
 export const LEAD_LABEL = "Message from the Dev Lead:";
 /** The longest summary a notice carries. */
 export const NOTICE_SUMMARY_MAX = 160;
+/** The longest a notice that holds questions is: they carry the options, so the Dev Lead can answer from the notice. */
+export const ASKS_SUMMARY_MAX = 600;
 
 /** What the session is told when its question went to the Dev Lead (its tool call is refused, so its turn ends). */
 export const ASKED_LEAD =
@@ -44,7 +46,7 @@ export const MESSAGE_MESSAGES = {
   stopped: (id: string) => `${id} is stopped. Only the user can resume it.`,
   working: (id: string) => `${id} is working. Its next notice says when it can be messaged.`,
   queued: (id: string) => `${id} is waiting for a slot. Its next notice says when it can be messaged.`,
-  sent: (id: string) => `Sent to ${id}.`,
+  sent: (id: string) => `Sent to ${id}. Its next notice tells you what it did.`,
 } as const;
 
 /** A `message_session` call: the story and what to tell its session. */
@@ -123,9 +125,21 @@ export function turnSummary(events: readonly ChatEvent[], outcome: TurnOutcome):
   return lastMessage(events);
 }
 
-/** The questions as one line: each question's text. */
+/** The questions as one line: each question's text with its option labels. */
 export const questionSummary = (questions: readonly Question[]): string =>
-  oneLine(questions.map((q) => q.question).join(" / "));
+  questions
+    .map((q) => (q.options.length > 0 ? `${q.question} (${q.options.map((o) => o.label).join(" / ")})` : q.question))
+    .join("; ");
+
+/** Every question a turn asked, as the one bounded line of an "asks" notice. */
+export const askedSummary = (asked: readonly (readonly Question[])[]): string =>
+  oneLine(asked.map(questionSummary).join(" | "), ASKS_SUMMARY_MAX);
+
+/** What a story session hears when the user answered the question that went to a Dev Lead that was gone. */
+export function userAnswerMessage(answers: Answers): string {
+  const lines = Object.entries(answers).map(([question, chosen]) => `- ${question} ${chosen.join(", ")}`);
+  return ["The user answered your question:", ...lines].join("\n");
+}
 
 /** The notice outcome for how a turn ended. */
 export const outcomeOf = (turn: TurnOutcome): NoticeOutcome => (turn === "done" ? "ended" : turn);

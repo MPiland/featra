@@ -2,7 +2,7 @@
  * The `message_session` tool (STORY-54): the Dev Lead steers a story's agent. Its description is product copy: it is
  * what teaches the Dev Lead when to use it, since Featra injects no system prompt (ADR 0006).
  */
-import { parseMessageInput } from "@featra/work-format";
+import { MESSAGE_MESSAGES, parseMessageInput } from "@featra/work-format";
 import { ToolRefusal, type Tool } from "./tool-types.ts";
 
 export const MESSAGE_SESSION: Tool = {
@@ -28,6 +28,6 @@ export const MESSAGE_SESSION: Tool = {
     const parsed = parseMessageInput(input);
     if (!parsed.ok) throw new ToolRefusal(parsed.error);
     const { story } = await host.message(parsed.value);
-    return `Sent to ${story}. Its next notice tells you what it did.`;
+    return MESSAGE_MESSAGES.sent(story);
   },
 };

@@ -64,6 +64,8 @@ export interface StoryHost {
   open: (id: string) => Promise<void>;
   agentFor: (c: Chat, adapter: ProviderAdapter, role: Role, inherited: readonly unknown[]) => ProviderSession;
   record: (c: Chat, event: ChatEvent) => void;
+  /** A session that waited for a slot could not start: its Dev Lead is told (STORY-54). */
+  failedStart: (c: Chat, reason: string) => void;
   setSummary: (c: Chat, summary: ChatSummary) => void;
   save: () => void;
   listChanged: (dir: string) => void;
@@ -241,6 +243,7 @@ export function createStoryRunner(host: StoryHost): StoryRunner {
               c.slot = false;
               host.setSummary(c, unqueued(c.summary));
               host.record(c, { type: "problem", problem: { type: "failed", message: reason(err) } });
+              host.failedStart(c, reason(err));
               host.listChanged(c.dir);
               pump(c.dir);
             }),

@@ -9,7 +9,7 @@ import { leadMessage, MESSAGE_MESSAGES } from "@featra/work-format";
 import { AGENT_MESSAGES } from "../src/agent-bridge.ts";
 import { sdk } from "./fake-query.ts";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
-import { finish, idleLead, quiet } from "./story-lead.ts";
+import { finish, idleLead, settled } from "./story-lead.ts";
 
 let w: StoryWorld;
 beforeAll(async () => {
@@ -56,7 +56,7 @@ describe("AC3: message_session", { timeout: 30_000 }, () => {
       ok: false,
       error: AGENT_MESSAGES.sessionMessage,
     });
-    await quiet();
+    await settled(w);
     expect(child.run.heard).toHaveLength(1);
   });
 
@@ -72,7 +72,10 @@ describe("AC3: message_session", { timeout: 30_000 }, () => {
       ok: false,
       error: MESSAGE_MESSAGES.noSession("STORY-13"),
     });
-    expect(await message(lead.agent, { story: "FEAT-2", text: "Hi." })).toMatchObject({ ok: false });
+    expect(await message(lead.agent, { story: "FEAT-2", text: "Hi." })).toMatchObject({
+      ok: false,
+      error: MESSAGE_MESSAGES.badStory,
+    });
     expect(await message(lead.agent, { story: "STORY-7", text: "  " })).toMatchObject({
       ok: false,
       error: MESSAGE_MESSAGES.badText,
@@ -92,7 +95,7 @@ describe("AC3: message_session", { timeout: 30_000 }, () => {
 
     const refused = await message(lead.agent, { story: "STORY-9", text: "Carry on." });
     expect(refused).toMatchObject({ ok: false, error: "STORY-9 is stopped. Only the user can resume it." });
-    await quiet();
+    await settled(w);
     expect(child.run.heard).toHaveLength(1);
     const card = await w.card("STORY-9", `${w.repo.main}/.claude/worktrees/STORY-9-spawn-9`);
     expect(card.history.at(-1)).toMatchObject({ field: "stopped", to: "stopped" });

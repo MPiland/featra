@@ -1,6 +1,8 @@
 /** STORY-54: the pure rules of notices and `message_session`: summaries, batching text, input and refusals. */
 import { describe, expect, it } from "vitest";
 import {
+  askedSummary,
+  ASKS_SUMMARY_MAX,
   leadMessage,
   lastMessage,
   MESSAGE_MESSAGES,
@@ -16,6 +18,7 @@ import {
   startedStory,
   stoppedStory,
   turnSummary,
+  userAnswerMessage,
   type ChatEvent,
 } from "../src/index.ts";
 import { at, story } from "./fixtures.ts";
@@ -27,6 +30,7 @@ const started = startedStory(
   at(1),
 );
 const idle = { running: false, queued: false, lead: "lead-1" };
+const opt = (label: string) => ({ label, description: "" });
 const q = (question: string) => ({ question, header: "h", options: [], multiSelect: false });
 const text = (block: string, delta: string): ChatEvent => ({ type: "text", block, delta });
 
@@ -107,7 +111,19 @@ describe("summaries", () => {
   });
 
   it("joins a question's text", () => {
-    expect(questionSummary([q("One?"), q("Two?")])).toBe("One? / Two?");
+    expect(questionSummary([q("One?"), q("Two?")])).toBe("One?; Two?");
+    expect(questionSummary([{ ...q("Which?"), options: [opt("A"), opt("B")] }])).toBe("Which? (A / B)");
+  });
+
+  it("holds every question a turn asked, bounded at the asks limit", () => {
+    expect(askedSummary([[q("One?")], [q("Two?")]])).toBe("One? | Two?");
+    const long = askedSummary([[q("x".repeat(ASKS_SUMMARY_MAX + 50))]]);
+    expect(long).toHaveLength(ASKS_SUMMARY_MAX);
+    expect(long.length).toBeGreaterThan(NOTICE_SUMMARY_MAX);
+  });
+
+  it("tells the session what the user answered", () => {
+    expect(userAnswerMessage({ "Which?": ["A", "B"] })).toBe("The user answered your question:\n- Which? A, B");
   });
 
   it("names the outcome a turn ended with", () => {

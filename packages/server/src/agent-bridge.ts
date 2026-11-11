@@ -49,7 +49,6 @@ export const AGENT_MESSAGES = {
   noSpawn: "Starting a story isn't available.",
   updateReadOnly: "Updating cards is off: this project's knowledge setting is read-only.",
   noUpdate: "Updating cards isn't available.",
-  messageReadOnly: "Messaging a story is off: this project's knowledge setting is read-only.",
   noMessage: "Messaging a story isn't available.",
   /** A story session reports to its Dev Lead and is steered by it; it does not message sessions. */
   sessionMessage: "A story session can't message other story sessions. Ask the Dev Lead.",
@@ -196,7 +195,9 @@ export function createAgentBridge({
 
   async function message(chat: string, dir: string, story: boolean | undefined, params: unknown) {
     if (story) throw new ApiError(AGENT_MESSAGES.sessionMessage);
-    const off = await refusal(dir, AGENT_MESSAGES.messageReadOnly);
+    // A message writes no card or knowledge file, so only the MCP's off switch applies (the read-only setting
+    // withholds the whole MCP at `attach` anyway).
+    const off = await mcpRefusal(dir);
     if (off !== null) throw new ApiError(off);
     if (!messages) throw new ApiError(AGENT_MESSAGES.noMessage);
     const input = parseMessageInput(params);

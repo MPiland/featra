@@ -17,6 +17,8 @@ export interface StoryControlHost {
   record: (c: Chat, event: ChatEvent) => void;
   stories: StoryRunner;
   notices: StoryNotices;
+  /** Claims the session's next turn, refused when one runs or is claimed (see chat-send.ts). */
+  claim: (c: Chat) => () => void;
   listChanged: (dir: string) => void;
   log: (message: string) => void;
 }
@@ -28,6 +30,7 @@ export function storyControl({
   record,
   stories,
   notices,
+  claim,
   listChanged,
   log,
 }: StoryControlHost): Pick<ChatManager, "resume" | "stop" | "dropQueued"> {
@@ -43,6 +46,8 @@ export function storyControl({
       if (c.running || c.summary.queued) throw new ChatError(CHAT_MESSAGES.busy);
       // Every check is made: the caller's own step (the card) comes before anything is sent.
       await before();
+      // The card step let others in: a message the Dev Lead sent meanwhile has the turn, and this Resume is busy.
+      const release = claim(c);
       // The message joins the transcript when the turn starts, so a turn stopped while it waits for a slot leaves none.
       const run = () => {
         record(c, { type: "user", text: RESUME_MESSAGE });
@@ -53,6 +58,8 @@ export function storyControl({
       } catch (err) {
         log(`A story session's turn couldn't wait for a slot: ${errorMessage(err)}`);
         run();
+      } finally {
+        release();
       }
     },
     async stop(id) {

@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { noticeMessage, type ChatEvent } from "@featra/work-format";
 import { sdk } from "./fake-query.ts";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
-import { finish, idleLead, noticesIn, quiet } from "./story-lead.ts";
+import { finish, idleLead, noticesIn, settled } from "./story-lead.ts";
 
 let w: StoryWorld;
 beforeAll(async () => {
@@ -69,11 +69,14 @@ describe("AC1: a notice in the Dev Lead's chat", { timeout: 30_000 }, () => {
     const lead = await idleLead(w);
     const child = await w.spawnAs(lead, "STORY-9");
     child.run.say(sdk.init());
-    await quiet();
+    await settled(w);
     expect(lead.run.heard).toHaveLength(1);
     finish(child.run, "Done.");
     await w.until(() => lead.run.heard.length === 2);
-    await quiet();
+    // The Dev Lead's turn on the notice ends; a later turn-end is the marker that nothing more was sent for it.
+    lead.run.say(sdk.success("Noted."));
+    await w.until(() => lead.events().filter((e) => e.type === "turn-end").length === 2);
+    await settled(w);
     expect(noticesIn(lead.events())).toHaveLength(1);
     expect(lead.run.heard).toHaveLength(2);
   });
@@ -89,7 +92,7 @@ describe("AC1: a notice in the Dev Lead's chat", { timeout: 30_000 }, () => {
     const chat = (started.result as { chat: string }).chat;
     const events = await w.window.watch(chat);
     await w.until(() => hasEnd(events(), "done"));
-    await quiet();
+    await settled(w);
     expect(w.claude.runs).toHaveLength(before + 1);
   });
 });
@@ -107,13 +110,13 @@ describe("AC4: notices that arrive while the Dev Lead is busy", { timeout: 30_00
     await w.until(() => hasEnd(eventsA(), "done"));
     finish(b.run, "Twelve is done.");
     await w.until(() => hasEnd(eventsB(), "done"));
-    await quiet();
+    await settled(w);
     expect(lead.run.heard).toHaveLength(1);
     expect(noticesIn(lead.events())).toEqual([]);
 
     lead.run.say(sdk.init(), sdk.success("Planned."));
     await w.until(() => lead.run.heard.length === 2);
-    await quiet();
+    await settled(w);
     expect(lead.run.heard).toHaveLength(2);
     expect(noticesIn(lead.events())).toEqual([
       noticeMessage([

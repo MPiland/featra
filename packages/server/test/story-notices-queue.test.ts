@@ -4,7 +4,7 @@
  * Agent SDK and the clock are faked.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { noticeMessage } from "@featra/work-format";
+import { MESSAGE_MESSAGES, noticeMessage } from "@featra/work-format";
 import { sdk } from "./fake-query.ts";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
 import { idleLead, noticesIn } from "./story-lead.ts";
@@ -25,6 +25,12 @@ describe("AC1: a story taken off the queue", { timeout: 30_000 }, () => {
     lead.agent.socket.send({ id, method: "story.spawn", params: { story: "STORY-6" } });
     const answered = await lead.agent.socket.next((f) => f.id === id, 20_000);
     expect(answered).toMatchObject({ ok: true, result: { queued: true } });
+
+    // Queued, it has no turn to message: the Dev Lead is told when it can be.
+    expect(await lead.agent.ask("session.message", { story: "STORY-6", text: "Hi." })).toMatchObject({
+      ok: false,
+      error: MESSAGE_MESSAGES.queued("STORY-6"),
+    });
 
     expect(await w.window.ask("story.stop", { dir: w.repo.main, id: "STORY-6" })).toMatchObject({ ok: true });
     await w.until(() => noticesIn(lead.events()).length === 1);

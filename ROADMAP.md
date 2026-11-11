@@ -15,6 +15,12 @@ epics in `.featra/cards/`.
   way they do natively.
 - **Keep queued story sessions across a restart** (FEAT-5 keeps the queue in memory), or tell the Dev Lead the
   queue was cleared.
+  The same goes for story notices held for a busy Dev Lead: they live in memory and are lost across a restart (accepted
+  for STORY-54).
+- **Story notices in the Inbox when no Dev Lead is open:** a story whose Dev Lead is gone gets its ended, stopped and
+  failed notices shown to the user, as its questions already are.
+- **A per-story notice budget or back-off:** a Dev Lead and a story session can message each other without limit
+  (`message_session` and notices), and nothing stops a loop.
 - **Evidence in the card pane:** show an acceptance criterion's evidence link there (STORY-10 writes it to the card;
   the pane does not show it yet).
 - **Agents link tests to criteria** through `update_card` (today a criterion's `test:` link is written by hand, not by

@@ -29,5 +29,11 @@ export function finish(run: FakeRun, text: string) {
 export const noticesIn = (events: ChatEvent[]): string[] =>
   events.flatMap((e) => (e.type === "user" && e.text.startsWith(NOTICE_LABEL) ? [e.text] : []));
 
-/** A short wait for something that must not happen. */
-export const quiet = () => new Promise((resolve) => setTimeout(resolve, 150));
+/**
+ * For checking that something did not happen: a round trip through the server (it has handled what came before it)
+ * and the ticks its own follow-up work takes. No timer, so it neither flakes nor waits when nothing is pending.
+ */
+export async function settled(w: StoryWorld) {
+  await w.window.ask("chat.list", { dir: w.repo.main });
+  for (let i = 0; i < 20; i++) await new Promise((resolve) => setImmediate(resolve));
+}
