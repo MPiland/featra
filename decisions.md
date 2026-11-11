@@ -1438,3 +1438,8 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - Plugins can bundle role presets and provider parts.
 - Install from git, URLs and marketplace lists, and later a curated registry too.
 - Designed now, built after M1. Provider plugins stay as planned.
+
+## 2026-11-11 — BUG-19: New chat picker busy state (developer)
+
+- While `chat.start` runs, the picker disables the role buttons and says "Starting…", so a double click makes one chat.
+  If the start is refused the roles come back, with the reason.
