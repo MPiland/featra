@@ -1330,3 +1330,13 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   repository's hooks. Every commit made in a checkout still does: Approve in main, and every commit of an agent or the
   user. Reason: Featra's own pre-commit runs the full check, which a temporary worktree can't pass; the plumbing commit
   needs no worktree at all (ADR 0024).
+
+## 2026-11-11 — STORY-9 review rulings (dev-lead)
+
+- **Card fields corrected:** a started story's card records `agent: <provider>` and `role: <role id>` (the first build
+  wrote the role into `agent`). Start and `spawn_session` use the card's own role, else developer. The assertions that
+  encoded the old value were corrected to match (`story-spawn.test.ts`, `start-story.spec.ts`, `card-server.ts`,
+  `start-story.test.tsx`); approved as a spec correction, no proof weakened.
+- **The cap counts every turn:** at most N story sessions run at once, including later turns; a later turn waits Queued.
+- **Story sessions can't start story sessions;** only the Dev Lead and the user spawn.
+- **Queued sessions are kept in memory only** for now; saving the queue across a restart is on the roadmap.

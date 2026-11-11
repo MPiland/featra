@@ -185,7 +185,7 @@ describe("spawn_session through the Featra MCP", () => {
     const client = await agent();
     const gone = await spawn(client, { story: "STORY-404" });
     expect(isError(gone)).toBe(true);
-    expect(text(gone)).toMatch(/^Not started\. .+/);
+    expect(text(gone)).toBe("Not started. That card is gone.");
     const bad = await spawn(client, { story: "soon" });
     expect(isError(bad)).toBe(true);
     expect(text(bad)).toBe("Not started. Give the story's id, such as STORY-9, as `story`.");

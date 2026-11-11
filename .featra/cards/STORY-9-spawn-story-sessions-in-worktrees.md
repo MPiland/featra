@@ -2,7 +2,7 @@
 id: STORY-9
 type: story
 title: Spawn a story agent
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 2
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-11T17:45:31Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
