@@ -2,7 +2,7 @@
 id: STORY-54
 type: story
 title: Story agents report to the Dev Lead
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 5
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-54
+  - at: 2026-11-11T22:40:36Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
