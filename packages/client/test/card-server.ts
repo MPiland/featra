@@ -10,8 +10,15 @@ import {
   buildWorkList,
   DEFAULT_CONFIG,
   draftStories,
+  isStopped,
   MAIN,
   planApproval,
+  resumedStory,
+  resumeRefusal,
+  stageTone,
+  stopRefusal,
+  stoppedStory,
+  type StoryTurn,
   type Card,
   type CardView,
   type OwnedCard,
@@ -36,12 +43,17 @@ export function fakeCardServer(
   /** What the server answers to Send back. */
   sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
   /** What the server answers to Approve and Reject; left out, the fake does what the server does to the cards. */
-  review: Partial<Pick<CardBridge, "approve" | "reject" | "start" | "startStory">> = {},
+  review: Partial<Pick<CardBridge, "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory">> = {},
   /** The chat the server starts for a story, and whether it waits for a slot: what a Start makes besides the card change. */
   storySession: (dir: string, story: Card, feature: Card) => { chat: string; queued: boolean } = () => ({
     chat: "story-chat",
     queued: false,
   }),
+  /** The server's side of a story's session for Stop and Resume: its turn, and taking it out of the queue. */
+  agents: { turn: (dir: string, id: string) => StoryTurn; drop: (dir: string, id: string) => void } = {
+    turn: () => ({ running: false, queued: false, stalled: false }),
+    drop: () => {},
+  },
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -159,6 +171,34 @@ export function fakeCardServer(
         );
       }
       return { ok: true, ...session };
+    },
+    // Stop and Resume are the server's to prove (the agent, the lane): the fake records the call and applies work-format's
+    // rules to the card, as the server does once the agent has stopped or gone on.
+    stopStory: async (dir, id) => {
+      calls.push(`stopStory:${dir}:${id}`);
+      if (review.stopStory) return review.stopStory(dir, id);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const tone = card ? stageTone(card.status, DEFAULT_CONFIG) : "idle";
+      // A story still queued, never started, just leaves the queue: its card is as it was.
+      if (card?.type === "story" && card.agent === null && agents.turn(dir, id).queued) {
+        agents.drop(dir, id);
+        return { ok: true };
+      }
+      const why = stopRefusal(card, tone);
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      changed(dir, stoppedStory(card, "user", EDIT_AT));
+      return { ok: true };
+    },
+    resumeStory: async (dir, id) => {
+      calls.push(`resumeStory:${dir}:${id}`);
+      if (review.resumeStory) return review.resumeStory(dir, id);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const tone = card ? stageTone(card.status, DEFAULT_CONFIG) : "idle";
+      const why = resumeRefusal(card, tone, agents.turn(dir, id));
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      // Only a Stopped story has a mark to clear; an idle session that ended without finishing just goes on.
+      if (isStopped(card)) changed(dir, resumedStory(card, "user", EDIT_AT));
+      return { ok: true };
     },
     reject: async (dir, id) => {
       calls.push(`reject:${dir}:${id}`);

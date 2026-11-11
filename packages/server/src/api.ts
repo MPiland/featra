@@ -25,6 +25,7 @@ import type { DraftActions } from "./draft-actions.ts";
 import type { DraftReview } from "./draft-review.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
+import type { StoryStop } from "./story-stop.ts";
 import type { Git } from "./git.ts";
 import type { RoleRegistry } from "./role-registry.ts";
 import type { RoleWatches } from "./role-watch.ts";
@@ -44,6 +45,7 @@ export interface ApiDeps {
   review: DraftReview;
   starts: FeatureStart;
   spawns: StorySpawn;
+  stops: StoryStop;
   chats: ChatManager;
   roles: RoleRegistry;
   roleWatches: RoleWatches;
@@ -81,6 +83,7 @@ export function createApi({
   review,
   starts,
   spawns,
+  stops,
   chats,
   roles,
   roleWatches,
@@ -181,6 +184,13 @@ export function createApi({
         const p = cardParams(params);
         if (!p) throw new ApiError("Expected { dir, id }.");
         return spawns.start(allow(p.dir), p.id);
+      }
+      case "story.stop":
+      case "story.resume": {
+        const p = cardParams(params);
+        if (!p) throw new ApiError("Expected { dir, id }.");
+        const dir = allow(p.dir);
+        return method === "story.stop" ? stops.stop(dir, p.id) : stops.resume(dir, p.id);
       }
       case "roles.watch": {
         const dir = project(params);

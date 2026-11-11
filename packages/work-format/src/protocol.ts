@@ -58,10 +58,7 @@ export interface ServerMethods {
   "work.applyCopy": { params: { dir: string; key: string }; result: CopyActionResult };
   /** Throws a stale copy's edit away: restores the copy from git. */
   "work.discardCopy": { params: { dir: string; key: string }; result: CopyActionResult };
-  /**
-   * One card as the card pane shows it, from its owner (null when there is no such card); then, until
-   * `work.unwatch`, a `card.view` push each time it changes (ADR 0017). The request's id names the watch.
-   */
+  /** One card from its owner (null if none), then a `card.view` push on each change until `work.unwatch` (ADR 0017). */
   "card.watch": { params: { dir: string; id: string }; result: CardView | null };
   /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
@@ -77,8 +74,7 @@ export interface ServerMethods {
   "draft.approve": { params: { dir: string; id: string }; result: { commit: string } };
   /**
    * Starts an approved feature (STORY-52, ADR 0024): creates `feature/N-slug` from the base branch without touching
-   * main's checkout, with the feature active on it, and answers with the branch. All or nothing; refused when the
-   * feature isn't approved, its branch exists, or the base branch can't be found.
+   * main's checkout, the feature active on it. All or nothing; refused when it isn't approved or its branch exists.
    */
   "feature.start": { params: { dir: string; id: string }; result: { branch: string } };
   /**
@@ -87,6 +83,16 @@ export interface ServerMethods {
    * starts when one ends. Refused when the story can't be started or its provider has no runner.
    */
   "story.start": { params: { dir: string; id: string }; result: { chat: string; queued: boolean } };
+  /**
+   * Stops a story's running turn (STORY-53, ADR 0026): marked Stopped, stage and worktree kept. A story queued and never
+   * started leaves the queue instead, unmarked. Refused when it has no turn or is already stopped.
+   */
+  "story.stop": { params: { dir: string; id: string }; result: null };
+  /**
+   * Resumes a Stopped story, or an In Progress one whose idle session ended without finishing: the same provider
+   * session goes on and Stopped is cleared. Refused when its provider can't resume.
+   */
+  "story.resume": { params: { dir: string; id: string }; result: null };
   /** Rejects a draft feature: deletes its card files. Refused when git tracks any of them. */
   "draft.reject": { params: { dir: string; id: string }; result: { removed: number } };
   /** The roles a chat in this project can start from (ADR 0018). */
@@ -205,6 +211,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "draft.approve",
   "feature.start",
   "story.start",
+  "story.stop",
+  "story.resume",
   "draft.reject",
   "chat.roles",
   "roles.watch",

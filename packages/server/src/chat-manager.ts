@@ -16,12 +16,10 @@ import {
   type ChatEvent,
   type ChatSummary,
   type ProviderId,
-  type Role,
 } from "@featra/work-format";
 import { projectKey } from "./allowed-projects.ts";
 import { createApprovalDesk } from "./approval-desk.ts";
-import { applyState, composerOf, configureChat, controlState } from "./chat-composer.ts";
-import { restoredState } from "./chat-configure.ts";
+import { composerOf, configureChat, controlState } from "./chat-composer.ts";
 import { ChatError } from "./chat-error.ts";
 import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
@@ -29,10 +27,11 @@ import { chatSaver, memoryChatStore, savedHistory, withWindow } from "./chat-sto
 import { chatsToSave, closeProjects, restoreChats } from "./chat-projects.ts";
 import { restored, type Chat } from "./chat-state.ts";
 import { createStoryRunner } from "./chat-stories.ts";
+import { createAgentFactory } from "./chat-agent.ts";
 import { chatLookups } from "./chat-lookups.ts";
+import { storyControl } from "./chat-story-control.ts";
 import { createInbox } from "./inbox.ts";
 import { createStoryMirror } from "./story-mirror.ts";
-import type { ProviderAdapter, ProviderSession } from "./provider.ts";
 
 export { ChatError };
 export type { ChatManager, ChatManagerDeps };
@@ -73,6 +72,13 @@ export function createChatManager({
     },
     same: (a, b) => projectKey(a, platform) === projectKey(b, platform),
     log,
+  });
+  const agentFor = createAgentFactory({
+    mcp,
+    decide,
+    desk,
+    record: (c, e) => record(c, e),
+    listChanged: (dir) => listChanged(dir),
   });
   const mirror = createStoryMirror(chats, (c, event) => record(c, event, true));
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
@@ -118,7 +124,8 @@ export function createChatManager({
     tell(c.listeners, event);
     if (event.type === "started") c.pending = c.agent?.sessionId() ?? null;
     // The agent's answer means Claude has written the turn, so the session can be resumed after a restart.
-    const answered = event.type === "text" || event.type === "tool" || event.type === "tool-result";
+    const answered =
+      event.type === "text" || event.type === "thinking" || event.type === "tool" || event.type === "tool-result";
     const session = answered && c.pending ? c.pending : c.session;
     if (answered) c.pending = null;
     const { summary, asks } = reduceRow(c, event);
@@ -133,36 +140,6 @@ export function createChatManager({
     save();
     // A new session id is saved, but the row doesn't show it.
     if (rowChanged) listChanged(c.dir);
-  }
-
-  /** The chat's agent session, through its provider; it starts the agent with the first message. */
-  function agentFor(
-    c: Chat,
-    adapter: ProviderAdapter,
-    role: Role,
-    inherited: readonly unknown[] = [],
-  ): ProviderSession {
-    // The session reaches the chat only through `emit`, so the chat's own fields are current when it is called.
-    const emit = (event: ChatEvent) => record(c, event);
-    // A reopened chat goes on with what the composer last set, while the provider still offers it.
-    const state = restoredState(adapter, role, c.kept);
-    if (c.kept && state.settings.model !== c.kept.settings.model) c.window = null;
-    c.kept = null;
-    const rowChanged = applyState(c, adapter, role, state);
-    const agent = adapter.start({
-      chat: c.id,
-      cwd: c.cwd,
-      role,
-      emit,
-      resume: c.session,
-      ...(inherited.length > 0 ? { inherited } : {}),
-      ...(mcp ? { mcp: () => mcp.attach({ id: c.id, dir: c.dir }) } : {}),
-      approve: (request, signal) => decide({ ...request, chat: c.id, cwd: c.cwd }, signal),
-      ask: (request, signal) => desk.ask({ ...request, chat: c.id }, signal),
-    });
-    agent.configure(role, state.settings);
-    if (rowChanged && c.events !== null) listChanged(c.dir);
-    return agent;
   }
 
   /** Reads a restored chat's transcript and makes its agent session; a chat whose session is gone gets neither. */
@@ -230,8 +207,30 @@ export function createChatManager({
     log,
   });
 
+  function send(id: string, text: string) {
+    const c = chat(id);
+    if (c.running) throw new ChatError(CHAT_MESSAGES.busy);
+    if (c.events === null) throw new Error("Open the chat before sending to it.");
+    const agent = c.agent;
+    if (!agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
+    record(c, { type: "user", text });
+    // A story session's turn, any turn, holds one of the project's story slots, or waits for one (STORY-9 AC5).
+    if (c.summary.story) {
+      stories
+        .turn(c, () => agent.send(text))
+        .catch((err: unknown) => {
+          log(`A story session's turn couldn't wait for a slot: ${errorMessage(err)}`);
+          agent.send(text);
+        });
+      return;
+    }
+    agent.send(text);
+  }
+
+  const control = storyControl({ chat, open, provider, record, stories, listChanged, log });
+
   return {
-    ...chatLookups(chats, chat, providers),
+    ...chatLookups(chats, chat, providers, same),
     startStory: (opts) => stories.start(opts),
     queuedStory: (dir, story) => stories.queuedFor(dir, story),
     async start(dir, roleId, card) {
@@ -275,31 +274,8 @@ export function createChatManager({
       save();
       listChanged(c.dir);
     },
-    send(id, text) {
-      const c = chat(id);
-      if (c.running) throw new ChatError(CHAT_MESSAGES.busy);
-      if (c.events === null) throw new Error("Open the chat before sending to it.");
-      const agent = c.agent;
-      if (!agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
-      record(c, { type: "user", text });
-      // A story session's turn, any turn, holds one of the project's story slots, or waits for one (STORY-9 AC5).
-      if (c.summary.story) {
-        stories
-          .turn(c, () => agent.send(text))
-          .catch((err: unknown) => {
-            log(`A story session's turn couldn't wait for a slot: ${errorMessage(err)}`);
-            agent.send(text);
-          });
-        return;
-      }
-      agent.send(text);
-    },
-    async stop(id) {
-      const c = chat(id);
-      if (!c.running) return;
-      if (await stories.cancelTurn(c)) record(c, { type: "turn-end", outcome: "stopped" });
-      else await c.agent?.interrupt();
-    },
+    send,
+    ...control,
     // A story session's approval shown in its parent chat is answered from there too.
     approve: (id, tool, answer) => desk.answer(mirror.holder(chat(id).id, tool) ?? chat(id).id, tool, answer),
     answer: (id, tool, answers) => desk.reply(chat(id).id, tool, answers),

@@ -139,6 +139,11 @@ export interface ProviderAdapter {
   /** Whether the user has the provider's agent installed: the chat list shows a group for each one that is. */
   installed: () => Promise<boolean>;
   start: (options: SessionOptions) => ProviderSession;
+  /**
+   * Whether a stopped session goes on in the same provider session, with its transcript (STORY-53): the adapter takes a
+   * message for the session after `interrupt`, and `SessionOptions.resume` after a restart. Absent, Resume is refused.
+   */
+  resumes?: true;
   /** Where its story sessions' worktrees live; absent when the adapter can't run story sessions (STORY-9). */
   worktrees?: WorktreeSpot;
   /** What the composer can pick for a chat from `role`, under the provider's own names (STORY-22). */

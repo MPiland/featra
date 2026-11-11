@@ -9,6 +9,7 @@ import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";
 import type { Resolution } from "./owner-copies.ts";
 import { epicProgress, featureProgress, itemsOf, progressLabel, scopeSummary } from "./rollup.ts";
+import { stoppedIn } from "./story-stop.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
 import { assertNever } from "./utils/guards.ts";
 import type {
@@ -75,12 +76,13 @@ const ticked = (items: readonly { done: boolean }[]) => ({
 });
 
 function storyRow(card: Card, added: ReadonlySet<string>, config: ProjectConfig): StoryRow {
+  const tone = stageTone(card.status, config);
   return {
     id: card.id,
     type: card.type === "bug" ? "bug" : "story",
     title: card.title,
     stage: card.status,
-    tone: stageTone(card.status, config),
+    tone,
     added: added.has(card.id),
     criteria: ticked(card.acs),
     tasks: ticked(card.tasks),
@@ -89,6 +91,7 @@ function storyRow(card: Card, added: ReadonlySet<string>, config: ProjectConfig)
     model: card.model,
     session: card.sessions.at(-1) ?? null,
     ...(evidenceState(card).reported ? { reported: true as const } : {}),
+    stopped: stoppedIn(card, tone),
   };
 }
 

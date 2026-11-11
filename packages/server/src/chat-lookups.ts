@@ -7,7 +7,8 @@ export function chatLookups(
   chats: Map<string, Chat>,
   chat: (id: string) => Chat,
   providers: readonly ProviderAdapter[],
-): Pick<ChatManager, "watch" | "dirOf" | "info" | "providers"> {
+  same: (a: string, b: string) => boolean,
+): Pick<ChatManager, "watch" | "dirOf" | "info" | "providers" | "storySession"> {
   return {
     watch(id, listener) {
       const c = chat(id);
@@ -18,6 +19,10 @@ export function chatLookups(
         note: c.note,
         stop: () => c.listeners.delete(listener),
       };
+    },
+    storySession(dir, story) {
+      const found = [...chats.values()].filter((c) => !c.closed && same(c.dir, dir) && c.summary.story?.id === story);
+      return found.toSorted((a, b) => b.summary.startedAt.localeCompare(a.summary.startedAt))[0]?.id ?? null;
     },
     dirOf: (id) => {
       const c = chats.get(id);

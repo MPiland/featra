@@ -19,6 +19,18 @@ import {
 /** The models the composer offers: Claude's aliases and their 1M-context forms. A role's own model is added to them. */
 const MODELS = ["default", "sonnet", "opus", "haiku", "sonnet[1m]", "opus[1m]"];
 
+/**
+ * The models known to take adaptive thinking: the current Sonnet and Opus aliases and their 1M forms. Haiku, `default`
+ * (whatever the account maps it to) and any other name get no thinking option: asking a model that doesn't take it
+ * could fail its turns, and nothing here can check that without spending the user's tokens on a real run.
+ */
+const ADAPTIVE_THINKING = new Set(["sonnet", "opus", "sonnet[1m]", "opus[1m]"]);
+
+/** The thinking option of a turn on `model`: summarized, so a watcher can read it (STORY-53), or none. */
+export function thinkingOption(model: string): Pick<Options, "thinking"> {
+  return ADAPTIVE_THINKING.has(model) ? { thinking: { type: "adaptive", display: "summarized" } } : {};
+}
+
 /** Claude's `default` mode is Featra's Ask (CONTEXT.md): every tool that needs approval asks. */
 const MODE_LABELS: Partial<Record<ClaudeMode, string>> = { default: "default (Ask)" };
 

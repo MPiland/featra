@@ -57,6 +57,11 @@ export interface ChatSummary {
   story?: StoryRef;
   /** A story session waiting for a free slot: its agent hasn't started (STORY-9). Absent once it runs. */
   queued?: true;
+  /**
+   * A story session idle after a turn that didn't finish: it failed, or a restart cut it off (STORY-53). Its transcript
+   * has no composer, so Resume is the way to go on. Absent otherwise, and cleared by the next message.
+   */
+  stalled?: true;
 }
 
 /** What a story session's row says of the story it works on. */
@@ -163,7 +168,13 @@ export function reduceRow(row: ChatRow, event: ChatEvent): ChatRow {
 /** A row out of a turn: not running, and waiting on no request, since none outlives the turn (its agent ended). */
 export function idleSummary(summary: ChatSummary): ChatSummary {
   const waiting = isAsk(summary.waiting) ? "reply" : summary.waiting;
-  return summary.running || waiting !== summary.waiting ? { ...summary, running: false, waiting } : summary;
+  if (!summary.running && waiting === summary.waiting) return summary;
+  // A story session whose turn or request was cut off here (its agent ended) is stalled: it didn't finish.
+  return withStalled({ ...summary, running: false, waiting }, summary.story !== undefined);
+}
+
+function withStalled({ stalled: _stalled, ...rest }: ChatSummary, stalled: boolean): ChatSummary {
+  return stalled ? { ...rest, stalled: true } : rest;
 }
 
 /** The row after one more event, without the open requests: right while at most one request is open at a time. */
@@ -181,9 +192,17 @@ function foldSummary(summary: ChatSummary, event: ChatEvent, asks: readonly Ask[
     title ??= chatTitle(event.text);
   }
   if (event.type === "turn-end") running = false;
-  return title === summary.title && running === summary.running && waiting === summary.waiting
+  // A story session's turn that failed leaves it stalled until the next message; any other end finished it.
+  const stalled =
+    event.type === "turn-end"
+      ? summary.story !== undefined && event.outcome === "failed"
+      : event.type !== "user" && summary.stalled === true;
+  return title === summary.title &&
+    running === summary.running &&
+    waiting === summary.waiting &&
+    stalled === (summary.stalled === true)
     ? summary
-    : { ...summary, title, running, waiting };
+    : withStalled({ ...summary, title, running, waiting }, stalled);
 }
 
 /** A new chat's row, before any event. */
@@ -256,6 +275,7 @@ export function normalizeSummary(raw: unknown): ChatSummary | null {
     ...(str(raw.card) ? { card: raw.card } : {}),
     ...(story ? { story } : {}),
     ...(raw.queued === true ? { queued: true as const } : {}),
+    ...(raw.stalled === true ? { stalled: true as const } : {}),
   };
 }
 

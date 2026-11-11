@@ -20,6 +20,12 @@ epics in `.featra/cards/`.
 - **Agents link tests to criteria** through `update_card` (today a criterion's `test:` link is written by hand, not by
   an agent's report).
 - **More providers:** Codex next (a runner behind the provider-neutral spawn interface from FEAT-5), then ACP agents.
+- **Agents from different providers in one room:** for example ChatGPT as UX and Claude as developer working the
+  same project. First step is free once a Codex runner exists: the Dev Lead relays through `message_session`. The
+  open design is direct agent-to-agent talk: turn-taking, loop and token guards, what the user sees, and each side's
+  permissions. Explore with the user before shaping.
+- **Sidebar grouping as a choice:** group chats by feature or by provider, with each chat showing its provider as a
+  badge, so mixed-provider work reads as one team.
 - **Knowledge:** a generated knowledge index, and an opt-in work protocol.
 - **Importers** for BMAD, spec-kit, OpenSpec and GSD.
 - **SSH remote compute.**

@@ -64,6 +64,8 @@ export interface WorldOptions {
   linked?: boolean;
   /** FEAT-2 was drafted by a Dev Lead chat of the project (its card says which); `drafter` is that chat's id. */
   drafted?: boolean;
+  /** How long Stop waits for the provider to end an interrupted turn. */
+  interruptMs?: number;
 }
 
 export async function storyWorld({
@@ -71,6 +73,7 @@ export async function storyWorld({
   claude = fakeClaude(),
   linked = false,
   drafted = false,
+  interruptMs,
 }: WorldOptions = {}) {
   const allowed = createAllowedProjects();
   const services = createServices({
@@ -79,6 +82,7 @@ export async function storyWorld({
     now: () => clockNow,
     claude: claude.deps,
     mcpEntry: fileURLToPath(import.meta.url),
+    ...(interruptMs ? { interruptMs } : {}),
   });
   const repo: CardRepo = await cardRepo();
   repo.git(repo.main, "config", "user.name", "Test");

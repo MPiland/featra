@@ -38,3 +38,5 @@ As the user, I let the Dev Lead coordinate the story agents: they report to it, 
 - [ ] Break down when picked up
 
 ## Notes
+
+- 2026-11-11 (from STORY-53): `message_session` to a story session that is Stopped must either clear Stopped (with a history event, like Resume) or be refused with a clear message. Decide it here and prove it with a test.

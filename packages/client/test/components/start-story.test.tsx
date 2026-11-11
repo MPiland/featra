@@ -37,7 +37,8 @@ describe("AC4: Start on a story row", () => {
     await waitFor(() => expect(within(row).getByText(/claude · opus/)).toBeTruthy());
     expect(within(row).queryByRole("button", { name: "Start STORY-5" })).toBeNull();
     await app.user.click(await within(row).findByRole("button", { name: "Open the session of STORY-5" }));
-    await screen.findByRole("textbox", { name: "Message" });
+    await screen.findByRole("log", { name: "Chat" });
+    expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull();
   });
 
   it("is a button of the keyboard's, in the row of a Ready story too", async () => {
