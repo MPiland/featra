@@ -6,6 +6,7 @@ import { CHAT_MESSAGES, errorMessage, RESUME_MESSAGE, type ChatEvent, type Provi
 import { ChatError } from "./chat-error.ts";
 import type { ChatManager } from "./chat-manager-types.ts";
 import type { StoryRunner } from "./chat-stories.ts";
+import type { StoryNotices } from "./story-notices.ts";
 import type { Chat } from "./chat-state.ts";
 import type { ProviderAdapter } from "./provider.ts";
 
@@ -15,6 +16,7 @@ export interface StoryControlHost {
   provider: (id: ProviderId) => ProviderAdapter | undefined;
   record: (c: Chat, event: ChatEvent) => void;
   stories: StoryRunner;
+  notices: StoryNotices;
   listChanged: (dir: string) => void;
   log: (message: string) => void;
 }
@@ -25,6 +27,7 @@ export function storyControl({
   provider,
   record,
   stories,
+  notices,
   listChanged,
   log,
 }: StoryControlHost): Pick<ChatManager, "resume" | "stop" | "dropQueued"> {
@@ -65,6 +68,7 @@ export function storyControl({
     dropQueued(id) {
       const c = chat(id);
       if (!c.summary.queued || c.agent) return false;
+      notices.removed(c);
       stories.dropped(c);
       listChanged(c.dir);
       return true;

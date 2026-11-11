@@ -1372,3 +1372,26 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **A stopped session doesn't count toward the cap;** Resume takes a slot or waits Queued like any turn. A queued
   later turn can be stopped.
 - **No confirmation, any client:** Stop and Resume are the user's own action and work remotely.
+
+## 2026-11-11 — STORY-54 rulings (dev-lead)
+
+- **The Dev Lead for a story is the chat that spawned it** (the scope STORY-10 uses). If that chat is gone, it is not told.
+- **`message_session` to a Stopped story is refused:** "STORY-N is stopped. Only the user can resume it." Proved by a test.
+- **Notices are short app-written text** (story id, outcome ended/stopped/failed/asks, one-line summary) with no token
+  cost, delivered as a clearly labelled user-role message from Featra. If the Dev Lead is mid-turn they are queued and sent
+  as one message when its turn ends.
+- **A story's `ask_user` does not reach the user directly;** the Dev Lead gets a notice. The user's own Stop still
+  produces a "stopped" notice.
+
+### Build choices (story agent)
+
+- `ask_user` is the provider's own `AskUserQuestion`: refused with a message that has the session end its turn (not
+  interrupted), then an "asks" notice at turn end. The Dev Lead answers with `message_session` or asks the user itself.
+- **With no Dev Lead, a story's question still asks the user** (the old path and the Inbox). Completion, stop and failure
+  notices are not sent at all then: the Inbox holds only approvals and questions, so the ruling "notices go to the Inbox
+  for the user" is only partly met. Flagged for the Dev Lead.
+- `message_session` is also refused while the session is working or waiting for a slot, from any chat but the spawner
+  (a story session included), and for a card that is gone or no story.
+- A story the user takes off the queue before it started gets a "stopped" notice.
+- Not covered: a queued story that fails to start (a problem with no turn end) gives no notice.
+- `packages/mcp/test/stdio.test.ts` gained `message_session` in its expected tool list (additive, as STORY-10 did).

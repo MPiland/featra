@@ -31,6 +31,7 @@ import { createAgentFactory } from "./chat-agent.ts";
 import { chatLookups } from "./chat-lookups.ts";
 import { storyControl } from "./chat-story-control.ts";
 import { createInbox } from "./inbox.ts";
+import { createStoryNotices } from "./story-notices.ts";
 import { createStoryMirror } from "./story-mirror.ts";
 
 export { ChatError };
@@ -79,6 +80,7 @@ export function createChatManager({
     desk,
     record: (c, e) => record(c, e),
     listChanged: (dir) => listChanged(dir),
+    asked: (c, request) => notices.asked(c, request),
   });
   const mirror = createStoryMirror(chats, (c, event) => record(c, event, true));
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
@@ -119,6 +121,7 @@ export function createChatManager({
       // A story session's turn is over: what its parent shows of its requests closes with it.
       mirror.clear(c);
       stories.release(c);
+      notices.turnEnded(c, event.outcome);
     }
     c.events?.push(event);
     tell(c.listeners, event);
@@ -189,6 +192,8 @@ export function createChatManager({
     c.summary = idleSummary(c.summary);
   }
 
+  const notices = createStoryNotices({ chats, open, send, log });
+
   const stories = createStoryRunner({
     chats,
     provider,
@@ -227,7 +232,7 @@ export function createChatManager({
     agent.send(text);
   }
 
-  const control = storyControl({ chat, open, provider, record, stories, listChanged, log });
+  const control = storyControl({ chat, open, provider, record, stories, notices, listChanged, log });
 
   return {
     ...chatLookups(chats, chat, providers, same),

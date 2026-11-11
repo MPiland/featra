@@ -49,4 +49,5 @@ export * from "./card-approval.ts";
 export * from "./card-start.ts";
 export * from "./story-start.ts";
 export * from "./card-report.ts";
+export * from "./story-notice.ts";
 export * from "./story-stop.ts";
