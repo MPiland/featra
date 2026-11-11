@@ -57,7 +57,7 @@ test("Watch a story session, Stop it and Resume it: read-only, Stopped with the 
     const status = git(folder, "status", "--porcelain");
     await session.getByRole("button", { name: `Stop ${id}` }).click();
     await expect(page.getByRole("alertdialog")).toHaveCount(0);
-    await expect(session.getByText("Stopped", { exact: true })).toBeVisible();
+    await expect(session.locator(".story-stop").getByRole("status")).toHaveText("Stopped");
     await expect(log).toContainText("Stopped");
     expect(git(folder, "status", "--porcelain")).toBe(status);
     const file = git(folder, "ls-files", "--modified", "--others", "--exclude-standard")
@@ -70,8 +70,9 @@ test("Watch a story session, Stop it and Resume it: read-only, Stopped with the 
     // The Work row shows the mark too, with the stage kept.
     await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Work" }).click();
     // The list shows its features collapsed when it comes back.
-    if ((await row.count()) === 0) await page.getByRole("button", { name: "Shaping", exact: true }).click();
-    await expect(row.getByText("Stopped", { exact: true })).toBeVisible();
+    await expect(row).toHaveCount(0);
+    await page.getByRole("button", { name: "Shaping", exact: true }).click();
+    await expect(row.locator(".story-stop").getByRole("status")).toHaveText("Stopped");
     await expect(row).toContainText("In Progress");
 
     // AC3: Resume, from the row. The same session goes on, and the mark is cleared.

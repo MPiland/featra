@@ -6,7 +6,12 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CHAT_MESSAGES, RESUME_MESSAGE, type ChatEvent } from "@featra/work-format";
+import { foldChat, RESUME_MESSAGE, type ChatEvent } from "@featra/work-format";
+import { createChatManager } from "../src/chat-manager.ts";
+import { createRepoGit } from "../src/repo-git.ts";
+import { createRoleRegistry } from "../src/role-registry.ts";
+import { createStoryStop } from "../src/story-stop.ts";
+import { createScanner } from "../src/work-scan.ts";
 import { sdk } from "./fake-query.ts";
 import { clockNow, storyWorld, type StoryWorld } from "./story-fixture.ts";
 
@@ -81,7 +86,9 @@ describe("AC2: Stop", () => {
     expect(w.repo.git(where, "rev-parse", "HEAD")).toBe(head);
     expect(w.repo.git(where, "status", "--porcelain")).toBe(status);
     expect(readFileSync(join(where, "scratch.txt"), "utf8")).toBe("work in progress\n");
-    expect(chat).toBeTruthy();
+    // The session the row lists is the one that stopped, and its transcript says the turn was stopped.
+    expect((await sessionOf("STORY-5"))?.id).toBe(chat);
+    expect(foldChat(events()).items.at(-1)).toMatchObject({ kind: "notice", notice: { type: "stopped" } });
   });
 
   it("is refused when the story is already stopped, isn't running, has no agent, or isn't there", async () => {
@@ -139,6 +146,22 @@ describe("AC3: Resume", () => {
   it("is refused for a story that isn't stopped", async () => {
     expect(await ask("story.resume", "STORY-5")).toMatchObject({ ok: false, error: "STORY-5 isn't stopped." });
     expect(await ask("story.resume", "STORY-7")).toMatchObject({ ok: false, error: "STORY-7 isn't stopped." });
-    expect(CHAT_MESSAGES.noSession).toBe("This story has no session.");
+  });
+
+  it("says the story has no session when its card has an agent and the project has no chat for it", async () => {
+    const { run } = await started("STORY-10", "session-10");
+    expect(await ask("story.stop", "STORY-10")).toMatchObject({ ok: true });
+    run.say(sdk.failure());
+    // A manager with no chats is a project whose session is gone (closed, or from another machine): the cards are real.
+    const chats = createChatManager({ providers: [], roles: createRoleRegistry() });
+    const scanner = createScanner(createRepoGit());
+    try {
+      const stops = createStoryStop({ scan: (dir) => scanner.scan(dir), now: () => clockNow, chats });
+      await expect(stops.stop(w.repo.main, "STORY-9")).rejects.toThrow("This story has no session.");
+      await expect(stops.resume(w.repo.main, "STORY-10")).rejects.toThrow("This story has no session.");
+    } finally {
+      chats.close();
+      await scanner.close();
+    }
   });
 });

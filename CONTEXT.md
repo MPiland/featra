@@ -91,7 +91,7 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   `stopped` event in the card's history. Stop ends the running turn and keeps the story's stage and worktree; **Resume**
   goes on in the same session and clears the mark. A stopped session doesn't count toward the running-sessions cap.
 - **Story session view** — a story's session is read-only: the live transcript (with the agent's thinking, where the
-  provider shows it) and no composer; the Dev Lead steers it.
+  provider shows it) and no composer.
 - **Orchestrator** — a session using the Dev Lead role. Shapes features with the user, drafts cards, spawns story
   sessions, reviews and merges.
 - **Agent instructions** — the user's own `CLAUDE.md` / `AGENTS.md`. Featra never edits them. Not the same as project

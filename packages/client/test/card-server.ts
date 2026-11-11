@@ -10,12 +10,15 @@ import {
   buildWorkList,
   DEFAULT_CONFIG,
   draftStories,
+  isStopped,
   MAIN,
   planApproval,
   resumedStory,
   resumeRefusal,
+  stageTone,
   stopRefusal,
   stoppedStory,
+  type StoryTurn,
   type Card,
   type CardView,
   type OwnedCard,
@@ -46,6 +49,11 @@ export function fakeCardServer(
     chat: "story-chat",
     queued: false,
   }),
+  /** The server's side of a story's session for Stop and Resume: its turn, and taking it out of the queue. */
+  agents: { turn: (dir: string, id: string) => StoryTurn; drop: (dir: string, id: string) => void } = {
+    turn: () => ({ running: false, queued: false, stalled: false }),
+    drop: () => {},
+  },
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -170,7 +178,13 @@ export function fakeCardServer(
       calls.push(`stopStory:${dir}:${id}`);
       if (review.stopStory) return review.stopStory(dir, id);
       const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const why = stopRefusal(card);
+      const tone = card ? stageTone(card.status, DEFAULT_CONFIG) : "idle";
+      // A story still queued, never started, just leaves the queue: its card is as it was.
+      if (card?.type === "story" && card.agent === null && agents.turn(dir, id).queued) {
+        agents.drop(dir, id);
+        return { ok: true };
+      }
+      const why = stopRefusal(card, tone);
       if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
       changed(dir, stoppedStory(card, "user", EDIT_AT));
       return { ok: true };
@@ -179,9 +193,11 @@ export function fakeCardServer(
       calls.push(`resumeStory:${dir}:${id}`);
       if (review.resumeStory) return review.resumeStory(dir, id);
       const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const why = resumeRefusal(card);
+      const tone = card ? stageTone(card.status, DEFAULT_CONFIG) : "idle";
+      const why = resumeRefusal(card, tone, agents.turn(dir, id));
       if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      changed(dir, resumedStory(card, "user", EDIT_AT));
+      // Only a Stopped story has a mark to clear; an idle session that ended without finishing just goes on.
+      if (isStopped(card)) changed(dir, resumedStory(card, "user", EDIT_AT));
       return { ok: true };
     },
     reject: async (dir, id) => {

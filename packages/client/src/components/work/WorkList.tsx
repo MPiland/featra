@@ -66,6 +66,7 @@ export function WorkList(props: {
       row: (id) => rows.get(id) ?? null,
       queued: (id) => chats.some((c) => c.story?.id === id && c.queued === true),
       running: (id) => chats.some((c) => c.story?.id === id && c.running),
+      stalled: (id) => chats.some((c) => c.story?.id === id && c.stalled === true),
       hasChat,
       stops: {
         stop: (id) => work.stopStory(project.dir, id),

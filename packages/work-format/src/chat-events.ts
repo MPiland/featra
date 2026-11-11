@@ -249,6 +249,8 @@ export const CHAT_MESSAGES = {
   queued: "Queued. It starts when a story agent ends.",
   /** Resume on a session whose provider can't go on with a session it stopped (STORY-53). */
   noResume: "This agent can't resume a stopped session.",
+  /** Resume on a session with no saved provider session to go on in (STORY-53). */
+  unsaved: "This session has nothing to continue.",
   /** Stop or Resume on a story whose session isn't there: it never started, or was closed (STORY-53). */
   noSession: "This story has no session.",
 } as const;

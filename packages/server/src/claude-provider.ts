@@ -15,7 +15,7 @@ import {
   type PermissionMode,
   type Role,
 } from "@featra/work-format";
-import { claudeControls, claudeSettings, sdkMode } from "./claude-controls.ts";
+import { claudeControls, claudeSettings, sdkMode, thinkingOption } from "./claude-controls.ts";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
 import { claudeQuestions, questionResult } from "./claude-question.ts";
 import { sessionRules, suggestedRule } from "./claude-rules.ts";
@@ -76,8 +76,7 @@ export function claudeOptions(
     systemPrompt: { type: "preset", preset: "claude_code", append: role.prompt },
     pathToClaudeCodeExecutable: claude,
     ...sdkMode(settings.mode),
-    // The agent's thinking is summarized, so a watcher of a story session can read it (STORY-53).
-    thinking: { type: "adaptive", display: "summarized" },
+    ...thinkingOption(settings.model),
     includePartialMessages: true,
     canUseTool,
     env,

@@ -52,6 +52,8 @@ export interface ServiceOptions {
   mcpExecPath?: string;
   /** How entries agents log are written and dated: the real disk and clock by default. */
   logs?: LogWriterDeps;
+  /** How long Stop waits for a provider to end the turn it interrupts; ten seconds by default. */
+  interruptMs?: number;
 }
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
@@ -69,6 +71,7 @@ export function createServices({
   mcpEntry,
   mcpExecPath,
   logs,
+  interruptMs,
 }: ServiceOptions): {
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
@@ -99,7 +102,7 @@ export function createServices({
   });
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
-  const stops = createStoryStop({ scan: watches.scan, now, lane, chats });
+  const stops = createStoryStop({ scan: watches.scan, now, lane, chats, ...(interruptMs ? { interruptMs } : {}) });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,

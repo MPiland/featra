@@ -30,6 +30,7 @@ async function running(host: Host = {}) {
   app.chats.emit("story-chat-1", { type: "user", text: "Do STORY-5." }, { type: "started", model: "opus" });
   return { app, row: () => screen.getByRole("row", { name: /Spawn five/ }) };
 }
+const rowOf = () => screen.getByRole("row", { name: /Spawn five/ });
 const stop = () => screen.findByRole<HTMLButtonElement>("button", { name: "Stop STORY-5" });
 const resume = () => screen.findByRole<HTMLButtonElement>("button", { name: "Resume STORY-5" });
 
@@ -68,7 +69,11 @@ describe("AC2: Stop", () => {
     const session = await screen.findByRole("region", { name: "Developer" });
     await app.user.click(await within(session).findByRole("button", { name: "Stop STORY-5" }));
     await within(session).findByText("Stopped");
-    expect(within(session).getByRole("button", { name: "Resume STORY-5" })).toBeTruthy();
+    // Resume waits for the turn to end.
+    expect(within(session).queryByRole("button", { name: "Resume STORY-5" })).toBeNull();
+    app.chats.emit("story-chat-1", { type: "turn-end", outcome: "stopped" });
+    expect(await within(session).findByRole("button", { name: "Resume STORY-5" })).toBeTruthy();
+    expect(within(session).queryByRole("textbox", { name: "Message" })).toBeNull();
   });
 
   it("shows the server's refusal in one sentence and keeps the button", async () => {
@@ -78,6 +83,16 @@ describe("AC2: Stop", () => {
     await app.user.click(await within(row()).findByRole("button", { name: "Stop STORY-5" }));
     expect((await within(row()).findByRole("alert")).textContent).toBe("STORY-5 isn't running.");
     expect((await stop()).disabled).toBe(false);
+  });
+
+  it("shows the Stopped mark but no Resume until the turn has ended", async () => {
+    const { app, row } = await running();
+    await app.user.click(await within(row()).findByRole("button", { name: "Stop STORY-5" }));
+    await within(row()).findByText("Stopped");
+    expect(within(row()).queryByRole("button", { name: "Resume STORY-5" })).toBeNull();
+    expect(within(row()).queryByRole("button", { name: "Stop STORY-5" })).toBeNull();
+    app.chats.emit("story-chat-1", { type: "turn-end", outcome: "stopped" });
+    expect(await within(row()).findByRole("button", { name: "Resume STORY-5" })).toBeTruthy();
   });
 
   it("is not offered while the agent isn't running", async () => {
@@ -106,5 +121,41 @@ describe("AC3: Resume", () => {
     await app.user.click(await resume());
     expect((await within(row()).findByRole("alert")).textContent).toBe(refusal);
     expect(within(row()).getByText("Stopped")).toBeTruthy();
+  });
+});
+
+describe("Stop on a story that waits in the queue", () => {
+  it("takes it out of the queue: no Queued, no Stopped mark, and the story keeps its stage", async () => {
+    const app = renderApp({ cards: cards(), queueStories: true });
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: "Delegation" }));
+    await app.user.click(await screen.findByRole("button", { name: "Start STORY-5" }));
+    const row = rowOf;
+    await within(row()).findByText("Queued");
+    await app.user.click(await within(row()).findByRole("button", { name: "Stop STORY-5" }));
+    await waitFor(() => expect(within(row()).queryByText("Queued")).toBeNull());
+    expect(within(row()).queryByText("Stopped")).toBeNull();
+    expect(within(row()).queryByRole("button", { name: "Stop STORY-5" })).toBeNull();
+  });
+});
+
+describe("Resume on an idle session that ended without finishing", () => {
+  it("is offered when the turn failed, with no Stopped mark and no composer, and goes on", async () => {
+    const { app, row } = await running();
+    app.chats.emit("story-chat-1", { type: "turn-end", outcome: "failed" });
+    await app.user.click(await within(row()).findByRole("button", { name: "Resume STORY-5" }));
+    await waitFor(() => expect(app.calls).toContain(`resumeStory:${PROJECT.dir}:STORY-5`));
+    expect(within(row()).queryByText("Stopped")).toBeNull();
+    await app.user.click(within(row()).getByRole("button", { name: "Open the session of STORY-5" }));
+    const session = await screen.findByRole("region", { name: "Developer" });
+    expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull();
+    expect(within(session).getByText("Watching the story's agent.")).toBeTruthy();
+  });
+
+  it("is not offered after a turn that finished", async () => {
+    const { app, row } = await running();
+    app.chats.emit("story-chat-1", { type: "turn-end", outcome: "done" });
+    await waitFor(() => expect(within(row()).queryByRole("button", { name: "Stop STORY-5" })).toBeNull());
+    expect(within(row()).queryByRole("button", { name: "Resume STORY-5" })).toBeNull();
   });
 });

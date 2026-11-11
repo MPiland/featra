@@ -6,6 +6,7 @@ import {
   chatName,
   chatTitle,
   groupChats,
+  idleSummary,
   newSummary,
   nextAsks,
   nextWait,
@@ -184,5 +185,55 @@ describe("a story session's request shown in its parent (STORY-9)", () => {
     const asked = reduceSummary(idle, shown);
     expect(asked.waiting).toBe("approval");
     expect(reduceSummary(asked, { type: "approval-cancelled", id: "b" }).waiting).toBe("reply");
+  });
+});
+
+describe("STORY-53: a story session that ended without finishing is stalled", () => {
+  const story = { id: "STORY-5", parent: null, feature: "FEAT-2", featureTitle: "Delegation" };
+  const started = (): ChatSummary =>
+    newSummary("c1", "claude", DEVELOPER, "2026-11-09T10:00:00.000Z", undefined, story);
+
+  it("is set by a failed turn and cleared by the next message", () => {
+    const failed = fold(
+      [
+        { type: "user", text: "Go" },
+        { type: "turn-end", outcome: "failed" },
+      ],
+      started(),
+    );
+    expect(failed).toMatchObject({ running: false, stalled: true });
+    expect(fold([{ type: "started", model: "opus" }], failed).stalled).toBe(true);
+    expect(fold([{ type: "user", text: "Again" }], failed).stalled).toBeUndefined();
+  });
+
+  it("is not set by a turn that finished or was stopped, or by a failure of a chat that is no story session", () => {
+    expect(fold([{ type: "user", text: "Go" }, done], started()).stalled).toBeUndefined();
+    expect(
+      fold(
+        [
+          { type: "user", text: "Go" },
+          { type: "turn-end", outcome: "stopped" },
+        ],
+        started(),
+      ).stalled,
+    ).toBeUndefined();
+    const chat = fold([
+      { type: "user", text: "Go" },
+      { type: "turn-end", outcome: "failed" },
+    ]);
+    expect(chat.stalled).toBeUndefined();
+  });
+
+  it("is set by a restart that cut a turn off, and only for a story session", () => {
+    const running = fold([{ type: "user", text: "Go" }], started());
+    expect(idleSummary(running)).toMatchObject({ running: false, stalled: true });
+    expect(idleSummary(fold([{ type: "user", text: "Go" }]))).not.toHaveProperty("stalled");
+    expect(idleSummary(fold([{ type: "user", text: "Go" }, done], started()))).not.toHaveProperty("stalled");
+  });
+
+  it("survives the list being read back", () => {
+    const stalled = idleSummary(fold([{ type: "user", text: "Go" }], started()));
+    const list = normalizeChatList({ providers: [CLAUDE], chats: [JSON.parse(JSON.stringify(stalled))] });
+    expect(list.chats[0]).toMatchObject({ stalled: true });
   });
 });

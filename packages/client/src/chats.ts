@@ -88,7 +88,7 @@ export const CHAT_COPY = {
   transcript: "Chat",
   working: "Working…",
   thinking: "Thinking",
-  watching: "Watching the story's agent. The Dev Lead steers it.",
+  watching: "Watching the story's agent.",
   denied: "Denied",
   toolStopped: "Stopped",
   cancelled: "Cancelled",

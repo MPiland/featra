@@ -17,6 +17,8 @@ export interface FakeRun {
   /** Throws from the stream, as when `claude` crashes. */
   crash: (error: Error) => void;
   interrupts: number;
+  /** What an interrupt does besides counting: a test makes it fail or never finish, as a stuck provider does. */
+  onInterrupt: (() => Promise<void>) | null;
   /** True once Featra has closed its input: the session is over. */
   closed: boolean;
   /** The permission updates Featra returned with an allow, in order: Claude applies these. */
@@ -51,6 +53,7 @@ export function fakeQuery() {
       end: () => out.close(),
       crash: (error) => out.push({ error }),
       interrupts: 0,
+      onInterrupt: null,
       closed: false,
       updates: [],
       ask: async (name, input, id, extra = {}) => {
@@ -91,6 +94,7 @@ export function fakeQuery() {
     const q: ClaudeQuery = Object.assign(stream(), {
       interrupt: async () => {
         run.interrupts += 1;
+        await run.onInterrupt?.();
       },
     });
     return q;

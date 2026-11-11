@@ -1,9 +1,10 @@
-import { createContext, useContext, useState } from "react";
-import { isStartable } from "@featra/work-format";
+import { createContext, useContext } from "react";
+import { canResume, isStartable } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
 import type { StartStoryResult } from "../../card-pane.ts";
 import { WORK_COPY } from "../../work-list.ts";
 import { StoryStop, type StopActions } from "./StoryStop.tsx";
+import { useAction } from "./useAction.ts";
 
 /** What a story row needs to start the story's agent and to show it (STORY-9). */
 export interface StoryAgents {
@@ -13,6 +14,8 @@ export interface StoryAgents {
   queued: (id: string) => boolean;
   /** Whether the story's session has a turn running (STORY-53). */
   running: (id: string) => boolean;
+  /** Whether the story's idle session ended without finishing: a failure, a question or a restart (STORY-53). */
+  stalled: (id: string) => boolean;
   /** Whether the project still has the chat. */
   hasChat: (chat: string) => boolean;
   start: (id: string) => Promise<StartStoryResult>;
@@ -27,6 +30,7 @@ const NONE: StoryAgents = {
   start: async () => ({ ok: false, error: "" }),
   open: () => {},
   running: () => false,
+  stalled: () => false,
   stops: { stop: async () => ({ ok: true }), resume: async () => ({ ok: true }) },
 };
 
@@ -39,31 +43,19 @@ export const StoryAgentsContext = createContext<StoryAgents>(NONE);
  */
 export function StoryAgent({ id }: { id: string }) {
   const agents = useContext(StoryAgentsContext);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { busy, error, run } = useAction();
   const row = agents.row(id);
   if (!row) return null;
   const { story, featureActive } = row;
 
-  const run = async () => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await agents.start(id);
-      if (!result.ok) setError(result.error);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const stop = (
     <StoryStop
       id={id}
-      stopped={story.stopped}
-      running={agents.running(id) || agents.queued(id)}
+      state={{
+        stopped: story.stopped,
+        resumable: canResume(story.stopped, agents.stalled(id), story.tone),
+        active: agents.running(id) || agents.queued(id),
+      }}
       actions={agents.stops}
     />
   );
@@ -82,7 +74,7 @@ export function StoryAgent({ id }: { id: string }) {
           className="review-draft"
           disabled={busy}
           aria-label={WORK_COPY.startOf(id)}
-          onClick={() => void run()}
+          onClick={() => void run(() => agents.start(id))}
         >
           {WORK_COPY.start}
         </button>

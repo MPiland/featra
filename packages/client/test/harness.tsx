@@ -126,6 +126,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     host.sendBack,
     host.review,
     (dir, story, feature) => chats.addStory(dir, story, feature, host.queueStories === true),
+    { turn: (dir, id) => chats.storyTurn(dir, id), drop: (dir, id) => chats.dropStory(dir, id) },
   );
   const chats: ReturnType<typeof fakeChatServer> = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);

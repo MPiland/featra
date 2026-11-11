@@ -31,7 +31,28 @@ are the user's own action, from any client, with no confirmation (remote use ove
 - **The cap is unchanged.** A turn holds a slot only while it runs, so a stopped session has freed its slot and does not
   count. Resume is a turn like any other: it takes a slot, or waits Queued.
 
+## Review rulings (PR 28)
+
+- **The card is written first.** Stop marks the story Stopped, then interrupts; Resume checks everything (the provider
+  resumes, an agent and session exist, nothing is running), clears the mark, then sends. A failed card write therefore
+  stops or sends nothing, and a failure after the mark leaves a Stopped story with Resume. The interrupt is bounded
+  (10 s) and the card lane is not held across it, so a stuck provider can't block other stories' cards.
+- **Stop on a story queued and never started drops it from the queue** (`stories.dropped`, the same path a cancelled
+  spawn takes). Its card keeps its stage and gets no Stopped mark; the `"queued"` history field (`HISTORY_FIELDS`)
+  records that it left the queue, but only where the owner's copy is writable: a never-started story's card lives on the
+  feature branch, which nobody has checked out, so the normal case writes no event (nothing about the story changed, and
+  writing one would need a commit on the feature branch). The slot count and the queue's order are unchanged for the rest.
+- **Stopped does not outlive the session.** The Work row's `stopped` is true only in a non-terminal stage (`stoppedIn`),
+  and `startedStory` clears a stale mark with the clearing event.
+- **Resume is also offered on an idle In Progress session that ended without finishing** (a failed turn, a question, or a
+  restart that cut the turn off). The chat row carries `stalled` for this (set by `foldSummary` on a failed turn of a story
+  session, by `idleSummary` on a restart, cleared by the next message). Same path, same cap rules, and a history event
+  only when the story was Stopped. The session stays read-only: no composer.
+- **Thinking is asked for only on models that support adaptive thinking** (the Claude provider's own list), so a model
+  that doesn't gets no `thinking` option. It is unverified on the real CLI for the unsupported ones; see
+  docs/spike-claude-sdk.md#thinking.
+- **The header shows Resume only after the turn has ended**, so it can't be pressed on a turn that is still stopping.
+
 ## Known gap
 
-A session that was queued and never started (its first turn still waiting) has no agent: Stop refuses it as not
-running. A later turn that waits Queued can be stopped. Dropping a never-started spawn is left to a follow-up.
+A story that is queued and never started has no Stopped mark to show: Stop only removes it from the queue (see above).

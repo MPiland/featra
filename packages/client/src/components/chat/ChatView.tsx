@@ -7,7 +7,7 @@ import { ComposerControls } from "./ComposerControls.tsx";
 import { ContextMeter } from "./ContextMeter.tsx";
 import { useChatControls } from "./use-chat-controls.ts";
 import { Transcript } from "./Transcript.tsx";
-import { StoryStop, type StopActions } from "../work/StoryStop.tsx";
+import { StoryStop, type StopActions, type StopState } from "../work/StoryStop.tsx";
 
 /** The chat the user opened: its id and the role it started from. */
 export interface OpenChat {
@@ -27,7 +27,7 @@ export interface ChatViewProps {
   /** What the header offers beside the chat's settings (STORY-49: Review draft). */
   headerExtra?: ReactNode;
   /** A story session's Stop and Resume, and whether its story is Stopped (STORY-53). */
-  story?: { stopped: boolean; actions: StopActions };
+  story?: Omit<StopState, "active"> & { queued: boolean; actions: StopActions };
 }
 
 /** One chat: the role it runs as, its transcript, and the composer. A chat whose history is gone offers a new one. */
@@ -63,7 +63,11 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
         </span>
         {headerExtra}
         {chat.story && story && (
-          <StoryStop id={chat.story} stopped={story.stopped} running={running} actions={story.actions} />
+          <StoryStop
+            id={chat.story}
+            state={{ stopped: story.stopped, resumable: story.resumable, active: running || story.queued }}
+            actions={story.actions}
+          />
         )}
       </header>
       {update.note && <p className="chat-note">{update.note}</p>}

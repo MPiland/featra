@@ -39,10 +39,20 @@ describe("AC1: thinking", () => {
     ]);
   });
 
-  it("asks the Agent SDK for summarized thinking", async () => {
+  it("asks the Agent SDK for summarized thinking on a model that takes adaptive thinking", async () => {
     const c = await chat();
     c.send("hi");
     const run = await c.run();
+    expect(run.options.model).toBe("sonnet");
     expect(run.options.thinking).toEqual({ type: "adaptive", display: "summarized" });
+  });
+
+  it("asks for no thinking on a model not known to take it, so its turns are not put at risk", async () => {
+    const c = await chat();
+    await c.manager.configure(c.id, { model: "haiku" });
+    c.send("hi");
+    const run = await c.run();
+    expect(run.options.model).toBe("haiku");
+    expect("thinking" in run.options).toBe(false);
   });
 });

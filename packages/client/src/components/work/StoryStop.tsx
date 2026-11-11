@@ -1,6 +1,6 @@
-import { useState } from "react";
 import type { ReviewResult } from "../../card-pane.ts";
 import { WORK_COPY } from "../../work-list.ts";
+import { useAction } from "./useAction.ts";
 
 /** What Stop and Resume call: the story's id. Both are the user's own action, with no confirmation (STORY-53). */
 export interface StopActions {
@@ -8,61 +8,51 @@ export interface StopActions {
   resume: (id: string) => Promise<ReviewResult>;
 }
 
-/**
- * A story agent's Stopped mark with Resume, or Stop while its turn runs or waits. A refusal shows in one sentence next to
- * the button, which stays. Shown in the story's Work row and in its session, from the same state.
- */
-export function StoryStop({
-  id,
-  stopped,
-  running,
-  actions,
-}: {
-  id: string;
+/** What the story's session is doing, as far as Stop and Resume go. */
+export interface StopState {
+  /** The card carries the Stopped mark. */
   stopped: boolean;
-  running: boolean;
-  actions: StopActions;
-}) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const run = async (call: (id: string) => Promise<ReviewResult>) => {
-    if (busy) return;
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await call(id);
-      if (!result.ok) setError(result.error);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-  if (!stopped && !running) return null;
+  /** Resume applies: the story is Stopped, or its idle session ended without finishing (and it is In Progress). */
+  resumable: boolean;
+  /** The session has a turn running, or waiting for a slot. */
+  active: boolean;
+}
+
+/**
+ * A story agent's Stop while its turn runs or waits, its Stopped mark, and Resume once the turn is over (never before,
+ * so it can't be pressed on a turn that is still ending). A refusal shows in one sentence next to the button, which
+ * stays. Shown in the story's Work row and in its session, from the same state.
+ */
+export function StoryStop({ id, state, actions }: { id: string; state: StopState; actions: StopActions }) {
+  const { busy, error, run } = useAction();
+  const { stopped, resumable, active } = state;
+  const resume = resumable && !active;
+  if (!stopped && !active && !resume) return null;
   return (
     <span className="story-stop">
-      {stopped ? (
-        <>
-          <span className="meta" role="status">
-            {WORK_COPY.stopped}
-          </span>{" "}
-          <button
-            type="button"
-            className="review-draft"
-            disabled={busy}
-            aria-label={WORK_COPY.resumeOf(id)}
-            onClick={() => void run(actions.resume)}
-          >
-            {WORK_COPY.resume}
-          </button>
-        </>
-      ) : (
+      {stopped && (
+        <span className="meta" role="status">
+          {WORK_COPY.stopped}
+        </span>
+      )}{" "}
+      {resume && (
+        <button
+          type="button"
+          className="review-draft"
+          disabled={busy}
+          aria-label={WORK_COPY.resumeOf(id)}
+          onClick={() => void run(() => actions.resume(id))}
+        >
+          {WORK_COPY.resume}
+        </button>
+      )}
+      {active && !stopped && (
         <button
           type="button"
           className="review-draft"
           disabled={busy}
           aria-label={WORK_COPY.stopOf(id)}
-          onClick={() => void run(actions.stop)}
+          onClick={() => void run(() => actions.stop(id))}
         >
           {WORK_COPY.stop}
         </button>

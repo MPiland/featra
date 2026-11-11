@@ -223,6 +223,18 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       act(() => listChanged(dir));
       return { chat: id, queued };
     },
+    /** What the server's row says of a story session's turn: the rules for Resume read it. */
+    storyTurn: (dir: string, story: string) => {
+      const row = [...rows.values()].find((r) => r.dir === dir && r.summary.story?.id === story)?.summary;
+      return { running: row?.running === true, queued: row?.queued === true, stalled: row?.stalled === true };
+    },
+    /** The server takes a queued story's session out of the queue (Stop on a story that never started). */
+    dropStory: (dir: string, story: string) => {
+      const found = [...rows].find(([, r]) => r.dir === dir && r.summary.story?.id === story);
+      if (!found) return;
+      rows.delete(found[0]);
+      act(() => listChanged(dir));
+    },
     watching: (id: string) => watchers.get(id)?.size ?? 0,
     /** How many chat lists the server has sent, so a test can wait until the list has arrived. */
     listsSent: () => listsSent,
