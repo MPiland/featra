@@ -11,6 +11,7 @@ export * from "./validate.ts";
 export * from "./utils/guards.ts";
 export * from "./scaffold.ts";
 export * from "./protocol.ts";
+export * from "./protocol-copy.ts";
 export * from "./setup-plan.ts";
 export * from "./setup-items.ts";
 export * from "./branch-rules.ts";

@@ -26,25 +26,8 @@ const RULE: PermissionUpdate = {
   destination: "localSettings",
 };
 
-/** A Dev Lead chat whose agent runs (so it has a mode and rules), and the run it started. */
-async function runningLead(window: Client, mode?: string) {
-  const lead = await w.devLead();
-  if (mode) await window.ask("chat.configure", { id: lead.id, change: { mode } });
-  const before = w.claude.runs.length;
-  await window.ask("chat.send", { id: lead.id, text: "Plan the work." });
-  await w.until(() => (w.claude.runs[before]?.heard.length ?? 0) === 1);
-  return { ...lead, run: w.claude.runs[before]! };
-}
-
-const spawnAs = async (lead: Awaited<ReturnType<typeof runningLead>>, story: string) => {
-  const before = w.claude.runs.length;
-  const id = Math.floor(Math.random() * 1e6);
-  lead.agent.socket.send({ id, method: "story.spawn", params: { story } });
-  const answered = await lead.agent.socket.next((f) => f.id === id, 20_000);
-  expect(answered).toMatchObject({ ok: true });
-  await w.until(() => (w.claude.runs[before]?.heard.length ?? 0) === 1);
-  return { chat: (answered.result as { chat: string }).chat, run: w.claude.runs[before]! };
-};
+const runningLead = (_window: Client, mode?: string) => w.runningLead(mode);
+const spawnAs = (lead: Parameters<StoryWorld["spawnAs"]>[0], story: string) => w.spawnAs(lead, story);
 
 describe("AC3: inheriting the Dev Lead's permissions", () => {
   it("gives the session the lead's permission mode and the allow rules it was given for the chat", async () => {

@@ -52,7 +52,7 @@ test("Start on a story row makes its worktree, nests the session in the sidebar,
     expect(git(repo.dir, "status", "--porcelain")).toBe("");
 
     // AC4: the row shows the agent and model with a link to the session, and the session is in the sidebar.
-    await expect(row).toContainText("developer");
+    await expect(row).toContainText("claude");
     await expect(row.getByRole("button", { name: `Open the session of ${id}` })).toBeVisible();
     await expect(row.getByRole("button", { name: /^Start STORY-/ })).toHaveCount(0);
     const chats = page.getByRole("region", { name: "Chats" });

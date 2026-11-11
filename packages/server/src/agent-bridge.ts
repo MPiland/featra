@@ -43,6 +43,8 @@ export const AGENT_MESSAGES = {
   noStart: "Starting a feature isn't available.",
   spawnReadOnly: "Starting a story is off: this project's knowledge setting is read-only.",
   noSpawn: "Starting a story isn't available.",
+  /** A story session is a worker: only the Dev Lead's chat puts agents on stories. */
+  sessionSpawn: "A story session can't start other story sessions. Ask the Dev Lead.",
 } as const;
 
 export interface AgentBridgeDeps {
@@ -154,7 +156,8 @@ export function createAgentBridge({
     return starts.start(dir, input.id, starter(chat));
   }
 
-  async function spawn(chat: string, dir: string, params: unknown) {
+  async function spawn(chat: string, dir: string, story: boolean | undefined, params: unknown) {
+    if (story) throw new ApiError(AGENT_MESSAGES.sessionSpawn);
     const off = await refusal(dir, AGENT_MESSAGES.spawnReadOnly);
     if (off !== null) throw new ApiError(off);
     if (!spawns) throw new ApiError(AGENT_MESSAGES.noSpawn);
@@ -210,7 +213,7 @@ export function createAgentBridge({
         case "feature.start":
           return start(chat, info.dir, params);
         case "story.spawn":
-          return spawn(chat, info.dir, params);
+          return spawn(chat, info.dir, info.story, params);
         case "log.append":
           return appendLog(chat, info.dir, info.session, params);
         default:

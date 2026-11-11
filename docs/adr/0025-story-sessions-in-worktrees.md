@@ -32,10 +32,18 @@ its approvals are Featra's to manage and nothing in the flow is provider-specifi
   guard), as `STORY-N: added to FEAT-M`, inside the card lane. When the feature branch is checked out in some worktree
   the ref is not moved under it: the card is written into the new worktree instead. The feature branch's copy of the
   card is never edited otherwise.
-- **The first message** is built by `storyFirstMessage` (pure, work-format): the role's template, the card as its file
-  has it (description, criteria, tasks, notes), the branch, the worktree, pointers to CONTEXT.md and decisions.md, and
-  the Dev Lead's brief when there is one. It is recorded as the session's first user message, so the user sees it.
-- **Permissions are inherited at spawn.** The child starts in the parent's permission mode (where the provider offers it;
+- **The role and the card.** The card's `agent` is the provider that runs it (`role.provider`) and `role` the role's id;
+  the role is the caller's, else the card's own `role`, else the developer. The role's prompt is sent once, as the
+  session's system prompt. The **first message** is built by `storyFirstMessage` (pure, work-format): the card as its
+  file has it (description, criteria, tasks, notes), the branch, the worktree, pointers to CONTEXT.md and decisions.md,
+  and the Dev Lead's brief when there is one. It is recorded as the session's first user message, so the user sees it.
+  The card written into the worktree is the owner's copy as it is, uncommitted edits included. Only STORY ids are
+  accepted, and the folder and branch are built from the parsed number and the slug, never from the id text.
+- **Story sessions don't spawn.** `story.spawn` from a chat that is itself a story session is refused ("A story session
+  can't start other story sessions. Ask the Dev Lead."), and the sidebar nests a session only under a parent that is not
+  one, falling back to the feature's group.
+- **Permissions are inherited when the session launches** (not when it was queued; a lead listed but not yet loaded
+  after a restart is loaded first). The child starts in the parent's permission mode (where the provider offers it;
   the parent's full access is the ceiling) and with the parent's always-allow rules: Featra's own per-chat rules are
   copied, and the provider's own suggested rules the user allowed for the chat are passed through `SessionOptions.inherited`
   (Claude: `allowedTools`). It is a copy at that moment; later changes to the parent do not follow. `spawn_session` itself
@@ -43,12 +51,22 @@ its approvals are Featra's to manage and nothing in the flow is provider-specifi
 - **Approvals a story session still needs** reach every connected client and the Inbox through the existing paths (the
   session is a chat of the project). The Dev Lead's chat also shows a copy of the approval labelled with the story
   (`approval.story`), answered there, and the answer goes to the session's request. The copy is not a second Inbox item:
-  the Inbox holds the session's own request, which escalates after the Inbox wait like any other.
-- **The limit.** `maxStoryAgents` (project config and Settings, default 3, whole number from 1). A story session holds a
-  slot from launch until its turn ends or it ends; spawns beyond the limit are `Queued` (the chat is listed with
-  `queued`, nothing can be sent to it, no worktree exists yet) and start in order as slots free. **The queue is in
-  memory:** a queued session is not saved, so a restart forgets it and the story stays New or Ready, to be started
-  again. A running session is saved and restored like any chat, with its worktree as its folder (`SavedChat.cwd`).
+  the Inbox holds the session's own request, which escalates after the Inbox wait like any other. The copy follows the
+  session's turn, not the Dev Lead's: it stays open when the lead's own turn ends, and closes when the session's turn
+  ends or the lead's chat ends. A lead left idle with an answered copy waits for a reply.
+- **The limit.** `maxStoryAgents` (project config and Settings, default `DEFAULT_CONFIG.maxStoryAgents`, whole number
+  from 1). At most that many story sessions run a turn at once, on **every** turn: a session holds a slot from launch
+  until its turn ends, and a later turn (a user or Dev Lead message to an idle session) takes a slot or waits `Queued`
+  (the chat is listed with `queued`; stopping it drops the wait) and runs in order as slots free. A session restored
+  after a restart takes a slot only while it runs. A spawn beyond the limit is `Queued` too (no worktree exists yet).
+  **The queue is in memory:** a queued session is not saved, so a restart forgets it and the story stays New or Ready, to
+  be started again. A running session is saved and restored like any chat, with its worktree as its folder
+  (`SavedChat.cwd`).
+- **Failure.** A start that fails removes the worktree and the branch it made, and says what remains ("Couldn't start
+  STORY-N. ... remains ..."). A chat closed while its worktree was being made leaves no worktree, branch or In Progress
+  card. A branch left from an earlier start is reused when no worktree has it checked out, and refused in one sentence
+  when one does. The provider's worktree folder is excluded through the repository's own `info/exclude`, also when the
+  project is a linked worktree.
 - **In the UI.** Start is on a New or Ready story of an active feature, in its Work row and in its card pane; a refusal is
   one sentence under the button. The row then shows the agent, model and a link that opens the session. The sidebar nests
   a session under its Dev Lead's chat (`story.parent`), or under a group named after its feature when that chat is gone

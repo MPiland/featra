@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from "react";
+import { isStartable } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
 import type { StartStoryResult } from "../../card-pane.ts";
 import { WORK_COPY } from "../../work-list.ts";
@@ -24,8 +25,6 @@ const NONE: StoryAgents = {
 };
 
 export const StoryAgentsContext = createContext<StoryAgents>(NONE);
-
-const STARTABLE: ReadonlySet<string> = new Set(["New", "Ready"]);
 
 /**
  * A story's agent in its row or its card pane: Start on a New or Ready story of a started feature (no confirmation: it
@@ -61,7 +60,7 @@ export function StoryAgent({ id }: { id: string }) {
       </span>
     );
   }
-  if (featureActive && STARTABLE.has(story.stage)) {
+  if (featureActive && isStartable(story.stage)) {
     return (
       <span className="story-agent">
         <button

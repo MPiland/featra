@@ -34,7 +34,7 @@ describe("AC4: Start on a story row", () => {
     expect(screen.queryByRole("alertdialog")).toBeNull();
     await waitFor(() => expect(app.calls).toContain(`startStory:${PROJECT.dir}:STORY-5`));
     const row = screen.getByRole("row", { name: /Spawn five/ });
-    await waitFor(() => expect(within(row).getByText(/developer · opus/)).toBeTruthy());
+    await waitFor(() => expect(within(row).getByText(/claude · opus/)).toBeTruthy());
     expect(within(row).queryByRole("button", { name: "Start STORY-5" })).toBeNull();
     await app.user.click(await within(row).findByRole("button", { name: "Open the session of STORY-5" }));
     await screen.findByRole("textbox", { name: "Message" });

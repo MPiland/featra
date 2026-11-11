@@ -27,7 +27,7 @@ function spawnWith(providers: ReturnType<typeof createClaudeProvider>[]) {
     story,
     prepare: async () => {
       prepared++;
-      return { cwd: DIR, first: "go" };
+      return { cwd: DIR, first: "go", undo: async () => {} };
     },
   });
   return { attempt, prepared: () => prepared, manager };

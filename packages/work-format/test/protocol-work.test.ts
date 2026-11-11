@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { copyParams, normalizeCopyActionResult, parsePush, parseRequest, unwatchParams } from "../src/protocol.ts";
+import { copyParams, normalizeCopyActionResult } from "../src/protocol-copy.ts";
+import { parsePush, parseRequest, unwatchParams } from "../src/protocol.ts";
 
 describe("the work methods and pushes (ADR 0016)", () => {
   it("knows the work methods", () => {

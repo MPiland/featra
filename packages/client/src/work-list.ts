@@ -4,7 +4,8 @@
  * wording, the filters, and how the client calls the server.
  */
 import { errorMessage } from "@featra/work-format/guards";
-import { normalizeCopyActionResult, type CopyActionResult } from "@featra/work-format/protocol";
+import type { CopyActionResult } from "@featra/work-format/protocol";
+import { normalizeCopyActionResult } from "@featra/work-format/protocol-copy";
 import {
   EMPTY_WORK_LIST,
   normalizeWorkList,

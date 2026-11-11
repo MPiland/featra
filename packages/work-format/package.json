@@ -8,6 +8,7 @@
     ".": "./src/index.ts",
     "./guards": "./src/utils/guards.ts",
     "./protocol": "./src/protocol.ts",
+    "./protocol-copy": "./src/protocol-copy.ts",
     "./setup-plan": "./src/setup-plan.ts",
     "./setup-items": "./src/setup-items.ts",
     "./work-list": "./src/work-list-types.ts",

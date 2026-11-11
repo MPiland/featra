@@ -7,6 +7,7 @@ import {
   chatTitle,
   groupChats,
   newSummary,
+  nextAsks,
   nextWait,
   normalizeChatList,
   parsePush,
@@ -159,5 +160,29 @@ describe("chat.list on the wire", () => {
     expect(row("d", "2026-11-09T10:00:00Z")).not.toHaveProperty("card");
     expect(normalizeChatList({ providers: [CLAUDE], chats: [withCard] }).chats).toEqual([withCard]);
     expect(normalizeChatList({ providers: [], chats: [{ ...withCard, card: 7 }] }).chats[0]).not.toHaveProperty("card");
+  });
+});
+
+describe("a story session's request shown in its parent (STORY-9)", () => {
+  const own: ChatEvent = { type: "approval", id: "a", name: "Bash", input: {}, forChat: false };
+  const shown: ChatEvent = { ...own, id: "b", story: "STORY-9" };
+
+  it("outlives the parent's turn and message, while the parent's own request does not", () => {
+    const open = nextAsks(nextAsks([], own), shown);
+    expect(open.map((a) => a.id)).toEqual(["a", "b"]);
+    expect(nextAsks(open, done)).toEqual([{ id: "b", reason: "approval", story: "STORY-9" }]);
+    expect(nextAsks(open, { type: "user", text: "go" }).map((a) => a.id)).toEqual(["b"]);
+  });
+
+  it("closes with its own answer or cancel", () => {
+    const open = nextAsks([], shown);
+    expect(nextAsks(open, { type: "approval-cancelled", id: "b" })).toEqual([]);
+  });
+
+  it("leaves an idle parent waiting for the user's reply once it is answered", () => {
+    const idle = fold([{ type: "user", text: "go" }, done]);
+    const asked = reduceSummary(idle, shown);
+    expect(asked.waiting).toBe("approval");
+    expect(reduceSummary(asked, { type: "approval-cancelled", id: "b" }).waiting).toBe("reply");
   });
 });

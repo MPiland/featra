@@ -29,9 +29,12 @@ export function nestChats(
 ) {
   const nested: NestedChats = { branches: [], groups: [] };
   const children = new Map<string, ChatSummary[]>();
+  // A session is itself nested (or grouped), so it never holds sessions of its own: one whose parent is a session
+  // falls back to the feature group, and none goes missing.
+  const sessions = new Set(chats.filter((c) => c.story).map((c) => c.id));
   for (const chat of chats) {
     const parent = chat.story?.parent;
-    if (parent && listed.has(parent) && parent !== chat.id)
+    if (parent && listed.has(parent) && parent !== chat.id && !sessions.has(parent))
       children.set(parent, [...(children.get(parent) ?? []), chat]);
   }
   const nestedIds = new Set([...children.values()].flat().map((c) => c.id));

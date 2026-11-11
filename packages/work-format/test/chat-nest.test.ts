@@ -49,4 +49,10 @@ describe("nestChats", () => {
     expect(nested.branches).toEqual([]);
     expect(nested.groups.map((g) => g.sessions.map((c) => c.id))).toEqual([["s1"]]);
   });
+
+  it("puts a session whose parent is itself a session in the feature group, so none is invisible", () => {
+    const nested = nestChats([lead("lead"), session("s1", "STORY-5", "lead"), session("s2", "STORY-6", "s1")]);
+    expect(nested.branches.map((b) => [b.chat.id, b.children.map((c) => c.id)])).toEqual([["lead", ["s1"]]]);
+    expect(nested.groups.map((g) => g.sessions.map((c) => c.id))).toEqual([["s2"]]);
+  });
 });

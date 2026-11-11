@@ -146,7 +146,8 @@ export function fakeCardServer(
           startedStory(
             story,
             {
-              agent: "developer",
+              agent: "claude",
+              role: "developer",
               model: "opus",
               reasoning: "high",
               session: session.chat,

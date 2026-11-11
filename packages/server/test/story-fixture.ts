@@ -60,9 +60,18 @@ export interface WorldOptions {
   /** More lines for `.featra/config.yaml` of the project. */
   config?: string;
   claude?: ReturnType<typeof fakeClaude>;
+  /** Opens the project as a linked worktree of the repository (a second checkout of the same repo). */
+  linked?: boolean;
+  /** FEAT-2 was drafted by a Dev Lead chat of the project (its card says which); `drafter` is that chat's id. */
+  drafted?: boolean;
 }
 
-export async function storyWorld({ config = "", claude = fakeClaude() }: WorldOptions = {}) {
+export async function storyWorld({
+  config = "",
+  claude = fakeClaude(),
+  linked = false,
+  drafted = false,
+}: WorldOptions = {}) {
   const allowed = createAllowedProjects();
   const services = createServices({
     allowed,
@@ -74,13 +83,27 @@ export async function storyWorld({ config = "", claude = fakeClaude() }: WorldOp
   const repo: CardRepo = await cardRepo();
   repo.git(repo.main, "config", "user.name", "Test");
   repo.git(repo.main, "config", "user.email", "test@example.invalid");
-  await repo.write(repo.main, { ...card("FEAT-2", "feature", null, "approved"), title: "Delegation" });
+  let drafter = "";
+  if (drafted) {
+    allowed.set([repo.main]);
+    const noWatch = { push: () => {}, keep: () => {}, unwatch: () => false };
+    drafter = ((await services.api("chat.start", { dir: repo.main, role: "dev-lead" }, 0, noWatch)) as { id: string })
+      .id;
+  }
+  await repo.write(repo.main, {
+    ...card("FEAT-2", "feature", null, "approved"),
+    title: "Delegation",
+    ...(drafted ? { extra: { "drafted-by": drafter } } : {}),
+  });
   await repo.write(repo.main, story("STORY-5", "Spawn five"));
   await repo.write(repo.main, story("STORY-6", "Spawn six", "Ready"));
   await repo.write(repo.main, story("STORY-7", "Spawn seven"));
   await repo.write(repo.main, story("STORY-8", "Spawn eight", "Done"));
+  for (const n of [9, 10, 11, 12, 13]) await repo.write(repo.main, story(`STORY-${n}`, `Spawn ${n}`));
   repo.commit(repo.main, "plan");
-  allowed.set([repo.main]);
+  // The project's folder: the repository itself, or a linked worktree of it.
+  const dir = linked ? repo.worktree("linked-checkout", "linked") : repo.main;
+  allowed.set([dir]);
   const server: RunningServer = await startServer({
     token: TOKEN,
     api: services.api,
@@ -95,18 +118,18 @@ export async function storyWorld({ config = "", claude = fakeClaude() }: WorldOp
     return c;
   };
   const window = await open();
-  const started = await window.ask("feature.start", { dir: repo.main, id: "FEAT-2" });
+  const started = await window.ask("feature.start", { dir, id: "FEAT-2" });
   if (started.ok !== true) throw new Error(`Feature didn't start: ${String(started.error)}`);
   if (config) {
-    await writeFile(join(repo.main, ".featra", "config.yaml"), `version: 1\n${config}`);
+    await writeFile(join(dir, ".featra", "config.yaml"), `version: 1\n${config}`);
   }
 
   /** A Dev Lead chat in the project, with its agent socket open as its MCP process would. */
   async function devLead(role = "dev-lead") {
-    const made = await window.ask("chat.start", { dir: repo.main, role });
+    const made = await window.ask("chat.start", { dir, role });
     const id = (made.result as { id: string }).id;
     const events = await window.watch(id);
-    const secret = (await services.agents.attach({ id, dir: repo.main }))?.env.FEATRA_AGENT_TOKEN ?? "";
+    const secret = (await services.agents.attach({ id, dir }))?.env.FEATRA_AGENT_TOKEN ?? "";
     const agent = await clientOf(
       await openFrames(`ws://127.0.0.1:${server.port}${AGENT_PATH}?token=${encodeURIComponent(secret)}`),
     );
@@ -114,20 +137,57 @@ export async function storyWorld({ config = "", claude = fakeClaude() }: WorldOp
     return { id, events, agent };
   }
 
+  /** A Dev Lead chat whose agent runs (so it has a mode and rules), and the run it started. */
+  async function runningLead(mode?: string) {
+    const lead = await devLead();
+    if (mode) await window.ask("chat.configure", { id: lead.id, change: { mode } });
+    const before = claude.runs.length;
+    await window.ask("chat.send", { id: lead.id, text: "Plan the work." });
+    await until(() => (claude.runs[before]?.heard.length ?? 0) === 1);
+    return { ...lead, run: claude.runs[before]! };
+  }
+
+  /** The lead (or any chat with an agent socket) spawns `story`; the session's chat and its run, once it heard its first message. */
+  async function spawnAs(lead: { agent: Client }, storyId: string) {
+    const before = claude.runs.length;
+    const id = Math.floor(Math.random() * 1e6);
+    lead.agent.socket.send({ id, method: "story.spawn", params: { story: storyId } });
+    const answered = await lead.agent.socket.next((f) => f.id === id, 20_000);
+    if (answered.ok !== true) throw new Error(`Spawn refused: ${String(answered.error)}`);
+    await until(() => (claude.runs[before]?.heard.length ?? 0) === 1);
+    return { chat: (answered.result as { chat: string }).chat, run: claude.runs[before]! };
+  }
+
+  /** A chat's own agent socket, as its MCP process would open it (a story session's too). */
+  async function agentOf(id: string) {
+    const secret = (await services.agents.attach({ id, dir }))?.env.FEATRA_AGENT_TOKEN ?? "";
+    const agent = await clientOf(
+      await openFrames(`ws://127.0.0.1:${server.port}${AGENT_PATH}?token=${encodeURIComponent(secret)}`),
+    );
+    clients.push(agent);
+    return agent;
+  }
+
   const chatList = async (): Promise<ChatSummary[]> => {
-    const listed = await window.ask("chat.list", { dir: repo.main });
+    const listed = await window.ask("chat.list", { dir });
     return (listed.result as { chats: ChatSummary[] }).chats;
   };
   const sessions = async () => (await chatList()).filter((c) => c.story);
-  const cardIn = async (id: string, tree = repo.main) => parseCard(await repo.read(tree, id));
+  const cardIn = async (id: string, tree = dir) => parseCard(await repo.read(tree, id));
 
   return {
     repo,
+    dir,
+    drafter,
+    allowed,
     claude,
     services,
     window,
     open,
     devLead,
+    runningLead,
+    agentOf,
+    spawnAs,
     chatList,
     sessions,
     card: cardIn,

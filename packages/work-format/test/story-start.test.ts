@@ -1,17 +1,13 @@
-/** STORY-9: the pure rules of starting a story's agent (naming, refusals, the card as started, the first message, the limit). */
+/** STORY-9: the pure rules of starting a story's agent (naming, refusals, the card as started, the first message). */
 import { describe, expect, it } from "vitest";
 import {
-  ConfigError,
-  DEFAULT_MAX_STORY_AGENTS,
   IN_PROGRESS,
+  isStartable,
   itemIdOfBranch,
-  maxStoryAgents,
   notSpawnableReason,
-  parseConfig,
   parseSpawnInput,
   spawner,
   startedStory,
-  storyAgentLimit,
   storyBranchName,
   storyFirstMessage,
   storyFolderName,
@@ -32,6 +28,12 @@ describe("names", () => {
     expect(itemIdOfBranch(storyBranchName(card))).toBe("STORY-9");
   });
 
+  it("are built from the parsed number, never the raw id, so no id names a path outside the folder", () => {
+    const evil = { ...card, id: "STORY-9/../../evil" };
+    expect(storyFolderName(evil)).toBe("STORY-0-spawn-a-story-agent");
+    expect(storyFolderName({ ...card, id: "..\\..\\x" })).not.toMatch(/[\\/.]/);
+  });
+
   it("fall back to the id alone when the title has no letters or digits", () => {
     const bare = { ...card, title: "!!!" };
     expect(storyFolderName(bare)).toBe("STORY-9");
@@ -48,6 +50,7 @@ describe("notSpawnableReason", () => {
   it.each([
     ["a gone card", undefined, active, "feature/5-x", "That card is gone."],
     ["a card that isn't a story", feature("FEAT-6"), active, "feature/5-x", "STORY-9 isn't a story."],
+    ["an id that isn't a STORY id", { ...card, id: "../evil" }, active, "feature/5-x", "STORY-9 isn't a story."],
     [
       "a story already started",
       { ...card, status: IN_PROGRESS },
@@ -73,13 +76,21 @@ describe("startedStory", () => {
   it("moves to In Progress with the starter and time, and records agent, model, reasoning, session and branch", () => {
     const started = startedStory(
       card,
-      { agent: "developer", model: "opus", reasoning: "high", session: "c1", branch: "featra/story-9-x" },
+      {
+        agent: "claude",
+        role: "developer",
+        model: "opus",
+        reasoning: "high",
+        session: "c1",
+        branch: "featra/story-9-x",
+      },
       spawner("lead"),
       at(30),
     );
     expect(started).toMatchObject({
       status: IN_PROGRESS,
-      agent: "developer",
+      agent: "claude",
+      role: "developer",
       model: "opus",
       reasoning: "high",
       sessions: ["c1"],
@@ -90,19 +101,18 @@ describe("startedStory", () => {
   });
 
   it("lists a session once however many times it starts", () => {
-    const start = { agent: "a", model: "m", reasoning: "r", session: "c1", branch: "b" };
+    const start = { agent: "a", role: "r0", model: "m", reasoning: "r", session: "c1", branch: "b" };
     const again = startedStory({ ...card, sessions: ["c1"] }, start, "user", at(1));
     expect(again.sessions).toEqual(["c1"]);
   });
 });
 
 describe("storyFirstMessage", () => {
-  const input = { template: "You are the developer.\n", card, branch: "featra/story-9-x", worktree: "/w/STORY-9" };
+  const input = { card, branch: "featra/story-9-x", worktree: "/w/STORY-9" };
 
-  it("has the role's template, the card, branch, worktree and the pointers, in that order", () => {
+  it("has the card, branch, worktree and the pointers, in that order; the role's prompt is the system prompt, not here", () => {
     const text = storyFirstMessage(input);
     const order = [
-      "You are the developer.",
       'STORY-9, "Spawn a story agent"',
       "Do it.",
       "Branch: featra/story-9-x",
@@ -124,11 +134,8 @@ describe("storyFirstMessage", () => {
 });
 
 describe("parseSpawnInput", () => {
-  it("takes a story id in any case, defaults the role to developer, and keeps what was given", () => {
-    expect(parseSpawnInput({ story: " story-9 " })).toEqual({
-      ok: true,
-      value: { story: "STORY-9", role: "developer" },
-    });
+  it("takes a story id in any case, leaves the role to the caller's default, and keeps what was given", () => {
+    expect(parseSpawnInput({ story: " story-9 " })).toEqual({ ok: true, value: { story: "STORY-9" } });
     expect(parseSpawnInput({ story: "STORY-9", role: "tester", model: "m", effort: "e", brief: "b" })).toEqual({
       ok: true,
       value: { story: "STORY-9", role: "tester", model: "m", effort: "e", brief: "b" },
@@ -140,19 +147,9 @@ describe("parseSpawnInput", () => {
   });
 });
 
-describe("the limit of story agents at once", () => {
-  it("is a whole number from 1, else the default", () => {
-    expect(storyAgentLimit(5)).toBe(5);
-    for (const bad of [0, -1, 1.5, "3", null, undefined]) expect(storyAgentLimit(bad)).toBe(DEFAULT_MAX_STORY_AGENTS);
-    expect(DEFAULT_MAX_STORY_AGENTS).toBe(3);
-  });
-
-  it("is read from the project's config, then the app default, then 3", () => {
-    expect(maxStoryAgents("version: 1\nmaxStoryAgents: 2\n", 5)).toBe(2);
-    expect(maxStoryAgents("version: 1\n", 5)).toBe(5);
-    expect(maxStoryAgents(null, undefined)).toBe(3);
-    expect(parseConfig("maxStoryAgents: 4\n").maxStoryAgents).toBe(4);
-    expect(() => parseConfig("maxStoryAgents: 0\n")).toThrow(ConfigError);
-    expect(() => parseConfig("maxStoryAgents: two\n")).toThrow(ConfigError);
+describe("isStartable", () => {
+  it("is true for New and Ready only", () => {
+    expect(["New", "Ready"].every(isStartable)).toBe(true);
+    expect(["In Progress", "In Review", "Done", "Rejected"].some(isStartable)).toBe(false);
   });
 });

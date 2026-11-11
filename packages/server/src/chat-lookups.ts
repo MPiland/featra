@@ -26,7 +26,11 @@ export function chatLookups(
     info(id) {
       const c = chats.get(id);
       if (!c || c.closed || c.events === null) return null;
-      return { dir: c.dir, session: `${c.summary.role.name} chat ${c.id.slice(0, 8)}` };
+      return {
+        dir: c.dir,
+        session: `${c.summary.role.name} chat ${c.id.slice(0, 8)}`,
+        story: c.summary.story !== undefined,
+      };
     },
     providers: () =>
       Promise.all(

@@ -7,12 +7,12 @@ import { randomUUID } from "node:crypto";
 import {
   CHAT_MESSAGES,
   chatName,
-  DEFAULT_MAX_STORY_AGENTS,
+  DEFAULT_CONFIG,
+  errorMessage,
   idleSummary,
   newSummary,
   reduceRow,
   retitle,
-  savedChat,
   type ChatEvent,
   type ChatSummary,
   type ProviderId,
@@ -26,6 +26,7 @@ import { ChatError } from "./chat-error.ts";
 import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
 import { chatSaver, memoryChatStore, savedHistory, withWindow } from "./chat-store.ts";
+import { chatsToSave, closeProjects, restoreChats } from "./chat-projects.ts";
 import { restored, type Chat } from "./chat-state.ts";
 import { createStoryRunner } from "./chat-stories.ts";
 import { chatLookups } from "./chat-lookups.ts";
@@ -48,7 +49,7 @@ export function createChatManager({
   now = () => new Date(),
   log = () => {},
   store = memoryChatStore(),
-  storyLimit = async () => DEFAULT_MAX_STORY_AGENTS,
+  storyLimit = async () => DEFAULT_CONFIG.maxStoryAgents,
   platform = process.platform,
 }: ChatManagerDeps): ChatManager {
   const chats = new Map<string, Chat>();
@@ -96,18 +97,8 @@ export function createChatManager({
   const saver = chatSaver(
     store,
     log,
-    (saved) => {
-      const dirs = new Set<string>();
-      for (const s of saved.filter((c) => !chats.has(c.summary.id))) {
-        chats.set(s.summary.id, restored(s.summary.id, s.dir, s.summary, s.session, s.composer ?? null, s.cwd));
-        dirs.add(s.dir);
-      }
-      for (const dir of dirs) listChanged(dir);
-    },
-    () =>
-      [...chats.values()]
-        .filter((c) => !c.summary.queued)
-        .map((c) => savedChat(c.dir, c.session, c.summary, composerOf(c, provider(c.summary.provider)), c.cwd)),
+    (saved) => restoreChats(chats, saved, listChanged),
+    () => chatsToSave(chats, provider),
   );
   const save = () => saver.save();
 
@@ -119,6 +110,8 @@ export function createChatManager({
     if (event.type === "user") c.running = true;
     if (event.type === "turn-end") {
       c.running = false;
+      // A story session's turn is over: what its parent shows of its requests closes with it.
+      mirror.clear(c);
       stories.release(c);
     }
     c.events?.push(event);
@@ -202,6 +195,7 @@ export function createChatManager({
   function end(c: Chat) {
     c.listeners.clear();
     mirror.clear(c);
+    mirror.ended(c);
     stories.dropped(c);
     mcp?.release(c.id);
     desk.forget(c.id);
@@ -223,6 +217,7 @@ export function createChatManager({
     provider,
     roles,
     desk,
+    open: (id) => open(id),
     newId,
     now,
     limit: storyLimit,
@@ -284,13 +279,26 @@ export function createChatManager({
       const c = chat(id);
       if (c.running) throw new ChatError(CHAT_MESSAGES.busy);
       if (c.events === null) throw new Error("Open the chat before sending to it.");
-      if (!c.agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
+      const agent = c.agent;
+      if (!agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
       record(c, { type: "user", text });
-      c.agent.send(text);
+      // A story session's turn, any turn, holds one of the project's story slots, or waits for one (STORY-9 AC5).
+      if (c.summary.story) {
+        stories
+          .turn(c, () => agent.send(text))
+          .catch((err: unknown) => {
+            log(`A story session's turn couldn't wait for a slot: ${errorMessage(err)}`);
+            agent.send(text);
+          });
+        return;
+      }
+      agent.send(text);
     },
     async stop(id) {
       const c = chat(id);
-      if (c.running) await c.agent?.interrupt();
+      if (!c.running) return;
+      if (await stories.cancelTurn(c)) record(c, { type: "turn-end", outcome: "stopped" });
+      else await c.agent?.interrupt();
     },
     // A story session's approval shown in its parent chat is answered from there too.
     approve: (id, tool, answer) => desk.answer(mirror.holder(chat(id).id, tool) ?? chat(id).id, tool, answer),
@@ -303,19 +311,7 @@ export function createChatManager({
     watchList: (dir, listener) => lists.watch(dir, listener),
     watchInbox: inbox.watch,
     watchAsked: inbox.watchAsked,
-    closeProjects(keep) {
-      const changed = new Set<string>();
-      for (const c of chats.values()) {
-        if (c.closed === !keep(c.dir)) continue;
-        if (c.closed) c.closed = false;
-        else {
-          end(c);
-          c.closed = true;
-        }
-        changed.add(c.dir);
-      }
-      for (const dir of changed) listChanged(dir);
-    },
+    closeProjects: (keep) => closeProjects(chats, keep, end, listChanged),
     close() {
       for (const c of chats.values()) end(c);
       lists.clear();

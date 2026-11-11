@@ -11,8 +11,10 @@ export interface StoryMirror {
   mirror: (child: Chat, event: ChatEvent) => void;
   /** The story session that holds the request `tool` the parent chat shows, or null when it is the parent's own. */
   holder: (parent: string, tool: string) => string | null;
-  /** The session ended with requests unanswered: its parent shows them cancelled. */
+  /** The session's turn or the session ended with requests unanswered: its parent shows them cancelled. */
   clear: (child: Chat) => void;
+  /** The chat ended: what it showed of its sessions' requests is gone with it. */
+  ended: (parent: Chat) => void;
 }
 
 interface Forwarded {
@@ -52,6 +54,9 @@ export function createStoryMirror(chats: Map<string, Chat>, record: (c: Chat, ev
         const c = chats.get(shown.parent);
         if (c && !c.closed && c.events !== null) record(c, { type: "approval-cancelled", id: shown.tool });
       }
+    },
+    ended(parent) {
+      for (const [key, shown] of forwarded) if (shown.parent === parent.id) forwarded.delete(key);
     },
   };
 }

@@ -146,6 +146,8 @@ const endTools = (state: ChatState, stopped: boolean): ChatState => ({
   ...state,
   items: state.items.map((item) => {
     if (item.kind !== "tool" || item.result !== null || item.denied) return item;
+    // A story session's request shown here belongs to the session's turn, not this one.
+    if (item.approval?.status === "pending" && item.approval.story) return item;
     const open = unasked(item);
     return stopped ? { ...item, ...open, stopped: true } : { ...item, ...open, cancelled: !item.stopped };
   }),

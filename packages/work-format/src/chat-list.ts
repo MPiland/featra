@@ -17,6 +17,8 @@ export interface Ask {
   /** The request's id: the tool call it is about. */
   id: string;
   reason: AskReason;
+  /** The story session whose request this is, when it is a copy shown in its Dev Lead's chat (STORY-9). */
+  story?: string;
 }
 
 /**
@@ -113,14 +115,21 @@ const isAnswer = (
 ): event is Extract<ChatEvent, { type: "tool-allowed" | "tool-denied" | "question-answered" | "approval-cancelled" }> =>
   ANSWERS.has(event.type);
 
-/** The requests still open after `event`. A turn's end, or a new message, leaves none: no request outlives its turn. */
+/**
+ * The requests still open after `event`. A turn's end, or a new message, leaves none: no request outlives its turn.
+ * Except a story session's request shown in its parent: it belongs to the session's turn, and closes with it.
+ */
 export function nextAsks(asks: readonly Ask[], event: ChatEvent): readonly Ask[] {
   if (event.type === "approval" || event.type === "question") {
-    return asks.some((a) => a.id === event.id) ? asks : [...asks, { id: event.id, reason: event.type }];
+    const story = event.type === "approval" && event.story ? { story: event.story } : {};
+    return asks.some((a) => a.id === event.id) ? asks : [...asks, { id: event.id, reason: event.type, ...story }];
   }
   // An answer closes its request.
   if (isAnswer(event)) return asks.some((a) => a.id === event.id) ? asks.filter((a) => a.id !== event.id) : asks;
-  if (event.type === "user" || event.type === "turn-end") return asks.length > 0 ? [] : asks;
+  if (event.type === "user" || event.type === "turn-end") {
+    const kept = asks.filter((a) => a.story !== undefined);
+    return kept.length === asks.length ? asks : kept;
+  }
   return asks;
 }
 
@@ -162,7 +171,9 @@ export const reduceSummary = (summary: ChatSummary, event: ChatEvent): ChatSumma
   foldSummary(summary, event, nextAsks([], event));
 
 function foldSummary(summary: ChatSummary, event: ChatEvent, asks: readonly Ask[]): ChatSummary {
-  const waiting = nextWait(summary.waiting, event, asks);
+  let waiting = nextWait(summary.waiting, event, asks);
+  // A story session's request answered in an idle chat leaves it waiting for the user's next message, as before it.
+  if (waiting === null && isAsk(summary.waiting) && !summary.running && event.type !== "user") waiting = "reply";
   let { title, running } = summary;
   if (event.type === "user") {
     running = true;

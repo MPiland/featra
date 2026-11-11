@@ -6,7 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { itemIdOfBranch, parseCard, type ChatSummary } from "@featra/work-format";
+import { BUILT_IN_ROLES, itemIdOfBranch, parseCard, type ChatSummary } from "@featra/work-format";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
 
 let w: StoryWorld;
@@ -30,7 +30,7 @@ const rowOf = (node: unknown, id: string): Record<string, unknown> | null => {
 const work = async () => (await w.window.ask("work.watch", { dir: w.repo.main })).result;
 
 describe("AC1 and AC4: the Start button", () => {
-  it("cuts the worktree off the feature branch, moves the card to it, and nests the session under the feature's chat", async () => {
+  it("cuts the worktree off the feature branch, moves the card to it, and lists the session with its story", async () => {
     const lead = await w.devLead();
     const reply = await w.window.ask("story.start", { dir: w.repo.main, id: "STORY-5" });
     expect(reply).toMatchObject({ ok: true, result: { queued: false } });
@@ -50,7 +50,12 @@ describe("AC1 and AC4: the Start button", () => {
 
     // The card in the worktree is the owner's copy: In Progress, with its agent, model, session and the starter.
     const started = await w.card("STORY-5", where);
-    expect(started).toMatchObject({ status: "In Progress", agent: "developer", branch: "featra/story-5-spawn-five" });
+    expect(started).toMatchObject({
+      status: "In Progress",
+      agent: "claude",
+      role: "developer",
+      branch: "featra/story-5-spawn-five",
+    });
     expect(started.sessions).toEqual([chat]);
     expect(started.history.at(-1)).toMatchObject({ from: "New", to: "In Progress", by: "user" });
     // Left uncommitted, and the feature branch's copy is as it was.
@@ -59,7 +64,7 @@ describe("AC1 and AC4: the Start button", () => {
 
     // AC4: the Work row follows the owner: In Progress, with the agent, model and session.
     const row = rowOf(await work(), "STORY-5");
-    expect(row).toMatchObject({ stage: "In Progress", agent: "developer", session: chat });
+    expect(row).toMatchObject({ stage: "In Progress", agent: "claude", session: chat });
     expect(typeof row?.model).toBe("string");
 
     // AC4: the session is listed with the story it works on, nested under the feature's chat id or a feature group.
@@ -69,12 +74,16 @@ describe("AC1 and AC4: the Start button", () => {
     expect(lead.id).not.toBe(chat);
   });
 
-  it("starts the agent in the worktree with the role template, the card, branch, worktree and pointers as the first message", async () => {
+  it("starts the agent in the worktree with the role template as its system prompt, and the card, branch, worktree and pointers as the first message", async () => {
     const where = folder("STORY-5-spawn-five");
     const run = w.claude.runs.at(-1)!;
     expect(run.options.cwd).toBe(where);
     await w.until(() => run.heard.length === 1);
     const first = run.heard[0]!;
+    // The role's prompt is sent once, as the system prompt; the first message does not repeat it.
+    const role = BUILT_IN_ROLES.find((r) => r.id === "developer")!;
+    expect(JSON.stringify(run.options.systemPrompt)).toContain(role.prompt.trim().slice(0, 60));
+    expect(first).not.toContain(role.prompt.trim().slice(0, 60));
     expect(first).toContain('You are working on STORY-5, "Spawn five"');
     expect(first).toContain("Do Spawn five.");
     expect(first).toContain("Branch: featra/story-5-spawn-five");
@@ -128,5 +137,20 @@ describe("AC6: a role that can't run the story", () => {
       error: "No such role.",
     });
     expect(existsSync(folder("STORY-7-spawn-seven"))).toBe(false);
+  });
+});
+
+describe("AC4: a feature a chat drafted", () => {
+  it("nests the session under the chat that drafted the feature", async () => {
+    const drafted = await storyWorld({ drafted: true });
+    try {
+      expect(drafted.drafter).not.toBe("");
+      const reply = await drafted.window.ask("story.start", { dir: drafted.dir, id: "STORY-5" });
+      const chat = (reply.result as { chat: string }).chat;
+      const listed = (await drafted.sessions()).find((c: ChatSummary) => c.id === chat);
+      expect(listed?.story?.parent).toBe(drafted.drafter);
+    } finally {
+      await drafted.close();
+    }
   });
 });
