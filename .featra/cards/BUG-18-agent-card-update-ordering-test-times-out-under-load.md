@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-18
-pr: null
+pr: "34"
 created: 2026-11-11T22:00:00Z
 history:
   - at: 2026-11-11T22:00:00Z
