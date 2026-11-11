@@ -76,6 +76,8 @@ export function claudeOptions(
     systemPrompt: { type: "preset", preset: "claude_code", append: role.prompt },
     pathToClaudeCodeExecutable: claude,
     ...sdkMode(settings.mode),
+    // The agent's thinking is summarized, so a watcher of a story session can read it (STORY-53).
+    thinking: { type: "adaptive", display: "summarized" },
     includePartialMessages: true,
     canUseTool,
     env,
@@ -124,6 +126,7 @@ export function createClaudeProvider({
     controls: claudeControls,
     settings: claudeSettings,
     start: (options) => startSession(options, { loadQuery, locate, env }),
+    resumes: true,
     worktrees: {
       folder: (repo, name) => join(repo, ".claude", "worktrees", name),
       ignore: ".claude/worktrees/",

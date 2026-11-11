@@ -31,6 +31,13 @@ export interface ChatManager {
    * limit. Refused for a role whose provider has no runner for story sessions.
    */
   startStory: (opts: StoryStartOpts) => Promise<{ chat: string; queued: boolean }>;
+  /** The chat of the story's newest session in the project, or null when it has none (STORY-53). */
+  storySession: (dir: string, story: string) => string | null;
+  /**
+   * Goes on in a stopped story session (STORY-53): the same provider session takes its next turn, which takes a story
+   * slot or waits Queued. Refused when the provider can't resume, the session has no agent, or it is running.
+   */
+  resume: (id: string) => Promise<void>;
   /** Whether a session for the story is waiting for a free slot. */
   queuedStory: (dir: string, story: string) => boolean;
   /** Starts a chat from a role in the project folder, on a card when it is for one; its agent starts with the first message. */

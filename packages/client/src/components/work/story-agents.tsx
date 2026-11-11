@@ -3,6 +3,7 @@ import { isStartable } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
 import type { StartStoryResult } from "../../card-pane.ts";
 import { WORK_COPY } from "../../work-list.ts";
+import { StoryStop, type StopActions } from "./StoryStop.tsx";
 
 /** What a story row needs to start the story's agent and to show it (STORY-9). */
 export interface StoryAgents {
@@ -10,10 +11,13 @@ export interface StoryAgents {
   row: (id: string) => { story: StoryRow; featureActive: boolean } | null;
   /** The story's session waiting for a free slot, if there is one. */
   queued: (id: string) => boolean;
+  /** Whether the story's session has a turn running (STORY-53). */
+  running: (id: string) => boolean;
   /** Whether the project still has the chat. */
   hasChat: (chat: string) => boolean;
   start: (id: string) => Promise<StartStoryResult>;
   open: (chat: string) => void;
+  stops: StopActions;
 }
 
 const NONE: StoryAgents = {
@@ -22,6 +26,8 @@ const NONE: StoryAgents = {
   hasChat: () => false,
   start: async () => ({ ok: false, error: "" }),
   open: () => {},
+  running: () => false,
+  stops: { stop: async () => ({ ok: true }), resume: async () => ({ ok: true }) },
 };
 
 export const StoryAgentsContext = createContext<StoryAgents>(NONE);
@@ -53,10 +59,18 @@ export function StoryAgent({ id }: { id: string }) {
     }
   };
 
+  const stop = (
+    <StoryStop
+      id={id}
+      stopped={story.stopped}
+      running={agents.running(id) || agents.queued(id)}
+      actions={agents.stops}
+    />
+  );
   if (agents.queued(id)) {
     return (
-      <span className="story-agent meta" role="status">
-        {WORK_COPY.queued}
+      <span className="story-agent meta">
+        <span role="status">{WORK_COPY.queued}</span> {stop}
       </span>
     );
   }
@@ -96,7 +110,8 @@ export function StoryAgent({ id }: { id: string }) {
             {WORK_COPY.openSession}
           </button>
         </>
-      )}
+      )}{" "}
+      {stop}
     </span>
   );
 }

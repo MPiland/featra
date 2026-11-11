@@ -38,7 +38,7 @@ export interface HostOptions extends ChatHost, RolesHost {
   /** What the card server answers to Send back. Default: sent and recorded. */
   sendBack?: CardBridge["sendBack"];
   /** What the card server answers to Approve and Reject. Default: it changes the cards as the server does. */
-  review?: Partial<Pick<CardBridge, "approve" | "reject" | "start" | "startStory">>;
+  review?: Partial<Pick<CardBridge, "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory">>;
   /** Whether Start queues the story's session instead of starting it, as a project at its limit does. Default: starts. */
   queueStories?: boolean;
   closeToTray?: CloseToTraySupport;

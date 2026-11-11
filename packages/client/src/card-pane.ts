@@ -37,6 +37,10 @@ export interface CardBridge {
   start: (dir: string, id: string) => Promise<ReviewResult>;
   /** Starts a story's agent in its own worktree; it is queued when the project is at its limit of story agents (STORY-9). */
   startStory: (dir: string, id: string) => Promise<StartStoryResult>;
+  /** Stops the story's running turn and marks it Stopped; its stage and worktree stay (STORY-53). */
+  stopStory: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Goes on in the stopped story's session, and clears Stopped (STORY-53). */
+  resumeStory: (dir: string, id: string) => Promise<ReviewResult>;
 }
 
 /** The chat the story's agent runs in, and whether it waits for a free slot; or why it didn't start. */
@@ -135,6 +139,8 @@ export function serverCards(server: ServerClient): CardBridge {
             : { ok: false, error: errorMessage(new Error("Featra gave an unexpected answer.")) },
         (err: unknown): StartStoryResult => ({ ok: false, error: errorMessage(err) }),
       ),
+    stopStory: (dir, id) => review(server.call("story.stop", { dir, id })),
+    resumeStory: (dir, id) => review(server.call("story.resume", { dir, id })),
   };
 }
 
@@ -151,5 +157,7 @@ export function noCards(error: string): CardBridge {
     reject: async () => ({ ok: false, error }),
     start: async () => ({ ok: false, error }),
     startStory: async () => ({ ok: false, error }),
+    stopStory: async () => ({ ok: false, error }),
+    resumeStory: async () => ({ ok: false, error }),
   };
 }

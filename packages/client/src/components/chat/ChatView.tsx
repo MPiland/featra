@@ -1,17 +1,20 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { EMPTY_CHAT } from "@featra/work-format/chat";
 import { ASK_MODE, modeLabel, modeWhere } from "@featra/work-format/modes";
-import { type ChatBridge, type ChatRoleRef, type ChatUpdate } from "../../chats.ts";
+import { CHAT_COPY, type ChatBridge, type ChatRoleRef, type ChatUpdate } from "../../chats.ts";
 import { Composer } from "./Composer.tsx";
 import { ComposerControls } from "./ComposerControls.tsx";
 import { ContextMeter } from "./ContextMeter.tsx";
 import { useChatControls } from "./use-chat-controls.ts";
 import { Transcript } from "./Transcript.tsx";
+import { StoryStop, type StopActions } from "../work/StoryStop.tsx";
 
 /** The chat the user opened: its id and the role it started from. */
 export interface OpenChat {
   id: string;
   role: ChatRoleRef;
+  /** The story this chat is the session of: its transcript is shown read-only (STORY-53). */
+  story?: string;
 }
 
 export interface ChatViewProps {
@@ -23,10 +26,12 @@ export interface ChatViewProps {
   onStarted: (id: string, role: ChatRoleRef) => void;
   /** What the header offers beside the chat's settings (STORY-49: Review draft). */
   headerExtra?: ReactNode;
+  /** A story session's Stop and Resume, and whether its story is Stopped (STORY-53). */
+  story?: { stopped: boolean; actions: StopActions };
 }
 
 /** One chat: the role it runs as, its transcript, and the composer. A chat whose history is gone offers a new one. */
-export function ChatView({ chats, chat, dir, onStarted, headerExtra }: ChatViewProps) {
+export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: ChatViewProps) {
   const [update, setUpdate] = useState<ChatUpdate>({ chat: EMPTY_CHAT, error: null });
   const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => chats.watch(chat.id, setUpdate), [chats, chat.id]);
@@ -57,6 +62,9 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra }: ChatViewP
           </span>
         </span>
         {headerExtra}
+        {chat.story && story && (
+          <StoryStop id={chat.story} stopped={story.stopped} running={running} actions={story.actions} />
+        )}
       </header>
       {update.note && <p className="chat-note">{update.note}</p>}
       {error && (
@@ -74,7 +82,12 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra }: ChatViewP
           onUndoLog: (entry) => chats.undoLog(chat.id, entry),
         }}
       />
-      {!gone && (
+      {chat.story && (
+        <p className="chat-note" role="note">
+          {CHAT_COPY.watching}
+        </p>
+      )}
+      {!gone && !chat.story && (
         <Composer
           running={running}
           fullAccess={fullAccess}

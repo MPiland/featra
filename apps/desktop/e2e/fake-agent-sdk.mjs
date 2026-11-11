@@ -13,6 +13,8 @@
  * - "draft": calls the Featra MCP's draft_cards tool (STORY-8) to draft a feature with two stories. With "again" in the
  *   text it calls it a second time, giving back the IDs the first answer named, with the first story changed.
  * - "slow": starts a reply and waits for interrupt().
+ * - with FEATRA_E2E_STORY_TURN=slow, a story session's first message ("You are working on ...") is a slow turn that
+ *   thinks first (STORY-53): it shows its thinking, then its reply, and waits for interrupt().
  * - anything else: streams "You said: <text>".
  *
  * Every assistant message reports its token use as the SDK does, growing by a thousand per user message (the first turn
@@ -40,6 +42,11 @@ const delta = (text) => ({
   ...MAIN,
   type: "stream_event",
   event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+});
+const thinking = (text) => ({
+  ...MAIN,
+  type: "stream_event",
+  event: { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: text } },
 });
 const assistant = (id, content) => ({
   ...MAIN,
@@ -306,6 +313,16 @@ export function query({ prompt, options }) {
 
   const session = sessionLog(options);
 
+  /** A reply that starts (with its thinking first, if any) and waits for interrupt(), then ends as stopped. */
+  async function* slow(thoughts, reply) {
+    const waiting = stopped();
+    yield start(`msg_${++seq}`);
+    for (const thought of thoughts) yield thinking(thought);
+    yield delta(reply);
+    await waiting;
+    yield { ...MAIN, type: "result", subtype: "error_during_execution", is_error: true, errors: [] };
+  }
+
   async function* run() {
     for await (const message of prompt) {
       const text = String(message.message.content);
@@ -313,7 +330,9 @@ export function query({ prompt, options }) {
       sessionModel = String(options.model);
       yield { ...MAIN, type: "system", subtype: "init", session_id: session.id, model: options.model };
       turn = new AbortController();
-      if (text.includes("decide")) {
+      if (process.env.FEATRA_E2E_STORY_TURN === "slow" && text.startsWith("You are working on")) {
+        yield* slow(["The worktree is clean."], "Starting the story.");
+      } else if (text.includes("decide")) {
         yield* decideTurn(options);
       } else if (text.includes("draft")) {
         yield* draftTurn(options, text.includes("again"));
@@ -322,12 +341,7 @@ export function query({ prompt, options }) {
       } else if (text.includes("question")) {
         yield* questionTurn(options, turn.signal);
       } else if (text.includes("slow")) {
-        const id = `msg_${++seq}`;
-        const waiting = stopped();
-        yield start(id);
-        yield delta("Thinking it over");
-        await waiting;
-        yield { ...MAIN, type: "result", subtype: "error_during_execution", is_error: true, errors: [] };
+        yield* slow([], "Thinking it over");
       } else {
         const kept = session.earlier.length > 0 ? `, after: ${session.earlier.join(", ")}` : "";
         // Written before the reply shows, as Claude does, so a restart right after it finds the turn.

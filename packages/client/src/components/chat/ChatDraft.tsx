@@ -4,6 +4,7 @@ import { CardPane } from "../work/CardPane.tsx";
 import { PaneHandle, type ChosenWidth } from "../work/PaneHandle.tsx";
 import { useDockedPane } from "../work/useDockedPane.ts";
 import { ChatView, type ChatViewProps } from "./ChatView.tsx";
+import { useWorkList } from "../work/useWorkList.ts";
 import { useChatDraft } from "./useChatDraft.ts";
 
 export interface ChatDraftProps extends ChatViewProps {
@@ -27,6 +28,11 @@ export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) 
   const paneId = useId();
   const reopen = useRef<HTMLButtonElement>(null);
   const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
+  const storyId = view.chat.story;
+  const stopped = useWorkList(work, view.dir)
+    ?.list.epics.flatMap((e) => e.features)
+    .flatMap((f) => f.stories)
+    .some((s) => s.id === storyId && s.stopped);
 
   if (draft !== seen) {
     setSeen(draft);
@@ -56,7 +62,17 @@ export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) 
     ) : null;
   return (
     <div ref={splitRef} className="work-split">
-      <ChatView {...view} headerExtra={reviewButton} />
+      <ChatView
+        {...view}
+        headerExtra={reviewButton}
+        story={{
+          stopped: stopped === true,
+          actions: {
+            stop: (id) => work.stopStory(view.dir, id),
+            resume: (id) => work.resumeStory(view.dir, id),
+          },
+        }}
+      />
       {shown && (
         <>
           <PaneHandle width={width} split={split} paneId={paneId} onMove={onMove} onChoose={choose} onClose={close} />

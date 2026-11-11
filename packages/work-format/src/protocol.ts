@@ -87,6 +87,17 @@ export interface ServerMethods {
    * starts when one ends. Refused when the story can't be started or its provider has no runner.
    */
   "story.start": { params: { dir: string; id: string }; result: { chat: string; queued: boolean } };
+  /**
+   * Stops a story's running turn (STORY-53, ADR 0026): the story keeps its stage and is marked Stopped, with a history
+   * event; its worktree and changes are untouched. A turn still waiting for a slot is dropped. Refused when the story
+   * has no running turn or is already stopped.
+   */
+  "story.stop": { params: { dir: string; id: string }; result: null };
+  /**
+   * Resumes a stopped story's session (STORY-53): the same provider session goes on, Stopped is cleared with a history
+   * event, and the turn takes a story slot or waits Queued like any turn. Refused when its provider can't resume.
+   */
+  "story.resume": { params: { dir: string; id: string }; result: null };
   /** Rejects a draft feature: deletes its card files. Refused when git tracks any of them. */
   "draft.reject": { params: { dir: string; id: string }; result: { removed: number } };
   /** The roles a chat in this project can start from (ADR 0018). */
@@ -205,6 +216,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "draft.approve",
   "feature.start",
   "story.start",
+  "story.stop",
+  "story.resume",
   "draft.reject",
   "chat.roles",
   "roles.watch",

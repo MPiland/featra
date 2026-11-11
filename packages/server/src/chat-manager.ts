@@ -12,6 +12,7 @@ import {
   idleSummary,
   newSummary,
   reduceRow,
+  RESUME_MESSAGE,
   retitle,
   type ChatEvent,
   type ChatSummary,
@@ -230,8 +231,28 @@ export function createChatManager({
     log,
   });
 
+  function send(id: string, text: string) {
+    const c = chat(id);
+    if (c.running) throw new ChatError(CHAT_MESSAGES.busy);
+    if (c.events === null) throw new Error("Open the chat before sending to it.");
+    const agent = c.agent;
+    if (!agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
+    record(c, { type: "user", text });
+    // A story session's turn, any turn, holds one of the project's story slots, or waits for one (STORY-9 AC5).
+    if (c.summary.story) {
+      stories
+        .turn(c, () => agent.send(text))
+        .catch((err: unknown) => {
+          log(`A story session's turn couldn't wait for a slot: ${errorMessage(err)}`);
+          agent.send(text);
+        });
+      return;
+    }
+    agent.send(text);
+  }
+
   return {
-    ...chatLookups(chats, chat, providers),
+    ...chatLookups(chats, chat, providers, same),
     startStory: (opts) => stories.start(opts),
     queuedStory: (dir, story) => stories.queuedFor(dir, story),
     async start(dir, roleId, card) {
@@ -275,24 +296,13 @@ export function createChatManager({
       save();
       listChanged(c.dir);
     },
-    send(id, text) {
+    send,
+    async resume(id) {
+      await open(id);
       const c = chat(id);
-      if (c.running) throw new ChatError(CHAT_MESSAGES.busy);
-      if (c.events === null) throw new Error("Open the chat before sending to it.");
-      const agent = c.agent;
-      if (!agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
-      record(c, { type: "user", text });
-      // A story session's turn, any turn, holds one of the project's story slots, or waits for one (STORY-9 AC5).
-      if (c.summary.story) {
-        stories
-          .turn(c, () => agent.send(text))
-          .catch((err: unknown) => {
-            log(`A story session's turn couldn't wait for a slot: ${errorMessage(err)}`);
-            agent.send(text);
-          });
-        return;
-      }
-      agent.send(text);
+      if (!provider(c.summary.provider)?.resumes) throw new ChatError(CHAT_MESSAGES.noResume);
+      if (!c.agent) throw new ChatError(c.refusal ?? CHAT_MESSAGES.noProvider);
+      send(id, RESUME_MESSAGE);
     },
     async stop(id) {
       const c = chat(id);

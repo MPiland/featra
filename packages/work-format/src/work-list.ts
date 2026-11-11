@@ -8,6 +8,7 @@ import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";
 import type { Resolution } from "./owner-copies.ts";
 import { epicProgress, featureProgress, itemsOf, progressLabel, scopeSummary } from "./rollup.ts";
+import { isStopped } from "./story-stop.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
 import { assertNever } from "./utils/guards.ts";
 import type {
@@ -87,6 +88,7 @@ function storyRow(card: Card, added: ReadonlySet<string>, config: ProjectConfig)
     agent: card.agent,
     model: card.model,
     session: card.sessions.at(-1) ?? null,
+    stopped: isStopped(card),
   };
 }
 

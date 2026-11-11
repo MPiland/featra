@@ -86,6 +86,8 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
   let loggedOut = false;
   /** Assistant messages whose text came as deltas, so their full copy adds no text. */
   const streamed = new Set<string>();
+  /** The same for thinking (STORY-53), which streams apart from the text. */
+  const thought = new Set<string>();
   let current = "";
   /** The model the agent reported at start, and the context its last assistant message used this turn. */
   let model = "";
@@ -102,11 +104,17 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
       current = text(event.message.id);
       return [];
     }
-    if (event.type !== "content_block_delta" || !isRecord(event.delta) || event.delta.type !== "text_delta") return [];
-    if (!current) return [];
+    if (event.type !== "content_block_delta" || !isRecord(event.delta) || !current) return [];
+    const block = `${current}:${String(event.index)}`;
+    if (event.delta.type === "thinking_delta") {
+      thought.add(current);
+      const delta = text(event.delta.thinking);
+      return delta ? [{ type: "thinking", block, delta }] : [];
+    }
+    if (event.delta.type !== "text_delta") return [];
     streamed.add(current);
     const delta = text(event.delta.text);
-    return delta ? [{ type: "text", block: `${current}:${String(event.index)}`, delta }] : [];
+    return delta ? [{ type: "text", block, delta }] : [];
   }
 
   /**
@@ -121,6 +129,10 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
       if (block.type === "text" && !streamed.has(id)) {
         const t = text(block.text);
         return t ? [{ type: "text", block: `${id}:${i}`, delta: t }] : [];
+      }
+      if (block.type === "thinking" && !thought.has(id)) {
+        const t = text(block.thinking);
+        return t ? [{ type: "thinking", block: `${id}:${i}`, delta: t }] : [];
       }
       if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
         return [{ type: "tool", id: block.id, name: block.name, input: block.input ?? null }];

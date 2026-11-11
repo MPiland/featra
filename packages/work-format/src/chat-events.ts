@@ -33,6 +33,11 @@ export type ChatEvent =
   | { type: "started"; model: string }
   /** More of the agent's reply. `block` names the reply block it belongs to, so a block's deltas join up. */
   | { type: "text"; block: string; delta: string }
+  /**
+   * More of the agent's thinking, where the provider exposes it (STORY-53). Shown apart from its reply; `block` joins a
+   * block's deltas as for `text`.
+   */
+  | { type: "thinking"; block: string; delta: string }
   /** The agent called a tool. */
   | { type: "tool"; id: string; name: string; input: unknown }
   /** A tool call's result, as text. */
@@ -113,6 +118,8 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
       return str(raw.model) ? { type: "started", model: raw.model } : null;
     case "text":
       return nonEmpty(raw.block) && str(raw.delta) ? { type: "text", block: raw.block, delta: raw.delta } : null;
+    case "thinking":
+      return nonEmpty(raw.block) && str(raw.delta) ? { type: "thinking", block: raw.block, delta: raw.delta } : null;
     case "tool":
       return nonEmpty(raw.id) && nonEmpty(raw.name)
         ? { type: "tool", id: raw.id, name: raw.name, input: raw.input ?? null }
@@ -240,4 +247,8 @@ export const CHAT_MESSAGES = {
   noRunner: "This role's agent can't run story sessions yet.",
   /** A story session still waiting for a free slot: nothing can be sent to it (STORY-9). */
   queued: "Queued. It starts when a story agent ends.",
+  /** Resume on a session whose provider can't go on with a session it stopped (STORY-53). */
+  noResume: "This agent can't resume a stopped session.",
+  /** Stop or Resume on a story whose session isn't there: it never started, or was closed (STORY-53). */
+  noSession: "This story has no session.",
 } as const;
