@@ -2,7 +2,7 @@
 id: BUG-15
 type: bug
 title: Spawn test sometimes misses the story's run
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 7
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-15-spawn-test-race
-pr: null
+pr: "30"
 created: 2026-11-11T20:00:00Z
 history:
   - at: 2026-11-11T20:00:00Z
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-15
+  - at: 2026-11-11T19:43:02Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
@@ -40,8 +45,7 @@ passed. The test looks up the story's run right after `spawn_session` answers "S
 
 ## Acceptance criteria
 
-- [x] The cause is found: either the test reads too early, or "Started" is answered before the session has been started.
-      If it is the product, "Started" is said only once the session is started.
+- [x] The cause is found: either the test reads too early, or "Started" is answered before the session has been started. If it is the product, "Started" is said only once the session is started.
 - [x] A regression test that fails on the old code reproduces the race (for example by delaying the provider's start).
 - [x] The original assertions stay as they are.
 
