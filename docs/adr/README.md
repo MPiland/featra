@@ -59,3 +59,4 @@ What becomes easier or harder, and what we must now do.
 | [0025](0025-story-sessions-in-worktrees.md)               | Story agents are Featra-run sessions, each in its own worktree    | accepted |
 | [0026](0026-stop-and-resume-story-agents.md)              | Watching, stopping and resuming a story agent                     | accepted |
 | [0027](0027-agents-report-on-their-card.md)               | Agents report on their card with `update_card`; only Reported     | accepted |
+| [0029](0029-featra-plugins.md)                            | Featra plugins: sandboxed UI with a permissioned API              | proposed |

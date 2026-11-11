@@ -1372,3 +1372,14 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **A stopped session doesn't count toward the cap;** Resume takes a slot or waits Queued like any turn. A queued
   later turn can be stopped.
 - **No confirmation, any client:** Stop and Resume are the user's own action and work remotely.
+
+## 2026-11-11 — Featra plugins (user)
+
+- Anyone can build Featra plugins that others install; a plugin can add a full pane, a modal, views and actions with its
+  own buttons (ADR 0029, proposed).
+- Plugin UI is sandboxed and reaches Featra through a permissioned API the user approves at install.
+- An opt-in tier lets a plugin run local programs.
+- Featra's components and theme are offered, not forced.
+- Plugins can bundle role presets and provider parts.
+- Install from git, URLs and marketplace lists, and later a curated registry too.
+- Designed now, built after M1. Provider plugins stay as planned.
