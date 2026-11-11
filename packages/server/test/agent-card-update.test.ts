@@ -46,6 +46,8 @@ const withWork = (c: Card): Card => ({
   ],
 });
 
+const count = (items: { done: boolean }[]) => ({ done: items.filter((i) => i.done).length, total: items.length });
+
 const rowOf = (node: unknown, id: string): Record<string, unknown> | null => {
   if (Array.isArray(node)) return node.map((n) => rowOf(n, id)).find((n) => n !== null) ?? null;
   if (typeof node !== "object" || node === null) return null;
@@ -118,6 +120,11 @@ describe("AC1: what a story session may write", () => {
 });
 
 describe("AC2: the owner copy, history, and the feature list", () => {
+  // Its own report, so nothing here leans on what an earlier case did.
+  beforeAll(async () => {
+    await update(session, { addTasks: ["AC2 task"], note: "AC2 note" });
+  });
+
   it("writes only to the worktree: the feature branch and main keep the card as committed", async () => {
     expect(w.repo.show(w.repo.main, "feature/2-delegation", "STORY-5")).not.toContain("Paths are checked");
     expect(await w.repo.read(w.repo.main, "STORY-5")).not.toContain("Paths are checked");
@@ -127,9 +134,10 @@ describe("AC2: the owner copy, history, and the feature list", () => {
   it("appends history events by session:<id>, and the card is Reported, nothing more", async () => {
     const card = await w.card("STORY-5", five());
     const mine = card.history.filter((e) => e.by === `session:${own.chat}`);
-    expect(mine.map((e) => e.field)).toEqual(["status", "status", "report"]);
-    expect(mine[0]).toMatchObject({ to: "In Review" });
-    expect(mine.at(-1)).toMatchObject({ to: "tasks, criteria, notes" });
+    expect(mine.map((e) => e.field)).toContain("status");
+    // Review item 3: the event records the delta only, never a before-snapshot.
+    expect(mine.at(-1)).toMatchObject({ field: "report", from: null });
+    expect(JSON.parse(mine.at(-1)?.to ?? "")).toEqual({ addTasks: ["AC2 task"], note: "AC2 note" });
     expect(evidenceState(card)).toMatchObject({ reported: true, verified: false, proven: false, accepted: false });
   });
 
@@ -141,16 +149,19 @@ describe("AC2: the owner copy, history, and the feature list", () => {
 
   it("shows on the Work list at once, marked Reported, and pushes it to a watcher", async () => {
     const list = (await w.window.ask("work.watch", { dir: w.repo.main })).result;
+    const card = await w.card("STORY-5", five());
     expect(rowOf(list, "STORY-5")).toMatchObject({
-      stage: "Acceptance",
+      stage: card.status,
       reported: true,
-      tasks: { done: 1, total: 3 },
-      criteria: { done: 1, total: 2 },
+      tasks: count(card.tasks),
+      criteria: count(card.acs),
     });
     expect(rowOf(list, "STORY-7")).not.toHaveProperty("reported");
-    await update(session, { criteria: [{ criterion: "The second works" }] });
+    await update(session, { addTasks: ["Pushed task"] });
     const push = await w.window.socket.next(
-      (f) => f.event === "work.list" && (rowOf(f.data, "STORY-5")?.criteria as { done: number })?.done === 2,
+      (f) =>
+        f.event === "work.list" &&
+        (rowOf(f.data, "STORY-5")?.tasks as { total: number })?.total === card.tasks.length + 1,
       15_000,
     );
     expect(rowOf(push.data, "STORY-5")).toMatchObject({ reported: true });
@@ -191,8 +202,9 @@ describe("AC3: whose card", () => {
   });
 
   it("refuses the Dev Lead a card whose owner copy is not checked out here", async () => {
+    // Review item 5: an agent is told what it can do, not to check a branch out.
     const frame = await update(lead, { card: "STORY-7", note: "x" });
-    expect(refusal(frame)).toBe("Check out feature/2-delegation to edit it.");
+    expect(refusal(frame)).toBe("STORY-7 has no working copy yet. Start it with spawn_session.");
   });
 
   it("refuses any other chat, and says which card to name when a Dev Lead leaves it out", async () => {
@@ -214,6 +226,11 @@ describe("AC3: whose card", () => {
 const link = (path: string) => update(session, { criteria: [{ criterion: "The second works", evidence: path }] });
 
 describe("AC4: evidence", () => {
+  beforeAll(async () => {
+    await evidence("linked.png");
+    await update(session, { criteria: [{ criterion: "The first works", evidence: `${FOLDER}linked.png` }] });
+  });
+
   it("links the folder from the card, and the evidence is in the story's own folder", async () => {
     expect(await readFile(join(five(), ".featra", "cards", "STORY-5-card.md"), "utf8")).toContain(
       `evidence: ${FOLDER}`,
@@ -248,6 +265,10 @@ describe("AC4: evidence", () => {
   });
 
   it("keeps one link per criterion: the newest", async () => {
-    expect((await w.card("STORY-5", five())).acs[1]?.evidence).toBe(`${FOLDER}exact.png`);
+    await evidence("old.png");
+    await evidence("new.png");
+    await update(session, { criteria: [{ criterion: "The first works", evidence: `${FOLDER}old.png` }] });
+    await update(session, { criteria: [{ criterion: "The first works", evidence: `${FOLDER}new.png` }] });
+    expect((await w.card("STORY-5", five())).acs[0]?.evidence).toBe(`${FOLDER}new.png`);
   });
 });

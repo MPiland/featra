@@ -168,8 +168,13 @@ describe("update_card through the Featra MCP", () => {
     expect(tool?.inputSchema.required ?? []).toEqual([]);
     for (const taught of [
       "Reported",
-      "Acceptance",
+      "the stage before Done",
       "Done",
+      "A tick never unticks",
+      "story or a bug",
+      "300 characters",
+      "40 ticks",
+      "case and spacing don't matter",
       ".featra/evidence/<FEAT-N>/<STORY-M>/",
       "1 MB",
       "Dev Lead",
@@ -227,11 +232,22 @@ describe("update_card through the Featra MCP", () => {
     expect(await cardFile()).toBe(before);
   });
 
-  it("refuses any other chat: this Dev Lead did not draft the feature", async () => {
-    const r = await update(await agent(lead), { card: "STORY-9", note: "x" });
+  // Spec correction (Dev Lead, 2026-11-11): the Dev Lead scope is the drafting chat AND the chat the story session
+  // nests under, so the Dev Lead that spawned STORY-9 may update it. This replaces "refuses any other chat: this Dev
+  // Lead did not draft the feature".
+  it("lets the Dev Lead that spawned the story session update its card", async () => {
+    const r = await update(await agent(lead), { card: "STORY-9", note: "From the Dev Lead." });
+    expect(isError(r)).toBe(false);
+    expect(parseCard(await cardFile()).notes).toContain("From the Dev Lead.");
+  });
+
+  it("refuses a chat that neither spawned the session nor drafted the feature", async () => {
+    const stranger = ((await call("chat.start", { dir: project, role: "dev-lead" })) as { id: string }).id;
+    const r = await update(await agent(stranger), { card: "STORY-9", note: "Mine?" });
     expect(isError(r)).toBe(true);
     expect(text(r)).toBe(
       "Not updated. STORY-9 isn't yours to update: only its own story session and its feature's Dev Lead can.",
     );
+    expect(parseCard(await cardFile()).notes).not.toContain("Mine?");
   });
 });

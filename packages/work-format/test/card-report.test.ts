@@ -115,8 +115,10 @@ describe("ticks, new tasks and notes", () => {
 
   it("records one report event by the session, naming what changed", () => {
     const r = ok({ tasks: ["Write it"], note: "Done." });
-    expect(r.card.history.at(-1)).toMatchObject({ field: "report", to: "tasks, notes", by: BY, at: at(5) });
-    expect(JSON.parse(r.card.history.at(-1)?.from ?? "")).toMatchObject({ tasks: work().tasks });
+    // Review item 3: the event records the delta only, never a before-snapshot of the card.
+    const event = r.card.history.at(-1);
+    expect(event).toMatchObject({ field: "report", from: null, by: BY, at: at(5) });
+    expect(JSON.parse(event?.to ?? "")).toEqual({ tasks: ["Write it"], note: "Done." });
   });
 
   it("changes nothing, and records nothing, when everything is already so", () => {
@@ -127,7 +129,10 @@ describe("ticks, new tasks and notes", () => {
   });
 
   it("refuses a task or criterion the card doesn't have, naming the ones it has", () => {
-    expect(refused({ tasks: ["Fly"] })).toBe('No task reads "Fly". It has: "Write it"; "Test it".');
+    // Review nit: the error says how text is matched and the length limit.
+    expect(refused({ tasks: ["Fly"] })).toBe(
+      'No task reads "Fly" (case and spacing don\'t matter; at most 300 characters). It has: "Write it"; "Test it".',
+    );
     expect(refused({ criteria: [{ criterion: "Third" }] })).toContain('No criterion reads "Third"');
   });
 

@@ -27,10 +27,10 @@
  * the SDK's real reader can read it back after a restart. A resumed session (`options.resume`) goes on in that file,
  * and its reply names the earlier prompts it kept: "You said: <text>, after: <earlier>".
  */
-import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { callMcpTool } from "./fake-mcp-client.mjs";
+import { sessionLog } from "./fake-session-log.mjs";
 
 const MAIN = { parent_tool_use_id: null };
 let seq = 0;
@@ -225,57 +225,6 @@ async function* questionTurn(options, signal) {
   yield success("Done.");
 }
 
-/**
- * The session's file, where Claude keeps it: `projects/<the cwd, non-alphanumerics as "-">/<session>.jsonl`. Claude
- * names the folder after the cwd's real path, so on Windows a short 8.3 name (`RUNNER~1`) is spelled out in full.
- */
-const sessionFile = (home, cwd, session) =>
-  join(home, "projects", cwd.replace(/[^a-zA-Z0-9]/g, "-"), `${session}.jsonl`);
-
-/** The session's file, kept as Claude keeps it, when the test gave Claude a config folder of its own. */
-function sessionLog(options) {
-  const home = process.env.CLAUDE_CONFIG_DIR;
-  if (!home) return { id: "fake-session", earlier: [], write: () => {} };
-  const id = options.resume ?? randomUUID();
-  const cwd = realpathSync.native(options.cwd);
-  const file = sessionFile(home, cwd, id);
-  const lines = existsSync(file)
-    ? readFileSync(file, "utf8")
-        .split("\n")
-        .filter(Boolean)
-        .map((l) => JSON.parse(l))
-    : [];
-  let parent = lines.at(-1)?.uuid ?? null;
-  const line = (type, message) => {
-    const uuid = randomUUID();
-    const entry = { type, parentUuid: parent, uuid, timestamp: new Date().toISOString(), isSidechain: false };
-    parent = uuid;
-    return JSON.stringify({
-      ...entry,
-      userType: "external",
-      cwd,
-      sessionId: id,
-      version: "2.1.0",
-      message,
-    });
-  };
-  const earlier = lines.filter((l) => l.type === "user" && typeof l.message.content === "string");
-  return {
-    id,
-    earlier: earlier.map((l) => l.message.content),
-    write: (text, reply) => {
-      mkdirSync(dirname(file), { recursive: true });
-      const user = line("user", { role: "user", content: text });
-      const answer = line("assistant", {
-        id: `msg_${++seq}`,
-        role: "assistant",
-        content: [{ type: "text", text: reply }],
-      });
-      appendFileSync(file, `${user}\n${answer}\n`);
-    },
-  };
-}
-
 export function query({ prompt, options }) {
   const log = process.env.FEATRA_E2E_AGENT_LOG;
   if (log) {
@@ -299,17 +248,20 @@ export function query({ prompt, options }) {
       sessionModel = String(options.model);
       yield { ...MAIN, type: "system", subtype: "init", session_id: session.id, model: options.model };
       turn = new AbortController();
-      if (process.env.FEATRA_E2E_REPORT && text.startsWith("You are working on")) {
+      // A story session's first message is the card, which holds any word: only its marker routes it, never a keyword.
+      const brief = text.startsWith("You are working on");
+      const said = brief ? "" : text;
+      if (brief && process.env.FEATRA_E2E_REPORT) {
         yield* reportTurn(options, text);
-      } else if (text.includes("decide")) {
+      } else if (said.includes("decide")) {
         yield* decideTurn(options);
-      } else if (text.includes("draft")) {
-        yield* draftTurn(options, text.includes("again"));
-      } else if (text.includes("tool")) {
-        yield* toolTurn(options, turn.signal, text.includes("twice"));
-      } else if (text.includes("question")) {
+      } else if (said.includes("draft")) {
+        yield* draftTurn(options, said.includes("again"));
+      } else if (said.includes("tool")) {
+        yield* toolTurn(options, turn.signal, said.includes("twice"));
+      } else if (said.includes("question")) {
         yield* questionTurn(options, turn.signal);
-      } else if (text.includes("slow")) {
+      } else if (said.includes("slow")) {
         const id = `msg_${++seq}`;
         const waiting = stopped();
         yield start(id);

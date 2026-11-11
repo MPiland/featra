@@ -154,7 +154,7 @@ export async function storyWorld({
     lead.agent.socket.send({ id, method: "story.spawn", params: { story: storyId } });
     const answered = await lead.agent.socket.next((f) => f.id === id, 20_000);
     if (answered.ok !== true) throw new Error(`Spawn refused: ${String(answered.error)}`);
-    await until(() => (claude.runs[before]?.heard.length ?? 0) === 1);
+    await until(() => (claude.runs[before]?.heard.length ?? 0) === 1, FIRST_ANSWER_MS);
     return { chat: (answered.result as { chat: string }).chat, run: claude.runs[before]! };
   }
 
@@ -167,6 +167,9 @@ export async function storyWorld({
     clients.push(agent);
     return agent;
   }
+
+  /** The address of the agent socket for a connection's `secret`: what an MCP process dials. */
+  const agentUrl = (secret: string) => `ws://127.0.0.1:${server.port}${AGENT_PATH}?token=${encodeURIComponent(secret)}`;
 
   const chatList = async (): Promise<ChatSummary[]> => {
     const listed = await window.ask("chat.list", { dir });
@@ -187,6 +190,7 @@ export async function storyWorld({
     devLead,
     runningLead,
     agentOf,
+    agentUrl,
     spawnAs,
     chatList,
     sessions,

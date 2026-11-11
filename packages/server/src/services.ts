@@ -100,7 +100,13 @@ export function createServices({
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
-  const reports = createCardReport({ scan: watches.scan, now, lane });
+  const reports = createCardReport({
+    scan: watches.scan,
+    now,
+    lane,
+    leads: (dir, story) =>
+      chats.list(dir).flatMap((c) => (c.story?.id === story && c.story.parent ? [c.story.parent] : [])),
+  });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,
     execPath: mcpExecPath,

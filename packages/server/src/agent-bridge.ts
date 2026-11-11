@@ -129,12 +129,13 @@ export function createAgentBridge({
     return (await mcpRefusal(dir)) ?? ((await knowledge(dir)) === "read-only" ? readOnly : null);
   }
 
-  async function appendLog(chat: string, dir: string, session: string, params: unknown) {
+  /** Logs go where the agent works (a story session's worktree), never into the user's own checkout. */
+  async function appendLog(chat: string, dir: string, cwd: string, session: string, params: unknown) {
     const off = await refusal(dir);
     if (off !== null) throw new ApiError(off);
     const input = parseLogInput(isRecord(params) ? params.kind : undefined, params);
     if (!input.ok) throw new ApiError(input.error);
-    const { entry: id, file, summary } = await writer.append(dir, chat, input.value, session);
+    const { entry: id, file, summary } = await writer.append(cwd, chat, input.value, session);
     chats.report(chat, { type: "logged", entry: id, file, summary });
     return { entry: id, file };
   }
@@ -181,9 +182,7 @@ export function createAgentBridge({
     if (!reports) throw new ApiError(AGENT_MESSAGES.noUpdate);
     const input = parseReportInput(params);
     if (!input.ok) throw new ApiError(input.error);
-    const card = input.value.card ?? info.storyId;
-    const changes = await reports.report(info.dir, { chat, story: info.storyId ?? null }, info.session, input.value);
-    return { card: card ?? "", changes };
+    return reports.report(info.dir, { chat, story: info.storyId ?? null }, info.session, input.value, info.cwd);
   }
 
   return {
@@ -237,7 +236,7 @@ export function createAgentBridge({
         case "card.update":
           return update(chat, info, params);
         case "log.append":
-          return appendLog(chat, info.dir, info.session, params);
+          return appendLog(chat, info.dir, info.cwd ?? info.dir, info.session, params);
         default:
           return assertNever(method);
       }

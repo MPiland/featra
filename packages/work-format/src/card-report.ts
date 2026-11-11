@@ -42,6 +42,8 @@ export interface ReportInput {
 export interface Reporter {
   chat: string;
   story: string | null;
+  /** The Dev Lead chats a story's sessions nest under (the chats that spawned them). */
+  leads?: (story: string) => readonly string[];
 }
 
 /** The folder of a card's evidence, `.featra/evidence/FEAT-N/STORY-M/`, or null when it has no feature. */
@@ -77,13 +79,25 @@ export function stageCeiling(config: ProjectConfig): string | null {
   return config.stages[(firstDone < 0 ? config.stages.length : firstDone) - 1]?.name ?? null;
 }
 
-/** Why `card` can't move to `to` by a report, or null: forward only, never to Done, Cancelled or an unknown stage. */
+/** Why a report can't touch `card` at all, or null: it is Cancelled, Done or past the ceiling, which are the user's. */
+export function reportCardError(card: Card, config: ProjectConfig): string | null {
+  const names = config.stages.map((s) => s.name);
+  const at = names.indexOf(card.status);
+  if (at < 0) return `${card.id} is ${card.status}, which a report can't move.`;
+  const ceiling = stageCeiling(config);
+  return ceiling !== null && at > names.indexOf(ceiling)
+    ? `${card.id} is ${card.status}: a report only changes a card up to ${ceiling}.`
+    : null;
+}
+
+/** Why `card` can't move to `to` by a report, or null: forward only, and never past the ceiling, Cancelled or unknown. */
 export function reportStageError(card: Card, to: string, config: ProjectConfig): string | null {
   const names = config.stages.map((s) => s.name);
   const target = names.find((n) => n.toLowerCase() === to.trim().toLowerCase());
   const ceiling = stageCeiling(config);
   if (!target) return `${to} isn't a stage you can move to; the stages are ${names.join(", ")}.`;
-  if (stageCategory(target, config) === "done") {
+  const past = ceiling !== null && names.indexOf(target) > names.indexOf(ceiling);
+  if (past || stageCategory(target, config) === "done") {
     return `Only the user moves ${card.id} to ${target}, once it is verified and accepted; move it to ${ceiling ?? "the last stage before it"}.`;
   }
   const from = names.indexOf(card.status);
@@ -91,15 +105,23 @@ export function reportStageError(card: Card, to: string, config: ProjectConfig):
   return names.indexOf(target) < from ? `${card.id} is ${card.status}: a report only moves a story forward.` : null;
 }
 
-/** Why `who` may not update card `id`, or null when it may: its own session, or the Dev Lead of its feature. */
+/**
+ * Why `who` may not update card `id`, or null when it may: the story's own latest session, or a Dev Lead of its feature
+ * (the chat that drafted it, or the one the story's session nests under, which spawned it).
+ */
 export function reportAuthError(who: Reporter, id: string, cards: readonly Card[]): string | null {
   const card = cards.find((c) => c.id === id);
   if (!card) return "That card is gone.";
   if (who.story !== null) {
-    return id === who.story ? null : `A story session can update only its own card, ${who.story}.`;
+    if (id !== who.story) return `A story session can update only its own card, ${who.story}.`;
+    const latest = card.sessions.at(-1);
+    return latest === undefined || latest === who.chat
+      ? null
+      : `${id} has a newer session: this one can no longer update it.`;
   }
   const feature = cards.find((c) => c.id === card.parent);
-  if (feature?.type !== "feature" || draftedBy(feature) !== who.chat) {
+  const lead = (feature !== undefined && draftedBy(feature) === who.chat) || (who.leads?.(id) ?? []).includes(who.chat);
+  if (feature?.type !== "feature" || !lead) {
     return `${id} isn't yours to update: only its own story session and its feature's Dev Lead can.`;
   }
   return needsReview(feature) ? `${feature.id} is still a draft: revise it with draft_cards.` : null;
@@ -183,28 +205,47 @@ export type ReportResult = ({ ok: true } & Reported) | { ok: false; error: strin
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const quoted = (items: readonly { text: string }[]) => items.map((i) => `"${i.text}"`).join("; ") || "none";
 
-/** Ticks the items `wanted` names; the ones that were open are counted, and one that isn't there is why it fails. */
+/**
+ * Ticks the items `wanted` names, each the first open one that reads so (else one already ticked); the ones that were
+ * open are counted, `at` says which item each wanted text meant, and one that isn't there is why it fails.
+ */
 function ticked<T extends { text: string; done: boolean }>(
   items: readonly T[],
   wanted: readonly string[],
   what: string,
-): { ok: true; items: T[]; count: number } | { ok: false; error: string } {
+): { ok: true; items: T[]; count: number; at: number[] } | { ok: false; error: string } {
   let count = 0;
   const next = [...items];
+  const at: number[] = [];
   for (const w of wanted) {
-    const at = next.findIndex((i) => same(i.text, w) && !i.done);
-    const any = at >= 0 ? at : next.findIndex((i) => same(i.text, w));
+    const open = next.findIndex((i) => same(i.text, w) && !i.done);
+    const any = open >= 0 ? open : next.findIndex((i) => same(i.text, w));
     const item = next[any];
-    if (!item) return { ok: false, error: `No ${what} reads "${w}". It has: ${quoted(items)}.` };
+    if (!item) {
+      return {
+        ok: false,
+        error: `No ${what} reads "${w}" (case and spacing don't matter; at most ${REPORT_LIMITS.text} characters). It has: ${quoted(items)}.`,
+      };
+    }
     if (!item.done) {
       next[any] = { ...item, done: true };
       count += 1;
     }
+    at.push(any);
   }
-  return { ok: true, items: next, count };
+  return { ok: true, items: next, count, at };
 }
 
 const refuse = (error: string): ReportResult => ({ ok: false, error });
+
+/** What one report changed, as the `report` event records it: only the delta, never a copy of the card. */
+interface Delta {
+  tasks?: string[];
+  addTasks?: string[];
+  criteria?: string[];
+  evidence?: string[];
+  note?: string;
+}
 
 /** The card with the report applied, as `by` at `at` (`who` signs the note), or why it can't be. */
 export function applyReport(
@@ -216,9 +257,11 @@ export function applyReport(
   who: string,
 ): ReportResult {
   if (card.type !== "story" && card.type !== "bug") return refuse(`${card.id} isn't a story or a bug.`);
+  const closed = reportCardError(card, ctx.config);
+  if (closed !== null) return refuse(closed);
   const changes: string[] = [];
   const links: string[] = [];
-  const before: Record<string, unknown> = {};
+  const delta: Delta = {};
   let next: Card = card;
 
   if (input.stage && !same(input.stage, card.status)) {
@@ -235,52 +278,58 @@ export function applyReport(
       (t, i, all) => !ticks.items.some((o) => same(o.text, t)) && all.findIndex((o) => same(o, t)) === i,
     );
     if (ticks.count || added.length) {
-      before.tasks = card.tasks;
       next = { ...next, tasks: [...ticks.items, ...added.map((t) => ({ text: t, done: false }))] };
-      if (ticks.count) changes.push(`ticked ${plural(ticks.count, "task")}`);
-      if (added.length) changes.push(`added ${plural(added.length, "task")}`);
+      if (ticks.count) {
+        changes.push(`ticked ${plural(ticks.count, "task")}`);
+        delta.tasks = (input.tasks ?? []).filter((_, i) => !card.tasks[ticks.at[i] ?? -1]?.done);
+      }
+      if (added.length) {
+        changes.push(`added ${plural(added.length, "task")}`);
+        delta.addTasks = added;
+      }
     }
   }
   if (input.criteria?.length) {
+    const wanted = input.criteria;
     const ticks = ticked(
       card.acs,
-      input.criteria.map((c) => c.criterion),
+      wanted.map((c) => c.criterion),
       "criterion",
     );
     if (!ticks.ok) return refuse(ticks.error);
     let acs = ticks.items;
-    let linked = 0;
-    for (const { criterion, evidence } of input.criteria) {
+    const linked: string[] = [];
+    for (const [n, { evidence }] of wanted.entries()) {
       if (!evidence) continue;
       const why = evidenceLinkError(card, evidence);
       if (why !== null) return refuse(why);
-      const i = acs.findIndex((a) => same(a.text, criterion));
-      if (acs[i]?.evidence !== evidence) linked += 1;
+      // The same criterion that was ticked, even when another one reads the same.
+      const i = ticks.at[n] ?? -1;
+      if (acs[i]?.evidence !== evidence) linked.push(evidence);
       acs = acs.map((a, j) => (j === i ? { ...a, evidence } : a));
       links.push(evidence);
     }
-    if (ticks.count || linked) {
-      before.criteria = card.acs;
-      const folder = linked ? evidenceFolder(card) : null;
+    if (ticks.count || linked.length) {
+      const folder = linked.length ? evidenceFolder(card) : null;
       next = { ...next, acs, extra: folder ? { ...next.extra, [EVIDENCE_KEY]: folder } : next.extra };
-      if (ticks.count) changes.push(`ticked ${plural(ticks.count, "criterion", "criteria")}`);
-      if (linked) changes.push(`linked ${plural(linked, "evidence file")}`);
+      if (ticks.count) {
+        changes.push(`ticked ${plural(ticks.count, "criterion", "criteria")}`);
+        delta.criteria = wanted.map((c) => c.criterion).filter((_, i) => !card.acs[ticks.at[i] ?? -1]?.done);
+      }
+      if (linked.length) {
+        changes.push(`linked ${plural(linked.length, "evidence file")}`);
+        delta.evidence = linked;
+      }
     }
   }
   if (input.note) {
-    before.notes = card.notes;
-    const line = `- ${at.slice(0, 10)} (${who}): ${input.note}`;
+    const line = `- ${at.slice(0, 10)} (${squash(who)}): ${input.note}`;
     next = { ...next, notes: card.notes.trim() ? `${card.notes.trim()}\n${line}` : line };
     changes.push("added a note");
+    delta.note = input.note;
   }
-  if (Object.keys(before).length) {
-    next = appendHistory(next, {
-      at,
-      field: "report",
-      from: JSON.stringify(before),
-      to: Object.keys(before).join(", "),
-      by,
-    });
+  if (Object.keys(delta).length) {
+    next = appendHistory(next, { at, field: "report", from: null, to: JSON.stringify(delta), by });
   }
   return { ok: true, card: next, changes, links };
 }
