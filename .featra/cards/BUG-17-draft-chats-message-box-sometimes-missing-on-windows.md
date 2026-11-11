@@ -70,3 +70,8 @@ Fix: `draftInNewChat` waits for the picker to close (20 s, named `CHAT_START_MS`
 that is slow passes; one that is refused or never answers fails at the picker, which says what is wrong. Assertions
 are unchanged. If it recurs with the picker closed and no composer, that is a product bug and the new failure point
 will say so.
+
+No regression test: the failure needs a cold runner where `chat.start` takes over 5 s, which can't be made to happen on
+demand. The helper is test code and the product path is unchanged, so the change is proved by the e2e jobs passing on
+CI. The same picker-then-composer sequence is hand-rolled in about 11 other specs; a shared `startChat(page, role)`
+helper is on the roadmap, not done here.
