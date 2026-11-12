@@ -2,7 +2,16 @@
  * The provider adapter seam (ADR 0018): how the session manager runs an agent without knowing which one. The Claude
  * adapter is the only one in M1; Codex and ACP agents (M2) implement the same interface.
  */
-import type { Answers, ChatControls, ChatEvent, ChatSettings, ProviderId, Question, Role } from "@featra/work-format";
+import type {
+  Answers,
+  ChatControls,
+  ChatEvent,
+  ChatSettings,
+  ProviderId,
+  Question,
+  Role,
+  TurnOutcome,
+} from "@featra/work-format";
 
 /**
  * A rule the provider suggests for Allow for this chat (ADR 0018): an optional adapter capability. The provider applies
@@ -28,6 +37,8 @@ export interface ToolRequest {
   forChat?: boolean;
   /** The provider's own rule for Allow for this chat on this call, when it has one. */
   suggested?: SuggestedRule;
+  /** The label of the subagent the call is from, when the session's own subagent asks (STORY-55). */
+  subagent?: string;
 }
 
 /** A request the agent is told no to. `interrupt` tells it to stop its turn rather than try another step (Stop, the chat ending). */
@@ -48,6 +59,8 @@ export interface QuestionRequest {
   id: string;
   name: string;
   questions: Question[];
+  /** The label of the subagent that asks, when the session's own subagent does (STORY-55). */
+  subagent?: string;
 }
 
 /** The user's answers, each question answered as it asks; or why the agent is told no (Stop, the chat ending). */
@@ -77,6 +90,21 @@ export interface McpServerSpec {
   env: Record<string, string>;
 }
 
+/**
+ * What a session reports of the subagents it spawns for itself (STORY-55), under an id of the provider's that is
+ * stable for the subagent's life. Provider neutral: each adapter turns its own stream into these, and the session manager
+ * shows each subagent as a read-only transcript nested under the session.
+ */
+export type SubagentEvent =
+  /** A subagent started, or one that ended started again (a resumed task). `stoppable` says `stopSubagent` can end it alone now. */
+  | { type: "started"; id: string; label: string; kind: string | null; stoppable: boolean }
+  /** `stoppable` changed (a foreground subagent moved to the background), or its announcement came after its messages and says what it is. */
+  | { type: "updated"; id: string; stoppable: boolean; label?: string; kind?: string | null }
+  /** One event of the subagent's own transcript. */
+  | { type: "event"; id: string; event: ChatEvent }
+  /** The subagent ended on its own, was stopped, or its agent went away with it. */
+  | { type: "ended"; id: string; outcome: TurnOutcome };
+
 export interface SessionOptions {
   chat: string;
   /** The project folder: the agent's working directory. */
@@ -88,6 +116,8 @@ export interface SessionOptions {
   ask: (request: Omit<QuestionRequest, "chat">, signal: AbortSignal) => Promise<QuestionDecision>;
   /** Hears each event of the agent's stream, in order. */
   emit: (event: ChatEvent) => void;
+  /** Hears the subagents the agent spawns for itself (STORY-55); an adapter without subagents never calls it. */
+  subagent?: (event: SubagentEvent) => void;
   /**
    * The Featra MCP for this session, asked for when the agent starts; null when the project turned it off. The adapter
    * attaches it, and lets the agent call its tools without asking: they only log (ADR 0019).
@@ -131,6 +161,13 @@ export interface ProviderSession {
   configure: (role: Role, settings: ChatSettings) => void;
   /** Ends the running turn; the agent keeps its conversation for the next message. */
   interrupt: () => Promise<void>;
+  /**
+   * Ends one subagent without ending the turn (STORY-55): an optional capability, present only where the provider can
+   * (Claude background subagents). A subagent's `stoppable` is true only while it can be. Its end comes as `ended`.
+   */
+  stopSubagent?: (id: string) => Promise<void>;
+  /** An ended subagent was archived: the adapter forgets it (STORY-55). */
+  forgetSubagent?: (id: string) => void;
   /** Ends the agent. */
   close: () => void;
   /** The provider's session id once the agent reported it, kept to resume the conversation (STORY-44). */

@@ -17,10 +17,10 @@ export function restoreChats(
   for (const dir of dirs) listChanged(dir);
 }
 
-/** What the manager saves: every chat that has started (a queued story session has not). */
+/** What the manager saves: every chat that has started (a queued story session has not), but no subagent (STORY-55). */
 export function chatsToSave(chats: Map<string, Chat>, provider: (id: ProviderId) => ProviderAdapter | undefined) {
   return [...chats.values()]
-    .filter((c) => !c.summary.queued)
+    .filter((c) => !c.summary.queued && !c.summary.subagent)
     .map((c) => savedChat(c.dir, c.session, c.summary, composerOf(c, provider(c.summary.provider)), c.cwd));
 }
 

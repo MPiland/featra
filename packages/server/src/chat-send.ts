@@ -31,6 +31,8 @@ export function createSend({ chat, record, stories, log }: SendHost) {
     /** Sends the user's message, starting the agent first if it isn't running. */
     send(id: string, text: string) {
       const c = chat(id);
+      // A subagent's transcript is read-only (STORY-55).
+      if (c.summary.subagent) throw new ChatError(CHAT_MESSAGES.subagent);
       if (busy(c)) throw new ChatError(CHAT_MESSAGES.busy);
       if (c.events === null) throw new Error("Open the chat before sending to it.");
       const agent = c.agent;

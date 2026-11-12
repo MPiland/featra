@@ -16,6 +16,10 @@
  *   STORY-N"). Writes a small evidence file into the story's folder in its worktree, then calls the Featra MCP's
  *   update_card tool: ticks the drafted task and criterion with that evidence, adds a task, moves the story to In
  *   Review and notes it. The tool call is real; only the agent is faked.
+ * - "subagent" (STORY-55): the agent spawns a background subagent (an Agent call, `task_started`, and the subagent's own
+ *   messages, tagged as the SDK tags them). The subagent says something, then asks to run a Bash `npm test` through
+ *   canUseTool as itself (`agentID`), and when that is answered says more and waits for `stopTask`, which ends it with
+ *   a stopped `task_notification`; the session's turn then finishes.
  * - "slow": starts a reply and waits for interrupt().
  * - with FEATRA_E2E_STORY_TURN=slow, a story session's first message ("You are working on ...") is a slow turn that
  *   thinks first (STORY-53): it shows its thinking, then its reply, and waits for interrupt().
@@ -32,6 +36,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { callMcpTool } from "./fake-mcp-client.mjs";
+import { questionTurn, subagentTurn } from "./fake-agent-turns.mjs";
 import { sessionLog } from "./fake-session-log.mjs";
 
 const MAIN = { parent_tool_use_id: null };
@@ -190,47 +195,8 @@ async function* reportTurn(options, text) {
   yield success("Done.");
 }
 
-const QUESTIONS = [
-  {
-    question: "Which colour do you prefer?",
-    header: "Colour",
-    options: [
-      { label: "Blue", description: "Calm" },
-      { label: "Red", description: "Loud" },
-    ],
-    multiSelect: false,
-  },
-  {
-    question: "Which features?",
-    header: "Features",
-    options: [
-      { label: "Search", description: "Find things" },
-      { label: "Export", description: "Get data out" },
-    ],
-    multiSelect: true,
-  },
-];
-
-/** An AskUserQuestion call, asked through canUseTool as the SDK asks; the tool's result says what the user chose. */
-async function* questionTurn(options, signal) {
-  const id = `toolu_ask_${++seq}`;
-  const input = { questions: QUESTIONS };
-  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "AskUserQuestion", input }]);
-  const decision = await options.canUseTool("AskUserQuestion", input, {
-    signal,
-    toolUseID: id,
-    requestId: `request_${seq}`,
-  });
-  const allowed = decision.behavior === "allow";
-  const given = allowed
-    ? Object.entries(decision.updatedInput.answers)
-        .map(([q, a]) => `"${q}"="${a}"`)
-        .join(", ")
-    : "";
-  yield toolResult(id, allowed ? given : decision.message, !allowed);
-  yield* say(allowed ? `Got: ${given}` : "No answer.");
-  yield success("Done.");
-}
+const nothing = () => {};
+const helpers = { MAIN, assistant, toolResult, say, success, next: () => ++seq, seq: () => seq };
 
 export function query({ prompt, options }) {
   const log = process.env.FEATRA_E2E_AGENT_LOG;
@@ -242,6 +208,8 @@ export function query({ prompt, options }) {
     appendFileSync(log, `${JSON.stringify(seen)}\n`);
   }
   let release = null;
+  let releaseTask = nothing;
+  const taskStopped = new Promise((resolve) => (releaseTask = resolve));
   const stopped = () => new Promise((resolve) => (release = resolve));
   // Aborted on interrupt(), as the SDK aborts a permission request when its turn is interrupted.
   let turn = new AbortController();
@@ -272,6 +240,8 @@ export function query({ prompt, options }) {
         yield* reportTurn(options, text);
       } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {
         yield* slow(["The worktree is clean."], "Starting the story.");
+      } else if (said.includes("subagent")) {
+        yield* subagentTurn(helpers, options, turn.signal, taskStopped);
       } else if (said.includes("decide")) {
         yield* decideTurn(options);
       } else if (said.includes("draft")) {
@@ -279,7 +249,7 @@ export function query({ prompt, options }) {
       } else if (said.includes("tool")) {
         yield* toolTurn(options, turn.signal, said.includes("twice"));
       } else if (said.includes("question")) {
-        yield* questionTurn(options, turn.signal);
+        yield* questionTurn(helpers, options, turn.signal);
       } else if (said.includes("slow")) {
         yield* slow([], "Thinking it over");
       } else {
@@ -298,5 +268,7 @@ export function query({ prompt, options }) {
       turn.abort();
       release?.();
     },
+    // Ends the subagent's task, as the SDK's Query.stopTask does; the subagent turn then reports it stopped.
+    stopTask: async () => releaseTask(),
   });
 }

@@ -215,7 +215,14 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
             project={projects.current}
             platform={bridge.platform}
             onNewChat={() => setDialog("newChat")}
-            chats={<ChatList list={chatList} current={chatId} onOpen={openChat} />}
+            chats={
+              <ChatList
+                list={chatList}
+                current={chatId}
+                onOpen={openChat}
+                onArchive={(id) => void bridge.chats.archive(id)}
+              />
+            }
             counts={{ inbox: inbox.items.length }}
             switcher={<ProjectSwitcher projects={projects} platform={bridge.platform} actions={projectActions} />}
           />

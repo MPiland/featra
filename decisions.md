@@ -1470,3 +1470,66 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 
 - While `chat.start` runs, the picker disables the role buttons and says "Starting…", so a double click makes one chat.
   If the start is refused the roles come back, with the reason.
+
+## 2026-11-11 — STORY-55 build choices (story agent, for the Dev Lead to confirm)
+
+- **A subagent is an in-memory, read-only chat, never saved.** Why: it reuses the chat log, watch and list row, so the
+  sidebar, the transcript and `chat.stop` needed no new protocol; saving one would copy what the provider owns. It is
+  removed when its session ends or its project closes (ADR 0030).
+- **Stop is offered only for a background subagent with a known task.** Why: the SDK's `Query.stopTask(taskId)` ends one
+  task, but a foreground subagent holds its tool call open and ends only with the turn, so a Stop there would stop the
+  session. The row's `stoppable` flips when `task_updated` moves a subagent to the background, and is false once it ends.
+  Evidence for the card: sdk.d.ts `Query.stopTask`, `forwardSubagentText`, `task_started.is_backgrounded` and
+  `canUseTool` options' `agentID`.
+- **Approvals and questions stay in the session's chat, labelled `Asked by the subagent <label>`.** Why: one place to
+  answer, one waiting dot, one Inbox path. The label is on the `approval` and `question` events and rides the Dev Lead's
+  copy of a story session's request unchanged.
+- **Nesting is flat:** a subagent of a subagent sits at the same level under the session (`spawn_depth` and
+  `parent_task_id` are ignored). Why: the sidebar stays one level deeper than a story session, not a tree.
+- **Subagents are not restored after a restart.** Roadmap: restore from `listSubagents` and `getSubagentMessages`.
+- **A resumed subagent with the same task id is ignored after it ends.** Why: the SDK re-registers resumed subagents in the
+  background, and showing a second chat for one task would mislead; rare, so not worth a rule yet. (Corrected below: a
+  `task_started` for a known ended task reopens the same chat.)
+- **The header's model, effort and mode line is hidden for a subagent.** Why: it runs with its session's settings, which
+  the subagent chat cannot change or truthfully report.
+- **Risk: message shapes are unverified against a real `claude`.** The adapter follows the SDK's types and is proved with
+  the fake `query` and the e2e fake SDK (CI), as every other adapter path is (ADR 0013). A first real run may need a fix.
+
+## 2026-11-11 — STORY-55 review rulings (dev-lead and user)
+
+- **Retention (user).** An ended subagent stays nested, marked ended, until its session ends or the project closes. A
+  session keeps at most 20 ended subagents (`MAX_ENDED_SUBAGENTS`), dropping the oldest ended first. Each ended row has
+  Archive (`chat.archive`), which removes it. The adapter prunes its task and call maps and translators on the same
+  rules, and a late message of an archived or dropped subagent makes no chat.
+- **Worktree cleanup (user).** The SDK does not report a subagent's worktree: task messages and the SubagentStart and
+  SubagentStop hook inputs carry no worktree path, and only WorktreeCreate and WorktreeRemove hook inputs mention
+  worktrees, with no subagent isolation field. So Archive removes only the row, and "clean up subagent worktrees" is on
+  the roadmap. Evidence is in the card.
+- **Stop on the session also stops its background subagents (user, finding 8).** Through `stopTask`, before the turn is
+  interrupted; one that refuses is skipped.
+- **Build choice 6 corrected (finding 3, C).** Identity is the task id. A `task_started` for a known ended task reopens the
+  same chat, running and stoppable, with its log; no second chat.
+- **Subagent ends (finding 2).** The session's turn ending ends every non-background subagent still running, with the
+  turn's outcome. `task_updated` with `patch.status` completed, failed or killed ends one (done, failed, stopped). A
+  message of a task that `isSubagentTask` rejected makes no chat.
+- **Finding 4.** The Inbox shows the subagent label for approvals and questions.
+- **Findings 5, 6, 7.** A server test runs the real adapter for AskUserQuestion with an `agentID`. A late `task_started` sets
+  background, kind and label and emits `updated`, and the row is then stoppable. A message naming both task and call
+  aliases the call to the known subagent.
+- **Findings 9, 10.** A quiet agent exit with no open turn ends subagents as stopped, not failed. A Stop that races the
+  subagent's end is rethrown as `noSubagentStop`.
+- **Findings 11 (D), 13, F.** A story session's subagent question still goes to the Dev Lead, with the label in the notice
+  text (`Asked by the subagent <label>: ...`). `chats.controls` is not called for a subagent chat. The copy "Asked by the
+  subagent <label>" stays.
+- **Finding 12.** `canUseTool` moved to `claude-approvals.ts`, the fake SDK's subagent and question turns to
+  `apps/desktop/e2e/fake-agent-turns.mjs`, and the `groupChats` rules to `chat-nest.ts`, so `chat-manager.ts` and
+  `chat-list.ts` are back to about 300 lines.
+- **E (open).** The real claude message shapes are unverified. The user's UAT will include one real foreground and one real
+  background subagent run.
+
+### STORY-55 follow-up build choices (dev-lead confirmed)
+
+- Archive refuses a subagent that is still running; Stop it first.
+- A subagent pushed out by the cap of 20 ended stays gone; a late message from it makes no new chat.
+- A foreground subagent ends with its session's turn; a background one keeps running until it ends, is stopped, or its
+  session is stopped.

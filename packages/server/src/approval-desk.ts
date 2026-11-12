@@ -141,13 +141,21 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         input,
         forChat: covers !== null,
         ...(covers ? { covers } : {}),
+        ...(request.subagent ? { subagent: request.subagent } : {}),
       };
       return hold<ToolDecision>(chat, id, signal, opening, (settle) => ({ kind: "tool", request, offer, settle }));
     },
     ask(request, signal) {
       const { chat, id, name, questions } = request;
       if (signal.aborted) return Promise.resolve(CANCELLED);
-      return hold<QuestionDecision>(chat, id, signal, { type: "question", id, name, questions }, (settle) => ({
+      const opening: ChatEvent = {
+        type: "question",
+        id,
+        name,
+        questions,
+        ...(request.subagent ? { subagent: request.subagent } : {}),
+      };
+      return hold<QuestionDecision>(chat, id, signal, opening, (settle) => ({
         kind: "question",
         request,
         settle,

@@ -71,6 +71,8 @@ export interface ChatManager {
   send: (id: string, text: string) => void;
   /** Interrupts the running turn, if any. */
   stop: (id: string) => Promise<void>;
+  /** Removes an ended subagent from its session's nest (STORY-55); refused for any other chat, or one still running. */
+  archive: (id: string) => void;
   /** The user's answer to a tool request the chat waits on (STORY-45); refused when it isn't waiting. */
   approve: (id: string, tool: string, answer: ApprovalAnswer) => void;
   /** The user's answers to a question the chat waits on (STORY-46); refused when it isn't waiting or isn't answered. */

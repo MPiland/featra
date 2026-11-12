@@ -92,6 +92,10 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   goes on in the same session and clears the mark. A stopped session doesn't count toward the running-sessions cap.
 - **Story session view** — a story's session is read-only: the live transcript (with the agent's thinking, where the
   provider shows it) and no composer.
+- **Subagent** — an agent a session spawns for itself (Claude's Agent tool). It shows as a read-only chat nested under
+  that session, with its live transcript, and exists only while the session does. **Stop** ends just that subagent, only
+  for a Claude background subagent; otherwise no Stop shows. What a subagent asks (a tool approval, a question) is
+  answered in its session's chat, labelled with the subagent. Not a story session: Featra does not run it.
 - **Notice** — a short message Featra writes into the Dev Lead's chat when a story session ends a turn, stops, fails or
   asks a question: written by the app (no model call), labelled as not from the user, and delivered together when the Dev
   Lead is busy. The **Dev Lead of a story** is the chat that spawned it; it answers with `message_session`, which is

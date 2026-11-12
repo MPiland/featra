@@ -33,6 +33,7 @@ import { createInbox } from "./inbox.ts";
 import { createSend } from "./chat-send.ts";
 import { createStoryNotices } from "./story-notices.ts";
 import { createStoryMirror } from "./story-mirror.ts";
+import { createSubagents } from "./chat-subagents.ts";
 
 export { ChatError };
 export type { ChatManager, ChatManagerDeps };
@@ -81,6 +82,7 @@ export function createChatManager({
     record: (c, e) => record(c, e),
     listChanged: (dir) => listChanged(dir),
     asked: (c, request) => notices.asked(c, request),
+    subagent: (c, event) => subagents.handle(c, event),
   });
   const mirror = createStoryMirror(chats, (c, event) => record(c, event, true));
   const provider = (id: ProviderId) => providers.find((p) => p.id === id);
@@ -98,6 +100,7 @@ export function createChatManager({
       .map((c) => c.summary)
       .toSorted(oldestFirst);
 
+  const subagents = createSubagents({ chats, newId, now, listChanged: (dir) => listChanged(dir), log });
   const tell = <T>(listeners: Iterable<(value: T) => void>, value: T) => tellAll(listeners, value, log);
   const lists = createListWatchers(list, same, log);
   const listChanged = (dir: string) => lists.changed(dir);
@@ -173,6 +176,9 @@ export function createChatManager({
 
   /** Ends the chat's agent and forgets its log; the chat itself is kept, to open again. */
   function end(c: Chat) {
+    // A subagent is part of its session: it goes when the session does, or with its project.
+    if (subagents.is(c.id)) return subagents.drop(c);
+    subagents.forget(c);
     c.listeners.clear();
     mirror.clear(c);
     mirror.ended(c);
@@ -273,6 +279,9 @@ export function createChatManager({
     },
     send,
     ...control,
+    // Stop on a subagent ends it alone; on any other chat it ends the turn.
+    stop: (id) => (subagents.is(id) ? subagents.stop(chat(id)) : control.stop(id)),
+    archive: (id) => subagents.archive(chat(id)),
     // A story session's approval shown in its parent chat is answered from there too.
     approve: (id, tool, answer) => desk.answer(mirror.holder(chat(id).id, tool) ?? chat(id).id, tool, answer),
     answer: (id, tool, answers) => desk.reply(chat(id).id, tool, answers),

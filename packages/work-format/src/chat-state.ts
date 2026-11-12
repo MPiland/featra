@@ -21,12 +21,12 @@ export interface ToolResult {
 
 /** Where a tool row's approval stands: waiting on the user, or allowed (by the user, or by an earlier Allow for this chat). */
 export type ToolApproval =
-  | { status: "pending"; forChat: boolean; covers?: string; story?: string }
+  | { status: "pending"; forChat: boolean; covers?: string; story?: string; subagent?: string }
   | { status: "allowed"; scope: AllowScope };
 
 /** Where a question stands: waiting on the user, or answered with what they chose. */
 export type ToolQuestion =
-  | { status: "pending"; questions: Question[] }
+  | { status: "pending"; questions: Question[]; subagent?: string }
   | { status: "answered"; questions: Question[]; answers: Answers };
 
 export type ChatItem =
@@ -176,11 +176,16 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
           forChat: event.forChat,
           ...(event.covers ? { covers: event.covers } : {}),
           ...(event.story ? { story: event.story } : {}),
+          ...(event.subagent ? { subagent: event.subagent } : {}),
         },
       }));
     case "question":
       return upsertTool(state, event.id, event.name, { questions: event.questions }, () => ({
-        question: { status: "pending", questions: event.questions },
+        question: {
+          status: "pending",
+          questions: event.questions,
+          ...(event.subagent ? { subagent: event.subagent } : {}),
+        },
       }));
     case "question-answered":
       return updateTool(state, event.id, (row) =>

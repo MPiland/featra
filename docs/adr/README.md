@@ -61,3 +61,4 @@ What becomes easier or harder, and what we must now do.
 | [0027](0027-agents-report-on-their-card.md)               | Agents report on their card with `update_card`; only Reported         | accepted |
 | [0028](0028-story-agents-report-to-the-dev-lead.md)       | Story agents report to the Dev Lead; it steers with `message_session` | accepted |
 | [0029](0029-featra-plugins.md)                            | Featra plugins: sandboxed UI with a permissioned API                  | proposed |
+| [0030](0030-native-subagents-nested.md)                   | Native subagents are read-only chats nested under their session       | accepted |

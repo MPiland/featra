@@ -62,6 +62,19 @@ export interface ChatSummary {
    * has no composer, so Resume is the way to go on. Absent otherwise, and cleared by the next message.
    */
   stalled?: true;
+  /**
+   * A subagent the chat's session spawned for itself (STORY-55): its transcript is read-only, and the sidebar nests it
+   * under that session. Absent for any other chat. Kept in memory with the session: never saved.
+   */
+  subagent?: SubagentRef;
+}
+
+/** What a subagent's row says of where it came from, and what the user can do to it. */
+export interface SubagentRef {
+  /** The chat of the session that spawned it. */
+  parent: string;
+  /** Stop ends just this subagent: only where the provider can (Claude background subagents); false shows no Stop. */
+  stoppable: boolean;
 }
 
 /** What a story session's row says of the story it works on. */
@@ -232,27 +245,6 @@ export function newSummary(
 /** What a row calls the chat: its title, or the role's name before the first message. */
 export const chatName = (chat: ChatSummary): string => chat.title ?? chat.role.name;
 
-export interface ChatGroup {
-  provider: ProviderInfo;
-  chats: ChatSummary[];
-}
-
-/**
- * The list as the sidebar shows it: one group per installed provider, in the order the server lists them, plus any
- * provider that isn't installed but still has chats (so none go missing). Newest chat first in each group.
- */
-const newestFirst = (a: ChatSummary, b: ChatSummary) =>
-  b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id);
-
-export function groupChats(list: ChatList): ChatGroup[] {
-  return list.providers
-    .map((provider) => ({
-      provider,
-      chats: list.chats.filter((c) => c.provider === provider.id).toSorted(newestFirst),
-    }))
-    .filter((g) => g.provider.installed || g.chats.length > 0);
-}
-
 const str = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 
 /** A chat row read from the socket or a saved file, or null when it isn't one. */
@@ -260,6 +252,7 @@ export function normalizeSummary(raw: unknown): ChatSummary | null {
   if (!isRecord(raw) || !isRecord(raw.role)) return null;
   const { id, provider, title, startedAt, role } = raw;
   const story = normalizeStory(raw.story);
+  const subagent = normalizeSubagent(raw.subagent);
   if (!str(id) || !isOneOf(PROVIDERS, provider) || !str(startedAt)) return null;
   if (title !== null && !str(title)) return null;
   if (!str(role.id) || !str(role.name) || !str(role.model) || !isOneOf(EFFORTS, role.effort)) return null;
@@ -276,7 +269,12 @@ export function normalizeSummary(raw: unknown): ChatSummary | null {
     ...(story ? { story } : {}),
     ...(raw.queued === true ? { queued: true as const } : {}),
     ...(raw.stalled === true ? { stalled: true as const } : {}),
+    ...(subagent ? { subagent } : {}),
   };
+}
+
+function normalizeSubagent(raw: unknown): SubagentRef | null {
+  return isRecord(raw) && str(raw.parent) ? { parent: raw.parent, stoppable: raw.stoppable === true } : null;
 }
 
 function normalizeStory(raw: unknown): StoryRef | null {

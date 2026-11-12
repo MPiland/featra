@@ -8,6 +8,8 @@ epics in `.featra/cards/`.
 
 ## M2 and later
 
+- **Clean up subagent worktrees.** The SDK does not report a subagent's worktree (STORY-55); when it does, Archive removes
+  the worktree if it is clean and keeps it, with a short message, if it has changes.
 - **Featra plugins** (ADR 0029): anyone builds plugins others install. A plugin can add a full pane, a modal, sidebar
   views and actions with its own buttons (for example a UX design pane that annotates image, PDF or Figma mockups and
   sends the notes to the story's agent), through a permissioned Featra API (cards, sessions, project files, Inbox,
@@ -22,6 +24,8 @@ epics in `.featra/cards/`.
   queue was cleared.
   The same goes for story notices held for a busy Dev Lead: they live in memory and are lost across a restart (accepted
   for STORY-54).
+- **Restore subagents after a restart:** a session's subagents live in memory and are gone with the process (STORY-55).
+  The SDK can read them back (`listSubagents`, `getSubagentMessages`), so a restored session could list them again.
 - **Story notices in the Inbox when no Dev Lead is open:** a story whose Dev Lead is gone gets its ended, stopped and
   failed notices shown to the user, as its questions already are.
 - **A per-story notice budget or back-off:** a Dev Lead and a story session can message each other without limit

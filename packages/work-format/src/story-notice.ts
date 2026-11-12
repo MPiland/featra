@@ -132,8 +132,15 @@ export const questionSummary = (questions: readonly Question[]): string =>
     .join("; ");
 
 /** Every question a turn asked, as the one bounded line of an "asks" notice. */
-export const askedSummary = (asked: readonly (readonly Question[])[]): string =>
-  oneLine(asked.map(questionSummary).join(" | "), ASKS_SUMMARY_MAX);
+export const askedSummary = (
+  asked: readonly (readonly Question[])[],
+  /** The subagent that asked each one, when one did (STORY-55): the line says so. */
+  by: readonly (string | undefined)[] = [],
+): string =>
+  oneLine(
+    asked.map((qs, i) => (by[i] ? `Asked by the subagent ${by[i]}: ` : "") + questionSummary(qs)).join(" | "),
+    ASKS_SUMMARY_MAX,
+  );
 
 /** What a story session hears when the user answered the question that went to a Dev Lead that was gone. */
 export function userAnswerMessage(answers: Answers): string {

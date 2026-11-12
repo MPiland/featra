@@ -158,6 +158,15 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       calls.push(`chat.stop:${id}`);
       return host.stopError ?? null;
     },
+    // The server removes an ended subagent's row.
+    archive: async (id) => {
+      calls.push(`chat.archive:${id}`);
+      const row = rows.get(id);
+      if (!row?.summary.subagent || row.summary.running) return "A subagent still running can't be archived.";
+      rows.delete(id);
+      act(() => listChanged(row.dir));
+      return null;
+    },
     // The answer is recorded; what the server then tells the chat, the test emits as the agent would go on.
     approve: async (id, tool, answer: ApprovalAnswer) => {
       calls.push(`chat.approve:${id}:${tool}:${answer.choice}${answer.reason ? `:${answer.reason}` : ""}`);
@@ -235,6 +244,29 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       }
       act(() => listChanged(dir));
       return { chat: id, queued };
+    },
+    /** The server lists a subagent the session `parent` spawned: a running, read-only chat nested under it (STORY-55). */
+    addSubagent: (parent: string, label: string, stoppable: boolean) => {
+      const under = rows.get(parent);
+      if (!under) throw new Error("No session.");
+      const id = `subagent-${logs.size + 1}`;
+      logs.set(id, []);
+      const role = { ...under.summary.role, id: "subagent", name: "Subagent" };
+      const row = newSummary(id, under.summary.provider, role, now());
+      rows.set(id, {
+        dir: under.dir,
+        summary: { ...row, title: label, running: true, subagent: { parent, stoppable } },
+        asks: [],
+      });
+      act(() => listChanged(under.dir));
+      return id;
+    },
+    /** The subagent ends: its row stops running and loses Stop. */
+    endSubagent: (id: string) => {
+      const row = rows.get(id);
+      if (!row?.summary.subagent) return;
+      row.summary = { ...row.summary, running: false, subagent: { ...row.summary.subagent, stoppable: false } };
+      act(() => listChanged(row.dir));
     },
     /** What the server's row says of a story session's turn: the rules for Resume read it. */
     storyTurn: (dir: string, story: string) => {

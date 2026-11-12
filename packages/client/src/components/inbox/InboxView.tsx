@@ -1,5 +1,6 @@
 import type { InboxItem } from "@featra/work-format/inbox";
 import type { ChatBridge } from "../../chats.ts";
+import { CHAT_COPY } from "../../chats.ts";
 import { INBOX_COPY } from "../../inbox.ts";
 import type { ProjectRef } from "../../projects.ts";
 import { ApprovalPrompt } from "../chat/ApprovalPrompt.tsx";
@@ -28,10 +29,17 @@ function Request({ item, chats }: { item: InboxItem; chats: Answering }) {
       input={request.input}
       forChat={request.forChat}
       covers={request.covers ?? null}
+      subagent={request.subagent ?? null}
       onAnswer={(answer) => chats.approve(item.chat, request.id, answer)}
     />
   ) : (
-    <QuestionForm questions={request.questions} onAnswer={(answers) => chats.answer(item.chat, request.id, answers)} />
+    <>
+      {request.subagent && <p className="meta">{CHAT_COPY.askedBySubagent(request.subagent)}</p>}
+      <QuestionForm
+        questions={request.questions}
+        onAnswer={(answers) => chats.answer(item.chat, request.id, answers)}
+      />
+    </>
   );
 }
 
