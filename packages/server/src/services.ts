@@ -160,7 +160,7 @@ export function createServices({
     merging,
     ...(interruptMs ? { interruptMs } : {}),
   });
-  const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats });
+  const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats, merging });
   const merges = createStoryMerge({
     scan: watches.scan,
     now,

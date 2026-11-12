@@ -49,7 +49,8 @@ const cardMessage = (id: string, into: string) => `${id}: merged into ${into}`;
 export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write = writeAtomic }: MergeSettleDeps) {
   /**
    * Commits the merged card onto the local feature branch, on top of the feature branch as GitHub has it now (which
-   * has the PR's merge commit). How far ahead of GitHub that leaves it, else why not; nothing changes then.
+   * has the PR's merge commit). How far ahead of GitHub that leaves it (null when git couldn't count), else why not;
+   * nothing changes then.
    */
   async function cardOnFeature(top: string, remote: string, into: string, path: string, text: string, id: string) {
     const remoteTip = await git.fetchTip(top, remote, into);
@@ -63,7 +64,8 @@ export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write 
     const made = await git.mergeCommit(top, { parents, path, text, message: cardMessage(id, into) });
     if ("conflicts" in made || !(await git.publish(top, into, made.commit, local))) return SETTLE_NOTES.feature(into);
     const ahead = await git.git(top, ["rev-list", "--count", `${remoteTip}..${made.commit}`]);
-    return { ahead: Number(ahead.stdout.trim()) || 1 };
+    const commits = Number(ahead.stdout.trim());
+    return { ahead: ahead.code === 0 && commits > 0 ? commits : null };
   }
 
   /**
@@ -85,16 +87,16 @@ export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write 
         // The card is written only once the feature branch has it: until then the story reads as not merged yet.
         const made = await cardOnFeature(top, remote.name, into, path, text, id);
         if (typeof made === "string") return { remains: [made] };
-        remains.push(SETTLE_NOTES.ahead(into, made.ahead));
+        if (made.ahead !== null) remains.push(SETTLE_NOTES.ahead(into, made.ahead));
       }
       await write(fileIn(found.root, path), text);
       const removed = await git.removeStory(top, found.root, path, owner.branch, into);
       remains.push(...removed.remains);
       if (removed.removed && remote) {
-        const note = await git.deleteRemote(top, remote.name, owner.branch);
+        const note = await git.deleteRemote(top, remote.name, owner.branch, into);
         if (note !== null) remains.push(note);
       } else if (removed.removed) {
-        remains.push(...(await git.deleteFromRemotes(top, owner.branch)));
+        remains.push(...(await git.deleteFromRemotes(top, owner.branch, into)));
       }
       await scanDir(dir);
       return { remains };

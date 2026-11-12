@@ -7,7 +7,8 @@ import { isOneOf } from "./utils/guards.ts";
  * - `verified` / `unverified`: the PR's required CI checks passed / stopped passing (e.g. a new push)
  * - `proven:<n>` / `unproven:<n>`: AC number n (1-based) had its linked test pass / fail
  * - `checked:<commit>`: the commit the latest verdict was for, recorded when it changes (STORY-12), so a merge after a
- *   restart knows whether Verified is for the branch's current head
+ *   restart knows whether Verified is for the branch's current head; `checked:` alone when a verdict's commit wasn't
+ *   known, so an older commit never stands beside a newer verdict
  * Acceptance uses field `accepted` with `accepted` / `withdrawn`.
  */
 export const VERIFIED = "verified";

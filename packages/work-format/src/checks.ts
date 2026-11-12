@@ -79,8 +79,9 @@ export function withCheckEvidence(card: Card, config: ProjectConfig, outcome: Ch
   const before = evidenceState(card);
   let next = card;
   // The commit first, so the verdict stays the run's last word on the card.
-  if (outcome.passed !== null && outcome.head && outcome.head !== before.checkedHead) {
-    next = recordEvidence(next, checkedEvent(outcome.head), by, at);
+  // A verdict whose commit isn't known clears the one before: Verified is then for no known commit.
+  if (outcome.passed !== null && (outcome.head || null) !== before.checkedHead) {
+    next = recordEvidence(next, checkedEvent(outcome.head ?? ""), by, at);
   }
   if (outcome.passed === true && !before.verified) next = recordEvidence(next, VERIFIED, by, at);
   if (outcome.passed === false && before.verified) next = recordEvidence(next, UNVERIFIED, by, at);

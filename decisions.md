@@ -1806,3 +1806,15 @@ ADR 0033 (proposed) records the design. Choices to confirm:
   - The remains say how far the local feature branch is ahead of GitHub.
   - `featureBranchOf` is the one feature-branch lookup.
   - chat-manager.ts is under 300 lines (`chat-approvals.ts`).
+
+## 2026-11-12 — STORY-12 review fixes, round 2
+
+- **A remote branch is deleted only when merged.** A local merge deletes the story's remote branch only when its tip
+  (from `ls-remote`) is in the feature branch's history, with `--force-with-lease` at that tip. Otherwise it stays and
+  the remains say it has commits that aren't merged.
+- **Every send to a merging story is refused.** A message typed in the story's chat (`chat.send`) and Send back refuse
+  with the busy sentence while it merges, as `message_session` and Resume already did.
+- **A verdict with no known commit clears the old one.** It records a bare `checked:`, so Merge after a restart needs a
+  new run. ADR 0004 lists `checked:<commit>`; ADR 0034 says the stored commit has the same trust as `verified`.
+- **The ahead note is said only when counted.** A failed `rev-list --count` leaves the note out instead of guessing.
+- Tested: GitHub saying it conflicts while git finds no files is an error and moves nothing.

@@ -202,4 +202,14 @@ describe("the commit Verified is for (review fix: a merge after a restart)", () 
     expect(ran(first, null, "bbb222", 6)).toBe(first);
     expect(evidenceState(inReview()).checkedHead).toBeNull();
   });
+
+  it("is cleared by a verdict whose commit isn't known, so an older commit never stands beside it", () => {
+    const first = ran(inReview(), true, "aaa111", 5);
+    const unknown = ran(first, true, undefined, 6);
+    expect(unknown.history.at(-1)).toMatchObject({ field: "evidence", to: "checked:", by: "system" });
+    expect(evidenceState(unknown)).toMatchObject({ verified: true, checkedHead: null });
+    expect(evidenceState(parseCard(serializeCard(unknown))).checkedHead).toBeNull();
+    expect(ran(unknown, true, undefined, 7)).toBe(unknown);
+    expect(ran(inReview(), true, undefined, 5).history.some((e) => e.to === "checked:")).toBe(false);
+  });
 });

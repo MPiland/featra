@@ -28,7 +28,9 @@ on its own. The card is owned by its worktree while the worktree exists (ADR 000
 - **The checked commit is on the card.** Each time the checks settle on a new commit, the card's evidence records
   `checked:<commit>` by `system` (ADR 0004's history, next to `verified`). The checks' own memory comes first; after a
   restart, the card's commit stands in for it. Merge works when the tip is that commit and refuses otherwise. A commit
-  Featra only saw on start is never taken as checked.
+  Featra only saw on start is never taken as checked. A verdict with no known commit records a bare `checked:`, so
+  an older commit never stands beside a newer verdict. The stored commit has the same trust as `verified`: both are
+  card history written by `system`, and Merge takes the card's word for them.
 - **Nothing is lost.** The story's worktree must have no uncommitted changes except its own card, and its session must
   not be running or queued. Both refuse with one sentence naming the problem. While a story merges, a message to its
   session and Resume are refused, so no turn starts mid-merge. Once the session has ended, the worktree is checked
@@ -46,7 +48,8 @@ on its own. The card is owned by its worktree while the worktree exists (ADR 000
     it is a commit on the local feature branch, on top of GitHub's merge, and it is not pushed.
   - The worktree, the local branch and the remote branch are removed. The remote branch goes with
     `git push --delete`, not `gh --delete-branch`, which also changes local checkouts. In local mode it is deleted from
-    each remote that has it; one that can't be reached is listed.
+    each remote that has it, only when the feature branch has its tip, and with `--force-with-lease` at that tip. One
+    with commits the feature doesn't have stays and is listed, and so is one that can't be reached.
   - Anything that can't be removed is listed in one line, and so is how far the local feature branch is ahead of
     GitHub after a GitHub merge.
   - If the feature branch can't take the card commit, nothing changes: the worktree's card isn't written as merged, so

@@ -55,7 +55,7 @@ export interface ApiDeps {
   stops: StoryStop;
   acceptance: StoryAcceptance;
   /** Merges stories into their features (STORY-12). Without it `story.merge` is refused. */
-  merges?: Pick<StoryMerge, "merge">;
+  merges?: Pick<StoryMerge, "merge" | "isMerging">;
   checks: StoryChecks;
   checkSettings: CheckSettings;
   prs: Pick<StoryPrs, "prState" | "decorate" | "createPr" | "focus">;
@@ -122,7 +122,7 @@ export function createApi({
     allow(p.dir);
     return p;
   };
-  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project });
+  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, merging: merges?.isMerging });
 
   const answer: Api = async (method, params, id, connection) => {
     switch (method) {

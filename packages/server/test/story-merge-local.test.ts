@@ -9,11 +9,13 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { isMerged, MERGE_MESSAGES, parseCard, stoppedStory } from "@featra/work-format";
 import { runGit } from "../src/git-run.ts";
+import { createChatApi } from "../src/api-chat.ts";
 import { REMOVE_NOTES } from "../src/merge-git.ts";
+import { createStoryAcceptance } from "../src/story-acceptance.ts";
 import { createStoryMessage } from "../src/story-message.ts";
 import { createStoryStop } from "../src/story-stop.ts";
 import { cardPath } from "./card-repo.ts";
-import { FEATURE_BRANCH, LEAD, mergeWorld, STORY_BRANCH } from "./story-merge-world.ts";
+import { FEATURE_BRANCH, LEAD, mergeWorld, SESSION, STORY_BRANCH } from "./story-merge-world.ts";
 
 const m = mergeWorld();
 const { w } = m;
@@ -38,6 +40,35 @@ describe("a turn that runs mid-merge (review fix)", { timeout: 60_000 }, () => {
       await messages.send(w.repo.main, { story: "STORY-1", text: "One more thing." }, LEAD).catch(said);
       await w.repo.write(w.tree, stoppedStory(await w.read(), "user", w.clock.now().toISOString()));
       await stops.resume(w.repo.main, "STORY-1").catch(said);
+    };
+    await expect(merge()).resolves.toEqual({ remains: [] });
+    expect(refusals).toEqual([MERGE_MESSAGES.busy("STORY-1"), MERGE_MESSAGES.busy("STORY-1")]);
+    expect(m.sent).toEqual([]);
+  });
+
+  it("can't start: the user's message in the story's chat and Send back are refused too", async () => {
+    await local();
+    await m.verified("Acceptance");
+    const chat = createChatApi({
+      chats: { ...m.chats, info: () => ({ storyId: "STORY-1" }), dirOf: () => w.repo.main } as never,
+      roles: {} as never,
+      allowed: {} as never,
+      agents: {} as never,
+      allow: (dir: string) => dir,
+      project: () => w.repo.main,
+      merging: m.merges.isMerging,
+    });
+    const acceptance = createStoryAcceptance({
+      scan: w.watches.scan,
+      now: w.clock.now,
+      chats: m.chats,
+      merging: m.merges.isMerging,
+    });
+    const refusals: string[] = [];
+    const said = (err: unknown) => void refusals.push(err instanceof Error ? err.message : String(err));
+    m.onRetire = async () => {
+      await chat("chat.send", { id: SESSION, text: "One more thing." }, 1, {} as never).catch(said);
+      await acceptance.sendBack(w.repo.main, "STORY-1", "Not yet.", false).catch(said);
     };
     await expect(merge()).resolves.toEqual({ remains: [] });
     expect(refusals).toEqual([MERGE_MESSAGES.busy("STORY-1"), MERGE_MESSAGES.busy("STORY-1")]);
@@ -147,6 +178,15 @@ describe("what goes after a local merge (review fixes)", { timeout: 60_000 }, ()
     expect(w.remoteBranches()).toContain(STORY_BRANCH);
     await expect(merge()).resolves.toEqual({ remains: [] });
     expect(w.remoteBranches()).not.toContain(STORY_BRANCH);
+  });
+
+  it("keeps a remote branch with commits the feature doesn't have, and says so", async () => {
+    await m.start({ remote: true, noGh: true });
+    await m.verified();
+    const extra = w.repo.git(w.tree, "commit-tree", "HEAD^{tree}", "-p", "HEAD", "-m", "pushed elsewhere").trim();
+    w.repo.git(w.tree, "push", "-q", "origin", `${extra}:refs/heads/${STORY_BRANCH}`);
+    await expect(merge()).resolves.toEqual({ remains: [REMOVE_NOTES.unmerged(STORY_BRANCH)] });
+    expect(w.repo.git(w.remote, "rev-parse", `refs/heads/${STORY_BRANCH}`).trim()).toBe(extra);
   });
 
   it("says the remote branch is still there when its remote can't be reached", async () => {

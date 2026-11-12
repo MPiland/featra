@@ -8,6 +8,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { evidenceState, isMerged, MERGE_MESSAGES, parseCard } from "@featra/work-format";
+import { runGit } from "../src/git-run.ts";
 import { REMOVE_NOTES } from "../src/merge-git.ts";
 import { SETTLE_NOTES } from "../src/merge-settle.ts";
 import { cardPath } from "./card-repo.ts";
@@ -222,5 +223,30 @@ describe("GitHub refusing the merge for another reason (review fix)", { timeout:
     expect(isMerged(card)).toBe(false);
     expect(m.sent).toEqual([]);
     expect(m.treeExists()).toBe(true);
+  });
+
+  it("is an error when GitHub says it conflicts but git finds no files: nothing moves", async () => {
+    const why = "X Pull request acme/app#1 is not mergeable: the merge commit cannot be cleanly created.";
+    await m.start({ gh: { mergeFails: why } });
+    await m.verified();
+    await expect(m.merges.merge(w.repo.main, "STORY-1")).rejects.toThrow(MERGE_MESSAGES.conflictUnknown("STORY-1"));
+    const card = await w.read();
+    expect(card.status).toBe("In Review");
+    expect(isMerged(card)).toBe(false);
+    expect(m.sent).toEqual([]);
+    expect(m.treeExists()).toBe(true);
+  });
+});
+
+describe("a local feature branch git can't count (review fix)", { timeout: 60_000 }, () => {
+  it("merges without guessing how far ahead it is", async () => {
+    await m.start();
+    await m.verified();
+    m.gitRun = async (command, root, args, options) =>
+      args[0] === "rev-list" && args[1] === "--count"
+        ? { code: 128, stdout: "", stderr: "fatal: bad revision\n" }
+        : runGit(command, root, args, options);
+    await expect(m.merges.merge(w.repo.main, "STORY-1")).resolves.toEqual({ remains: [] });
+    expectSettled();
   });
 });

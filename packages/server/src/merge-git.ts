@@ -34,6 +34,7 @@ export const REMOVE_NOTES = {
   folder: (path: string) => `The worktree ${path} is still there.`,
   branch: (branch: string) => `The branch ${branch} is still there.`,
   remote: (branch: string) => `The remote branch ${branch} is still there.`,
+  unmerged: (branch: string) => `The remote branch ${branch} has commits that aren't merged, so it's still there.`,
   kept: (path: string) => `The worktree ${path} has uncommitted changes, so it's still there.`,
 } as const;
 
@@ -169,28 +170,42 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
     return { remains, removed: true };
   }
 
-  /** Deletes `branch` on `remote`; one already gone counts as deleted. Null once gone, else what to tell the user. */
-  async function deleteRemote(top: string, remote: string, branch: string): Promise<string | null> {
-    const r = await git(top, ["push", remote, "--delete", branch]);
-    if (r.code === 0 || /remote ref does not exist/i.test(r.stderr)) return null;
-    return REMOVE_NOTES.remote(branch);
+  /** The commit `branch` is at on `remote`: null when it has no such branch, undefined when it can't be reached. */
+  async function remoteTip(top: string, remote: string, branch: string): Promise<string | null | undefined> {
+    const ref = `refs/heads/${branch}`;
+    const r = await git(top, ["ls-remote", "--heads", remote, ref]);
+    if (r.code !== 0) return undefined;
+    const line = r.stdout.split(/\r?\n/).find((l) => l.endsWith(`\t${ref}`));
+    return line ? (line.split("\t")[0] ?? null) : null;
   }
 
   /**
-   * Deletes `branch` from every remote that has it, after a merge made without GitHub. A remote that can't be
-   * reached, but whose copy Featra fetched before, is said; one that doesn't have it is left alone.
+   * Deletes `branch` on `remote` when everything on it is merged into `into`, and only at the commit read (a lease), so
+   * a push that lands meanwhile is never deleted. Null once gone (one already gone counts), else what to tell the user.
    */
-  async function deleteFromRemotes(top: string, branch: string): Promise<string[]> {
+  async function deleteRemote(top: string, remote: string, branch: string, into: string): Promise<string | null> {
+    const tip = await remoteTip(top, remote, branch);
+    if (tip === null) return null;
+    if (tip === undefined) return REMOVE_NOTES.remote(branch);
+    if (!(await isAncestor(top, tip, `refs/heads/${into}`))) return REMOVE_NOTES.unmerged(branch);
+    const r = await git(top, ["push", `--force-with-lease=refs/heads/${branch}:${tip}`, remote, "--delete", branch]);
+    return r.code === 0 ? null : REMOVE_NOTES.remote(branch);
+  }
+
+  /**
+   * Deletes `branch` from every remote that has it, after a merge made without GitHub, as `deleteRemote` does. A
+   * remote that can't be reached, but whose copy Featra fetched before, is said; one that doesn't have it is left alone.
+   */
+  async function deleteFromRemotes(top: string, branch: string, into: string): Promise<string[]> {
     const remains = new Set<string>();
     const remotes = (await git(top, ["remote"])).stdout.split(/\r?\n/).filter(Boolean);
     for (const remote of remotes) {
-      const listed = await git(top, ["ls-remote", "--heads", remote, `refs/heads/${branch}`]);
-      if (listed.code !== 0) {
-        if (await commitOf(top, `refs/remotes/${remote}/${branch}`)) remains.add(REMOVE_NOTES.remote(branch));
-        continue;
+      const tip = await remoteTip(top, remote, branch);
+      if (tip === undefined && (await commitOf(top, `refs/remotes/${remote}/${branch}`))) {
+        remains.add(REMOVE_NOTES.remote(branch));
       }
-      if (listed.stdout.trim() === "") continue;
-      const note = await deleteRemote(top, remote, branch);
+      if (!tip) continue;
+      const note = await deleteRemote(top, remote, branch, into);
       if (note !== null) remains.add(note);
     }
     return [...remains];
