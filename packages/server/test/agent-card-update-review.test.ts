@@ -26,7 +26,7 @@ const link = (session: Client, path: string) => update(session, { criteria: [{ c
 const refusal = (frame: { ok?: boolean; error?: string }) => (frame.ok === true ? null : String(frame.error));
 
 beforeAll(async () => {
-  w = await storyWorld({ drafted: true, config: "maxStoryAgents: 10\n" });
+  w = await storyWorld({ drafted: true, config: "maxStoryAgents: 10\n", watched: true });
   lead = await w.agentOf(w.drafter);
 }, 60_000);
 afterAll(() => w.close());

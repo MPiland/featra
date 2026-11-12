@@ -89,6 +89,7 @@ export const CHAT_COPY = {
   watchingSubagent: "Watching a subagent.",
   roles: "Roles",
   noRoles: "No roles to start from.",
+  starting: "Starting…",
   ask: "Ask",
   composer: "Message",
   placeholder: "Message the agent",
