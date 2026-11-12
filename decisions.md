@@ -1526,3 +1526,10 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   `chat-list.ts` are back to about 300 lines.
 - **E (open).** The real claude message shapes are unverified. The user's UAT will include one real foreground and one real
   background subagent run.
+
+### STORY-55 follow-up build choices (dev-lead confirmed)
+
+- Archive refuses a subagent that is still running; Stop it first.
+- A subagent pushed out by the cap of 20 ended stays gone; a late message from it makes no new chat.
+- A foreground subagent ends with its session's turn; a background one keeps running until it ends, is stopped, or its
+  session is stopped.
