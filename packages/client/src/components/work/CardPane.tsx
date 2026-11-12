@@ -6,6 +6,7 @@ import { CloseIcon } from "../icons.tsx";
 import { DraftReview } from "./DraftReview.tsx";
 import { SendBack } from "./SendBack.tsx";
 import { StartFeature } from "./StartFeature.tsx";
+import { AcceptStory } from "./AcceptStory.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
@@ -143,6 +144,18 @@ export function CardPane({
           {view.type === "story" && (
             <div className="draft-actions">
               <StoryAgent id={id} />
+            </div>
+          )}
+          {view.awaiting && !readOnly && (
+            <div className="draft-actions">
+              <AcceptStory
+                key={`accept-${id}`}
+                id={id}
+                actions={{
+                  accept: (story) => work.acceptStory(dir, story),
+                  sendBack: (story, reason, addCriterion) => work.sendBackStory(dir, story, reason, addCriterion),
+                }}
+              />
             </div>
           )}
           {view.startable && (

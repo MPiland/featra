@@ -37,6 +37,10 @@ export interface CardBridge {
   start: (dir: string, id: string) => Promise<ReviewResult>;
   /** Starts a story's agent in its own worktree; it is queued when the project is at its limit of story agents (STORY-9). */
   startStory: (dir: string, id: string) => Promise<StartStoryResult>;
+  /** Accepts a story waiting in Acceptance: Accepted in its history, and Done when its evidence allows (STORY-23). */
+  acceptStory: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Sends a story in Acceptance back to its session with the reason, optionally as a new criterion (STORY-23). */
+  sendBackStory: (dir: string, id: string, reason: string, addCriterion: boolean) => Promise<SendBackResult>;
   /** Stops the story's running turn and marks it Stopped; its stage and worktree stay (STORY-53). */
   stopStory: (dir: string, id: string) => Promise<ReviewResult>;
   /** Goes on in the stopped story's session, and clears Stopped (STORY-53). */
@@ -51,6 +55,15 @@ export type ReviewResult = { ok: true } | { ok: false; error: string };
 
 /** Why a send-back didn't go, or that it did; `recorded` is false when the chat has it but history doesn't. */
 export type SendBackResult = { ok: true; recorded: boolean } | { ok: false; error: string };
+
+/** What Accept and Send back call: the story's id. */
+export interface AcceptActions {
+  accept: (id: string) => Promise<ReviewResult>;
+  sendBack: (id: string, reason: string, addCriterion: boolean) => Promise<SendBackResult>;
+}
+
+const sent = (r: unknown): SendBackResult => ({ ok: true, recorded: !(isRecord(r) && r.recorded === false) });
+const refused = (err: unknown): SendBackResult => ({ ok: false, error: errorMessage(err) });
 
 export const CARD_COPY = {
   close: "Close card",
@@ -75,6 +88,10 @@ export const CARD_COPY = {
   sendBackHint: "What should change?",
   sendBackSend: "Send",
   sendBackCancel: "Cancel",
+  sendBackCriterion: "Add as acceptance criterion",
+  accept: "Accept",
+  acceptOf: (id: string) => `Accept ${id}`,
+  sendBackOf: (id: string) => `Send back ${id}`,
   sendBackGone: "Its chat is gone.",
   sendBackUnrecorded: "Sent. Couldn't record it in history.",
   approve: "Approve",
@@ -123,11 +140,10 @@ export function serverCards(server: ServerClient): CardBridge {
         error: errorMessage(err),
         view: null,
       })),
-    sendBack: (dir, id, reason) =>
-      server.call("draft.sendBack", { dir, id, reason }).then(
-        (r): SendBackResult => ({ ok: true, recorded: !(isRecord(r) && r.recorded === false) }),
-        (err: unknown): SendBackResult => ({ ok: false, error: errorMessage(err) }),
-      ),
+    sendBack: (dir, id, reason) => server.call("draft.sendBack", { dir, id, reason }).then(sent, refused),
+    acceptStory: (dir, id) => review(server.call("story.accept", { dir, id })),
+    sendBackStory: (dir, id, reason, addCriterion) =>
+      server.call("story.sendBack", { dir, id, reason, addCriterion }).then(sent, refused),
     approve: (dir, id) => review(server.call("draft.approve", { dir, id })),
     reject: (dir, id) => review(server.call("draft.reject", { dir, id })),
     start: (dir, id) => review(server.call("feature.start", { dir, id })),
@@ -153,6 +169,8 @@ export function noCards(error: string): CardBridge {
     },
     updateCard: async () => ({ ok: false, error, view: null }),
     sendBack: async () => ({ ok: false, error }),
+    acceptStory: async () => ({ ok: false, error }),
+    sendBackStory: async () => ({ ok: false, error }),
     approve: async () => ({ ok: false, error }),
     reject: async () => ({ ok: false, error }),
     start: async () => ({ ok: false, error }),

@@ -41,11 +41,19 @@ export function recordSentBack(card: Card, reason: string, by: string, at: strin
   return change(card, "sent-back", null, reason.trim(), by, at);
 }
 
-/** What the drafting chat is told when its draft is sent back: short, and naming the feature it refers to. */
 /** The longest reason a send-back takes, in characters. */
 export const SEND_BACK_MAX = 2000;
 
-export const sendBackMessage = (feature: string, reason: string): string => `Sent back ${feature}: ${reason.trim()}`;
+/** What a send-back refuses with, for a draft and for a story alike (STORY-50, STORY-23). */
+export const SEND_BACK_REFUSALS = {
+  noReason: "Say why you're sending it back.",
+  tooLong: `Keep it under ${SEND_BACK_MAX.toLocaleString("en-US")} characters.`,
+  gone: "That card is gone.",
+  readOnly: "Can't edit it here.",
+} as const;
+
+/** What the chat is told when a draft feature or a story is sent back: short, and naming the card it refers to. */
+export const sendBackMessage = (card: string, reason: string): string => `Sent back ${card}: ${reason.trim()}`;
 
 const ms = (iso: string) => Date.parse(iso);
 

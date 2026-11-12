@@ -2,12 +2,13 @@
  * Builds the Work list from the owner copies: epics, their features, the features' stories, and the counts. Every
  * count comes from the rollups (ADR 0003) at the moment the list is built; nothing here is stored.
  */
+import { awaitingAcceptance } from "./acceptance.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { evidenceState } from "./evidence.ts";
 import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";
-import type { Resolution } from "./owner-copies.ts";
+import type { OwnedCard, Resolution } from "./owner-copies.ts";
 import { epicProgress, featureProgress, itemsOf, progressLabel, scopeSummary } from "./rollup.ts";
 import { stoppedIn } from "./story-stop.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
@@ -75,7 +76,12 @@ const ticked = (items: readonly { done: boolean }[]) => ({
   total: items.length,
 });
 
-function storyRow(card: Card, added: ReadonlySet<string>, config: ProjectConfig): StoryRow {
+function storyRow(
+  card: Card,
+  added: ReadonlySet<string>,
+  config: ProjectConfig,
+  editable: ReadonlySet<string>,
+): StoryRow {
   const tone = stageTone(card.status, config);
   return {
     id: card.id,
@@ -92,13 +98,20 @@ function storyRow(card: Card, added: ReadonlySet<string>, config: ProjectConfig)
     session: card.sessions.at(-1) ?? null,
     ...(evidenceState(card).reported ? { reported: true as const } : {}),
     stopped: stoppedIn(card, tone),
+    awaiting: editable.has(card.id) && awaitingAcceptance(card, config),
   };
 }
 
-function featureRow(feature: Card | null, stories: Card[], cards: readonly Card[], config: ProjectConfig): FeatureRow {
+function featureRow(
+  feature: Card | null,
+  stories: Card[],
+  cards: readonly Card[],
+  config: ProjectConfig,
+  editable: ReadonlySet<string>,
+): FeatureRow {
   const scope = feature ? scopeSummary(feature.id, cards, config) : null;
   const added = new Set(scope?.added.map((a) => a.id));
-  const rows = stories.toSorted(byOrder).map((s) => storyRow(s, added, config));
+  const rows = stories.toSorted(byOrder).map((s) => storyRow(s, added, config, editable));
   const counted = feature ? itemsOf(feature.id, cards) : stories.filter((s) => s.status !== CANCELLED);
   const tones = counted.map((s) => stageTone(s.status, config));
   const done = tones.filter((t) => t === "done").length;
@@ -139,7 +152,13 @@ export function copyKey(location: OwnerLocation, path: string): string {
   }
 }
 
-export function buildWorkList(resolution: Resolution, config: ProjectConfig): WorkList {
+export function buildWorkList(
+  resolution: Resolution,
+  config: ProjectConfig,
+  /** Whether the card can be edited where it is: Accept and Send back show only then, as in the card pane. */
+  canEdit: (owned: OwnedCard) => boolean = () => true,
+): WorkList {
+  const editable = new Set(resolution.cards.filter(canEdit).map((o) => o.card.id));
   const cards = resolution.cards.map((c) => c.card);
   const epics = cards.filter((c) => c.type === "epic").toSorted(byOrder);
   const features = cards.filter((c) => c.type === "feature").toSorted(byOrder);
@@ -152,6 +171,7 @@ export function buildWorkList(resolution: Resolution, config: ProjectConfig): Wo
       items.filter((s) => s.parent === f.id),
       cards,
       config,
+      editable,
     );
 
   const rows: EpicRow[] = epics.map((e) => {
@@ -167,7 +187,7 @@ export function buildWorkList(resolution: Resolution, config: ProjectConfig): Wo
 
   const loose = features.filter((f) => !f.parent || !epicIds.has(f.parent)).map(rowOf);
   const orphans = items.filter((s) => !s.parent || !featureIds.has(s.parent));
-  if (orphans.length) loose.push(featureRow(null, orphans, cards, config));
+  if (orphans.length) loose.push(featureRow(null, orphans, cards, config, editable));
   if (loose.length) {
     const tones = loose.filter((f) => f.id !== null && f.status !== "cancelled").map((f) => f.tone);
     const done = tones.filter((t) => t === "done").length;

@@ -93,6 +93,20 @@ export interface ServerMethods {
    * session goes on and Stopped is cleared. Refused when its provider can't resume.
    */
   "story.resume": { params: { dir: string; id: string }; result: null };
+  /**
+   * Accepts a story waiting in Acceptance (STORY-23): records Accepted in its history, by the user, and moves it to Done
+   * when its evidence allows. Refused when the story isn't waiting in Acceptance or is already accepted.
+   */
+  "story.accept": { params: { dir: string; id: string }; result: null };
+  /**
+   * Sends a story in Acceptance back to its session with the user's reason, as the user's message (STORY-23): logged in
+   * history, the story In Progress again, and with `addCriterion` the reason a new acceptance criterion. Refused
+   * without a reason, when the story isn't waiting in Acceptance, or when its session is gone.
+   */
+  "story.sendBack": {
+    params: { dir: string; id: string; reason: string; addCriterion: boolean };
+    result: { recorded: boolean };
+  };
   /** Rejects a draft feature: deletes its card files. Refused when git tracks any of them. */
   "draft.reject": { params: { dir: string; id: string }; result: { removed: number } };
   /** The roles a chat in this project can start from (ADR 0018). */
@@ -215,6 +229,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "story.start",
   "story.stop",
   "story.resume",
+  "story.accept",
+  "story.sendBack",
   "draft.reject",
   "chat.roles",
   "roles.watch",

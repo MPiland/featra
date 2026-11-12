@@ -66,6 +66,8 @@ export interface CardView {
   draftChat?: string;
   /** With `draftChat`: every story under the draft, Cancelled ones too. Reject deletes all of them (STORY-51). */
   draftStories?: number;
+  /** True on a story waiting in Acceptance, which Accept and Send back apply to (STORY-23); absent otherwise. */
+  awaiting?: true;
   /** True on an approved feature, which Start can give its branch (STORY-52); absent otherwise. */
   startable?: true;
   /** Why the card can't be edited here, or null when it can. */
@@ -140,6 +142,14 @@ export function sendBackParams(params: unknown): { dir: string; id: string; reas
   return p && isRecord(params) && typeof params.reason === "string" ? { ...p, reason: params.reason } : null;
 }
 
+/** The `{ dir, id, reason, addCriterion }` params of `story.sendBack`, or null. An empty reason is the method's to refuse. */
+export function storySendBackParams(
+  params: unknown,
+): { dir: string; id: string; reason: string; addCriterion: boolean } | null {
+  const p = sendBackParams(params);
+  return p && isRecord(params) ? { ...p, addCriterion: params.addCriterion === true } : null;
+}
+
 const option = (r: Record<string, unknown>): CardOption => ({ value: textOrNull(r.value), label: text(r.label) });
 
 /** A view from the socket, read defensively; null when there is no card. */
@@ -175,6 +185,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     readOnly: textOrNull(raw.readOnly),
     ...(typeof raw.draftChat === "string" && raw.draftChat ? { draftChat: raw.draftChat } : {}),
     ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
+    ...(raw.awaiting === true ? { awaiting: true as const } : {}),
     ...(raw.startable === true ? { startable: true as const } : {}),
   };
 }

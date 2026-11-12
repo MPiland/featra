@@ -59,8 +59,9 @@ export function workList(
   stale: StaleCopy[] = [],
   problems: string[] = [],
   more: Card[] = [],
+  canEdit?: (owned: OwnedCard) => boolean,
 ): WorkList {
-  return buildWorkList({ cards: [...specs.map(cardOf), ...more].map(owned), stale, problems }, DEFAULT_CONFIG);
+  return buildWorkList({ cards: [...specs.map(cardOf), ...more].map(owned), stale, problems }, DEFAULT_CONFIG, canEdit);
 }
 
 /** A small project: one epic with three features in different states, and a loose story. */

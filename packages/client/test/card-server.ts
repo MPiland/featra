@@ -1,5 +1,7 @@
 // The local server's card side, as a fake: cards held in memory, edited with work-format's own rules.
 import {
+  acceptanceRefusal,
+  acceptedStory,
   applyCardEdit,
   notStartableReason,
   notSpawnableReason,
@@ -15,6 +17,7 @@ import {
   planApproval,
   resumedStory,
   resumeRefusal,
+  sentBackStory,
   stageTone,
   stopRefusal,
   stoppedStory,
@@ -43,7 +46,12 @@ export function fakeCardServer(
   /** What the server answers to Send back. */
   sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
   /** What the server answers to Approve and Reject; left out, the fake does what the server does to the cards. */
-  review: Partial<Pick<CardBridge, "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory">> = {},
+  review: Partial<
+    Pick<
+      CardBridge,
+      "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory" | "acceptStory" | "sendBackStory"
+    >
+  > = {},
   /** The chat the server starts for a story, and whether it waits for a slot: what a Start makes besides the card change. */
   storySession: (dir: string, story: Card, feature: Card) => { chat: string; queued: boolean } = () => ({
     chat: "story-chat",
@@ -199,6 +207,26 @@ export function fakeCardServer(
       // Only a Stopped story has a mark to clear; an idle session that ended without finishing just goes on.
       if (isStopped(card)) changed(dir, resumedStory(card, "user", EDIT_AT));
       return { ok: true };
+    },
+    // Accept and Send back are the server's to prove (the lane, the session): the fake records the call and applies
+    // work-format's rules to the card, as the server does.
+    acceptStory: async (dir, id) => {
+      calls.push(`acceptStory:${dir}:${id}`);
+      if (review.acceptStory) return review.acceptStory(dir, id);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = acceptanceRefusal(card, id, DEFAULT_CONFIG);
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      changed(dir, acceptedStory(card, DEFAULT_CONFIG, "user", EDIT_AT));
+      return { ok: true };
+    },
+    sendBackStory: async (dir, id, reason, addCriterion) => {
+      calls.push(`sendBackStory:${dir}:${id}:${reason}:${addCriterion}`);
+      if (review.sendBackStory) return review.sendBackStory(dir, id, reason, addCriterion);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = acceptanceRefusal(card, id, DEFAULT_CONFIG);
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      changed(dir, sentBackStory(card, DEFAULT_CONFIG, reason, addCriterion, "user", EDIT_AT));
+      return { ok: true, recorded: true };
     },
     reject: async (dir, id) => {
       calls.push(`reject:${dir}:${id}`);

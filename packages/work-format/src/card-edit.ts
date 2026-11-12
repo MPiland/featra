@@ -127,7 +127,7 @@ function oldPart(card: Card, part: string): unknown {
 }
 
 /** `edited` with a `by` content event for the text edit that made it from `card`; `card` itself when nothing changed. */
-function recorded(card: Card, edited: Card, field: CardTextField | CardItemField, by: string, at: string): Card {
+export function recorded(card: Card, edited: Card, field: CardTextField | CardItemField, by: string, at: string): Card {
   const part = partOf(card, field);
   if (canonical(oldPart(card, part)) === canonical(oldPart(edited, part))) return card;
   const from = JSON.stringify({ [part]: oldPart(card, part) });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import type { FeatureRow, StoryRow, Tone } from "@featra/work-format/work-list";
 import { featureStatusLabel, WORK_COPY } from "../../work-list.ts";
 import { ChevronRightIcon } from "../icons.tsx";
@@ -6,7 +6,8 @@ import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
-import { StoryAgent } from "./story-agents.tsx";
+import { AcceptStory } from "./AcceptStory.tsx";
+import { StoryAgent, StoryAgentsContext } from "./story-agents.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
 
@@ -39,31 +40,38 @@ function Scope({ added, openBugs }: FeatureRow["scope"]) {
 function Story({ story }: { story: StoryRow }) {
   const { selected, paneId, open } = useCardSelection();
   const shown = selected === story.id;
+  const agents = useContext(StoryAgentsContext);
+  // Send back's form opens below the row, across its width, not in the name cell.
+  const [below, setBelow] = useState<HTMLElement | null>(null);
   return (
-    <div className={shown ? "prow shown" : "prow"} role="row" data-card={story.id}>
-      <span aria-hidden="true" />
-      <span role="cell" className="pn">
-        <button
-          type="button"
-          className="row-open"
-          aria-expanded={shown}
-          aria-controls={shown ? paneId : undefined}
-          onClick={() => open(story.id)}
-        >
-          {story.title}
-        </button>
-        {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
-        <StaleMark id={story.id} />
-        <StoryAgent id={story.id} />
-        {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
-      </span>
-      <span role="cell">
-        <Status tone={story.tone} label={story.stage} />
-      </span>
-      <span role="cell">{ticks(story.criteria)}</span>
-      <span role="cell">{ticks(story.tasks)}</span>
-      <span role="cell">{story.pr ?? <span className="meta">{WORK_COPY.none}</span>}</span>
-    </div>
+    <>
+      <div className={shown ? "prow shown" : "prow"} role="row" data-card={story.id}>
+        <span aria-hidden="true" />
+        <span role="cell" className="pn">
+          <button
+            type="button"
+            className="row-open"
+            aria-expanded={shown}
+            aria-controls={shown ? paneId : undefined}
+            onClick={() => open(story.id)}
+          >
+            {story.title}
+          </button>
+          {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
+          <StaleMark id={story.id} />
+          <StoryAgent id={story.id} />
+          {story.awaiting && <AcceptStory id={story.id} actions={agents.acceptance} into={below} />}
+          {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
+        </span>
+        <span role="cell">
+          <Status tone={story.tone} label={story.stage} />
+        </span>
+        <span role="cell">{ticks(story.criteria)}</span>
+        <span role="cell">{ticks(story.tasks)}</span>
+        <span role="cell">{story.pr ?? <span className="meta">{WORK_COPY.none}</span>}</span>
+      </div>
+      <div role="none" ref={setBelow} className="prow-below" />
+    </>
   );
 }
 
