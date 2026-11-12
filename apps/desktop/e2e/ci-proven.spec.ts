@@ -38,7 +38,8 @@ test("Name CI's test report, and a story's PR checks finishing prove its criteri
   await mkdir(remote, { recursive: true });
   git(remote, "init", "-q", "--bare");
   git(repo.dir, "remote", "add", "origin", remote);
-  const gh = await fakeGh();
+  // GitHub's copy is the bare remote, so a PR's head commit is its branch's tip there.
+  const gh = await fakeGh({ remote });
   const bin = await standInClaude();
   let running: ElectronApplication | undefined;
   try {
