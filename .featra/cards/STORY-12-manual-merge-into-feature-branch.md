@@ -1,10 +1,10 @@
 ---
 id: STORY-12
 type: story
-title: Manual merge into feature branch
+title: Merge a story into its feature
 status: New
 parent: FEAT-6
-order: 2
+order: 5
 origin: planned
 role: developer
 agent: claude
@@ -24,17 +24,23 @@ history:
 
 ## Description
 
-Manual merge into feature branch.
+As a builder, I merge a Verified story into its feature branch from Featra, or approve the Dev Lead's request to. Accept gates Done, not the merge.
 
 ## Acceptance criteria
 
-- [ ] A Merge button merges the story's PR into the feature branch
-- [ ] On conflict the story returns to its session with the conflict details
-- [ ] After merge, card ownership moves to the feature branch and the worktree is archived
-- [ ] Abandoning a story asks whether to keep its card as Cancelled or discard it
+- [ ] A Verified story shows Merge in its card pane and Work row; merging needs Verified, not Accept
+- [ ] Merge uses a merge commit: through the PR on GitHub, or a git merge into the feature branch in local mode; a PR merged on GitHub outside Featra is noticed and handled the same way
+- [ ] The Dev Lead can ask to merge with `request_merge`; the user sees a card to approve or decline, and approving merges
+- [ ] On a conflict nothing is merged; the story returns to In Progress and its session gets the conflicting files
+- [ ] After the merge, card ownership moves to the feature branch, the story's worktree and its local and remote branches are removed, and its chat stays as read-only history
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
+
+## Depends on
+
+- STORY-11 Story PR and PR chip
+- STORY-56 Local checks and where checks run

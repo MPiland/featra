@@ -17,7 +17,7 @@ history:
 
 ## Description
 
-Evidence from GitHub on every card, manual merges, and bug routing.
+Evidence on every card from GitHub or from checks run on this computer, Accept and Send back for stories, manual merges into the feature and into main, abandoning a story, and bug routing. Projects without GitHub work in local mode.
 
 ## Depends on
 

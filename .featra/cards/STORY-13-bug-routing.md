@@ -1,10 +1,10 @@
 ---
 id: STORY-13
 type: story
-title: Bug routing
+title: File and place bugs
 status: New
 parent: FEAT-6
-order: 3
+order: 7
 origin: planned
 role: developer
 agent: claude
@@ -24,13 +24,14 @@ history:
 
 ## Description
 
-Bug routing.
+As a builder, bugs land in the right place: the Dev Lead proposes the cause, and I confirm where the bug goes.
 
 ## Acceptance criteria
 
-- [ ] A regression caused by the in-progress feature becomes a bug card under it with origin `bug` and a bug icon
-- [ ] A bug with no in-progress cause goes to the project bug list
-- [ ] A problem in a story still being worked becomes a task on that story
+- [ ] The Dev Lead files a bug with `report_bug` and a suspected cause; the user files one from Work with New bug
+- [ ] Featra proposes the placement: a bug card under the in-progress feature that caused it (origin `bug`, counted as added scope), a task on a story still being worked, or the project bug list
+- [ ] The user confirms or changes the placement before the bug is created
+- [ ] Bug cards show a bug icon, Work has a project bug list, and a Done feature stays Done
 
 ## Tasks
 

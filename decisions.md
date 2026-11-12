@@ -1533,3 +1533,31 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - A subagent pushed out by the cap of 20 ended stays gone; a late message from it makes no new chat.
 - A foreground subagent ends with its session's turn; a background one keeps running until it ends, is stopped, or its
   session is stopped.
+
+## 2026-11-11 — FEAT-6 shaping (user and dev-lead)
+
+- **Not every project has GitHub.** Featra detects per project whether GitHub is usable (a GitHub remote and a
+  signed-in `gh`). Without it the project is in local mode: no PRs, the same buttons and evidence states, and merges are
+  plain git merges.
+- **Where checks run is a project setting: CI or this computer.** Private GitHub repos have limited free Actions minutes
+  (2,000 a month on Free), so the default is CI only when the repo is public on GitHub with workflows; otherwise this
+  computer. Onboarding (STORY-33) asks, with a plain explanation of CI.
+- **Local checks.** Featra proposes a check command from the project's files, or the Dev Lead proposes one; the user
+  confirms it. It runs at In Review, when new commits land, and on Re-run.
+- **Proven** comes from the project's check location: on this computer Featra runs each criterion's linked test; on CI
+  Featra reads the JUnit report named in project settings, and Proven from CI is off until it is set.
+- **PRs.** Featra opens PRs through the user's `gh`, never the agent. Two project settings, both on by default: "Open
+  story PRs automatically" (at In Review) and "Open feature PRs automatically" (on Accept). Off shows Create PR.
+- **CI status** is re-read every N minutes (project setting, default 2, since AI reviewers take about that long) and on
+  window focus. No tokens.
+- **Merging a story** needs Verified, not Accept; Accept gates Done. The user presses Merge, or approves the Dev Lead's
+  `request_merge`. Merge commits only. After the merge the worktree and the local and remote story branches are removed,
+  and the chat stays read-only.
+- **Abandon** warns about uncommitted or unpushed work, then keeps the card as Cancelled or discards it, and removes the
+  worktree and branches.
+- **Bugs.** The Dev Lead files with a suspected cause, or the user files from Work; Featra proposes the placement and the
+  user confirms it.
+- **Main** gets an explicit Merge to main click after the feature's Accept and passing checks. Behind or conflicting with
+  main goes to the Dev Lead to merge main in, never rebase.
+- **Order:** STORY-23 Accept or send back first (no GitHub needed), then STORY-11, STORY-56, STORY-57, STORY-12,
+  STORY-58, STORY-13, STORY-14. FEAT-6 stays one feature of eight stories.

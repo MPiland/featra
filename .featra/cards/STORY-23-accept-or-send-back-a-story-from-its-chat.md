@@ -1,10 +1,10 @@
 ---
 id: STORY-23
 type: story
-title: Accept or send back a story from its chat
+title: Accept or send back a story
 status: New
 parent: FEAT-6
-order: 5
+order: 1
 origin: planned
 role: developer
 agent: claude
@@ -24,14 +24,14 @@ history:
 
 ## Description
 
-As a builder, when a story is ready I accept it, or send it back with a reason, from wherever I am looking at it.
+As a builder, when a story is ready I accept it, or send it back with a reason, from wherever I am looking at it. It works with or without GitHub.
 
 ## Acceptance criteria
 
-- [ ] A story waiting on Accept shows an Accept card at the end of its chat, in its card pane, and in Work
-- [ ] Accept records Accepted evidence in the card's history
-- [ ] Send back requires a reason; it is sent to the story's session as the user's message, logged in history, and can be added as a new acceptance criterion
-- [ ] After Accept, Send back disappears everywhere; the chat stays open and later changes count as added scope or bugs
+- [ ] A story in Acceptance shows Accept and Send back at the end of its chat, in its card pane and in its Work row
+- [ ] Accept records Accepted in the card's history, by the user; when the story is also Verified (or needs Accept only, as a Researcher story) it moves to Done
+- [ ] Send back requires a reason; the reason is sent to the story's session as the user's message, logged in history, the story returns to In Progress, and the reason can be added as a new acceptance criterion
+- [ ] After Accept, Send back disappears everywhere; the chat stays open, and later changes come in as added scope or bugs
 
 ## Tasks
 
