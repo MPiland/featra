@@ -62,3 +62,4 @@ What becomes easier or harder, and what we must now do.
 | [0028](0028-story-agents-report-to-the-dev-lead.md)       | Story agents report to the Dev Lead; it steers with `message_session` | accepted |
 | [0029](0029-featra-plugins.md)                            | Featra plugins: sandboxed UI with a permissioned API                  | proposed |
 | [0030](0030-native-subagents-nested.md)                   | Native subagents are read-only chats nested under their session       | accepted |
+| [0031](0031-local-checks.md)                              | Checks run on this computer, or in CI                                 | proposed |

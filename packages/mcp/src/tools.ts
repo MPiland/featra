@@ -19,6 +19,7 @@ import {
 } from "@featra/work-format";
 import { ToolRefusal, type FeatraHost, type Tool } from "./tool-types.ts";
 import { MESSAGE_SESSION } from "./message-session.ts";
+import { PROPOSE_CHECK_COMMAND } from "./propose-check-command.ts";
 import { UPDATE_CARD } from "./update-card.ts";
 
 export { ToolRefusal, type FeatraHost, type Tool } from "./tool-types.ts";
@@ -226,4 +227,5 @@ export const TOOLS: readonly Tool[] = [
   SPAWN_SESSION,
   UPDATE_CARD,
   MESSAGE_SESSION,
+  PROPOSE_CHECK_COMMAND,
 ];

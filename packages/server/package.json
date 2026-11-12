@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./host-messages": "./src/host-messages.ts",
-    "./json-store": "./src/json-store.ts"
+    "./json-store": "./src/json-store.ts",
+    "./config-writer": "./src/config-writer.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

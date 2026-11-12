@@ -13,6 +13,7 @@
     "./setup-items": "./src/setup-items.ts",
     "./work-list": "./src/work-list-types.ts",
     "./card-view": "./src/card-view-types.ts",
+    "./checks": "./src/checks-types.ts",
     "./roles": "./src/roles.ts",
     "./modes": "./src/modes.ts",
     "./role-edit": "./src/role-edit.ts",

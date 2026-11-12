@@ -2,11 +2,12 @@
  * The card pane's shapes (ADR 0017): a card as the pane shows it, and the one-field edits the pane sends. Types and
  * the checks for data that crosses the socket only, so the client can import it without the card parser.
  */
+import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
-/** What is known about an AC's proof: its linked test passed, a test is linked but hasn't passed, or none is. */
-export type AcProof = "passed" | "linked" | "none";
-const AC_PROOFS: readonly AcProof[] = ["passed", "linked", "none"];
+/** What is known about an AC's proof: its linked test passed or failed, a test is linked but hasn't run, or none is. */
+export type AcProof = "passed" | "failed" | "linked" | "none";
+const AC_PROOFS: readonly AcProof[] = ["passed", "failed", "linked", "none"];
 
 export interface CardViewAc {
   text: string;
@@ -66,6 +67,8 @@ export interface CardView {
   draftChat?: string;
   /** With `draftChat`: every story under the draft, Cancelled ones too. Reject deletes all of them (STORY-51). */
   draftStories?: number;
+  /** A story's checks on this computer (STORY-56): running, the last result and its output; absent when CI runs them. */
+  checks?: CardChecks;
   /** True on a story waiting in Acceptance, which Accept and Send back apply to (STORY-23); absent otherwise. */
   awaiting?: true;
   /** True on an approved feature, which Start can give its branch (STORY-52); absent otherwise. */
@@ -152,6 +155,11 @@ export function storySendBackParams(
 
 const option = (r: Record<string, unknown>): CardOption => ({ value: textOrNull(r.value), label: text(r.label) });
 
+const checksOf = (raw: unknown): { checks?: CardChecks } => {
+  const checks = normalizeCardChecks(raw);
+  return checks ? { checks } : {};
+};
+
 /** A view from the socket, read defensively; null when there is no card. */
 export function normalizeCardView(raw: unknown): CardView | null {
   if (!isRecord(raw) || typeof raw.id !== "string" || !raw.id) return null;
@@ -185,6 +193,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     readOnly: textOrNull(raw.readOnly),
     ...(typeof raw.draftChat === "string" && raw.draftChat ? { draftChat: raw.draftChat } : {}),
     ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
+    ...checksOf(raw.checks),
     ...(raw.awaiting === true ? { awaiting: true as const } : {}),
     ...(raw.startable === true ? { startable: true as const } : {}),
   };

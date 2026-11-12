@@ -1,6 +1,6 @@
-import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { configOverrides, ConfigError, errorMessage, isRecord, setConfigValue } from "@featra/work-format";
+import { access, readFile } from "node:fs/promises";
+import { join } from "node:path";
+import { configOverrides, errorMessage, isRecord } from "@featra/work-format";
 import {
   normalizeAppSettings,
   normalizeWorkOverrides,
@@ -9,6 +9,7 @@ import {
   type WorkSettingKey,
   type WorkSettings,
 } from "@featra/client/bridge";
+import { configFile, CONFIG_PATH, isMissing, writeConfigValue } from "@featra/server/config-writer";
 import { createJsonStore, type JsonStore } from "@featra/server/json-store";
 
 export type SettingsStore = JsonStore<AppSettings>;
@@ -46,13 +47,9 @@ const exists = (file: string) =>
     () => false,
   );
 
-export const CONFIG_PATH = [".featra", "config.yaml"] as const;
-const configFile = (projectDir: string) => join(projectDir, ...CONFIG_PATH);
+export { CONFIG_PATH };
 
 const message = errorMessage;
-
-/** A file that isn't there: Node's ENOENT. */
-const isMissing = (err: unknown) => isRecord(err) && err.code === "ENOENT";
 
 /** Reads the project's work-setting overrides from `.featra/config.yaml`. No file means no overrides. */
 export async function readProjectSettings(projectDir: string): Promise<ProjectSettings> {
@@ -70,44 +67,16 @@ export async function readProjectSettings(projectDir: string): Promise<ProjectSe
   }
 }
 
-/** Serialises writes to each config file, so quick changes land in order. */
-const queues = new Map<string, Promise<unknown>>();
-
 /**
  * Overrides one work setting in the project's `.featra/config.yaml`, or removes the override (`null`). The file is
- * edited in place (comments and other keys kept) by work-format, and replaced atomically. A file that can't be read
- * is left alone and its error returned.
+ * edited in place by the server's config writer; a file that can't be read is left alone and its error returned.
  */
-export function writeProjectValue<K extends WorkSettingKey>(
+export async function writeProjectValue<K extends WorkSettingKey>(
   projectDir: string,
   key: K,
   value: WorkSettings[K] | null,
 ): Promise<ProjectSettings> {
-  const file = configFile(projectDir);
-  const run = async (): Promise<ProjectSettings> => {
-    let text = "";
-    try {
-      text = await readFile(file, "utf8");
-    } catch (err) {
-      if (!isMissing(err)) return { dir: projectDir, overrides: {}, error: message(err) };
-    }
-    let next: string;
-    try {
-      next = setConfigValue(text, key, value ?? undefined);
-    } catch (err) {
-      if (err instanceof ConfigError) return { ...(await readProjectSettings(projectDir)), error: err.message };
-      throw err;
-    }
-    await mkdir(dirname(file), { recursive: true });
-    const tmp = `${file}.tmp`;
-    await writeFile(tmp, next, "utf8");
-    await rename(tmp, file);
-    return readProjectSettings(projectDir);
-  };
-  const next = (queues.get(file) ?? Promise.resolve()).then(run, run);
-  queues.set(
-    file,
-    next.catch(() => {}),
-  );
-  return next;
+  const { error } = await writeConfigValue(projectDir, key, value);
+  const settings = await readProjectSettings(projectDir);
+  return error === null ? settings : { ...settings, error };
 }

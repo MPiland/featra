@@ -6,6 +6,7 @@ import { CloseIcon } from "../icons.tsx";
 import { DraftReview } from "./DraftReview.tsx";
 import { SendBack } from "./SendBack.tsx";
 import { StartFeature } from "./StartFeature.tsx";
+import { StoryChecks } from "./StoryChecks.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
@@ -181,6 +182,9 @@ export function CardPane({
           placeholder={CARD_COPY.storyEmpty}
         />
         {onOpen && <StoriesSection stories={view.stories} onOpen={onOpen} />}
+        {view.checks && (
+          <StoryChecks checks={view.checks} readOnly={readOnly} onRerun={() => work.rerunChecks(dir, id)} />
+        )}
         <AcSection view={view} save={save} />
         <TaskSection view={view} save={save} />
         <TextSection view={view} save={save} field="notes" title={CARD_COPY.notes} placeholder={CARD_COPY.notesEmpty} />

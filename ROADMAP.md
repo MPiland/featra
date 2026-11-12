@@ -8,6 +8,11 @@ epics in `.featra/cards/`.
 
 ## M2 and later
 
+- **Run end-to-end tests linked to criteria.** A per-path template (for example Playwright with a JUnit reporter) so
+  e2e refs can prove criteria; STORY-56 shows "No command runs this test" for them.
+- **Structured test links on cards.** Replace the free-text `(test: path::name)` link, which breaks on `)` or `;` in a
+  test name.
+- **Re-run checks for commits made while Featra was closed.** STORY-56 takes a baseline at startup.
 - **Guided GitHub setup.** Help builders who don't have GitHub install `gh`, sign in and create the repo. Until then,
   FEAT-6 says in one line what's missing and works in local mode.
 - **Clean up subagent worktrees.** The SDK does not report a subagent's worktree (STORY-55); when it does, Archive removes

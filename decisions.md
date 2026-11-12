@@ -1580,3 +1580,30 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   Send back returns to the first `active` stage, so renamed stages keep working.
 - Story and draft Send back share `sendThenRecord` and one set of refusal messages; the Work row respects read-only like
   the card pane; the Send back form opens below the Work row.
+
+## 2026-11-12 — STORY-56 build choices (story agent, for the Dev Lead to confirm)
+
+- **A linked test command template, proposed with the check command** (your design note): `linkedTestCommand`, run once per test file. `{file}`, `{name}`, `{namePattern}` and `{report}` are each one quoted argument; `{namePattern}` is the file's linked names, escaped and joined by `|`. Same Checks section, same confirm.
+- **Proof is a JUnit report, not an exit code** (review ruling, ADR 0004). `{report}` is a temp path; a criterion is Proven only if the report has a passed test whose full name equals the linked name. A name matching nothing, a name that is only part of another test's name, a skipped test and a run without a report prove nothing. A template without `{report}` says "Can't prove linked tests without a report". The parser is in work-format for STORY-57. The vitest proposal is `pnpm exec vitest run {file} -t {namePattern} --reporter=junit --outputFile={report}`; jest is not proposed because it can't write a report to a chosen path.
+- **No command runs this test:** a ref under an `e2e`, `playwright` or `cypress` folder gets that note and its criterion stays unchanged, never failed. An e2e template is a roadmap item.
+- **A command changed through git does not run unconfirmed.** The app data folder keeps the last confirmed `checkCommand` and `linkedTestCommand` (`check-confirmed.json`); a different value in `config.yaml` shows "Changed in the project's config" with Confirm. Saving in Project settings confirms. A story can still make itself Verified by editing its own test script (same as CI); ADR 0031 says so.
+- **Proposals are kept in the app's data folder, not in the project.** Why: a proposal is not a decision, and the committed config must hold only what the user confirmed. "Use this" fills the field; only Save writes `.featra/config.yaml`. A saved field drops its proposals.
+- **Checks apply to a story in the review stage or in Acceptance, not In Progress** (found by position, like acceptance). Why: a half-built story would fail on every commit.
+- **Triggers:** the move into review, a change of the worktree's HEAD, and Re-run. At startup the current HEAD is recorded and nothing runs. Evidence is written only on a change, so history does not grow with every run.
+- **Queue, not cancel** (my call). A request during a run sets one pending flag; the stale result is discarded and the run starts again. At most 2 runs go at once across the app. Why: a cancelled run may have been the commit's only result, and a result for old code would mislead.
+- **Linked tests run after the check command, whatever it said.** An AC is Proven only if every ref is in the report as passed; a missing file counts as a failure; an AC with a ref nothing can run is left unchanged. A run that throws ends with running off and a note; a story's checks are dropped when it leaves review. With no template set the card says so and the criteria stay as they are.
+- **Quoting is per platform.** POSIX single quotes. Windows double quotes, refusing `"`, `%`, `^`, `!` and line breaks rather than guessing at cmd.exe. The confirmed check command is run as typed.
+- **Where checks run** defaults from `github-detect.ts` (remote, workflows, `gh repo view --json visibility`, fixed argv). Unknown (no `gh`, signed out, failing) counts as not public and says "Couldn't tell if it's public on GitHub, so checks run on this computer."
+- **The server watches every allowed project's worktrees** for HEAD changes, permanently: a few more file watchers.
+- **`writeProjectValue` in the desktop settings store now delegates to the server's `config-writer`**, so the Checks section and the Workflow page share one writer.
+- **A failing linked test shows as "Test failed" on its criterion**, a new proof state beside passed, linked and none.
+
+## 2026-11-12 — STORY-56 review rulings (dev-lead)
+
+- Proven never comes from an exit code: linked tests write a JUnit report through `{report}`, and a criterion is Proven
+  only when the report has a passed test whose full name equals the linked name. The JUnit parser lives in work-format for
+  STORY-57 to reuse.
+- Refs no template covers (end-to-end folders) get "No command runs this test" and are never counted as failed.
+- A check command changed through git does not run until the user confirms it.
+- Other build choices confirmed, with the unknown-visibility copy "Couldn't tell if it's public on GitHub, so checks run
+  on this computer."

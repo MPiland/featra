@@ -5,6 +5,7 @@ import type {
   LoggedEntry,
   LogInput,
   MessageInput,
+  ProposeInput,
   ReportInput,
   SpawnInput,
 } from "@featra/work-format";
@@ -23,6 +24,8 @@ export interface FeatraHost {
   update: (input: ReportInput) => Promise<{ card: string; changes: string[] }>;
   /** The Dev Lead tells a story's session something, as its next turn (STORY-54). */
   message: (input: MessageInput) => Promise<{ story: string }>;
+  /** The Dev Lead proposes the check command and linked-test command; the user confirms them in settings (STORY-56). */
+  propose: (input: ProposeInput) => Promise<{ proposed: string[] }>;
 }
 
 export interface Tool {

@@ -5,6 +5,7 @@
 import { awaitingAcceptance } from "./acceptance.ts";
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
+import type { CardChecks } from "./checks-types.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { notStartableReason } from "./card-start.ts";
 import { evidenceState } from "./evidence.ts";
@@ -23,9 +24,10 @@ export function readOnlyReason(owned: OwnedCard, checkedOut: boolean, baseBranch
   return `Check out ${branch} to edit it.`;
 }
 
-function proofOf(card: Card, provenAcs: readonly number[]) {
+function proofOf(card: Card, provenAcs: readonly number[], failedAcs: readonly number[]) {
   return (index: number): AcProof => {
     if (provenAcs.includes(index + 1)) return "passed";
+    if (failedAcs.includes(index + 1)) return "failed";
     return card.acs[index]?.test ? "linked" : "none";
   };
 }
@@ -39,11 +41,19 @@ const storiesOf = (card: Card, cards: readonly Card[]) =>
         .toSorted((a, b) => a.order - b.order || a.id.localeCompare(b.id, undefined, { numeric: true }))
         .map((c) => ({ id: c.id, title: c.title, status: c.status }));
 
-/** The pane's view of `owned`; `checkedOut` says whether the owner's location has a working tree. */
-export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEditContext): CardView {
+/**
+ * The pane's view of `owned`; `checkedOut` says whether the owner's location has a working tree. `checks` is what the
+ * server knows of the story's checks on this computer (STORY-56), which the card itself doesn't keep.
+ */
+export function buildCardView(
+  owned: OwnedCard,
+  checkedOut: boolean,
+  ctx: CardEditContext,
+  checks?: CardChecks,
+): CardView {
   const { card } = owned;
   const ev = evidenceState(card);
-  const proof = proofOf(card, ev.provenAcs);
+  const proof = proofOf(card, ev.provenAcs, checks?.failedAcs ?? []);
   const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   return {
     id: card.id,
@@ -62,6 +72,7 @@ export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEd
     stories: storiesOf(card, ctx.cards),
     owner: locationLabel(owned.owner),
     readOnly: readOnlyReason(owned, checkedOut, ctx.config.baseBranch),
+    ...(checks ? { checks } : {}),
     ...(awaitingAcceptance(card, ctx.config) ? { awaiting: true as const } : {}),
     ...(notStartableReason(card, card.id) === null ? { startable: true as const } : {}),
     ...(draftChat === null

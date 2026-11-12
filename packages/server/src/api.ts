@@ -7,6 +7,7 @@ import {
   roleEditParams,
   sendBackParams,
   storySendBackParams,
+  checksSetParams,
   setupParams,
   starter,
   unwatchParams,
@@ -27,6 +28,8 @@ import type { DraftReview } from "./draft-review.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
 import type { StoryAcceptance } from "./story-acceptance.ts";
+import type { CheckSettings } from "./check-settings.ts";
+import type { StoryChecks } from "./story-checks.ts";
 import type { StoryStop } from "./story-stop.ts";
 import type { Git } from "./git.ts";
 import type { RoleRegistry } from "./role-registry.ts";
@@ -49,6 +52,8 @@ export interface ApiDeps {
   spawns: StorySpawn;
   stops: StoryStop;
   acceptance: StoryAcceptance;
+  checks: StoryChecks;
+  checkSettings: CheckSettings;
   chats: ChatManager;
   roles: RoleRegistry;
   roleWatches: RoleWatches;
@@ -88,6 +93,8 @@ export function createApi({
   spawns,
   stops,
   acceptance,
+  checks,
+  checkSettings,
   chats,
   roles,
   roleWatches,
@@ -154,7 +161,7 @@ export function createApi({
         const dir = allow(p.dir);
         const { value, stop } = await watches.observe(
           dir,
-          (scan) => cardViewIn(scan, p.id),
+          (scan) => cardViewIn(scan, p.id, checks.checksFor(dir, p.id)),
           (next) => {
             if (allowed.has(dir)) connection.push("card.view", id, next);
           },
@@ -200,6 +207,18 @@ export function createApi({
         const p = cardParams(params);
         if (!p) throw new ApiError("Expected { dir, id }.");
         return acceptance.accept(allow(p.dir), p.id);
+      }
+      case "story.rerunChecks": {
+        const p = cardParams(params);
+        if (!p) throw new ApiError("Expected { dir, id }.");
+        return checks.rerun(allow(p.dir), p.id);
+      }
+      case "checks.load":
+        return checkSettings.load(project(params));
+      case "checks.set": {
+        const p = checksSetParams(params);
+        if (!p) throw new ApiError("Expected { dir, patch }.");
+        return checkSettings.set(allow(p.dir), p.patch);
       }
       case "story.sendBack": {
         const p = storySendBackParams(params);

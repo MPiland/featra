@@ -9,78 +9,29 @@ import {
   DEFAULT_WINDOW_STATE,
   normalizeWorkOverrides,
   type AppSettings,
-  type CloseToTraySupport,
   type FeatraBridge,
   type ProjectRef,
   type ProjectSetup,
   type ProjectsResult,
-  type SetupItemId,
   type ProjectsSnapshot,
   type SettingsSnapshot,
   type UiState,
   type WindowState,
-  type WorkOverrides,
   type WorkUpdate,
 } from "../src/bridge.ts";
 import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
 import type { Card } from "@featra/work-format";
-import type { CardBridge } from "../src/card-pane.ts";
 import { fakeCardServer } from "./card-server.ts";
-import { fakeChatServer, type ChatHost } from "./chat-server.ts";
-import { fakeRolesServer, type RolesHost } from "./roles-server.ts";
-import type { CopyActionResult } from "@featra/work-format/protocol";
+import { fakeChatServer } from "./chat-server.ts";
+import type { HostOptions } from "./harness-options.ts";
+import { fakeChecksServer } from "./checks-server.ts";
+import { fakeRolesServer } from "./roles-server.ts";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
 /** Where New Project… suggests a folder by default. */
 export const LOCATION = "/home/me";
 
-export interface HostOptions extends ChatHost, RolesHost {
-  /** What the card server answers to Send back. Default: sent and recorded. */
-  sendBack?: CardBridge["sendBack"];
-  /** What the card server answers to Approve and Reject. Default: it changes the cards as the server does. */
-  review?: Partial<
-    Pick<
-      CardBridge,
-      "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory" | "acceptStory" | "sendBackStory"
-    >
-  >;
-  /** Whether Start queues the story's session instead of starting it, as a project at its limit does. Default: starts. */
-  queueStories?: boolean;
-  closeToTray?: CloseToTraySupport;
-  /** The current project, or null for none. Default: PROJECT. */
-  project?: ProjectRef | null;
-  /** Every known project. Default: the current one only. */
-  projects?: ProjectRef[];
-  /** Folders the folder dialog returns, in turn; then it is cancelled. */
-  folderPicks?: string[];
-  /** What the host answers to a switch, an open or a create, by folder: a refusal such as a folder that is gone. */
-  refusals?: Record<string, string>;
-  /** What each project's config file overrides, by folder. */
-  projectFiles?: Record<string, WorkOverrides>;
-  /** A project whose config file can't be read: its error. */
-  brokenProjects?: Record<string, string>;
-  /** Config-file writes wait until `releaseWrites()`: a slow disk or IPC round trip. */
-  slowProjectWrites?: boolean;
-  /** Each folder's setup as the server would find it on disk. Default: set up ("ready"). */
-  setup?: Record<string, ProjectSetup>;
-  /** Setup items already in each folder, as the server would find them. Default: none. */
-  existing?: Record<string, SetupItemId[]>;
-  /** Folders the server can't check for setup: its error. */
-  planFailures?: Record<string, string>;
-  /** Folders where the server's setup fails: its error. */
-  initFailures?: Record<string, string>;
-  /** What the server's setup reports it created and kept, by folder. Default: it created config.yaml only. */
-  initResults?: Record<string, { created: string[]; kept: string[] }>;
-  /** Each folder's Work list as the server would send it. Default: empty. */
-  work?: Record<string, WorkList>;
-  /** What apply and discard answer. Default: ok. */
-  copyResult?: CopyActionResult;
-  /**
-   * Each folder's cards, owned by main and checked out: the Work list and the card pane are built from them by
-   * work-format, and the pane's edits change them. Overrides `work` for that folder.
-   */
-  cards?: Record<string, Card[]>;
-}
+export type { HostOptions } from "./harness-options.ts";
 
 export { EDIT_AT } from "./card-server.ts";
 
@@ -132,6 +83,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     host.review,
     (dir, story, feature) => chats.addStory(dir, story, feature, host.queueStories === true),
     { turn: (dir, id) => chats.storyTurn(dir, id), drop: (dir, id) => chats.dropStory(dir, id) },
+    (_dir, id) => host.cardChecks?.[id],
   );
   const chats: ReturnType<typeof fakeChatServer> = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
@@ -234,6 +186,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     // Records which element had focus when the command reached the host: that is the field it acts on.
     chats: chats.bridge,
     roles: roles.bridge,
+    checks: fakeChecksServer(host.checks ?? {}, calls),
     inbox: chats.inbox.bridge,
     notifications: {
       asked: (item) => void calls.push(`notify:${item.chat}:${item.request.id}`),
