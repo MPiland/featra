@@ -8,8 +8,14 @@ import { randomBytes } from "node:crypto";
 import { access } from "node:fs/promises";
 import {
   AGENT_PATH,
+  assertNever,
   parseDraft,
   parseLogInput,
+  parseMessageInput,
+  parseReportInput,
+  parseSpawnInput,
+  parseStartInput,
+  starter,
   SERVER_HOST,
   isRecord,
   type AgentMethod,
@@ -19,7 +25,11 @@ import {
 import { ApiError } from "./api-error.ts";
 import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
+import type { CardReport } from "./card-report.ts";
 import type { DraftWriter } from "./draft-writer.ts";
+import type { FeatureStart } from "./feature-start.ts";
+import type { StoryMessage } from "./story-message.ts";
+import type { StorySpawn } from "./story-spawn.ts";
 import type { LogWriter } from "./log-writer.ts";
 import type { McpServerSpec } from "./provider.ts";
 import { sameSecret } from "./secret.ts";
@@ -33,7 +43,20 @@ export const AGENT_MESSAGES = {
   readOnly: "Logging is off: this project's knowledge setting is read-only.",
   draftReadOnly: "Drafting is off: this project's knowledge setting is read-only.",
   noDrafts: "Drafting cards isn't available.",
+  startReadOnly: "Starting is off: this project's knowledge setting is read-only.",
+  noStart: "Starting a feature isn't available.",
+  spawnReadOnly: "Starting a story is off: this project's knowledge setting is read-only.",
+  noSpawn: "Starting a story isn't available.",
+  updateReadOnly: "Updating cards is off: this project's knowledge setting is read-only.",
+  noUpdate: "Updating cards isn't available.",
+  noMessage: "Messaging a story isn't available.",
+  /** A story session reports to its Dev Lead and is steered by it; it does not message sessions. */
+  sessionMessage: "A story session can't message other story sessions. Ask the Dev Lead.",
+  /** A story session is a worker: only the Dev Lead's chat puts agents on stories. */
+  sessionSpawn: "A story session can't start other story sessions. Ask the Dev Lead.",
 } as const;
+
+type ChatInfo = NonNullable<ReturnType<Pick<ChatManager, "info">["info"]>>;
 
 export interface AgentBridgeDeps {
   /** The MCP's script (`dist/mcp.cjs` in the app). Without it no agent gets the MCP. */
@@ -51,6 +74,14 @@ export interface AgentBridgeDeps {
   writer: LogWriter;
   /** Writes the cards agents draft (STORY-8). Without it `cards.draft` is refused. */
   drafts?: DraftWriter;
+  /** Starts approved features (STORY-52). Without it `feature.start` is refused. */
+  starts?: FeatureStart;
+  /** Starts story sessions (STORY-9). Without it `story.spawn` is refused. */
+  spawns?: StorySpawn;
+  /** Writes agents' reports on cards (STORY-10). Without it `card.update` is refused. */
+  reports?: CardReport;
+  /** Sends the Dev Lead's messages to story sessions (STORY-54). Without it `session.message` is refused. */
+  messages?: StoryMessage;
   newToken?: () => string;
 }
 
@@ -79,6 +110,10 @@ export function createAgentBridge({
   chats,
   writer,
   drafts,
+  starts,
+  spawns,
+  reports,
+  messages,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -102,12 +137,13 @@ export function createAgentBridge({
     return (await mcpRefusal(dir)) ?? ((await knowledge(dir)) === "read-only" ? readOnly : null);
   }
 
-  async function appendLog(chat: string, dir: string, session: string, params: unknown) {
+  /** Logs go where the agent works (a story session's worktree), never into the user's own checkout. */
+  async function appendLog(chat: string, dir: string, cwd: string, session: string, params: unknown) {
     const off = await refusal(dir);
     if (off !== null) throw new ApiError(off);
     const input = parseLogInput(isRecord(params) ? params.kind : undefined, params);
     if (!input.ok) throw new ApiError(input.error);
-    const { entry: id, file, summary } = await writer.append(dir, chat, input.value, session);
+    const { entry: id, file, summary } = await writer.append(cwd, chat, input.value, session);
     chats.report(chat, { type: "logged", entry: id, file, summary });
     return { entry: id, file };
   }
@@ -127,6 +163,46 @@ export function createAgentBridge({
       log(`Couldn't rename chat ${chat} after its draft: ${error instanceof Error ? error.message : String(error)}`);
     }
     return result;
+  }
+
+  async function start(chat: string, dir: string, params: unknown) {
+    const off = await refusal(dir, AGENT_MESSAGES.startReadOnly);
+    if (off !== null) throw new ApiError(off);
+    if (!starts) throw new ApiError(AGENT_MESSAGES.noStart);
+    const input = parseStartInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return starts.start(dir, input.id, starter(chat));
+  }
+
+  async function spawn(chat: string, dir: string, story: boolean | undefined, params: unknown) {
+    if (story) throw new ApiError(AGENT_MESSAGES.sessionSpawn);
+    const off = await refusal(dir, AGENT_MESSAGES.spawnReadOnly);
+    if (off !== null) throw new ApiError(off);
+    if (!spawns) throw new ApiError(AGENT_MESSAGES.noSpawn);
+    const input = parseSpawnInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return spawns.spawn(dir, input.value, chat);
+  }
+
+  async function update(chat: string, info: ChatInfo, params: unknown) {
+    const off = await refusal(info.dir, AGENT_MESSAGES.updateReadOnly);
+    if (off !== null) throw new ApiError(off);
+    if (!reports) throw new ApiError(AGENT_MESSAGES.noUpdate);
+    const input = parseReportInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return reports.report(info.dir, { chat, story: info.storyId ?? null }, info.session, input.value, info.cwd);
+  }
+
+  async function message(chat: string, dir: string, story: boolean | undefined, params: unknown) {
+    if (story) throw new ApiError(AGENT_MESSAGES.sessionMessage);
+    // A message writes no card or knowledge file, so only the MCP's off switch applies (the read-only setting
+    // withholds the whole MCP at `attach` anyway).
+    const off = await mcpRefusal(dir);
+    if (off !== null) throw new ApiError(off);
+    if (!messages) throw new ApiError(AGENT_MESSAGES.noMessage);
+    const input = parseMessageInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return messages.send(dir, input.value, chat);
   }
 
   return {
@@ -170,7 +246,22 @@ export function createAgentBridge({
     async call(chat, method, params) {
       const info = chats.info(chat);
       if (!info) throw new ApiError("No such chat.");
-      return method === "cards.draft" ? draft(chat, info.dir, params) : appendLog(chat, info.dir, info.session, params);
+      switch (method) {
+        case "cards.draft":
+          return draft(chat, info.dir, params);
+        case "feature.start":
+          return start(chat, info.dir, params);
+        case "story.spawn":
+          return spawn(chat, info.dir, info.story, params);
+        case "card.update":
+          return update(chat, info, params);
+        case "session.message":
+          return message(chat, info.dir, info.story, params);
+        case "log.append":
+          return appendLog(chat, info.dir, info.cwd ?? info.dir, info.session, params);
+        default:
+          return assertNever(method);
+      }
     },
     async undo(chat, id) {
       await writer.undo(chat, id);

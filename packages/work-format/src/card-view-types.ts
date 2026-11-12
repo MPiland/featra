@@ -66,6 +66,8 @@ export interface CardView {
   draftChat?: string;
   /** With `draftChat`: every story under the draft, Cancelled ones too. Reject deletes all of them (STORY-51). */
   draftStories?: number;
+  /** True on an approved feature, which Start can give its branch (STORY-52); absent otherwise. */
+  startable?: true;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -173,6 +175,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     readOnly: textOrNull(raw.readOnly),
     ...(typeof raw.draftChat === "string" && raw.draftChat ? { draftChat: raw.draftChat } : {}),
     ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
+    ...(raw.startable === true ? { startable: true as const } : {}),
   };
 }
 

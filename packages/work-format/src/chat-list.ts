@@ -17,6 +17,8 @@ export interface Ask {
   /** The request's id: the tool call it is about. */
   id: string;
   reason: AskReason;
+  /** The story session whose request this is, when it is a copy shown in its Dev Lead's chat (STORY-9). */
+  story?: string;
 }
 
 /**
@@ -51,6 +53,39 @@ export interface ChatSummary {
   waiting: WaitReason | null;
   /** The card the chat was started to work on (STORY-7), when there is one. */
   card?: string;
+  /** A story session (STORY-9): who it belongs to, for the sidebar to nest it. Absent for any other chat. */
+  story?: StoryRef;
+  /** A story session waiting for a free slot: its agent hasn't started (STORY-9). Absent once it runs. */
+  queued?: true;
+  /**
+   * A story session idle after a turn that didn't finish: it failed, or a restart cut it off (STORY-53). Its transcript
+   * has no composer, so Resume is the way to go on. Absent otherwise, and cleared by the next message.
+   */
+  stalled?: true;
+  /**
+   * A subagent the chat's session spawned for itself (STORY-55): its transcript is read-only, and the sidebar nests it
+   * under that session. Absent for any other chat. Kept in memory with the session: never saved.
+   */
+  subagent?: SubagentRef;
+}
+
+/** What a subagent's row says of where it came from, and what the user can do to it. */
+export interface SubagentRef {
+  /** The chat of the session that spawned it. */
+  parent: string;
+  /** Stop ends just this subagent: only where the provider can (Claude background subagents); false shows no Stop. */
+  stoppable: boolean;
+}
+
+/** What a story session's row says of the story it works on. */
+export interface StoryRef {
+  /** The story's id. */
+  id: string;
+  /** The Dev Lead's chat it nests under; the sidebar uses a group named after the feature when that chat isn't listed. */
+  parent: string | null;
+  /** The feature's id and title: the group's name when the parent chat is gone. */
+  feature: string;
+  featureTitle: string;
 }
 
 /** A provider the list can group by: its name, and whether the user has its agent installed. */
@@ -98,14 +133,21 @@ const isAnswer = (
 ): event is Extract<ChatEvent, { type: "tool-allowed" | "tool-denied" | "question-answered" | "approval-cancelled" }> =>
   ANSWERS.has(event.type);
 
-/** The requests still open after `event`. A turn's end, or a new message, leaves none: no request outlives its turn. */
+/**
+ * The requests still open after `event`. A turn's end, or a new message, leaves none: no request outlives its turn.
+ * Except a story session's request shown in its parent: it belongs to the session's turn, and closes with it.
+ */
 export function nextAsks(asks: readonly Ask[], event: ChatEvent): readonly Ask[] {
   if (event.type === "approval" || event.type === "question") {
-    return asks.some((a) => a.id === event.id) ? asks : [...asks, { id: event.id, reason: event.type }];
+    const story = event.type === "approval" && event.story ? { story: event.story } : {};
+    return asks.some((a) => a.id === event.id) ? asks : [...asks, { id: event.id, reason: event.type, ...story }];
   }
   // An answer closes its request.
   if (isAnswer(event)) return asks.some((a) => a.id === event.id) ? asks.filter((a) => a.id !== event.id) : asks;
-  if (event.type === "user" || event.type === "turn-end") return asks.length > 0 ? [] : asks;
+  if (event.type === "user" || event.type === "turn-end") {
+    const kept = asks.filter((a) => a.story !== undefined);
+    return kept.length === asks.length ? asks : kept;
+  }
   return asks;
 }
 
@@ -139,7 +181,13 @@ export function reduceRow(row: ChatRow, event: ChatEvent): ChatRow {
 /** A row out of a turn: not running, and waiting on no request, since none outlives the turn (its agent ended). */
 export function idleSummary(summary: ChatSummary): ChatSummary {
   const waiting = isAsk(summary.waiting) ? "reply" : summary.waiting;
-  return summary.running || waiting !== summary.waiting ? { ...summary, running: false, waiting } : summary;
+  if (!summary.running && waiting === summary.waiting) return summary;
+  // A story session whose turn or request was cut off here (its agent ended) is stalled: it didn't finish.
+  return withStalled({ ...summary, running: false, waiting }, summary.story !== undefined);
+}
+
+function withStalled({ stalled: _stalled, ...rest }: ChatSummary, stalled: boolean): ChatSummary {
+  return stalled ? { ...rest, stalled: true } : rest;
 }
 
 /** The row after one more event, without the open requests: right while at most one request is open at a time. */
@@ -147,7 +195,9 @@ export const reduceSummary = (summary: ChatSummary, event: ChatEvent): ChatSumma
   foldSummary(summary, event, nextAsks([], event));
 
 function foldSummary(summary: ChatSummary, event: ChatEvent, asks: readonly Ask[]): ChatSummary {
-  const waiting = nextWait(summary.waiting, event, asks);
+  let waiting = nextWait(summary.waiting, event, asks);
+  // A story session's request answered in an idle chat leaves it waiting for the user's next message, as before it.
+  if (waiting === null && isAsk(summary.waiting) && !summary.running && event.type !== "user") waiting = "reply";
   let { title, running } = summary;
   if (event.type === "user") {
     running = true;
@@ -155,9 +205,17 @@ function foldSummary(summary: ChatSummary, event: ChatEvent, asks: readonly Ask[
     title ??= chatTitle(event.text);
   }
   if (event.type === "turn-end") running = false;
-  return title === summary.title && running === summary.running && waiting === summary.waiting
+  // A story session's turn that failed leaves it stalled until the next message; any other end finished it.
+  const stalled =
+    event.type === "turn-end"
+      ? summary.story !== undefined && event.outcome === "failed"
+      : event.type !== "user" && summary.stalled === true;
+  return title === summary.title &&
+    running === summary.running &&
+    waiting === summary.waiting &&
+    stalled === (summary.stalled === true)
     ? summary
-    : { ...summary, title, running, waiting };
+    : withStalled({ ...summary, title, running, waiting }, stalled);
 }
 
 /** A new chat's row, before any event. */
@@ -167,6 +225,8 @@ export function newSummary(
   role: ChatRoleRef,
   startedAt: string,
   card?: string,
+  story?: StoryRef,
+  queued = false,
 ): ChatSummary {
   return {
     id,
@@ -177,32 +237,13 @@ export function newSummary(
     running: false,
     waiting: null,
     ...(card ? { card } : {}),
+    ...(story ? { story } : {}),
+    ...(queued ? { queued: true as const } : {}),
   };
 }
 
 /** What a row calls the chat: its title, or the role's name before the first message. */
 export const chatName = (chat: ChatSummary): string => chat.title ?? chat.role.name;
-
-export interface ChatGroup {
-  provider: ProviderInfo;
-  chats: ChatSummary[];
-}
-
-/**
- * The list as the sidebar shows it: one group per installed provider, in the order the server lists them, plus any
- * provider that isn't installed but still has chats (so none go missing). Newest chat first in each group.
- */
-const newestFirst = (a: ChatSummary, b: ChatSummary) =>
-  b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id);
-
-export function groupChats(list: ChatList): ChatGroup[] {
-  return list.providers
-    .map((provider) => ({
-      provider,
-      chats: list.chats.filter((c) => c.provider === provider.id).toSorted(newestFirst),
-    }))
-    .filter((g) => g.provider.installed || g.chats.length > 0);
-}
 
 const str = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 
@@ -210,6 +251,8 @@ const str = (v: unknown): v is string => typeof v === "string" && v.length > 0;
 export function normalizeSummary(raw: unknown): ChatSummary | null {
   if (!isRecord(raw) || !isRecord(raw.role)) return null;
   const { id, provider, title, startedAt, role } = raw;
+  const story = normalizeStory(raw.story);
+  const subagent = normalizeSubagent(raw.subagent);
   if (!str(id) || !isOneOf(PROVIDERS, provider) || !str(startedAt)) return null;
   if (title !== null && !str(title)) return null;
   if (!str(role.id) || !str(role.name) || !str(role.model) || !isOneOf(EFFORTS, role.effort)) return null;
@@ -223,6 +266,24 @@ export function normalizeSummary(raw: unknown): ChatSummary | null {
     running: raw.running === true,
     waiting: isOneOf(WAIT_REASONS, raw.waiting) ? raw.waiting : null,
     ...(str(raw.card) ? { card: raw.card } : {}),
+    ...(story ? { story } : {}),
+    ...(raw.queued === true ? { queued: true as const } : {}),
+    ...(raw.stalled === true ? { stalled: true as const } : {}),
+    ...(subagent ? { subagent } : {}),
+  };
+}
+
+function normalizeSubagent(raw: unknown): SubagentRef | null {
+  return isRecord(raw) && str(raw.parent) ? { parent: raw.parent, stoppable: raw.stoppable === true } : null;
+}
+
+function normalizeStory(raw: unknown): StoryRef | null {
+  if (!isRecord(raw) || !str(raw.id) || !str(raw.feature)) return null;
+  return {
+    id: raw.id,
+    parent: str(raw.parent) ? raw.parent : null,
+    feature: raw.feature,
+    featureTitle: typeof raw.featureTitle === "string" ? raw.featureTitle : raw.feature,
   };
 }
 

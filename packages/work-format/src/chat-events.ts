@@ -33,6 +33,11 @@ export type ChatEvent =
   | { type: "started"; model: string }
   /** More of the agent's reply. `block` names the reply block it belongs to, so a block's deltas join up. */
   | { type: "text"; block: string; delta: string }
+  /**
+   * More of the agent's thinking, where the provider exposes it (STORY-53). Shown apart from its reply; `block` joins a
+   * block's deltas as for `text`.
+   */
+  | { type: "thinking"; block: string; delta: string }
   /** The agent called a tool. */
   | { type: "tool"; id: string; name: string; input: unknown }
   /** A tool call's result, as text. */
@@ -40,18 +45,30 @@ export type ChatEvent =
   /**
    * A tool call needs the user's approval (STORY-45): the chat waits until it is answered. `forChat` is false when
    * Allow for this chat isn't offered (the agent says the call may only be allowed once, or there is no rule for it),
-   * so only Allow and Deny are. `covers` says what Allow for this chat would cover, when it is offered.
+   * so only Allow and Deny are. `covers` says what Allow for this chat would cover, when it is offered. `story` is set
+   * on the copy the Dev Lead's chat shows of a story session's approval (STORY-9): the story it is for. `subagent` is
+   * set when a subagent the session spawned asks (STORY-55): its label.
    */
-  | { type: "approval"; id: string; name: string; input: unknown; forChat: boolean; covers?: string }
+  | {
+      type: "approval";
+      id: string;
+      name: string;
+      input: unknown;
+      forChat: boolean;
+      covers?: string;
+      story?: string;
+      subagent?: string;
+    }
   /** The call may run: the user allowed it, or an Allow for this chat already covers it (`scope: "chat"`). */
   | { type: "tool-allowed"; id: string; name: string; input: unknown; scope: AllowScope }
   /** The user denied a tool call, with the reason the agent was sent when there was one. */
   | { type: "tool-denied"; id: string; name: string; input: unknown; reason?: string }
   /**
    * The agent asks the user to choose (STORY-46): the chat waits until it is answered. `id` is the call's, so the
-   * question shows on the call's own row.
+   * question shows on the call's own row. `subagent` is set when a subagent the session spawned asks (STORY-55): its
+   * label.
    */
-  | { type: "question"; id: string; name: string; questions: Question[] }
+  | { type: "question"; id: string; name: string; questions: Question[]; subagent?: string }
   /** The user answered a question; the agent goes on with the answers. */
   | { type: "question-answered"; id: string; answers: Answers }
   /** A request (an approval or a question) ended unanswered: Stop, the chat closing, or the agent no longer waiting. */
@@ -112,6 +129,8 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
       return str(raw.model) ? { type: "started", model: raw.model } : null;
     case "text":
       return nonEmpty(raw.block) && str(raw.delta) ? { type: "text", block: raw.block, delta: raw.delta } : null;
+    case "thinking":
+      return nonEmpty(raw.block) && str(raw.delta) ? { type: "thinking", block: raw.block, delta: raw.delta } : null;
     case "tool":
       return nonEmpty(raw.id) && nonEmpty(raw.name)
         ? { type: "tool", id: raw.id, name: raw.name, input: raw.input ?? null }
@@ -134,12 +153,20 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
             input: raw.input ?? null,
             forChat: raw.forChat === true,
             ...(raw.forChat === true && nonEmpty(raw.covers) ? { covers: raw.covers } : {}),
+            ...(nonEmpty(raw.story) ? { story: raw.story } : {}),
+            ...(nonEmpty(raw.subagent) ? { subagent: raw.subagent } : {}),
           }
         : null;
     case "question": {
       const questions = normalizeQuestions(raw.questions);
       return nonEmpty(raw.id) && nonEmpty(raw.name) && questions
-        ? { type: "question", id: raw.id, name: raw.name, questions }
+        ? {
+            type: "question",
+            id: raw.id,
+            name: raw.name,
+            questions,
+            ...(nonEmpty(raw.subagent) ? { subagent: raw.subagent } : {}),
+          }
         : null;
     }
     case "question-answered": {
@@ -234,4 +261,20 @@ export const CHAT_MESSAGES = {
   onceOnly: "This call can only be allowed once.",
   /** An answer that doesn't answer every question the way it asks (STORY-46). */
   badAnswer: "Answer every question.",
+  /** A story session on a role whose provider has no runner for it (STORY-9). */
+  noRunner: "This role's agent can't run story sessions yet.",
+  /** A story session still waiting for a free slot: nothing can be sent to it (STORY-9). */
+  queued: "Queued. It starts when a story agent ends.",
+  /** Resume on a session whose provider can't go on with a session it stopped (STORY-53). */
+  noResume: "This agent can't resume a stopped session.",
+  /** Resume on a session with no saved provider session to go on in (STORY-53). */
+  unsaved: "This session has nothing to continue.",
+  /** A message to a subagent: it is a read-only transcript of an agent the session spawned for itself (STORY-55). */
+  subagent: "A subagent is read-only.",
+  /** Stop on a subagent the provider can't stop on its own, or that has ended (STORY-55). */
+  noSubagentStop: "This subagent can't be stopped.",
+  /** Archive on anything but a subagent that has ended (STORY-55). */
+  noSubagentArchive: "Only a subagent that has ended can be archived.",
+  /** Stop or Resume on a story whose session isn't there: it never started, or was closed (STORY-53). */
+  noSession: "This story has no session.",
 } as const;

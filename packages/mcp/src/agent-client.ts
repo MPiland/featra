@@ -73,6 +73,36 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       if (!result) throw new Error("Featra gave an unexpected answer.");
       return result;
     },
+    async start(feature) {
+      const result = await call("feature.start", { feature });
+      if (!isRecord(result) || typeof result.branch !== "string") throw new Error("Featra gave an unexpected answer.");
+      return { branch: result.branch };
+    },
+    async spawn(input) {
+      const result = await call("story.spawn", input);
+      if (!isRecord(result) || typeof result.chat !== "string" || typeof result.queued !== "boolean") {
+        throw new Error("Featra gave an unexpected answer.");
+      }
+      return { chat: result.chat, queued: result.queued };
+    },
+    async update(input) {
+      const result = await call("card.update", input);
+      const changes = isRecord(result) && Array.isArray(result.changes) ? result.changes : null;
+      if (
+        !isRecord(result) ||
+        typeof result.card !== "string" ||
+        !changes ||
+        !changes.every((c) => typeof c === "string")
+      ) {
+        throw new Error("Featra gave an unexpected answer.");
+      }
+      return { card: result.card, changes: changes.map(String) };
+    },
+    async message(input) {
+      const result = await call("session.message", input);
+      if (!isRecord(result) || typeof result.story !== "string") throw new Error("Featra gave an unexpected answer.");
+      return { story: result.story };
+    },
     close: () => socket.close(),
   };
 }

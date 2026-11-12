@@ -6,6 +6,9 @@
  */
 import type { DraftInput, DraftResult } from "./card-draft-input.ts";
 import type { LogFile, LogInput } from "./knowledge-log.ts";
+import type { ReportInput } from "./card-report.ts";
+import type { MessageInput } from "./story-notice.ts";
+import type { SpawnInput } from "./story-start.ts";
 import { isRecord } from "./utils/guards.ts";
 
 /** The path agents connect to. */
@@ -22,8 +25,24 @@ export interface AgentMethods {
   "log.append": { params: LogInput; result: LoggedEntry };
   /** Drafts a feature and its stories, or revises the chat's open draft in place (STORY-8). */
   "cards.draft": { params: DraftInput; result: DraftResult };
+  /** Starts an approved feature: its branch, with the feature active on it, by the chat's session (STORY-52). */
+  "feature.start": { params: { feature: string }; result: { branch: string } };
+  /** Starts a story's agent in its own worktree as a session nested under the calling chat (STORY-9). */
+  "story.spawn": { params: SpawnInput; result: { chat: string; queued: boolean } };
+  /** Reports progress on a card: a story session's own, or one of the Dev Lead's feature (STORY-10). `card` is the card's id. */
+  "card.update": { params: ReportInput; result: { card: string; changes: string[] } };
+  /** The Dev Lead tells a story's session something, which goes on its next turn; refused for any other chat (STORY-54). */
+  "session.message": { params: MessageInput; result: { story: string } };
 }
 export type AgentMethod = keyof AgentMethods;
+export const AGENT_METHODS = [
+  "log.append",
+  "cards.draft",
+  "feature.start",
+  "story.spawn",
+  "card.update",
+  "session.message",
+] as const satisfies readonly AgentMethod[];
 
 export interface AgentRequest {
   id: number;
@@ -42,6 +61,7 @@ export function parseAgentRequest(text: string): AgentRequest | { id: number | n
   if (!isRecord(raw) || typeof raw.id !== "number" || !Number.isSafeInteger(raw.id)) {
     return { id: null, error: "Malformed request." };
   }
-  if (raw.method !== "log.append" && raw.method !== "cards.draft") return { id: raw.id, error: "Unknown method." };
-  return { id: raw.id, method: raw.method, params: raw.params };
+  const method = AGENT_METHODS.find((m) => m === raw.method);
+  if (!method) return { id: raw.id, error: "Unknown method." };
+  return { id: raw.id, method, params: raw.params };
 }

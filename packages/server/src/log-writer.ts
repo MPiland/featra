@@ -7,7 +7,6 @@
 import { randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
 import {
   appendEntry,
   CHAT_MESSAGES,
@@ -20,6 +19,7 @@ import {
   type LogInput,
 } from "@featra/work-format";
 import { projectKey } from "./allowed-projects.ts";
+import { isBusy, retryBusy } from "./busy-retry.ts";
 import { ChatError } from "./chat-error.ts";
 
 /** The disk the log files are read from and written to. A missing file reads as null. */
@@ -31,10 +31,6 @@ export interface LogFs {
    */
   write: (file: string, text: string, base: string | null) => Promise<"changed" | void>;
 }
-
-/** Windows holds a file briefly while a virus scanner or an editor has it open: replacing it then fails, and passes. */
-const BUSY = new Set(["EPERM", "EBUSY"]);
-const REPLACE_TRIES = 5;
 
 export interface NodeLogFsDeps {
   rename?: typeof rename;
@@ -52,7 +48,7 @@ async function readText(file: string): Promise<string | null> {
 }
 
 /** The real disk: writes replace the file atomically, so a crash never leaves half an entry. */
-export function createNodeLogFs({ rename: move = rename, pause = delay }: NodeLogFsDeps = {}): LogFs {
+export function createNodeLogFs({ rename: move = rename, pause }: NodeLogFsDeps = {}): LogFs {
   return {
     read: readText,
     async write(file, text, base) {
@@ -63,16 +59,11 @@ export function createNodeLogFs({ rename: move = rename, pause = delay }: NodeLo
         await writeFile(tmp, text, "utf8");
         // The user may have saved the file since it was read: look again just before it is replaced.
         if ((await readText(file)) !== base) return "changed";
-        for (let attempt = 1; ; attempt++) {
-          try {
-            return await move(tmp, file);
-          } catch (err) {
-            if (!isRecord(err) || typeof err.code !== "string" || !BUSY.has(err.code)) throw err;
-            if (attempt >= REPLACE_TRIES) {
-              throw new ChatError(`Couldn't write ${basename(file)}: another program has it open.`, { cause: err });
-            }
-            await pause(25 * attempt);
-          }
+        try {
+          return await retryBusy(() => move(tmp, file), pause);
+        } catch (err) {
+          if (!isBusy(err)) throw err;
+          throw new ChatError(`Couldn't write ${basename(file)}: another program has it open.`, { cause: err });
         }
       } finally {
         await rm(tmp, { force: true });

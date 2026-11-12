@@ -8,12 +8,39 @@ epics in `.featra/cards/`.
 
 ## M2 and later
 
+- **Clean up subagent worktrees.** The SDK does not report a subagent's worktree (STORY-55); when it does, Archive removes
+  the worktree if it is clean and keeps it, with a short message, if it has changes.
+- **Featra plugins** (ADR 0029): anyone builds plugins others install. A plugin can add a full pane, a modal, sidebar
+  views and actions with its own buttons (for example a UX design pane that annotates image, PDF or Figma mockups and
+  sends the notes to the story's agent), through a permissioned Featra API (cards, sessions, project files, Inbox,
+  settings, named network hosts). An opt-in tier runs local programs. Plugins can bundle role presets and provider
+  parts. Installed from git or URLs and from marketplace lists; a curated registry later.
 - **Remote control** (MVP), phone first, reusing the same React client against the local server. Over Tailscale
   (for example Tailscale Serve, reachable only inside the tailnet), with an SSH tunnel to the server as an alternative
   for users without Tailscale. Featra never exposes a public port, and it keeps nothing hosted. It does not rely on
   vendors' own remote-control features: imported sessions are resumed in place, so they carry over to the vendor's CLI the
   way they do natively.
-- **More providers:** Codex next, then ACP agents.
+- **Keep queued story sessions across a restart** (FEAT-5 keeps the queue in memory), or tell the Dev Lead the
+  queue was cleared.
+  The same goes for story notices held for a busy Dev Lead: they live in memory and are lost across a restart (accepted
+  for STORY-54).
+- **Restore subagents after a restart:** a session's subagents live in memory and are gone with the process (STORY-55).
+  The SDK can read them back (`listSubagents`, `getSubagentMessages`), so a restored session could list them again.
+- **Story notices in the Inbox when no Dev Lead is open:** a story whose Dev Lead is gone gets its ended, stopped and
+  failed notices shown to the user, as its questions already are.
+- **A per-story notice budget or back-off:** a Dev Lead and a story session can message each other without limit
+  (`message_session` and notices), and nothing stops a loop.
+- **Evidence in the card pane:** show an acceptance criterion's evidence link there (STORY-10 writes it to the card;
+  the pane does not show it yet).
+- **Agents link tests to criteria** through `update_card` (today a criterion's `test:` link is written by hand, not by
+  an agent's report).
+- **More providers:** Codex next (a runner behind the provider-neutral spawn interface from FEAT-5), then ACP agents.
+- **Agents from different providers in one room:** for example ChatGPT as UX and Claude as developer working the
+  same project. First step is free once a Codex runner exists: the Dev Lead relays through `message_session`. The
+  open design is direct agent-to-agent talk: turn-taking, loop and token guards, what the user sees, and each side's
+  permissions. Explore with the user before shaping.
+- **Sidebar grouping as a choice:** group chats by feature or by provider, with each chat showing its provider as a
+  badge, so mixed-provider work reads as one team.
 - **Knowledge:** a generated knowledge index, and an opt-in work protocol.
 - **Importers** for BMAD, spec-kit, OpenSpec and GSD.
 - **SSH remote compute.**
@@ -28,6 +55,15 @@ epics in `.featra/cards/`.
   so any agent can use them. Off by default (tool definitions cost tokens), with per-app approval, browsers and
   terminals restricted, and macOS screen-recording and accessibility permissions. Linux under Wayland limits it. M1
   covers browser use only (STORY-40).
+
+- **Performance: unwatched projects pay two git scans per card write.** Reuse git state for lane writes on unwatched
+  folders, as the watched path does (ADR 0016). Not M1 scope.
+- **Test hygiene:** the ordering case in `agent-card-update-review.test.ts` needs the STORY-6 session that the "who is
+  calling" case spawns, so it fails when run alone; make each case build its own.
+
+- **Test hygiene:** a shared `startChat(page, role)` e2e helper. The picker-then-composer sequence is hand-rolled in
+  about 11 specs (chat, chat-log, composer, draft, inbox, review-draft, chat-approvals, chat-questions, chat-list,
+  chat-restore, roles), so a fix like BUG-17's has to be made in each.
 
 ## Before public release
 

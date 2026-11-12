@@ -21,17 +21,19 @@ export interface ToolResult {
 
 /** Where a tool row's approval stands: waiting on the user, or allowed (by the user, or by an earlier Allow for this chat). */
 export type ToolApproval =
-  | { status: "pending"; forChat: boolean; covers?: string }
+  | { status: "pending"; forChat: boolean; covers?: string; story?: string; subagent?: string }
   | { status: "allowed"; scope: AllowScope };
 
 /** Where a question stands: waiting on the user, or answered with what they chose. */
 export type ToolQuestion =
-  | { status: "pending"; questions: Question[] }
+  | { status: "pending"; questions: Question[]; subagent?: string }
   | { status: "answered"; questions: Question[]; answers: Answers };
 
 export type ChatItem =
   | { kind: "user"; key: string; text: string }
   | { kind: "assistant"; key: string; block: string; text: string }
+  /** The agent's thinking, where the provider exposes it (STORY-53). */
+  | { kind: "thinking"; key: string; block: string; text: string }
   | {
       kind: "tool";
       key: string;
@@ -129,12 +131,12 @@ const unasked = (row: ToolItem) => ({
   question: row.question?.status === "pending" ? null : row.question,
 });
 
-function appendText(state: ChatState, block: string, delta: string): ChatState {
+function appendText(state: ChatState, kind: "assistant" | "thinking", block: string, delta: string): ChatState {
   const last = state.items.at(-1);
-  if (last?.kind === "assistant" && last.block === block) {
+  if (last?.kind === kind && last.block === block) {
     return replace(state, state.items.length - 1, { ...last, text: last.text + delta });
   }
-  return push(state, { kind: "assistant", key: key(state), block, text: delta });
+  return push(state, { kind, key: key(state), block, text: delta });
 }
 
 /**
@@ -146,6 +148,8 @@ const endTools = (state: ChatState, stopped: boolean): ChatState => ({
   ...state,
   items: state.items.map((item) => {
     if (item.kind !== "tool" || item.result !== null || item.denied) return item;
+    // A story session's request shown here belongs to the session's turn, not this one.
+    if (item.approval?.status === "pending" && item.approval.story) return item;
     const open = unasked(item);
     return stopped ? { ...item, ...open, stopped: true } : { ...item, ...open, cancelled: !item.stopped };
   }),
@@ -160,16 +164,28 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
     case "usage":
       return { ...state, usage: { used: event.used, window: event.window } };
     case "text":
-      return event.delta ? appendText(state, event.block, event.delta) : state;
+      return event.delta ? appendText(state, "assistant", event.block, event.delta) : state;
+    case "thinking":
+      return event.delta ? appendText(state, "thinking", event.block, event.delta) : state;
     case "tool":
       return upsertTool(state, event.id, event.name, event.input);
     case "approval":
       return upsertTool(state, event.id, event.name, event.input, () => ({
-        approval: { status: "pending", forChat: event.forChat, ...(event.covers ? { covers: event.covers } : {}) },
+        approval: {
+          status: "pending",
+          forChat: event.forChat,
+          ...(event.covers ? { covers: event.covers } : {}),
+          ...(event.story ? { story: event.story } : {}),
+          ...(event.subagent ? { subagent: event.subagent } : {}),
+        },
       }));
     case "question":
       return upsertTool(state, event.id, event.name, { questions: event.questions }, () => ({
-        question: { status: "pending", questions: event.questions },
+        question: {
+          status: "pending",
+          questions: event.questions,
+          ...(event.subagent ? { subagent: event.subagent } : {}),
+        },
       }));
     case "question-answered":
       return updateTool(state, event.id, (row) =>

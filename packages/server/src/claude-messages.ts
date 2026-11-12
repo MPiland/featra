@@ -1,7 +1,8 @@
 /**
  * Turns the Agent SDK's message stream into chat events (ADR 0018). The stream is the agent's output, so it is read
- * as `unknown` and narrowed here, at the boundary. Only the main conversation shows: a subagent's own messages
- * (`parent_tool_use_id` set) stay inside its Task row.
+ * as `unknown` and narrowed here, at the boundary. A main conversation's translator drops a subagent's own messages
+ * (`parent_tool_use_id` set): `claude-subagents.ts` gives each subagent a translator of its own (STORY-55), which keeps
+ * them and ignores everything of the session (its start, its result).
  */
 import { isRecord, type ChatEvent } from "@featra/work-format";
 
@@ -80,12 +81,17 @@ function contextWindow(modelUsage: unknown, model: string): number | null {
   return typeof window === "number" && window > 0 ? window : null;
 }
 
-/** `session` is the session a resumed chat goes on with, until the agent reports its own. */
-export function createClaudeTranslator(session: string | null = null): ClaudeTranslator {
+/**
+ * `session` is the session a resumed chat goes on with, until the agent reports its own. `subagent` makes the translator
+ * of one subagent's messages: it reads its transcript, never the session's own start or result.
+ */
+export function createClaudeTranslator(session: string | null = null, subagent = false): ClaudeTranslator {
   let stopping = false;
   let loggedOut = false;
   /** Assistant messages whose text came as deltas, so their full copy adds no text. */
   const streamed = new Set<string>();
+  /** The same for thinking (STORY-53), which streams apart from the text. */
+  const thought = new Set<string>();
   let current = "";
   /** The model the agent reported at start, and the context its last assistant message used this turn. */
   let model = "";
@@ -102,11 +108,17 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
       current = text(event.message.id);
       return [];
     }
-    if (event.type !== "content_block_delta" || !isRecord(event.delta) || event.delta.type !== "text_delta") return [];
-    if (!current) return [];
+    if (event.type !== "content_block_delta" || !isRecord(event.delta) || !current) return [];
+    const block = `${current}:${String(event.index)}`;
+    if (event.delta.type === "thinking_delta") {
+      thought.add(current);
+      const delta = text(event.delta.thinking);
+      return delta ? [{ type: "thinking", block, delta }] : [];
+    }
+    if (event.delta.type !== "text_delta") return [];
     streamed.add(current);
     const delta = text(event.delta.text);
-    return delta ? [{ type: "text", block: `${current}:${String(event.index)}`, delta }] : [];
+    return delta ? [{ type: "text", block, delta }] : [];
   }
 
   /**
@@ -121,6 +133,10 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
       if (block.type === "text" && !streamed.has(id)) {
         const t = text(block.text);
         return t ? [{ type: "text", block: `${id}:${i}`, delta: t }] : [];
+      }
+      if (block.type === "thinking" && !thought.has(id)) {
+        const t = text(block.thinking);
+        return t ? [{ type: "thinking", block: `${id}:${i}`, delta: t }] : [];
       }
       if (block.type === "tool_use" && typeof block.id === "string" && typeof block.name === "string") {
         return [{ type: "tool", id: block.id, name: block.name, input: block.input ?? null }];
@@ -160,10 +176,11 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
   return {
     translate(message) {
       if (!isRecord(message)) return [];
-      if (message.parent_tool_use_id !== null && message.parent_tool_use_id !== undefined) return [];
+      // The session's translator drops a subagent's messages; a subagent's own is handed only its own.
+      if (!subagent && message.parent_tool_use_id !== null && message.parent_tool_use_id !== undefined) return [];
       switch (message.type) {
         case "system":
-          if (message.subtype !== "init") return [];
+          if (message.subtype !== "init" || subagent) return [];
           session = text(message.session_id) || session;
           model = text(message.model);
           used = null;
@@ -175,7 +192,7 @@ export function createClaudeTranslator(session: string | null = null): ClaudeTra
         case "user":
           return isRecord(message.message) ? toolResults(message.message) : [];
         case "result":
-          return result(message);
+          return subagent ? [] : result(message);
         default:
           return [];
       }

@@ -2,6 +2,7 @@ import { createAgentBridge, type AgentBridge } from "./agent-bridge.ts";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { createApi, type Api } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
+import { createCardReport } from "./card-report.ts";
 import { createCardLane } from "./card-lane.ts";
 import { createChatManager } from "./chat-manager.ts";
 import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts";
@@ -11,10 +12,14 @@ import { loadAgentQuery } from "./claude-sdk.ts";
 import { createDraftActions } from "./draft-actions.ts";
 import { createDraftReview } from "./draft-review.ts";
 import { createDraftWriter } from "./draft-writer.ts";
+import { createFeatureStart } from "./feature-start.ts";
+import { createStoryMessage } from "./story-message.ts";
+import { createStorySpawn } from "./story-spawn.ts";
+import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createLogWriter, type LogWriterDeps } from "./log-writer.ts";
-import { readKnowledge, readMcpEnabled } from "./mcp-enabled.ts";
+import { readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
 import { createRepoGit, type RepoGit } from "./repo-git.ts";
 import { createClaudeReader } from "./claude-reader.ts";
 import { createCodexReader } from "./codex-reader.ts";
@@ -49,6 +54,8 @@ export interface ServiceOptions {
   mcpExecPath?: string;
   /** How entries agents log are written and dated: the real disk and clock by default. */
   logs?: LogWriterDeps;
+  /** How long Stop waits for a provider to end the turn it interrupts; ten seconds by default. */
+  interruptMs?: number;
 }
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
@@ -66,6 +73,7 @@ export function createServices({
   mcpEntry,
   mcpExecPath,
   logs,
+  interruptMs,
 }: ServiceOptions): {
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
@@ -91,9 +99,20 @@ export function createServices({
     roles,
     log,
     store,
+    storyLimit: readMaxStoryAgents(dataDir),
     mcp: { attach: (chat) => agents.attach(chat), release: (chat) => agents.release(chat) },
   });
+  const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
+  const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
+  const stops = createStoryStop({ scan: watches.scan, now, lane, chats, ...(interruptMs ? { interruptMs } : {}) });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
+  const reports = createCardReport({
+    scan: watches.scan,
+    now,
+    lane,
+    leads: (dir, story) =>
+      chats.list(dir).flatMap((c) => (c.story?.id === story && c.story.parent ? [c.story.parent] : [])),
+  });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,
     execPath: mcpExecPath,
@@ -103,6 +122,10 @@ export function createServices({
     chats,
     writer: createLogWriter({ now, ...logs }),
     drafts: createDraftWriter({ scan: watches.scan, now, lane }),
+    starts,
+    spawns,
+    reports,
+    messages: createStoryMessage({ scan: watches.scan, chats }),
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
@@ -117,6 +140,9 @@ export function createServices({
     cards,
     drafts,
     review: createDraftReview({ scan: watches.scan, now, lane, gitCommand }),
+    starts,
+    spawns,
+    stops,
     chats,
     roles,
     roleWatches,

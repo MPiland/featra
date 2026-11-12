@@ -9,7 +9,11 @@
 @import "./controls.css";
 @import "./setup.css";
 @import "./work.css";
+@import "./work-story.css";
+@import "./work-stale.css";
 @import "./card-pane.css";
 @import "./chat.css";
+@import "./chat-list.css";
+@import "./chat-story.css";
 @import "./chat-question.css";
 @import "./inbox.css";

@@ -10,7 +10,16 @@ export const CONTAINER_STATUSES: readonly ContainerStatus[] = ["draft", "approve
 /** stories and bugs use project stage names; `Cancelled` is always available. */
 export const CANCELLED = "Cancelled";
 
-export type HistoryField = "status" | "parent" | "evidence" | "accepted" | "content" | "sent-back";
+export type HistoryField =
+  | "status"
+  | "parent"
+  | "evidence"
+  | "accepted"
+  | "content"
+  | "sent-back"
+  | "stopped"
+  | "queued"
+  | "report";
 export const HISTORY_FIELDS: readonly HistoryField[] = [
   "status",
   "parent",
@@ -18,6 +27,9 @@ export const HISTORY_FIELDS: readonly HistoryField[] = [
   "accepted",
   "content",
   "sent-back",
+  "report",
+  "stopped",
+  "queued",
 ];
 
 /** Append-only record of a change, written at the card's owner (ADR 0002). */
@@ -38,6 +50,8 @@ export interface ChecklistItem {
 export interface AcceptanceCriterion extends ChecklistItem {
   /** Reference to the test that proves this AC, e.g. `packages/x/test/y.test.ts > name`. */
   test: string | null;
+  /** The evidence file an agent linked for this AC, inside the story's evidence folder (STORY-10). Absent when none. */
+  evidence?: string;
 }
 
 export interface BodySection {
@@ -93,4 +107,6 @@ export interface ProjectConfig {
   autoMerge: boolean;
   uat: boolean;
   knowledge: KnowledgePermission;
+  /** The most story sessions that run at once (STORY-9); the rest wait, Queued. */
+  maxStoryAgents: number;
 }

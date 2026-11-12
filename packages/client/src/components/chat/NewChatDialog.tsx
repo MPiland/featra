@@ -15,6 +15,7 @@ interface NewChatDialogProps {
 export function NewChatDialog({ chats, dir, onStarted, onClose }: NewChatDialogProps) {
   const [roles, setRoles] = useState<Role[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
   useEffect(() => {
     let live = true;
     chats.roles(dir).then(
@@ -27,9 +28,17 @@ export function NewChatDialog({ chats, dir, onStarted, onClose }: NewChatDialogP
   }, [chats, dir]);
 
   async function start(role: Role) {
-    const r = await chats.start(dir, role.id);
-    if (r.ok) onStarted(r.id, role);
-    else setError(r.error);
+    setStarting(true);
+    setError(null);
+    try {
+      const r = await chats.start(dir, role.id);
+      if (r.ok) onStarted(r.id, role);
+      else setError(r.error);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setStarting(false);
+    }
   }
 
   return (
@@ -38,7 +47,7 @@ export function NewChatDialog({ chats, dir, onStarted, onClose }: NewChatDialogP
       <ul className="role-list" aria-label={CHAT_COPY.roles}>
         {roles?.map((role) => (
           <li key={role.id}>
-            <button type="button" className="role-pick" onClick={() => void start(role)}>
+            <button type="button" className="role-pick" disabled={starting} onClick={() => void start(role)}>
               <span className="role-name">{role.name}</span>
               <span className="role-meta">
                 {role.model} · {role.effort} · {modeLabel(role.mode ?? ASK_MODE)}
@@ -47,6 +56,7 @@ export function NewChatDialog({ chats, dir, onStarted, onClose }: NewChatDialogP
           </li>
         ))}
       </ul>
+      {starting && <p role="status">{CHAT_COPY.starting}</p>}
       {error && (
         <p className="chat-error" role="alert">
           {error}

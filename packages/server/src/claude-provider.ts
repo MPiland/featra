@@ -3,27 +3,34 @@
  * user's own `claude` in the project folder, with the role's prompt appended to Claude Code's system prompt and the
  * role's model and effort. `settingSources` keeps the SDK default, so CLAUDE.md, skills and hooks load as usual.
  */
+import { join } from "node:path";
 import type { CanUseTool, Options, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 import {
   EFFORTS,
   errorMessage,
   isOneOf,
+  isRecord,
   type ChatEvent,
   type ChatSettings,
   type PermissionMode,
   type Role,
+  type TurnOutcome,
 } from "@featra/work-format";
-import { claudeControls, claudeSettings, sdkMode } from "./claude-controls.ts";
+import { claudeCanUseTool } from "./claude-approvals.ts";
+import { claudeControls, claudeSettings, sdkMode, thinkingOption } from "./claude-controls.ts";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
-import { claudeQuestions, questionResult } from "./claude-question.ts";
-import { sessionRules, suggestedRule } from "./claude-rules.ts";
+import { createClaudeSubagents } from "./claude-subagents.ts";
 import { loadSessionReader } from "./claude-sdk.ts";
 import { claudeHistory, type SessionReader } from "./claude-transcript.ts";
 import { createInputQueue, type InputQueue } from "./input-queue.ts";
 import type { McpServerSpec, ProviderAdapter, ProviderSession, SessionOptions } from "./provider.ts";
 
 /** A running query: the agent's messages, and how to stop its turn. */
-export type ClaudeQuery = AsyncIterable<unknown> & { interrupt: () => Promise<unknown> };
+export type ClaudeQuery = AsyncIterable<unknown> & {
+  interrupt: () => Promise<unknown>;
+  /** Ends one background task, a subagent among them (STORY-55). */
+  stopTask?: (task: string) => Promise<unknown>;
+};
 
 /** The SDK's `query`, narrowed to how Featra calls it. Tests fake it here, at the package boundary. */
 export type QueryFn = (args: { prompt: AsyncIterable<SDKUserMessage>; options: Options }) => ClaudeQuery;
@@ -64,7 +71,9 @@ export function claudeOptions(
   resume: string | null,
   mcp: McpServerSpec | null = null,
   settings: ChatSettings = claudeSettings(role),
+  inherited: readonly unknown[] = [],
 ): Options {
+  const allowed = [...(mcp ? [`mcp__${mcp.name}`] : []), ...inheritedTools(inherited)];
   return {
     cwd,
     model: settings.model,
@@ -72,20 +81,35 @@ export function claudeOptions(
     systemPrompt: { type: "preset", preset: "claude_code", append: role.prompt },
     pathToClaudeCodeExecutable: claude,
     ...sdkMode(settings.mode),
+    ...thinkingOption(settings.model),
     includePartialMessages: true,
+    // Each subagent's own conversation, so its transcript can be shown (STORY-55); else only its tool calls come.
+    forwardSubagentText: true,
     canUseTool,
     env,
     ...(resume ? { resume } : {}),
     ...(mcp ? mcpOptions(mcp) : {}),
+    ...(allowed.length > 0 ? { allowedTools: allowed } : {}),
   };
+}
+
+/** The tool rules of the allow rules a parent chat was given (`addRules` updates), as `allowedTools` writes them. */
+function inheritedTools(inherited: readonly unknown[]): string[] {
+  return inherited.flatMap((u) =>
+    isRecord(u) && u.type === "addRules" && u.behavior === "allow" && Array.isArray(u.rules)
+      ? u.rules
+          .filter((r): r is { toolName: string; ruleContent?: string } => isRecord(r) && typeof r.toolName === "string")
+          .map((r) => (r.ruleContent ? `${r.toolName}(${r.ruleContent})` : r.toolName))
+      : [],
+  );
 }
 
 /**
  * Featra's own MCP as Claude takes it: a stdio server, with its tools allowed without asking. Only these tools: the
  * user's own allow and deny rules, and Ask for everything else, stand as before (ADR 0018, ADR 0019).
  */
-function mcpOptions({ name, command, args, env }: McpServerSpec): Pick<Options, "mcpServers" | "allowedTools"> {
-  return { mcpServers: { [name]: { type: "stdio", command, args, env } }, allowedTools: [`mcp__${name}`] };
+function mcpOptions({ name, command, args, env }: McpServerSpec): Pick<Options, "mcpServers"> {
+  return { mcpServers: { [name]: { type: "stdio", command, args, env } } };
 }
 
 const userMessage = (text: string, session: string | null): SDKUserMessage => ({
@@ -108,16 +132,22 @@ export function createClaudeProvider({
     controls: claudeControls,
     settings: claudeSettings,
     start: (options) => startSession(options, { loadQuery, locate, env }),
+    resumes: true,
+    worktrees: {
+      folder: (repo, name) => join(repo, ".claude", "worktrees", name),
+      ignore: ".claude/worktrees/",
+    },
     history: async (session, cwd) => claudeHistory(await loadSessions(), session, cwd),
   };
 }
 
 function startSession(
-  { cwd, role: startRole, approve, ask, emit, resume, mcp }: SessionOptions,
+  { cwd, role: startRole, approve, ask, emit, subagent, resume, mcp, inherited }: SessionOptions,
   { loadQuery, locate, env }: Omit<Required<ClaudeDeps>, "loadSessions">,
 ): ProviderSession {
   // A restored chat resumes its session; the agent's own report of its session id takes over once it starts.
   const translator = createClaudeTranslator(resume ?? null);
+  const subagents = createClaudeSubagents((event) => subagent?.(event));
   let input: InputQueue<SDKUserMessage> | null = null;
   let query: ClaudeQuery | null = null;
   let closed = false;
@@ -130,40 +160,28 @@ function startSession(
   const configKey = () => JSON.stringify([role.prompt, settings]);
   /** A turn is open from its message until its turn-end. */
   let open = false;
+  /** Settles when the agent of the latest `send` is running, or its start ended without one. */
+  let started: Promise<void> = Promise.resolve();
 
-  const canUseTool: CanUseTool = async (name, toolInput, options) => {
-    const { signal, toolUseID, suppressAlwaysAllowRule, suggestions } = options;
-    // The agent asks the user to choose: a card, not an approval.
-    const asked = claudeQuestions(name, toolInput);
-    if (asked && "refusal" in asked) return asked.refusal;
-    if (asked) {
-      const request = { id: toolUseID, name, questions: asked.questions };
-      return questionResult(toolInput, await ask(request, AbortSignal.any([signal, turn.signal])));
-    }
-    // Claude says not to offer an always-allow for this call: Allow for this chat isn't offered either.
-    const forChat = suppressAlwaysAllowRule !== true;
-    const rules = forChat ? sessionRules(suggestions) : [];
-    const suggested = suggestedRule(rules);
-    const request = { id: toolUseID, name, input: toolInput, forChat, ...(suggested ? { suggested } : {}) };
-    const decision = await approve(request, AbortSignal.any([signal, turn.signal]));
-    // Allow for this chat on Claude's suggestion hands back the very rules suggested: Claude applies them.
-    const chosen = decision.allow && suggested !== null && decision.rule === suggested.rule;
-    return decision.allow
-      ? { behavior: "allow", updatedInput: decision.input, ...(chosen ? { updatedPermissions: rules } : {}) }
-      : { behavior: "deny", message: decision.message, ...(decision.interrupt ? { interrupt: true } : {}) };
-  };
+  const canUseTool = claudeCanUseTool({ subagents, approve, ask, signal: () => turn.signal });
 
   const relay = (e: ChatEvent) => {
-    if (e.type === "turn-end") open = false;
+    if (e.type === "turn-end") {
+      open = false;
+      // A foreground subagent can't outlive its turn; a background one goes on.
+      subagents.turnEnded(e.outcome);
+    }
     emit(e);
   };
 
-  const fail = (events: ChatEvent[]) => {
+  const fail = (events: ChatEvent[], subagentsEnd: TurnOutcome = "failed") => {
     // The agent is gone: a request it was waiting on ends before the turn does.
     turn.abort();
     input?.close();
     input = null;
     query = null;
+    // Its subagents went with it.
+    subagents.endAll(subagentsEnd);
     for (const e of events) relay(e);
   };
 
@@ -175,7 +193,7 @@ function startSession(
   };
 
   /** Starts the agent, then relays its stream until it ends. A later message starts it again, resuming. */
-  async function run(queue: InputQueue<SDKUserMessage>) {
+  async function run(queue: InputQueue<SDKUserMessage>, began: () => void) {
     // What this agent starts with, taken before anything is awaited: a change made while it starts differs from this
     // key, so the next message replaces the agent, and never relies on a message being held back.
     const starting = { role, settings };
@@ -195,6 +213,7 @@ function startSession(
         translator.sessionId(),
         attached,
         starting.settings,
+        inherited,
       );
       const queryFn = await loadQuery();
       if (closed || stoppedEarly()) return;
@@ -203,9 +222,11 @@ function startSession(
       return fail([failed(errorMessage(err)), END_FAILED]);
     }
     query = running;
+    began();
     let mid = false;
     try {
       for await (const message of running) {
+        if (subagents.handle(message)) continue;
         for (const e of translator.translate(message)) {
           if (e.type === "turn-end") mid = false;
           else if (e.type !== "started") mid = true;
@@ -218,7 +239,7 @@ function startSession(
       return;
     }
     // The agent ended on its own: a turn it left open fails, and the next message starts it again.
-    if (!closed && query === running) fail(mid ? [failed(FAILED), END_FAILED] : []);
+    if (!closed && query === running) fail(mid ? [failed(FAILED), END_FAILED] : [], open ? "failed" : "stopped");
   }
 
   return {
@@ -232,26 +253,36 @@ function startSession(
         input.close();
         input = null;
         query = null;
+        subagents.endAll("stopped");
       }
       const queue = input ?? createInputQueue<SDKUserMessage>();
       queue.push(userMessage(text, translator.sessionId()));
       if (input) return;
       input = queue;
-      run(queue).catch((err: unknown) => {
-        // Finding `claude` failed, or telling the chat did: end the turn, never leave the rejection loose.
-        if (!closed && input === queue) fail([failed(errorMessage(err)), END_FAILED]);
+      started = new Promise<void>((began) => {
+        run(queue, began)
+          .catch((err: unknown) => {
+            // Finding `claude` failed, or telling the chat did: end the turn, never leave the rejection loose.
+            if (!closed && input === queue) fail([failed(errorMessage(err)), END_FAILED]);
+          })
+          .finally(began);
       });
     },
+    started: () => started,
     configure(next, nextSettings) {
       role = next;
       settings = nextSettings;
     },
+    stopSubagent: (id) => subagents.stop(id, query?.stopTask?.bind(query)),
+    forgetSubagent: (id) => subagents.forget(id),
     async interrupt() {
       if (!open) return;
       turn.abort();
       // Only a turn the agent is running reads its result as stopped; before that, run() ends it (stoppedEarly).
       if (!query) return;
       translator.interrupted();
+      // Stop on the session also ends the background subagents it spawned.
+      await subagents.stopAll(query.stopTask?.bind(query));
       await query.interrupt();
     },
     close() {

@@ -12,7 +12,17 @@
  *   faked.
  * - "draft": calls the Featra MCP's draft_cards tool (STORY-8) to draft a feature with two stories. With "again" in the
  *   text it calls it a second time, giving back the IDs the first answer named, with the first story changed.
+ * - "report" (STORY-10): only with FEATRA_E2E_REPORT set, for a story session's first message ("You are working on
+ *   STORY-N"). Writes a small evidence file into the story's folder in its worktree, then calls the Featra MCP's
+ *   update_card tool: ticks the drafted task and criterion with that evidence, adds a task, moves the story to In
+ *   Review and notes it. The tool call is real; only the agent is faked.
+ * - "subagent" (STORY-55): the agent spawns a background subagent (an Agent call, `task_started`, and the subagent's own
+ *   messages, tagged as the SDK tags them). The subagent says something, then asks to run a Bash `npm test` through
+ *   canUseTool as itself (`agentID`), and when that is answered says more and waits for `stopTask`, which ends it with
+ *   a stopped `task_notification`; the session's turn then finishes.
  * - "slow": starts a reply and waits for interrupt().
+ * - with FEATRA_E2E_STORY_TURN=slow, a story session's first message ("You are working on ...") is a slow turn that
+ *   thinks first (STORY-53): it shows its thinking, then its reply, and waits for interrupt().
  * - anything else: streams "You said: <text>".
  *
  * Every assistant message reports its token use as the SDK does, growing by a thousand per user message (the first turn
@@ -23,11 +33,11 @@
  * the SDK's real reader can read it back after a restart. A resumed session (`options.resume`) goes on in that file,
  * and its reply names the earlier prompts it kept: "You said: <text>, after: <earlier>".
  */
-import { spawn } from "node:child_process";
-import { randomUUID } from "node:crypto";
-import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { createInterface } from "node:readline";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { callMcpTool } from "./fake-mcp-client.mjs";
+import { questionTurn, subagentTurn } from "./fake-agent-turns.mjs";
+import { sessionLog } from "./fake-session-log.mjs";
 
 const MAIN = { parent_tool_use_id: null };
 let seq = 0;
@@ -40,6 +50,11 @@ const delta = (text) => ({
   ...MAIN,
   type: "stream_event",
   event: { type: "content_block_delta", index: 0, delta: { type: "text_delta", text } },
+});
+const thinking = (text) => ({
+  ...MAIN,
+  type: "stream_event",
+  event: { type: "content_block_delta", index: 0, delta: { type: "thinking_delta", thinking: text } },
 });
 const assistant = (id, content) => ({
   ...MAIN,
@@ -88,51 +103,6 @@ async function* toolTurn(options, signal, twice) {
   if (twice) yield* bash(options, signal);
   yield* say("Done.");
   yield success("Done.");
-}
-
-/** Calls one tool of an MCP server over stdio (newline-delimited JSON-RPC), as an agent's host does. */
-async function callMcpTool(spec, name, args) {
-  const child = spawn(spec.command, spec.args ?? [], {
-    env: { ...process.env, ...spec.env },
-    stdio: ["pipe", "pipe", "inherit"],
-  });
-  const waiting = new Map();
-  let next = 0;
-  createInterface({ input: child.stdout }).on("line", (line) => {
-    try {
-      const message = JSON.parse(line);
-      waiting.get(message.id)?.(message);
-    } catch {
-      // Not a JSON-RPC line.
-    }
-  });
-  const ended = () => {
-    for (const answer of waiting.values()) answer({ error: { message: "The MCP server exited." } });
-  };
-  child.once("exit", ended);
-  child.once("error", ended);
-  const send = (message) =>
-    child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}
-`);
-  const call = (method, params) =>
-    new Promise((resolve) => {
-      const id = ++next;
-      waiting.set(id, resolve);
-      send({ id, method, params });
-    });
-  try {
-    await call("initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "fake", version: "0" },
-    });
-    send({ method: "notifications/initialized" });
-    const reply = await call("tools/call", { name, arguments: args });
-    if (reply.error) return { text: reply.error.message, isError: true };
-    return { text: reply.result.content.map((c) => c.text).join(""), isError: reply.result.isError === true };
-  } finally {
-    child.kill();
-  }
 }
 
 /** Logs a decision through the Featra MCP the way an agent would, when Featra gave it one. */
@@ -197,98 +167,36 @@ async function* draftTurn(options, again) {
   yield success("Done.");
 }
 
-const QUESTIONS = [
-  {
-    question: "Which colour do you prefer?",
-    header: "Colour",
-    options: [
-      { label: "Blue", description: "Calm" },
-      { label: "Red", description: "Loud" },
-    ],
-    multiSelect: false,
-  },
-  {
-    question: "Which features?",
-    header: "Features",
-    options: [
-      { label: "Search", description: "Find things" },
-      { label: "Export", description: "Get data out" },
-    ],
-    multiSelect: true,
-  },
-];
-
-/** An AskUserQuestion call, asked through canUseTool as the SDK asks; the tool's result says what the user chose. */
-async function* questionTurn(options, signal) {
-  const id = `toolu_ask_${++seq}`;
-  const input = { questions: QUESTIONS };
-  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "AskUserQuestion", input }]);
-  const decision = await options.canUseTool("AskUserQuestion", input, {
-    signal,
-    toolUseID: id,
-    requestId: `request_${seq}`,
-  });
-  const allowed = decision.behavior === "allow";
-  const given = allowed
-    ? Object.entries(decision.updatedInput.answers)
-        .map(([q, a]) => `"${q}"="${a}"`)
-        .join(", ")
-    : "";
-  yield toolResult(id, allowed ? given : decision.message, !allowed);
-  yield* say(allowed ? `Got: ${given}` : "No answer.");
+/** A story session's first turn, with FEATRA_E2E_REPORT set: reports on the story's card through the Featra MCP. */
+async function* reportTurn(options, text) {
+  const spec = options.mcpServers?.featra;
+  const story = /STORY-\d+/.exec(text)?.[0];
+  const feature = /FEAT-\d+/.exec(text)?.[0];
+  if (!spec || !story || !feature) {
+    yield* say("No Featra MCP.");
+    yield success("No Featra MCP.");
+    return;
+  }
+  const folder = `.featra/evidence/${feature}/${story}`;
+  mkdirSync(join(options.cwd, folder), { recursive: true });
+  writeFileSync(join(options.cwd, folder, "draft-shows.txt"), "The draft shows in Work.");
+  const id = `toolu_mcp_${++seq}`;
+  const input = {
+    stage: "In Review",
+    tasks: ["Write the draft"],
+    addTasks: ["Check the draft"],
+    criteria: [{ criterion: "The draft shows in Work", evidence: `${folder}/draft-shows.txt` }],
+    note: "Drafted and checked.",
+  };
+  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "mcp__featra__update_card", input }]);
+  const result = await callMcpTool(spec, "update_card", input);
+  yield toolResult(id, result.text, result.isError);
+  yield* say(`Tool said: ${result.text}`);
   yield success("Done.");
 }
 
-/**
- * The session's file, where Claude keeps it: `projects/<the cwd, non-alphanumerics as "-">/<session>.jsonl`. Claude
- * names the folder after the cwd's real path, so on Windows a short 8.3 name (`RUNNER~1`) is spelled out in full.
- */
-const sessionFile = (home, cwd, session) =>
-  join(home, "projects", cwd.replace(/[^a-zA-Z0-9]/g, "-"), `${session}.jsonl`);
-
-/** The session's file, kept as Claude keeps it, when the test gave Claude a config folder of its own. */
-function sessionLog(options) {
-  const home = process.env.CLAUDE_CONFIG_DIR;
-  if (!home) return { id: "fake-session", earlier: [], write: () => {} };
-  const id = options.resume ?? randomUUID();
-  const cwd = realpathSync.native(options.cwd);
-  const file = sessionFile(home, cwd, id);
-  const lines = existsSync(file)
-    ? readFileSync(file, "utf8")
-        .split("\n")
-        .filter(Boolean)
-        .map((l) => JSON.parse(l))
-    : [];
-  let parent = lines.at(-1)?.uuid ?? null;
-  const line = (type, message) => {
-    const uuid = randomUUID();
-    const entry = { type, parentUuid: parent, uuid, timestamp: new Date().toISOString(), isSidechain: false };
-    parent = uuid;
-    return JSON.stringify({
-      ...entry,
-      userType: "external",
-      cwd,
-      sessionId: id,
-      version: "2.1.0",
-      message,
-    });
-  };
-  const earlier = lines.filter((l) => l.type === "user" && typeof l.message.content === "string");
-  return {
-    id,
-    earlier: earlier.map((l) => l.message.content),
-    write: (text, reply) => {
-      mkdirSync(dirname(file), { recursive: true });
-      const user = line("user", { role: "user", content: text });
-      const answer = line("assistant", {
-        id: `msg_${++seq}`,
-        role: "assistant",
-        content: [{ type: "text", text: reply }],
-      });
-      appendFileSync(file, `${user}\n${answer}\n`);
-    },
-  };
-}
+const nothing = () => {};
+const helpers = { MAIN, assistant, toolResult, say, success, next: () => ++seq, seq: () => seq };
 
 export function query({ prompt, options }) {
   const log = process.env.FEATRA_E2E_AGENT_LOG;
@@ -300,11 +208,23 @@ export function query({ prompt, options }) {
     appendFileSync(log, `${JSON.stringify(seen)}\n`);
   }
   let release = null;
+  let releaseTask = nothing;
+  const taskStopped = new Promise((resolve) => (releaseTask = resolve));
   const stopped = () => new Promise((resolve) => (release = resolve));
   // Aborted on interrupt(), as the SDK aborts a permission request when its turn is interrupted.
   let turn = new AbortController();
 
   const session = sessionLog(options);
+
+  /** A reply that starts (with its thinking first, if any) and waits for interrupt(), then ends as stopped. */
+  async function* slow(thoughts, reply) {
+    const waiting = stopped();
+    yield start(`msg_${++seq}`);
+    for (const thought of thoughts) yield thinking(thought);
+    yield delta(reply);
+    await waiting;
+    yield { ...MAIN, type: "result", subtype: "error_during_execution", is_error: true, errors: [] };
+  }
 
   async function* run() {
     for await (const message of prompt) {
@@ -313,21 +233,25 @@ export function query({ prompt, options }) {
       sessionModel = String(options.model);
       yield { ...MAIN, type: "system", subtype: "init", session_id: session.id, model: options.model };
       turn = new AbortController();
-      if (text.includes("decide")) {
+      // A story session's first message is the card, which holds any word: only its marker routes it, never a keyword.
+      const brief = text.startsWith("You are working on");
+      const said = brief ? "" : text;
+      if (brief && process.env.FEATRA_E2E_REPORT) {
+        yield* reportTurn(options, text);
+      } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {
+        yield* slow(["The worktree is clean."], "Starting the story.");
+      } else if (said.includes("subagent")) {
+        yield* subagentTurn(helpers, options, turn.signal, taskStopped);
+      } else if (said.includes("decide")) {
         yield* decideTurn(options);
-      } else if (text.includes("draft")) {
-        yield* draftTurn(options, text.includes("again"));
-      } else if (text.includes("tool")) {
-        yield* toolTurn(options, turn.signal, text.includes("twice"));
-      } else if (text.includes("question")) {
-        yield* questionTurn(options, turn.signal);
-      } else if (text.includes("slow")) {
-        const id = `msg_${++seq}`;
-        const waiting = stopped();
-        yield start(id);
-        yield delta("Thinking it over");
-        await waiting;
-        yield { ...MAIN, type: "result", subtype: "error_during_execution", is_error: true, errors: [] };
+      } else if (said.includes("draft")) {
+        yield* draftTurn(options, said.includes("again"));
+      } else if (said.includes("tool")) {
+        yield* toolTurn(options, turn.signal, said.includes("twice"));
+      } else if (said.includes("question")) {
+        yield* questionTurn(helpers, options, turn.signal);
+      } else if (said.includes("slow")) {
+        yield* slow([], "Thinking it over");
       } else {
         const kept = session.earlier.length > 0 ? `, after: ${session.earlier.join(", ")}` : "";
         // Written before the reply shows, as Claude does, so a restart right after it finds the turn.
@@ -344,5 +268,7 @@ export function query({ prompt, options }) {
       turn.abort();
       release?.();
     },
+    // Ends the subagent's task, as the SDK's Query.stopTask does; the subagent turn then reports it stopped.
+    stopTask: async () => releaseTask(),
   });
 }

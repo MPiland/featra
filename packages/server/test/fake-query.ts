@@ -17,6 +17,12 @@ export interface FakeRun {
   /** Throws from the stream, as when `claude` crashes. */
   crash: (error: Error) => void;
   interrupts: number;
+  /** The task ids `stopTask` was asked to end (STORY-55). */
+  stopped: string[];
+  /** Makes `stopTask` refuse, as the SDK does for a task that has just ended. */
+  stopFails: boolean;
+  /** What an interrupt does besides counting: a test makes it fail or never finish, as a stuck provider does. */
+  onInterrupt: (() => Promise<void>) | null;
   /** True once Featra has closed its input: the session is over. */
   closed: boolean;
   /** The permission updates Featra returned with an allow, in order: Claude applies these. */
@@ -51,6 +57,9 @@ export function fakeQuery() {
       end: () => out.close(),
       crash: (error) => out.push({ error }),
       interrupts: 0,
+      stopped: [],
+      stopFails: false,
+      onInterrupt: null,
       closed: false,
       updates: [],
       ask: async (name, input, id, extra = {}) => {
@@ -91,6 +100,11 @@ export function fakeQuery() {
     const q: ClaudeQuery = Object.assign(stream(), {
       interrupt: async () => {
         run.interrupts += 1;
+        await run.onInterrupt?.();
+      },
+      stopTask: async (task: string) => {
+        run.stopped.push(task);
+        if (run.stopFails) throw new Error("No such task");
       },
     });
     return q;
@@ -151,4 +165,36 @@ export const sdk = {
     errors: [],
     ...extra,
   }),
+
+  /** A subagent's task starting (`task_started`): a background one by default. */
+  taskStarted: (task: string, call: string, extra: Record<string, unknown> = {}) => ({
+    ...MAIN,
+    type: "system",
+    subtype: "task_started",
+    task_id: task,
+    tool_use_id: call,
+    description: "Review the diff",
+    subagent_type: "reviewer",
+    task_type: "local_agent",
+    is_backgrounded: true,
+    prompt: "Review the diff.",
+    ...extra,
+  }),
+  taskUpdated: (task: string, patch: Record<string, unknown>) => ({
+    ...MAIN,
+    type: "system",
+    subtype: "task_updated",
+    task_id: task,
+    patch,
+  }),
+  taskDone: (task: string, status: "completed" | "failed" | "stopped", summary = "") => ({
+    ...MAIN,
+    type: "system",
+    subtype: "task_notification",
+    task_id: task,
+    status,
+    summary,
+  }),
+  /** A message of a subagent's own conversation: `message` is one of the helpers above, tagged as the SDK tags it. */
+  within: (call: string, task: string, message: object) => ({ ...message, parent_tool_use_id: call, agent_id: task }),
 };

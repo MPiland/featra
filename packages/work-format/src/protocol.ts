@@ -58,10 +58,7 @@ export interface ServerMethods {
   "work.applyCopy": { params: { dir: string; key: string }; result: CopyActionResult };
   /** Throws a stale copy's edit away: restores the copy from git. */
   "work.discardCopy": { params: { dir: string; key: string }; result: CopyActionResult };
-  /**
-   * One card as the card pane shows it, from its owner (null when there is no such card); then, until
-   * `work.unwatch`, a `card.view` push each time it changes (ADR 0017). The request's id names the watch.
-   */
+  /** One card from its owner (null if none), then a `card.view` push on each change until `work.unwatch` (ADR 0017). */
   "card.watch": { params: { dir: string; id: string }; result: CardView | null };
   /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
@@ -75,6 +72,27 @@ export interface ServerMethods {
    * main's checkout, never pushing. All or nothing; refused when the feature isn't a draft any more.
    */
   "draft.approve": { params: { dir: string; id: string }; result: { commit: string } };
+  /**
+   * Starts an approved feature (STORY-52, ADR 0024): creates `feature/N-slug` from the base branch without touching
+   * main's checkout, the feature active on it. All or nothing; refused when it isn't approved or its branch exists.
+   */
+  "feature.start": { params: { dir: string; id: string }; result: { branch: string } };
+  /**
+   * Starts a story's agent (STORY-9, ADR 0025): a worktree off the feature's branch, the story In Progress there, and a
+   * session in it, nested under the feature's chat. Answers `queued` when the project's limit is reached: the session
+   * starts when one ends. Refused when the story can't be started or its provider has no runner.
+   */
+  "story.start": { params: { dir: string; id: string }; result: { chat: string; queued: boolean } };
+  /**
+   * Stops a story's running turn (STORY-53, ADR 0026): marked Stopped, stage and worktree kept. A story queued and never
+   * started leaves the queue instead, unmarked. Refused when it has no turn or is already stopped.
+   */
+  "story.stop": { params: { dir: string; id: string }; result: null };
+  /**
+   * Resumes a Stopped story, or an In Progress one whose idle session ended without finishing: the same provider
+   * session goes on and Stopped is cleared. Refused when its provider can't resume.
+   */
+  "story.resume": { params: { dir: string; id: string }; result: null };
   /** Rejects a draft feature: deletes its card files. Refused when git tracks any of them. */
   "draft.reject": { params: { dir: string; id: string }; result: { removed: number } };
   /** The roles a chat in this project can start from (ADR 0018). */
@@ -101,6 +119,8 @@ export interface ServerMethods {
   "chat.send": { params: { id: string; text: string }; result: null };
   /** Interrupts the running turn. */
   "chat.stop": { params: { id: string }; result: null };
+  /** Removes an ended subagent from its session's nest (STORY-55); refused for any other chat, or one still running. */
+  "chat.archive": { params: { id: string }; result: null };
   /**
    * Answers the tool request the chat waits on (STORY-45): Allow, Allow for this chat, or Deny with an optional
    * reason the agent is sent. Refused when the request isn't waiting.
@@ -191,6 +211,10 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "card.update",
   "draft.sendBack",
   "draft.approve",
+  "feature.start",
+  "story.start",
+  "story.stop",
+  "story.resume",
   "draft.reject",
   "chat.roles",
   "roles.watch",
@@ -201,6 +225,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "chat.configure",
   "chat.send",
   "chat.stop",
+  "chat.archive",
   "chat.approve",
   "chat.answer",
   "chat.undoLog",
@@ -271,19 +296,7 @@ export function normalizeInitResult(raw: unknown): InitResult {
   return { ok: false, error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
 }
 
-/** The `{ dir, key }` params of the stale-copy actions, or null. */
-export function copyParams(params: unknown): { dir: string; key: string } | null {
-  const dir = dirParams(params);
-  return dir && isRecord(params) && typeof params.key === "string" && params.key ? { ...dir, key: params.key } : null;
-}
-
 /** The `{ watch }` params of `work.unwatch`, or null. */
 export function unwatchParams(params: unknown): { watch: number } | null {
   return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
-}
-
-export function normalizeCopyActionResult(raw: unknown): CopyActionResult {
-  const r = isRecord(raw) ? raw : {};
-  if (r.ok === true) return { ok: true };
-  return { ok: false, error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
 }

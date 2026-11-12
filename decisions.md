@@ -1299,3 +1299,237 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   of 50 full runs in a row. Under the cap the gate passed 4 of 5 and the soak 6 of 8; the failures are 20 s+ process
   stalls from the PC's memory pressure (WSL and kernel pools), which no repo change can fix. The product race fix and
   the cap merge now. No assertion changed.
+
+## 2026-11-10 — FEAT-5 Delegation shaped
+
+- **Start is its own action.** Approve still only commits the draft (ADR 0023). Start, by the user or the Dev Lead
+  (`start_feature`), creates `feature/N-slug` and moves the cards' ownership there.
+- **Story agents are Featra-run provider sessions that behave like subagents.** Neither Claude's SDK nor Codex documents
+  a per-subagent working directory, or stopping and messaging one child reliably. Both document starting a session in a
+  folder, streaming it, interrupting it and messaging it. So the Dev Lead (or the story row's Start) spawns a real
+  session per story through the provider interface. It nests under the feature's chat; the user watches it live,
+  read-only, and can Stop and Resume it. Messages go through the Dev Lead (`message_session`); story agents' questions go
+  to the Dev Lead first, which escalates to the user. Native subagents that a session spawns for itself show nested,
+  read-only, with Stop where the provider supports it.
+- **Story sessions inherit the Dev Lead's permission mode and always-allow rules.** Approvals they still need show in the
+  Dev Lead's chat, labelled with the story, then in the Inbox, so the user never has to open a story session to approve.
+- **Worktrees go where the provider keeps them** (Claude: `<repo>/.claude/worktrees/`, Codex: `~/.codex/worktrees/`), so
+  the user can resume the session in the provider's own tools. Featra never moves or deletes a worktree it didn't create.
+- **At most 3 story sessions run at once** (project setting); the rest queue. Stop keeps the stage and marks Stopped.
+- **`update_card` is scoped:** a story session edits only its own card (stage up to Acceptance, tasks, ACs, notes,
+  evidence), all Reported; the Dev Lead edits cards in its feature. Evidence is committed in
+  `.featra/evidence/FEAT-N/STORY-M/`, kept as small as the story allows.
+- **Claude runner only in F4.** The spawn interface is provider-neutral; the Codex runner stays on the roadmap.
+- Stories: STORY-52 Start a feature, STORY-9 Spawn a story agent, STORY-53 Watch, stop and resume, STORY-10 Agents update
+  their own card, STORY-54 Story agents report to the Dev Lead, STORY-55 Native subagents appear nested.
+
+## 2026-11-10 — Start's commit runs no hooks (user)
+
+- The user ruled: Start's commit is card-only and runs no hooks. Featra's own card-only bookkeeping commits on a branch
+  with no checkout (Start's, built with git plumbing and published with a create-only `update-ref`) don't run the
+  repository's hooks. Every commit made in a checkout still does: Approve in main, and every commit of an agent or the
+  user. Reason: Featra's own pre-commit runs the full check, which a temporary worktree can't pass; the plumbing commit
+  needs no worktree at all (ADR 0024).
+
+## 2026-11-11 — STORY-9 review rulings (dev-lead)
+
+- **Card fields corrected:** a started story's card records `agent: <provider>` and `role: <role id>` (the first build
+  wrote the role into `agent`). Start and `spawn_session` use the card's own role, else developer. The assertions that
+  encoded the old value were corrected to match (`story-spawn.test.ts`, `start-story.spec.ts`, `card-server.ts`,
+  `start-story.test.tsx`); approved as a spec correction, no proof weakened.
+- **The cap counts every turn:** at most N story sessions run at once, including later turns; a later turn waits Queued.
+- **Story sessions can't start story sessions;** only the Dev Lead and the user spawn.
+- **Queued sessions are kept in memory only** for now; saving the queue across a restart is on the roadmap.
+
+## 2026-11-11 - STORY-10 build choices (story agent, for the Dev Lead to confirm)
+
+- **`update_card` is new, and only ever Reported** (ADR 0027). One `report` history event per call, a `status` event for a
+  stage move; both `by: session:<chat>`.
+- **`evidenceState.reported` no longer counts a card's creation** (an agent-drafted story is not Reported); it counts a
+  session's status move after creation, or a `report`. Regression tests added.
+- **The Dev Lead may update stories and bugs of a feature it drafted, but not while the feature is still a review-pending
+  draft.** The stage ceiling is the last stage before Done.
+- **Evidence:** a plain file of at most 1 MB under the story's evidence folder, one link per criterion, newest wins.
+  The card pane does not show the link yet.
+
+## 2026-11-11 — STORY-10 review rulings (dev-lead)
+
+- The story agent's build choices above are confirmed.
+- **Spec correction:** the Dev Lead that spawned a story may update that story's card, in addition to cards in features it
+  drafted.
+- `report` history events store only what changed, as JSON, not the whole card.
+- `update_card` is refused once the story's worktree is gone, and only the story's latest session may update it.
+- Done and Cancelled cards are refused.
+
+## 2026-11-11 — STORY-53 Stop and Resume rulings (user)
+
+- **Story sessions are watch-only:** the live transcript, read-only, no composer; the Dev Lead steers them (STORY-54).
+  The assertion in `start-story.test.tsx` that a story session shows the composer is changed to the opposite, as the
+  spec requires.
+- **Stop keeps the card's stage** and marks it Stopped with a history event; the worktree and changes are untouched.
+  Resume goes on in the same provider session and clears Stopped with a history event. Stopped is derived from the
+  history, not a card field (ADR 0026).
+- **A stopped session doesn't count toward the cap;** Resume takes a slot or waits Queued like any turn. A queued
+  later turn can be stopped.
+- **No confirmation, any client:** Stop and Resume are the user's own action and work remotely.
+
+## 2026-11-11 — STORY-54 rulings (dev-lead)
+
+- **The Dev Lead for a story is the chat that spawned it** (the scope STORY-10 uses). If that chat is gone, it is not told.
+- **`message_session` to a Stopped story is refused:** "STORY-N is stopped. Only the user can resume it." Proved by a test.
+- **Notices are short app-written text** (story id, outcome ended/stopped/failed/asks, one-line summary) with no token
+  cost, delivered as a clearly labelled user-role message from Featra. If the Dev Lead is mid-turn they are queued and sent
+  as one message when its turn ends.
+- **A story's `ask_user` does not reach the user directly;** the Dev Lead gets a notice. The user's own Stop still
+  produces a "stopped" notice.
+
+### Build choices (story agent)
+
+- `ask_user` is the provider's own `AskUserQuestion`: refused with a message that has the session end its turn (not
+  interrupted), then an "asks" notice at turn end. The Dev Lead answers with `message_session` or asks the user itself.
+- **With no Dev Lead, a story's question still asks the user** (the old path and the Inbox). Completion, stop and failure
+  notices are not sent at all then: the Inbox holds only approvals and questions, so the ruling "notices go to the Inbox
+  for the user" is only partly met. Flagged for the Dev Lead.
+- `message_session` is also refused while the session is working or waiting for a slot, from any chat but the spawner
+  (a story session included), and for a card that is gone or no story.
+- A story the user takes off the queue before it started gets a "stopped" notice.
+- `packages/mcp/test/stdio.test.ts` gained `message_session` in its expected tool list (additive, as STORY-10 did).
+
+### Review rulings (dev-lead, round 2)
+
+- **No live Dev Lead: ended/stopped/failed notices are shown nowhere for now;** a question still goes to the user. This
+  relaxes the earlier "notices go to the Inbox" ruling. Roadmap: story notices in the Inbox when no Dev Lead is open.
+- **Unbounded lead-to-story ping-pong is accepted for now;** roadmap: a per-story notice budget or back-off.
+- A queued story that fails to start (its worktree or launch throws) posts a "failed" notice with the reason.
+- A Dev Lead whose own turn the user stopped is not given waiting notices; they are held and delivered when its next turn
+  that is not a stop ends.
+- "asks" notices carry each question with its option labels, every question the turn asked (none overwritten), and may
+  run to 600 characters (other notices stay at 160). The ask-summary format therefore changed in
+  `story-notices-ask.test.ts` and `story-notice.test.ts`: the old assertions did not hold the options.
+- A chat that ends forgets the questions and notices it held. A held question whose Dev Lead is gone by the end of the
+  turn asks the user in the story's chat (the no-Dev-Lead path), and the user's answer is sent to the session.
+- Delivery errors drop notices only when they can never succeed (the Dev Lead is closed or can't take a message); a
+  transient error keeps them for the next idle. Notices held in memory are lost across an app restart: accepted, on the
+  roadmap with "keep queued story sessions across a restart". Found while testing: a failed send also dropped them,
+  because they were removed before sending; now removed after.
+- `message_session` and Resume cannot both put a message in one turn: each claims the session's next turn first
+  (`chat-send.ts`), and the second is refused as busy. Proved with a deterministic race test.
+- **`message_session` is not gated by the read-only knowledge setting,** only by the MCP's off switch. The precedent
+  (the MCP off switch and the knowledge setting apply, decisions of STORY-8) is a ruling about `draft_cards`, because
+  drafting writes cards; it was not a ruling about messaging. A read-only project withholds the whole MCP at attach, so a
+  per-call gate added nothing. Flagged for the Dev Lead to confirm.
+- Messaging a restored, unopened story session works as ADR 0028 says: proved with a restart test.
+
+### BUG-16: update-card journey flakes on Windows (2026-11-11)
+
+- **A card write retries a rename Windows refuses (EPERM, EBUSY), five tries, as the log writer already did.** Why: the
+  failing run's row showed the story's turn ending without the card changing, so the update was lost, not late. The
+  rename over the card is the one step that fails on Windows alone, when a scan or a scanner has the card open. One
+  helper (`busy-retry.ts`) serves `writeAtomic` and the log writer. Not seen in a trace: the cause is by elimination, so
+  a further sighting should open the trace first.
+
+## 2026-11-11 — Featra plugins (user)
+
+- Anyone can build Featra plugins that others install; a plugin can add a full pane, a modal, views and actions with its
+  own buttons (ADR 0029, proposed).
+- Plugin UI is sandboxed and reaches Featra through a permissioned API the user approves at install.
+- An opt-in tier lets a plugin run local programs.
+- Featra's components and theme are offered, not forced.
+- Plugins can bundle role presets and provider parts.
+- Install from git, URLs and marketplace lists, and later a curated registry too.
+- Designed now, built after M1. Provider plugins stay as planned.
+
+## 2026-11-11 — BUG-18: card-write and Stop tests that fail under load (developer)
+
+- The ordering test "both land, whatever order they arrive in" is timing: card writes share one lane and every run
+  passed its assertions. The test world never watched the project, so each write did two unwatched git scans (about
+  0.65 s a write, 6.6 s in all). The world now watches, as the app does: 0.9 s, and no longer needs a longer limit
+  (24 of 24 parallel copies failed at 30 s before, passed in under 5 s after).
+- The Stop test "does not hold the card lane" no longer waits on real time: it takes the interrupt's bound timer over
+  and fires it when it says. No assertion changed.
+
+## 2026-11-11 — BUG-17: Draft chat's Message box missing (developer)
+
+- A one-off on the first e2e test of a cold Windows run (14.1 s against 5–6 s): the New chat picker was still open, so
+  the app behind it was inert and had no Message box. The cause is slowness, not a product bug; the trace was lost, so it
+  is not proven. `draftInNewChat` now waits for the picker to close, with its own 20 s limit, before the composer check.
+  No assertion changed.
+
+## 2026-11-11 — BUG-17 and BUG-18 review rulings (dev-lead)
+
+- BUG-18: the ordering test's cost was re-measured with no other load (0.65 s a write); the root cause is the unwatched
+  world, and the world now watches. A load time-out can't be a deterministic test, so the 24-copy repro and the 20 ms
+  Stop repro stand in for one.
+- Roadmap: reuse git state for lane writes on unwatched folders; the ordering case's dependency on "who is calling".
+- Product: the New chat picker shows no busy state while `chat.start` runs and its role button can be double-clicked into
+  two chats. Taken as BUG-19 after these two.
+- BUG-17 has no regression test: the failure needs a cold runner where `chat.start` takes over 5 s; the helper is test
+  code and the product path is unchanged. A shared `startChat(page, role)` e2e helper goes on the roadmap, not done here.
+
+## 2026-11-11 — BUG-19: New chat picker busy state (developer)
+
+- While `chat.start` runs, the picker disables the role buttons and says "Starting…", so a double click makes one chat.
+  If the start is refused the roles come back, with the reason.
+
+## 2026-11-11 — STORY-55 build choices (story agent, for the Dev Lead to confirm)
+
+- **A subagent is an in-memory, read-only chat, never saved.** Why: it reuses the chat log, watch and list row, so the
+  sidebar, the transcript and `chat.stop` needed no new protocol; saving one would copy what the provider owns. It is
+  removed when its session ends or its project closes (ADR 0030).
+- **Stop is offered only for a background subagent with a known task.** Why: the SDK's `Query.stopTask(taskId)` ends one
+  task, but a foreground subagent holds its tool call open and ends only with the turn, so a Stop there would stop the
+  session. The row's `stoppable` flips when `task_updated` moves a subagent to the background, and is false once it ends.
+  Evidence for the card: sdk.d.ts `Query.stopTask`, `forwardSubagentText`, `task_started.is_backgrounded` and
+  `canUseTool` options' `agentID`.
+- **Approvals and questions stay in the session's chat, labelled `Asked by the subagent <label>`.** Why: one place to
+  answer, one waiting dot, one Inbox path. The label is on the `approval` and `question` events and rides the Dev Lead's
+  copy of a story session's request unchanged.
+- **Nesting is flat:** a subagent of a subagent sits at the same level under the session (`spawn_depth` and
+  `parent_task_id` are ignored). Why: the sidebar stays one level deeper than a story session, not a tree.
+- **Subagents are not restored after a restart.** Roadmap: restore from `listSubagents` and `getSubagentMessages`.
+- **A resumed subagent with the same task id is ignored after it ends.** Why: the SDK re-registers resumed subagents in the
+  background, and showing a second chat for one task would mislead; rare, so not worth a rule yet. (Corrected below: a
+  `task_started` for a known ended task reopens the same chat.)
+- **The header's model, effort and mode line is hidden for a subagent.** Why: it runs with its session's settings, which
+  the subagent chat cannot change or truthfully report.
+- **Risk: message shapes are unverified against a real `claude`.** The adapter follows the SDK's types and is proved with
+  the fake `query` and the e2e fake SDK (CI), as every other adapter path is (ADR 0013). A first real run may need a fix.
+
+## 2026-11-11 — STORY-55 review rulings (dev-lead and user)
+
+- **Retention (user).** An ended subagent stays nested, marked ended, until its session ends or the project closes. A
+  session keeps at most 20 ended subagents (`MAX_ENDED_SUBAGENTS`), dropping the oldest ended first. Each ended row has
+  Archive (`chat.archive`), which removes it. The adapter prunes its task and call maps and translators on the same
+  rules, and a late message of an archived or dropped subagent makes no chat.
+- **Worktree cleanup (user).** The SDK does not report a subagent's worktree: task messages and the SubagentStart and
+  SubagentStop hook inputs carry no worktree path, and only WorktreeCreate and WorktreeRemove hook inputs mention
+  worktrees, with no subagent isolation field. So Archive removes only the row, and "clean up subagent worktrees" is on
+  the roadmap. Evidence is in the card.
+- **Stop on the session also stops its background subagents (user, finding 8).** Through `stopTask`, before the turn is
+  interrupted; one that refuses is skipped.
+- **Build choice 6 corrected (finding 3, C).** Identity is the task id. A `task_started` for a known ended task reopens the
+  same chat, running and stoppable, with its log; no second chat.
+- **Subagent ends (finding 2).** The session's turn ending ends every non-background subagent still running, with the
+  turn's outcome. `task_updated` with `patch.status` completed, failed or killed ends one (done, failed, stopped). A
+  message of a task that `isSubagentTask` rejected makes no chat.
+- **Finding 4.** The Inbox shows the subagent label for approvals and questions.
+- **Findings 5, 6, 7.** A server test runs the real adapter for AskUserQuestion with an `agentID`. A late `task_started` sets
+  background, kind and label and emits `updated`, and the row is then stoppable. A message naming both task and call
+  aliases the call to the known subagent.
+- **Findings 9, 10.** A quiet agent exit with no open turn ends subagents as stopped, not failed. A Stop that races the
+  subagent's end is rethrown as `noSubagentStop`.
+- **Findings 11 (D), 13, F.** A story session's subagent question still goes to the Dev Lead, with the label in the notice
+  text (`Asked by the subagent <label>: ...`). `chats.controls` is not called for a subagent chat. The copy "Asked by the
+  subagent <label>" stays.
+- **Finding 12.** `canUseTool` moved to `claude-approvals.ts`, the fake SDK's subagent and question turns to
+  `apps/desktop/e2e/fake-agent-turns.mjs`, and the `groupChats` rules to `chat-nest.ts`, so `chat-manager.ts` and
+  `chat-list.ts` are back to about 300 lines.
+- **E (open).** The real claude message shapes are unverified. The user's UAT will include one real foreground and one real
+  background subagent run.
+
+### STORY-55 follow-up build choices (dev-lead confirmed)
+
+- Archive refuses a subagent that is still running; Stop it first.
+- A subagent pushed out by the cap of 20 ended stays gone; a late message from it makes no new chat.
+- A foreground subagent ends with its session's turn; a background one keeps running until it ends, is stopped, or its
+  session is stopped.

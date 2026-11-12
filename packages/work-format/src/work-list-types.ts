@@ -40,6 +40,14 @@ export interface StoryRow {
   criteria: Count;
   tasks: Count;
   pr: string | null;
+  /** Who works on it (STORY-9): the card's agent and model, and the chat that is its latest session. Null until started. */
+  agent: string | null;
+  model: string | null;
+  session: string | null;
+  /** An agent's progress report is the latest word on it (ADR 0004): the row shows Reported. Left out otherwise. */
+  reported?: true;
+  /** The user stopped its agent (STORY-53): the row shows Stopped and offers Resume. */
+  stopped: boolean;
 }
 
 export interface FeatureRow {
@@ -115,6 +123,11 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   criteria: count(r.criteria),
   tasks: count(r.tasks),
   pr: textOrNull(r.pr),
+  agent: textOrNull(r.agent),
+  model: textOrNull(r.model),
+  session: textOrNull(r.session),
+  ...(r.reported === true ? { reported: true as const } : {}),
+  stopped: r.stopped === true,
 });
 
 const feature = (r: Record<string, unknown>): FeatureRow => {

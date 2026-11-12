@@ -14,7 +14,10 @@ export type CloseButton = "tray" | "quit";
 export const CLOSE_BUTTON_CHOICES: readonly CloseButton[] = ["tray", "quit"];
 
 /** Project settings that also have an app-wide default. Featra's own defaults match work-format's DEFAULT_CONFIG. */
-export type WorkSettings = Pick<ProjectConfig, "progress" | "requireAccept" | "worktrees" | "mcp" | "knowledge">;
+export type WorkSettings = Pick<
+  ProjectConfig,
+  "progress" | "requireAccept" | "worktrees" | "mcp" | "knowledge" | "maxStoryAgents"
+>;
 export type WorkSettingKey = keyof WorkSettings;
 export type WorkOverrides = Partial<WorkSettings>;
 
@@ -24,6 +27,7 @@ export const DEFAULT_WORK_SETTINGS: WorkSettings = {
   worktrees: true,
   mcp: true,
   knowledge: "propose",
+  maxStoryAgents: 3,
 };
 
 export interface AppSettings {
@@ -59,6 +63,7 @@ export type WorkSettingDef =
       help?: string;
       choices: readonly ChoiceDef<KnowledgePermission>[];
     }
+  | { key: "maxStoryAgents"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<number>[] }
   | { key: "requireAccept" | "worktrees" | "mcp"; kind: "toggle"; label: string; help?: string };
 
 /** Work settings in the order Settings shows them, with their wording. */
@@ -91,6 +96,13 @@ export const WORK_SETTINGS: readonly WorkSettingDef[] = [
       { value: "propose", label: "Propose edits" },
       { value: "read-only", label: "Read only" },
     ],
+  },
+  {
+    key: "maxStoryAgents",
+    kind: "choice",
+    label: "Story agents at once",
+    help: "More wait as Queued.",
+    choices: [1, 2, 3, 4, 5, 6].map((n) => ({ value: n, label: String(n) })),
   },
 ];
 

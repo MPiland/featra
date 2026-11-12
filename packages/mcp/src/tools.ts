@@ -11,34 +11,17 @@ import {
   parseDecision,
   parseDraft,
   parseQuestion,
-  type DraftInput,
+  parseSpawnInput,
+  parseStartInput,
   type DraftResult,
-  type LoggedEntry,
   type LogInput,
   type Parsed,
 } from "@featra/work-format";
+import { ToolRefusal, type FeatraHost, type Tool } from "./tool-types.ts";
+import { MESSAGE_SESSION } from "./message-session.ts";
+import { UPDATE_CARD } from "./update-card.ts";
 
-/** What the tools reach the server through. */
-export interface FeatraHost {
-  /** Adds an entry to the chat's `decisions.md` or `open-questions.md`. */
-  log: (input: LogInput) => Promise<LoggedEntry>;
-  /** Drafts a feature and its stories, or revises the chat's open draft in place (STORY-8). */
-  draft: (input: DraftInput) => Promise<DraftResult>;
-}
-
-export interface Tool {
-  name: string;
-  description: string;
-  /** JSON Schema of the input, as an agent sees it. */
-  inputSchema: { type: "object"; properties: Record<string, unknown>; required: string[] };
-  /** Runs the call; throws a `ToolRefusal` for input to fix. Resolves with the line the agent is told. */
-  run: (input: unknown, host: FeatraHost) => Promise<string>;
-  /** What a failure that isn't a refusal (the server said no, or is gone) starts with. Default: "Not logged." */
-  failed?: string;
-}
-
-/** A call that can't be done as given: the message tells the agent what to fix. */
-export class ToolRefusal extends Error {}
+export { ToolRefusal, type FeatraHost, type Tool } from "./tool-types.ts";
 
 const card = {
   type: "string",
@@ -176,5 +159,71 @@ const DRAFT_CARDS: Tool = {
   },
 };
 
+const START_FEATURE: Tool = {
+  name: "start_feature",
+  failed: "Not started.",
+  description: [
+    "Start a feature the user has approved: Featra creates its branch (feature/<number>-<title>) from the base branch,",
+    "marks the feature active there, and from then on the feature and its stories live on that branch.",
+    "Call it only once the user has approved the feature and asked you to start it.",
+    "It never changes the user's checkout and never pushes. It is refused when the feature isn't approved,",
+    "already has a branch, or the base branch can't be found; the error says which.",
+  ].join(" "),
+  inputSchema: {
+    type: "object",
+    properties: { feature: { type: "string", description: "The feature's card id, such as FEAT-5." } },
+    required: ["feature"],
+  },
+  async run(input, host) {
+    const parsed = parseStartInput(input);
+    if (!parsed.ok) throw new ToolRefusal(parsed.error);
+    const { branch } = await host.start(parsed.id);
+    return `Started ${parsed.id} on ${branch}. Not pushed.`;
+  },
+};
+
+const SPAWN_SESSION: Tool = {
+  name: "spawn_session",
+  failed: "Not started.",
+  description: [
+    "Start an agent on one story of a started feature: Featra makes the story's worktree off the feature's branch,",
+    "moves the story to In Progress there, and starts a session in it whose first message is the role's instructions,",
+    "the story's card and your brief. The session runs with your permissions, and what it still needs to ask shows in",
+    "this chat. It is queued when the project's limit of story agents at once is reached, and starts when one ends.",
+    "Call it once the feature is started and the user wants the story worked on.",
+    "It is refused when the story isn't New or Ready, its feature isn't started, or the role's agent can't run stories.",
+  ].join(" "),
+  inputSchema: {
+    type: "object",
+    properties: {
+      story: { type: "string", description: "The story's card id, such as STORY-9." },
+      role: { type: "string", description: "The role the agent runs as. Default: developer." },
+      model: { type: "string", description: "The model, in the agent's own names. Default: the role's." },
+      effort: { type: "string", description: "The effort, in the agent's own names. Default: the role's." },
+      brief: {
+        type: "string",
+        description: "What to tell the agent beyond the card: what to focus on, what to avoid.",
+      },
+    },
+    required: ["story"],
+  },
+  async run(input, host) {
+    const parsed = parseSpawnInput(input);
+    if (!parsed.ok) throw new ToolRefusal(parsed.error);
+    const { queued } = await host.spawn(parsed.value);
+    return queued
+      ? `Queued ${parsed.value.story}. It starts when a story agent ends.`
+      : `Started ${parsed.value.story}.`;
+  },
+};
+
 /** Every tool the server offers, in the order an agent lists them. */
-export const TOOLS: readonly Tool[] = [LOG_DECISION, DEFER_QUESTION, DRAFT_CARDS];
+export const TOOLS: readonly Tool[] = [
+  LOG_DECISION,
+  DEFER_QUESTION,
+  DRAFT_CARDS,
+  START_FEATURE,
+  SPAWN_SESSION,
+  UPDATE_CARD,
+  MESSAGE_SESSION,
+];

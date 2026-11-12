@@ -38,7 +38,9 @@ export interface HostOptions extends ChatHost, RolesHost {
   /** What the card server answers to Send back. Default: sent and recorded. */
   sendBack?: CardBridge["sendBack"];
   /** What the card server answers to Approve and Reject. Default: it changes the cards as the server does. */
-  review?: Partial<Pick<CardBridge, "approve" | "reject">>;
+  review?: Partial<Pick<CardBridge, "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory">>;
+  /** Whether Start queues the story's session instead of starting it, as a project at its limit does. Default: starts. */
+  queueStories?: boolean;
   closeToTray?: CloseToTraySupport;
   /** The current project, or null for none. Default: PROJECT. */
   project?: ProjectRef | null;
@@ -123,8 +125,10 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     },
     host.sendBack,
     host.review,
+    (dir, story, feature) => chats.addStory(dir, story, feature, host.queueStories === true),
+    { turn: (dir, id) => chats.storyTurn(dir, id), drop: (dir, id) => chats.dropStory(dir, id) },
   );
-  const chats = fakeChatServer(calls, host);
+  const chats: ReturnType<typeof fakeChatServer> = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
   const listOf = (dir: string) => cards.listOf(dir) ?? workLists.get(dir) ?? EMPTY_WORK_LIST;
   const bridge: FeatraBridge = {

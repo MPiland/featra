@@ -55,6 +55,8 @@ export interface ChatBridge {
   send: (id: string, text: string) => Promise<string | null>;
   /** Interrupts the running turn; resolves with why it couldn't, or null. */
   stop: (id: string) => Promise<string | null>;
+  /** Removes an ended subagent from the sidebar (STORY-55); resolves with why it couldn't, or null. */
+  archive: (id: string) => Promise<string | null>;
   /** Answers a tool request the chat waits on; resolves with why it wasn't taken, or null. */
   approve: (id: string, tool: string, answer: ApprovalAnswer) => Promise<string | null>;
   /** Answers a question the chat waits on (STORY-46); resolves with why it wasn't taken, or null. */
@@ -75,8 +77,19 @@ export const CHAT_COPY = {
   newChatMenu: "New Chat",
   chats: "Chats",
   waiting: "Waiting for you",
+  queued: "Queued",
+  askedFor: (story: string) => `Asked by the session of ${story}`,
+  storySessions: (lead: string) => `Story sessions of ${lead}`,
+  subagentsOf: (session: string) => `Subagents of ${session}`,
+  askedBySubagent: (label: string) => `Asked by the subagent ${label}`,
+  stopSubagent: (name: string) => `Stop ${name}`,
+  archiveSubagent: (name: string) => `Archive ${name}`,
+  ended: "Ended",
+  archive: "Archive",
+  watchingSubagent: "Watching a subagent.",
   roles: "Roles",
   noRoles: "No roles to start from.",
+  starting: "Starting…",
   ask: "Ask",
   composer: "Message",
   placeholder: "Message the agent",
@@ -84,6 +97,8 @@ export const CHAT_COPY = {
   stop: "Stop",
   transcript: "Chat",
   working: "Working…",
+  thinking: "Thinking",
+  watching: "Watching the story's agent.",
   denied: "Denied",
   toolStopped: "Stopped",
   cancelled: "Cancelled",
@@ -204,6 +219,7 @@ export function serverChats(server: ServerClient): ChatBridge {
     },
     send: (id, text) => server.call("chat.send", { id, text }).then(() => null, errorMessage),
     stop: (id) => server.call("chat.stop", { id }).then(() => null, errorMessage),
+    archive: (id) => server.call("chat.archive", { id }).then(() => null, errorMessage),
     approve: (id, tool, answer) => server.call("chat.approve", { id, tool, ...answer }).then(() => null, errorMessage),
     answer: (id, tool, answers) => server.call("chat.answer", { id, tool, answers }).then(() => null, errorMessage),
     undoLog: (id, entry) => server.call("chat.undoLog", { id, entry }).then(() => null, errorMessage),
@@ -237,6 +253,7 @@ export function noChats(error: string): ChatBridge {
     },
     send: async () => error,
     stop: async () => error,
+    archive: async () => error,
     approve: async () => error,
     answer: async () => error,
     undoLog: async () => error,

@@ -25,6 +25,13 @@ function Item({ item, actions }: { item: ChatItem; actions: TranscriptActions })
       return <div className="chat-msg user">{item.text}</div>;
     case "assistant":
       return <div className="chat-msg agent">{item.text}</div>;
+    case "thinking":
+      return (
+        <details className="chat-think">
+          <summary>{CHAT_COPY.thinking}</summary>
+          <p>{item.text}</p>
+        </details>
+      );
     case "tool":
       return item.question ? (
         <QuestionCard item={item} onAnswer={actions.onAnswerQuestion} />

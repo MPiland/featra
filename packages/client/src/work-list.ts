@@ -4,7 +4,8 @@
  * wording, the filters, and how the client calls the server.
  */
 import { errorMessage } from "@featra/work-format/guards";
-import { normalizeCopyActionResult, type CopyActionResult } from "@featra/work-format/protocol";
+import type { CopyActionResult } from "@featra/work-format/protocol";
+import { normalizeCopyActionResult } from "@featra/work-format/protocol-copy";
 import {
   EMPTY_WORK_LIST,
   normalizeWorkList,
@@ -67,6 +68,19 @@ export const WORK_COPY = {
   review: "Review",
   reviewDraft: "Review draft",
   reviewDraftOf: (id: string) => `Review draft ${id}`,
+  openFeature: "Open",
+  openFeatureOf: (id: string) => `Open ${id}`,
+  start: "Start",
+  startOf: (id: string) => `Start ${id}`,
+  queued: "Queued",
+  reported: "Reported",
+  stopped: "Stopped",
+  stop: "Stop",
+  resume: "Resume",
+  stopOf: (id: string) => `Stop ${id}`,
+  resumeOf: (id: string) => `Resume ${id}`,
+  openSession: "Session",
+  openSessionOf: (id: string) => `Open the session of ${id}`,
   none: "—",
   epic: "epic",
   showStories: (title: string) => `Show stories of ${title}`,

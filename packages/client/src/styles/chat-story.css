@@ -1,0 +1,18 @@
+/* Story sessions (STORY-9): nested under their Dev Lead's chat, or under a group named after their feature. */
+.chat-children {
+  margin-left: 12px;
+}
+
+.chat-children .chat-group-name {
+  padding-left: 10px;
+}
+
+.chat-children li {
+  display: flex;
+  align-items: center;
+}
+
+.chat-children li > .nav {
+  flex: 1;
+  min-width: 0;
+}

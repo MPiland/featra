@@ -6,6 +6,7 @@ import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
+import { StoryAgent } from "./story-agents.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
 
@@ -53,6 +54,8 @@ function Story({ story }: { story: StoryRow }) {
         </button>
         {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
         <StaleMark id={story.id} />
+        <StoryAgent id={story.id} />
+        {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
       </span>
       <span role="cell">
         <Status tone={story.tone} label={story.stage} />
@@ -68,6 +71,7 @@ function Story({ story }: { story: StoryRow }) {
 export function Feature({ feature }: { feature: FeatureRow }) {
   const [open, setOpen] = useState(false);
   const review = useReviewDraft();
+  const { open: openCard } = useCardSelection();
   const title = feature.id === null ? WORK_COPY.noFeature : feature.title;
   return (
     <>
@@ -91,6 +95,17 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               onClick={() => review(feature.draftedBy ?? "", feature.id ?? "")}
             >
               {WORK_COPY.reviewDraft}
+            </button>
+          )}
+          {feature.status === "approved" && feature.id && (
+            // An approved feature has no story to open it from: this opens its card, where Start is (STORY-52).
+            <button
+              type="button"
+              className="review-draft"
+              aria-label={WORK_COPY.openFeatureOf(feature.id)}
+              onClick={() => openCard(feature.id ?? "")}
+            >
+              {WORK_COPY.openFeature}
             </button>
           )}
           <StaleMark id={feature.id} />
