@@ -5,14 +5,18 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  bucketsVerdict,
   checksSetParams,
   checksVerdict,
   ciOutcome,
+  prCiOutcome,
   ConfigError,
   DEFAULT_CONFIG,
   GITHUB_COPY,
   githubPrUrl,
+  githubRepoOf,
   githubUse,
+  httpsLink,
   normalizeCardPr,
   normalizeChecksView,
   normalizeWorkList,
@@ -61,6 +65,30 @@ describe("the checks verdict", () => {
   });
 });
 
+const read = (verdict: "passing" | "failing" | "pending" | "none" | null, stale = false, moved = false) =>
+  prCiOutcome({ stale, moved, verdict }).passed;
+
+describe("a PR read as CI evidence", () => {
+  it("verifies on passing checks, unverifies on a failing one, and waits for running ones", () => {
+    expect(read("passing")).toBe(true);
+    expect(read("failing")).toBe(false);
+    expect(read("pending")).toBeNull();
+    expect(read("none")).toBeNull();
+    expect(read(null)).toBeNull();
+  });
+
+  it("never verifies checks for a commit the story's branch has moved past", () => {
+    expect(read("passing", true)).toBe(false);
+    expect(read("pending", true)).toBe(false);
+  });
+
+  it("unverifies a moved head until its own checks pass", () => {
+    expect(read("pending", false, true)).toBe(false);
+    expect(read("none", false, true)).toBe(false);
+    expect(read("passing", false, true)).toBe(true);
+  });
+});
+
 describe("a PR as gh answers it", () => {
   const url = "https://github.com/acme/app/pull/14";
 
@@ -69,6 +97,8 @@ describe("a PR as gh answers it", () => {
       number: 14,
       url,
       status: { state: "open", checks: "none" },
+      head: null,
+      repo: null,
     });
     expect(readPr({ number: 14, url, state: "OPEN", isDraft: true })?.status.state).toBe("draft");
     expect(readPr({ number: 14, url, state: "MERGED" })?.status.state).toBe("merged");
@@ -80,10 +110,30 @@ describe("a PR as gh answers it", () => {
       number: 3,
       url,
       status: { state: "open", checks: "none" },
+      head: null,
+      repo: null,
+    });
+    const rest = { head: { sha: "ABC1234", repo: { full_name: "Acme/App" } } };
+    expect(readPr({ number: 3, html_url: url, state: "open", ...rest })).toMatchObject({
+      head: "abc1234",
+      repo: "acme/app",
     });
     expect(readPr({ number: 3, html_url: url, state: "closed", merged_at: "2026-11-12T00:00:00Z" })?.status.state).toBe(
       "merged",
     );
+  });
+
+  it("reads the commit its head is at and the repository its head branch is in", () => {
+    const raw = {
+      number: 14,
+      url,
+      state: "OPEN",
+      headRefOid: "0123456789abcdef0123456789abcdef01234567",
+      headRepository: { name: "App" },
+      headRepositoryOwner: { login: "Acme" },
+    };
+    expect(readPr(raw)).toMatchObject({ head: "0123456789abcdef0123456789abcdef01234567", repo: "acme/app" });
+    expect(readPr({ ...raw, headRefOid: "not a commit" })?.head).toBeNull();
   });
 
   it("is null for anything else", () => {
@@ -107,6 +157,45 @@ describe("the PR chip's label", () => {
     expect(prLabel("https://github.com/acme/app/pull/14")).toBe("#14");
     expect(prLabel("https://github.com/acme/app/pull/14/files")).toBe("#14");
     expect(prLabel("https://gitlab.example/acme/app/-/merge_requests/3")).toBe("PR");
+  });
+
+  it("is the number of a pr recorded as the number alone, as older cards have it", () => {
+    expect(prNumber("12")).toBe(12);
+    expect(prNumber("#12")).toBe(12);
+    expect(prLabel("15")).toBe("#15");
+    expect(prNumber("12a")).toBeNull();
+    expect(prNumber("PR 12")).toBeNull();
+  });
+});
+
+const checks = (...buckets: string[]) => buckets.map((bucket, i) => ({ bucket, name: `c${i}` }));
+
+describe("the required checks' verdict", () => {
+  it("passes when every check passed or was skipped, and is none without checks", () => {
+    expect(bucketsVerdict(checks("pass", "skipping"))).toBe("passing");
+    expect(bucketsVerdict([])).toBe("none");
+  });
+
+  it("fails on a failed or cancelled check, even with others running", () => {
+    expect(bucketsVerdict(checks("pass", "fail"))).toBe("failing");
+    expect(bucketsVerdict(checks("cancel", "pending"))).toBe("failing");
+  });
+
+  it("is pending while a check runs, and null for an answer that isn't a list", () => {
+    expect(bucketsVerdict(checks("pass", "pending"))).toBe("pending");
+    expect(bucketsVerdict(checks("pass", "unknown"))).toBe("pending");
+    expect(bucketsVerdict(null)).toBeNull();
+    expect(bucketsVerdict({ bucket: "pass" })).toBeNull();
+  });
+});
+
+describe("the repository a GitHub remote names", () => {
+  it("is owner/name from an https, ssh or path remote", () => {
+    expect(githubRepoOf("https://github.com/Acme/App.git")).toBe("acme/app");
+    expect(githubRepoOf("git@github.com:acme/app.git")).toBe("acme/app");
+    expect(githubRepoOf("ssh://git@github.com/acme/app")).toBe("acme/app");
+    expect(githubRepoOf("D:/tmp/x/github.com/acme/app.git")).toBe("acme/app");
+    expect(githubRepoOf("https://gitlab.com/acme/app.git")).toBeNull();
   });
 });
 
@@ -136,6 +225,19 @@ describe("what is safe to hand to gh and git", () => {
     expect(githubPrUrl("https://evil.example/acme/app/pull/14")).toBeNull();
     expect(githubPrUrl('https://github.com/acme/app/pull/1"&calc')).toBeNull();
     expect(githubPrUrl(null)).toBeNull();
+  });
+
+  it("hands the OS browser only an https link", () => {
+    expect(httpsLink("https://github.com/acme/app/pull/14")).toBe("https://github.com/acme/app/pull/14");
+    expect(httpsLink("http://github.com/acme/app/pull/14")).toBeNull();
+    expect(httpsLink("file:///C:/Windows/System32/calc.exe")).toBeNull();
+    expect(httpsLink("javascript:alert(1)")).toBeNull();
+    expect(httpsLink("/acme/app/pull/14")).toBeNull();
+    expect(httpsLink("github.com/acme/app/pull/14")).toBeNull();
+    expect(httpsLink("https://github.com/a b")).toBeNull();
+    expect(httpsLink('https://github.com/"onclick')).toBeNull();
+    expect(httpsLink("https://")).toBeNull();
+    expect(httpsLink(14)).toBeNull();
   });
 
   it("takes only a plain branch name", () => {

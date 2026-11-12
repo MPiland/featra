@@ -1,7 +1,9 @@
 // A stand-in for the GitHub CLI (STORY-11): the platform faked, never Featra's own logic. It keeps its GitHub in a JSON
 // file (FAKE_GH_STATE): whether it is signed in and the repo's PRs. Each call is appended to FAKE_GH_STATE + ".calls"
-// as one JSON line with its arguments and what came in on standard input.
+// as one JSON line with its arguments and what came in on standard input. A PR's head commit is the tip of its branch
+// in the bare repository that stands in for GitHub (`remote`), as on GitHub.
 const fs = require("node:fs");
+const { execFileSync } = require("node:child_process");
 
 const statePath = process.env.FAKE_GH_STATE;
 const read = () => JSON.parse(fs.readFileSync(statePath, "utf8"));
@@ -19,15 +21,56 @@ const flag = (name) => {
   const at = args.indexOf(name);
   return at >= 0 ? args[at + 1] : undefined;
 };
+const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+const state = read();
+const OWNER = "acme";
+const REPO = "app";
+
+/** The tip of `branch` in the remote, as GitHub would have it; null when the remote doesn't have it. */
+function tipOf(branch) {
+  if (!state.remote) return null;
+  try {
+    const oid = execFileSync("git", [
+      "--git-dir",
+      state.remote,
+      "rev-parse",
+      "--verify",
+      "--quiet",
+      `refs/heads/${branch}`,
+    ]);
+    return String(oid).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+/** The PR's checks: those of its head commit when they are kept per commit, else its own. */
+const checksOf = (pr) => (pr.checksAt ? (pr.checksAt[tipOf(pr.head) ?? ""] ?? []) : (pr.checks ?? []));
+
 const view = (pr) => ({
   number: pr.number,
   url: pr.url,
   state: pr.state,
   isDraft: pr.isDraft === true,
-  statusCheckRollup: pr.checks ?? [],
+  statusCheckRollup: checksOf(pr),
+  headRefOid: tipOf(pr.head) ?? undefined,
+  headRepository: { name: REPO },
+  headRepositoryOwner: { login: pr.headOwner ?? OWNER },
 });
 
-const state = read();
+/** GitHub's bucket for a check run or a commit status. */
+function bucketOf(check) {
+  const status = String(check.status ?? "").toUpperCase();
+  const outcome = String(check.conclusion ?? check.state ?? "").toUpperCase();
+  if ("conclusion" in check && status !== "COMPLETED") return "pending";
+  if (["SUCCESS", "NEUTRAL"].includes(outcome)) return "pass";
+  if (outcome === "SKIPPED") return "skipping";
+  if (outcome === "CANCELLED") return "cancel";
+  if (["FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"].includes(outcome)) return "fail";
+  return "pending";
+}
+
 const [first, second] = args;
 if (first === "--version") {
   out("gh version 2.99.0 (fake)");
@@ -36,22 +79,36 @@ if (first === "--version") {
   process.stdout.write("github.com\n  Logged in to github.com account fake\n");
 } else if (first === "pr" && second === "list") {
   const head = flag("--head");
-  out(state.prs.filter((pr) => pr.head === head && pr.state === "OPEN").map(view));
+  const base = flag("--base");
+  const found = state.prs.filter((pr) => pr.head === head && pr.state === "OPEN" && (!base || pr.base === base));
+  out(found.map(view));
 } else if (first === "pr" && second === "view") {
+  if (state.viewDelayMs) sleep(state.viewDelayMs);
   const pr = state.prs.find((p) => p.url === args[2]);
   if (!pr) fail("GraphQL: Could not resolve to a PullRequest");
   out(view(pr));
+} else if (first === "pr" && second === "checks") {
+  const pr = state.prs.find((p) => p.url === args[2]);
+  if (!pr) fail("GraphQL: Could not resolve to a PullRequest");
+  const required = args.includes("--required");
+  const checks = checksOf(pr).filter((c) => !required || (pr.required ?? []).includes(c.name));
+  if (checks.length === 0) fail(`no ${required ? "required " : ""}checks reported on the '${pr.head}' branch`);
+  out(checks.map((c) => ({ bucket: bucketOf(c), name: c.name })));
 } else if (first === "api" && second === "repos/{owner}/{repo}/pulls" && flag("--method") === "POST") {
   if (state.createFails) fail(state.createFails);
+  // The user changes the card while GitHub opens the PR.
+  if (state.whileCreating) fs.writeFileSync(state.whileCreating.file, state.whileCreating.text);
   const body = JSON.parse(input);
-  if (state.prs.some((p) => p.head === body.head && p.state === "OPEN")) {
-    fail(`gh: A pull request already exists for acme:${body.head}. (HTTP 422)`);
+  const same = (p) => p.head === body.head && p.base === body.base && p.state === "OPEN" && !p.headOwner;
+  if (state.prs.some(same)) {
+    fail(`gh: A pull request already exists for ${OWNER}:${body.head}. (HTTP 422)`);
   }
   const number = state.next++;
-  const pr = { number, url: `https://github.com/acme/app/pull/${number}`, state: "OPEN", ...body };
+  const pr = { number, url: `https://github.com/${OWNER}/${REPO}/pull/${number}`, state: "OPEN", ...body };
   state.prs.push(pr);
   write(state);
-  out({ number, html_url: pr.url, state: "open", draft: false, merged_at: null });
+  const head = { sha: tipOf(body.head) ?? undefined, repo: { full_name: `${OWNER}/${REPO}` } };
+  out({ number, html_url: pr.url, state: "open", draft: false, merged_at: null, head });
 } else {
   fail(`unknown command: ${args.join(" ")}`);
 }

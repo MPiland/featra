@@ -10,7 +10,7 @@
 import {
   checksApply,
   checksWhere,
-  ciOutcome,
+  GITHUB_COPY,
   prContent,
   prIsOpen,
   serializeCard,
@@ -28,10 +28,13 @@ import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { recordEvidence } from "./check-evidence.ts";
 import type { CheckSettings } from "./check-settings.ts";
+import { githubRemote } from "./github-detect.ts";
 import { createPr, openPrFor, pushStory, readPrAt, PR_NOTES, type GithubPrDeps } from "./github-prs.ts";
 import type { Timers } from "./inbox.ts";
+import { ciRead, headIsStale, UNVERIFY } from "./pr-ci.ts";
 import { createPrPoller } from "./pr-poller.ts";
 import { watchProjects } from "./project-watch.ts";
+import { baseOf, keyOf, seenOf, type ProjectSeen } from "./story-prs-seen.ts";
 import type { Scan } from "./work-scan.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
@@ -47,43 +50,15 @@ export interface StoryPrsDeps extends GithubPrDeps {
   focusMs?: number;
 }
 
-/** A story as this module follows it. */
-interface Followed {
-  id: string;
-  inReview: boolean;
-  pr: string | null;
-  /** Its owner copy is its own worktree, where the branch is pushed from. */
-  worktree: boolean;
-}
-
-interface ProjectSeen {
-  auto: boolean;
-  minutes: number;
-  stories: Followed[];
-}
-
 export const PR_REFUSALS = {
   notReady: "Only a story in review, in its own worktree, can open a PR.",
   hasPr: "This story already has a PR.",
 } as const;
 
-const keyOf = (dir: string, id: string) => `${dir}\0${id}`;
-
-function seenOf(scan: Scan | null): ProjectSeen {
-  if (!scan) return { auto: false, minutes: 2, stories: [] };
-  const { config } = scan.collected;
-  const stories = scan.resolution.cards.flatMap(({ card, owner }): Followed[] =>
-    card.type === "story"
-      ? [{ id: card.id, inReview: checksApply(card, config), pr: card.pr, worktree: owner.kind === "worktree" }]
-      : [],
-  );
-  return { auto: config.openStoryPrs, minutes: config.prRefreshMinutes, stories };
-}
-
 export function createStoryPrs(deps: StoryPrsDeps) {
   const { scan: scanDir, observe, allowed, settings, now, timers, log, lane = createCardLane() } = deps;
-  /** The PR last read for each story, with the URL it was read from (a changed `pr` field makes it stale). */
-  const read = new Map<string, { url: string; status: PrStatus }>();
+  /** The PR last read for each story: the URL it was read from (a changed `pr` field makes it stale), and its head. */
+  const read = new Map<string, { url: string; status: PrStatus; head: string | null }>();
   const notes = new Map<string, string>();
   const opening = new Set<string>();
   const inFlight = new Set<Promise<unknown>>();
@@ -97,11 +72,20 @@ export function createStoryPrs(deps: StoryPrsDeps) {
     return use;
   };
   const push = (dir: string) => (closed ? Promise.resolve(null) : scanDir(dir).catch(() => null));
+  const track = <T>(work: Promise<T>) => {
+    inFlight.add(work);
+    void work.finally(() => inFlight.delete(work));
+    return work;
+  };
+  /** Evidence is recorded only for a project still watched. */
+  const evidence = (dir: string, id: string, outcome: typeof UNVERIFY) =>
+    closed || !seen.has(dir) ? false : recordEvidence({ scan: scanDir, lane, now }, dir, id, outcome);
 
+  /** Records the PR on the owner copy, unless someone set another `pr` there meanwhile: theirs stands. */
   const recordPr = (dir: string, id: string, url: string) =>
     lane.exclusive(async () => {
       const found = ownedIn(await scanDir(dir), id);
-      if (!found?.root) return;
+      if (!found?.root || (found.owned.card.pr && found.owned.card.pr !== url)) return;
       const next = setPr(found.owned.card, url, "system", toIso(now()));
       if (next !== found.owned.card) await writeAtomic(fileIn(found.root, found.owned.path), serializeCard(next));
     });
@@ -114,15 +98,17 @@ export function createStoryPrs(deps: StoryPrsDeps) {
     const { card } = found.owned;
     if (!checksApply(card, scan.collected.config)) return PR_REFUSALS.notReady;
     if (card.pr) return null;
-    const base = (card.parent && scan.collected.state.features[card.parent]?.branch) || scan.collected.git.baseBranch;
+    const base = baseOf(scan, card);
     if (!card.branch) return PR_NOTES.branch;
-    const pushed = await pushStory(found.root, base, card.branch, deps);
+    const remote = await githubRemote(dir, deps.gitCommand);
+    if (!remote) return GITHUB_COPY.noRemote;
+    const pushed = await pushStory(found.root, remote, base, card.branch, deps);
     if (pushed !== null) return pushed;
     const pr =
-      (await openPrFor(dir, card.branch, deps)) ??
+      (await openPrFor(dir, { head: card.branch, base, repo: remote.repo }, deps)) ??
       (await createPr(dir, { base, head: card.branch, ...prContent(card) }, deps));
     if (typeof pr === "string") return pr;
-    read.set(keyOf(dir, id), { url: pr.url, status: pr.status });
+    read.set(keyOf(dir, id), { url: pr.url, status: pr.status, head: pr.head });
     await recordPr(dir, id, pr.url);
     return null;
   }
@@ -130,10 +116,27 @@ export function createStoryPrs(deps: StoryPrsDeps) {
   /** Opens story `id`'s PR, showing Opening meanwhile and the reason on the card when it can't. */
   function open(dir: string, id: string): Promise<string | null> {
     if (opening.has(keyOf(dir, id))) return Promise.resolve(null);
-    const done = openShown(dir, id);
-    inFlight.add(done);
-    void done.finally(() => inFlight.delete(done));
-    return done;
+    return track(openShown(dir, id));
+  }
+
+  /**
+   * A story with a PR came back into review: its branch is pushed again (never forced) so the PR has its commits.
+   * Verified given for an older commit goes first, when checks run in CI.
+   */
+  async function pushAgain(dir: string, id: string) {
+    const scan = await scanDir(dir);
+    const found = ownedIn(scan, id);
+    if (!scan || !found?.root || found.owned.owner.kind !== "worktree") return;
+    const { card } = found.owned;
+    const remote = await githubRemote(dir, deps.gitCommand);
+    if (!card.pr || !card.branch || !remote) return;
+    const pr = await readPrAt(dir, card.pr, deps);
+    const ci = checksWhere(scan.collected.config, await settings.github(dir)) === "ci";
+    if (ci && pr && (await headIsStale(dir, card, pr, deps))) await evidence(dir, id, UNVERIFY);
+    const note = await pushStory(found.root, remote, baseOf(scan, card), card.branch, deps);
+    if (note !== null) notes.set(keyOf(dir, id), note);
+    await push(dir);
+    if (!closed) void poller.now(dir);
   }
 
   async function openShown(dir: string, id: string): Promise<string | null> {
@@ -170,10 +173,13 @@ export function createStoryPrs(deps: StoryPrsDeps) {
       const last = read.get(key);
       if (last?.url === card.pr && !prIsOpen(last.status)) continue;
       const pr = await readPrAt(dir, card.pr, deps);
-      if (!pr || closed) continue;
+      if (!pr || closed || !seen.has(dir)) continue;
       changed ||= JSON.stringify(last?.status) !== JSON.stringify(pr.status) || last?.url !== card.pr;
-      read.set(key, { url: card.pr, status: pr.status });
-      if (ci) await recordEvidence({ scan: scanDir, lane, now }, dir, card.id, ciOutcome(pr.status.checks));
+      read.set(key, { url: card.pr, status: pr.status, head: pr.head });
+      if (ci && checksApply(card, config)) {
+        const outcome = await ciRead(dir, card, pr, last?.url === card.pr ? last.head : undefined, deps);
+        await evidence(dir, card.id, outcome);
+      }
     }
     if (changed) await push(dir);
   }
@@ -198,9 +204,10 @@ export function createStoryPrs(deps: StoryPrsDeps) {
         const key = keyOf(dir, story.id);
         if (!story.inReview) notes.delete(key);
         const was = before?.stories.find((s) => s.id === story.id);
-        // Only a move into review opens a PR; the stories already in review when Featra starts are left alone.
-        if (baseline || !was || was.inReview || !story.inReview || story.pr || !next.auto) continue;
-        if (usable.get(dir)) void open(dir, story.id);
+        // Only a move into review opens a PR or pushes again; stories already in review when Featra starts are left.
+        if (baseline || !was || was.inReview || !story.inReview || !usable.get(dir)) continue;
+        if (story.pr) void track(pushAgain(dir, story.id));
+        else if (next.auto) void open(dir, story.id);
       }
     };
     const { value, stop } = await observe(dir, (scan) => seenOf(scan), consider);
@@ -211,6 +218,9 @@ export function createStoryPrs(deps: StoryPrsDeps) {
       stop();
       stopPolling();
       seen.delete(dir);
+      usable.delete(dir);
+      for (const map of [read, notes])
+        for (const key of map.keys()) if (key.startsWith(keyOf(dir, ""))) map.delete(key);
     };
   }
 

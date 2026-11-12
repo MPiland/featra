@@ -53,9 +53,9 @@ export function httpsLink(raw: unknown): string | null {
   }
 }
 
-/** The PR number in a PR's URL, or null when it has none. */
-export function prNumber(url: string): number | null {
-  const m = /\/pull\/(\d+)(?:[/?#]|$)/.exec(url);
+/** The PR number in a PR's URL, or in a `pr` recorded as the number alone (`12`, `#12`); null when it has none. */
+export function prNumber(pr: string): number | null {
+  const m = /\/pull\/(\d+)(?:[/?#]|$)/.exec(pr) ?? /^#?(\d+)$/.exec(pr.trim());
   return m ? Number(m[1]) : null;
 }
 

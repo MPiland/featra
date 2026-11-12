@@ -1,7 +1,7 @@
 /**
  * Story PRs (STORY-11): pure rules. What `gh` says about a PR becomes its state and one verdict for its checks; that
- * verdict is the CI evidence when the project's checks run in CI (ADR 0004). GitHub can't tell `gh pr view` which
- * checks are required, so every check it reports counts.
+ * verdict is the CI evidence when the project's checks run in CI (ADR 0004): the repo's required checks, as
+ * `gh pr checks --required` buckets them, or every reported check when the repo requires none.
  */
 import type { CheckOutcome } from "./checks.ts";
 import { GITHUB_COPY, type GithubUse, type PrChecks, type PrState, type PrStatus } from "./prs-types.ts";
@@ -10,7 +10,10 @@ import type { WorkList } from "./work-list-types.ts";
 import { isRecord } from "./utils/guards.ts";
 
 /** The `--json` fields Featra asks `gh pr view` and `gh pr list` for. */
-export const PR_FIELDS = "number,url,state,isDraft,statusCheckRollup";
+export const PR_FIELDS = "number,url,state,isDraft,statusCheckRollup,headRefOid,headRepository,headRepositoryOwner";
+
+/** The `--json` fields Featra asks `gh pr checks` for. */
+export const CHECK_FIELDS = "bucket,name";
 
 /** A check run's conclusions that mean it failed. */
 const FAILED = new Set(["FAILURE", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE", "ERROR"]);
@@ -41,8 +44,51 @@ export function checksVerdict(rollup: unknown): PrChecks {
   return verdicts.has("pending") ? "pending" : "passing";
 }
 
+/**
+ * The checks `gh pr checks --json bucket` lists, as one verdict: a failed or cancelled check fails, one still running
+ * keeps it pending, and passed or skipped checks pass. Null when the answer isn't a list of checks.
+ */
+export function bucketsVerdict(raw: unknown): PrChecks | null {
+  if (!Array.isArray(raw)) return null;
+  if (raw.length === 0) return "none";
+  const buckets = new Set((raw as unknown[]).map((c) => (isRecord(c) ? upper(c.bucket) : "")));
+  if (buckets.has("FAIL") || buckets.has("CANCEL")) return "failing";
+  return [...buckets].every((b) => b === "PASS" || b === "SKIPPING") ? "passing" : "pending";
+}
+
+/** `owner/name` of the repository at a GitHub remote URL (https, ssh, or a path that names github.com), lower case. */
+export function githubRepoOf(remoteUrl: string): string | null {
+  const m = /github\.com[:/]+([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/i.exec(remoteUrl.trim());
+  return m ? `${m[1]}/${m[2]}`.toLowerCase() : null;
+}
+
+/** `owner/name` of a PR's head repository as `gh` (or the REST answer) gives it, lower case; null when not given. */
+function headRepoOf(raw: Record<string, unknown>): string | null {
+  const owner = isRecord(raw.headRepositoryOwner) ? raw.headRepositoryOwner.login : undefined;
+  const name = isRecord(raw.headRepository) ? raw.headRepository.name : undefined;
+  if (typeof owner === "string" && typeof name === "string") return `${owner}/${name}`.toLowerCase();
+  const rest = isRecord(raw.head) && isRecord(raw.head.repo) ? raw.head.repo.full_name : undefined;
+  return typeof rest === "string" ? rest.toLowerCase() : null;
+}
+
+/** The commit a PR's head is at, as `gh` (or the REST answer) gives it; null when not given. */
+function headOidOf(raw: Record<string, unknown>): string | null {
+  const oid = typeof raw.headRefOid === "string" ? raw.headRefOid : isRecord(raw.head) ? raw.head.sha : undefined;
+  return typeof oid === "string" && /^[0-9a-f]{7,64}$/i.test(oid) ? oid.toLowerCase() : null;
+}
+
+export interface ReadPr {
+  number: number;
+  url: string;
+  status: PrStatus;
+  /** The commit the PR's head is at, when `gh` said. */
+  head: string | null;
+  /** `owner/name` of the repository the PR's head branch is in, when `gh` said. */
+  repo: string | null;
+}
+
 /** A PR as `gh pr view --json`, `gh pr list --json` or `gh api …/pulls` answers it; null when it isn't one. */
-export function readPr(raw: unknown): { number: number; url: string; status: PrStatus } | null {
+export function readPr(raw: unknown): ReadPr | null {
   if (!isRecord(raw)) return null;
   const url = typeof raw.url === "string" ? raw.url : typeof raw.html_url === "string" ? raw.html_url : null;
   const number = typeof raw.number === "number" && Number.isInteger(raw.number) ? raw.number : null;
@@ -55,7 +101,8 @@ export function readPr(raw: unknown): { number: number; url: string; status: PrS
   else if (state === "CLOSED") prState = "closed";
   else if (state === "OPEN") prState = draft ? "draft" : "open";
   else return null;
-  return { number, url, status: { state: prState, checks: checksVerdict(raw.statusCheckRollup) } };
+  const status: PrStatus = { state: prState, checks: checksVerdict(raw.statusCheckRollup) };
+  return { number, url, status, head: headOidOf(raw), repo: headRepoOf(raw) };
 }
 
 /** A PR that may still change: open or draft. Merged and closed PRs are not read again. */
@@ -68,6 +115,27 @@ export const prIsOpen = (status: PrStatus | null | undefined): boolean =>
  */
 export function ciOutcome(checks: PrChecks): CheckOutcome {
   return { passed: checks === "passing" ? true : checks === "failing" ? false : null, acs: [] };
+}
+
+/** What a read of a PR found, for its CI evidence. */
+export interface PrRead {
+  /** The PR's head isn't the commit the story's branch is at: its checks are for another commit. */
+  stale: boolean;
+  /** The PR's head moved since the last read: the checks that verified the story were for an older commit. */
+  moved: boolean;
+  /** The verdict of the checks that count (`bucketsVerdict`, or `checksVerdict` when none are required); null if unread. */
+  verdict: PrChecks | null;
+}
+
+/**
+ * A PR read's CI evidence. Checks for a commit the branch has moved past remove Verified and never grant it; a moved
+ * head that hasn't passed yet removes it too. Otherwise passing checks verify, a failing one unverifies, and checks
+ * still running change nothing.
+ */
+export function prCiOutcome({ stale, moved, verdict }: PrRead): CheckOutcome {
+  if (stale) return { passed: false, acs: [] };
+  const outcome = ciOutcome(verdict ?? "none");
+  return outcome.passed === null && moved ? { passed: false, acs: [] } : outcome;
 }
 
 /** What Featra found: a GitHub remote, a `gh` that runs, and whether it is signed in. */

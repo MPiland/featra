@@ -1620,17 +1620,17 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **Base is the feature branch** (`features[parent].branch`), else the repo's base branch. The feature branch is pushed
   only when the remote lacks it. The story branch is pushed with `-u`; nothing is ever forced, and a rejected push shows
   git's reason on the card.
-- **An open PR from the story's branch is adopted** (`gh pr list --head`), so a PR the user opened by hand isn't
-  duplicated. A new PR is created with `gh api repos/{owner}/{repo}/pulls --method POST --input -`, its title and body as
+- **An open PR from the story's branch is adopted** (`gh pr list --head --base`, in the project's own repository, not a
+  fork's), so a PR the user opened by hand isn't duplicated. A new PR is created with `gh api repos/{owner}/{repo}/pulls --method POST --input -`, its title and body as
   JSON on stdin, so card text never reaches a command line (ADR 0031's rule). Title `STORY-n: title`; body the user
   story, the criteria as a checklist, and "Opened by Featra for STORY-n."
 - **The PR is recorded on the owner copy by `system`**, with a `pr` history event, through the card lane.
 - **Create PR** shows when GitHub is usable, the story is in review in its worktree with no PR, and nothing is opening;
   also after a failure, with the failure as a note. It is offered whatever the automatic setting, so a failed or skipped
   open can be retried.
-- **Every check `gh pr view` lists counts as required.** `gh` can't tell which are required without another call per
-  check run. Failure beats pending; pending or none changes nothing. Passing writes Verified, failing removes it, only
-  when `checksWhere` is CI, through the same `recordEvidence` the local checks use.
+- **The repo's required checks count** (`gh pr checks --required`, Dev Lead ruling), or every reported check when the
+  repo requires none. Failure beats pending; skipped passes; pending or none changes nothing. Passing writes Verified,
+  failing removes it, only when `checksWhere` is CI, through the same `recordEvidence` the local checks use.
 - **One poller per project.** It reads at start, then every N minutes. Window focus asks the server (`prs.refresh`),
   which settles a burst of focus changes for 1 second and reads once. Reads never overlap. Merged or closed PRs and the
   PRs of done or cancelled stories aren't read again. Polling stops when the project closes; local mode reads nothing.
@@ -1641,3 +1641,21 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   remote is a bare repository whose path contains `github.com`, so detection passes and pushes stay on disk. The
   Playwright journey puts the same fake `gh` first on the PATH. The Work list's fixture PR is now a URL, as cards record
   it, so the existing tests' `#15` is the chip's label.
+
+## 2026-11-12 — STORY-11 review fixes
+
+The Dev Lead's review of 0194bbe, fixed in this story:
+
+- **Verified follows the commit.** `headRefOid` is read with the PR. When it isn't the story branch's tip, Verified is
+  removed and never granted; a head that moved since the last read removes Verified until its own checks pass. A story
+  with a PR has its branch pushed again (never forced) on every move into review, after removing Verified given for an
+  older commit.
+- **Required checks** (`gh pr checks --required --json bucket,name`), else every reported check. The chip still shows
+  every check.
+- **Older `pr` values** (`12`, `#12`) show as `#12` text with no link.
+- **Windows quoting**: any argument with a character outside `[\w./:{}@+-]` is quoted; commas and `=` were not.
+- **Recording the PR** leaves a `pr` someone set meanwhile alone.
+- **Adopting** needs the same base and the project's own repository.
+- **Pushes** go to the remote GitHub was detected on (`origin` first), not always `origin`.
+- **A closed project** forgets its PR reads and notes, and a read that finishes after it closed records no evidence.
+- `App.tsx` and `bridge.ts` are under 300 lines (`usePrFocus`, `window-state.ts`).

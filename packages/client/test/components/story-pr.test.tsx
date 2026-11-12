@@ -8,7 +8,7 @@ import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/re
 import { afterEach, describe, expect, it } from "vitest";
 import type { Card, CardPr } from "@featra/work-format";
 import { PROJECT, renderApp } from "../harness.tsx";
-import { cardOf, PLAN } from "../work-fixtures.ts";
+import { cardOf, LEGACY_PR, PLAN } from "../work-fixtures.ts";
 
 afterEach(cleanup);
 
@@ -76,6 +76,22 @@ describe("AC3: the PR chip", () => {
     expect(within(section).getByRole("link", { name: "#14" })).toBeTruthy();
     expect(within(section).queryByText("Open")).toBeNull();
     expect(within(section).queryByText(/Checks/)).toBeNull();
+  });
+});
+
+describe("a pr recorded as the number alone, as older cards have it", () => {
+  it("shows #N as text with no link, on the Work row and the card", async () => {
+    const app = renderApp({ cards: { [PROJECT.dir]: [...PLAN, LEGACY_PR].map(cardOf) } });
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: "Cards and the feature list" }));
+    const row = screen.getByRole("button", { name: "Older card" }).closest('[role="row"]') as HTMLElement;
+    expect(within(row).getByText("#15")).toBeTruthy();
+    expect(within(row).queryByRole("link")).toBeNull();
+    await app.user.click(screen.getByRole("button", { name: "Older card" }));
+    const pane = await screen.findByRole("complementary", { name: "STORY-5 card" });
+    const section = await within(pane).findByRole("region", { name: "PR" });
+    expect(within(section).getByText("#15")).toBeTruthy();
+    expect(within(section).queryByRole("link")).toBeNull();
   });
 });
 

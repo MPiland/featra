@@ -86,3 +86,13 @@ export const PLAN: CardSpec[] = [
   { id: "STORY-4", type: "story", parent: "FEAT-3", status: "New", title: "Draw the chart" },
   { id: "STORY-9", type: "story", parent: null, status: "Ready", title: "Loose story" },
 ];
+
+/** A story from before STORY-11, whose `pr` was written as the PR's number alone. */
+export const LEGACY_PR: CardSpec = {
+  id: "STORY-5",
+  type: "story",
+  parent: "FEAT-2",
+  status: "In Review",
+  title: "Older card",
+  pr: "15",
+};

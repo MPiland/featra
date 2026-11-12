@@ -20,6 +20,12 @@ export interface FakePr {
   isDraft?: boolean;
   /** `statusCheckRollup` as `gh pr view` gives it. */
   checks?: unknown[];
+  /** The checks of each head commit, in place of `checks`: a new push starts with none, as on GitHub. */
+  checksAt?: Record<string, unknown[]>;
+  /** The names of the checks the repo requires; none by default. */
+  required?: string[];
+  /** The owner of a fork the PR comes from; the repo's own owner by default. */
+  headOwner?: string;
 }
 
 export interface FakeGhState {
@@ -28,6 +34,12 @@ export interface FakeGhState {
   next: number;
   /** When set, opening a PR fails with this message. */
   createFails?: string;
+  /** The bare repository that stands in for GitHub's copy: a PR's head commit is its branch's tip there. */
+  remote?: string;
+  /** A file written while the PR opens, as a user editing the card meanwhile would. */
+  whileCreating?: { file: string; text: string };
+  /** How long `gh pr view` takes to answer. */
+  viewDelayMs?: number;
 }
 
 export interface GhCall {

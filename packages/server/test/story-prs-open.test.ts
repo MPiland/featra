@@ -3,11 +3,12 @@
  * pushed and its PR opened through the user's `gh` (or adopts the open one); with the setting off, the card offers
  * Create PR instead. Real repository, watches, lane and rules; GitHub, the remote and the clock are faked.
  */
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { GITHUB_COPY } from "@featra/work-format";
+import { GITHUB_COPY, serializeCard } from "@featra/work-format";
 import { detectGithubUse } from "../src/github-detect.ts";
 import { PR_REFUSALS } from "../src/story-prs.ts";
-import { FEATURE_BRANCH, prWorld, STORY_BRANCH } from "./story-prs-world.ts";
+import { FEATURE_BRANCH, prWorld, STORY_BRANCH, storyCard } from "./story-prs-world.ts";
 
 const w = prWorld();
 const prOf = () => w.prs.prState(w.repo.main, "STORY-1");
@@ -71,10 +72,53 @@ describe("a story moving into review (AC2)", { timeout: 60_000 }, () => {
 
   it("adopts the open PR from the story's branch instead of opening another", async () => {
     const url = "https://github.com/acme/app/pull/14";
-    await w.start({ gh: { prs: [{ number: 14, url, head: STORY_BRANCH, state: "OPEN" }], next: 15 } });
+    await w.start({
+      gh: { prs: [{ number: 14, url, head: STORY_BRANCH, base: FEATURE_BRANCH, state: "OPEN" }], next: 15 },
+    });
     await w.move("In Review");
     expect(await w.callsOf("api")).toEqual([]);
     expect((await w.read()).pr).toBe(url);
+  });
+
+  it("doesn't adopt a fork's branch of the same name, or a PR into another branch", async () => {
+    const fork = { number: 14, url: "https://github.com/acme/app/pull/14", head: STORY_BRANCH, base: FEATURE_BRANCH };
+    const elsewhere = { number: 15, url: "https://github.com/acme/app/pull/15", head: STORY_BRANCH, base: "main" };
+    await w.start({
+      gh: {
+        prs: [
+          { ...fork, headOwner: "someone", state: "OPEN" },
+          { ...elsewhere, state: "OPEN" },
+        ],
+        next: 16,
+      },
+    });
+    await w.move("In Review");
+    expect(await w.callsOf("pr list")).toContainEqual(
+      expect.arrayContaining(["--head", STORY_BRANCH, "--base", FEATURE_BRANCH]),
+    );
+    expect(await w.callsOf("api")).toHaveLength(1);
+    expect((await w.read()).pr).toBe("https://github.com/acme/app/pull/16");
+  });
+
+  it("pushes to the remote GitHub is on, whatever its name", async () => {
+    await w.start({ remoteName: "upstream" });
+    await w.move("In Review");
+    expect(w.repo.git(w.repo.main, "remote").trim()).toBe("upstream");
+    expect(w.remoteBranches()).toEqual(expect.arrayContaining([FEATURE_BRANCH, STORY_BRANCH]));
+    expect((await w.read()).pr).toBe("https://github.com/acme/app/pull/1");
+  });
+
+  it("keeps the pr someone set on the card while the PR opened", async () => {
+    const theirs = "https://github.com/acme/app/pull/77";
+    await w.start();
+    const file = join(w.tree, ".featra", "cards", "STORY-1-card.md");
+    await w.gh.change((s) => {
+      s.whileCreating = { file, text: serializeCard(storyCard("In Review", { pr: theirs })) };
+    });
+    await w.move("In Review");
+    const story = await w.read();
+    expect(story.pr).toBe(theirs);
+    expect(story.history.some((e) => e.field === "pr" && e.by === "system")).toBe(false);
   });
 
   it("leaves the stories already in review when Featra starts alone", async () => {

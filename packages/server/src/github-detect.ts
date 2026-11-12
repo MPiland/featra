@@ -5,7 +5,7 @@
  */
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { githubUse, type GithubDetection, type GithubUse } from "@featra/work-format";
+import { githubRepoOf, githubUse, type GithubDetection, type GithubUse } from "@featra/work-format";
 import { isRecord } from "@featra/work-format/guards";
 import { ghJson, runGh } from "./gh-run.ts";
 import { runGit } from "./git-run.ts";
@@ -19,14 +19,32 @@ export interface GithubDeps {
   ghTimeoutMs?: number;
 }
 
-const hasGithubRemote = async (dir: string, git: string) => {
+/** A remote of the project on GitHub: its name, and the repository it is as `owner/name`. */
+export interface GithubRemote {
+  name: string;
+  repo: string;
+}
+
+/** The project's GitHub remote: `origin` when it is on GitHub, else the first that is; null when none is. */
+export async function githubRemote(dir: string, git = "git"): Promise<GithubRemote | null> {
+  let stdout: string;
   try {
     const r = await runGit(git, dir, ["remote", "-v"]);
-    return r.code === 0 && /github\.com[:/]/i.test(r.stdout);
+    if (r.code !== 0) return null;
+    stdout = r.stdout;
   } catch {
-    return false;
+    return null;
   }
-};
+  const found: GithubRemote[] = [];
+  for (const line of stdout.split(/\r?\n/)) {
+    const [, name, url] = /^([\w.-]+)\s+(.+?)\s+\(fetch\)$/.exec(line.trim()) ?? [];
+    const repo = url ? githubRepoOf(url) : null;
+    if (name && repo && !name.startsWith("-")) found.push({ name, repo });
+  }
+  return found.find((r) => r.name === "origin") ?? found[0] ?? null;
+}
+
+const hasGithubRemote = async (dir: string, git: string) => (await githubRemote(dir, git)) !== null;
 
 const hasWorkflows = async (dir: string) => {
   try {

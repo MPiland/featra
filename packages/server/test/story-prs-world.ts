@@ -7,7 +7,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach } from "vitest";
-import { parseCard, type Card } from "@featra/work-format";
+import { parseCard, setStatus, type Card } from "@featra/work-format";
 import { createAllowedProjects, type AllowedProjects } from "../src/allowed-projects.ts";
 import { createCheckSettings, type CheckSettings } from "../src/check-settings.ts";
 import { createRepoGit } from "../src/repo-git.ts";
@@ -32,6 +32,8 @@ export interface PrStartOptions {
   noGh?: boolean;
   /** The story's status when the watch starts. */
   status?: string;
+  /** The name of the GitHub remote; `origin` by default. */
+  remoteName?: string;
 }
 
 export interface PrWorld {
@@ -48,6 +50,8 @@ export interface PrWorld {
   start: (options?: PrStartOptions) => Promise<void>;
   /** The story's status changes in its worktree, as a session's report would write it, and everything settles. */
   move: (status: string, extra?: Partial<Card>) => Promise<void>;
+  /** The story's status changes in its worktree, its history kept, as a session moving it would write it. */
+  moveOn: (status: string) => Promise<void>;
   read: () => Promise<Card>;
   /** The branches the remote has. */
   remoteBranches: () => string[];
@@ -82,6 +86,11 @@ export function prWorld(): PrWorld {
     // The PR's own write is heard by the watch too.
     await w.settle();
   };
+  w.moveOn = async (status) => {
+    await w.repo.write(w.tree, setStatus(await w.read(), status, "session:test", w.clock.now().toISOString()));
+    await w.settle();
+    await w.settle();
+  };
   w.callsOf = async (kind) =>
     (await w.gh.calls()).map((c) => c.args).filter((a) => a.slice(0, kind.split(" ").length).join(" ") === kind);
 
@@ -91,6 +100,7 @@ export function prWorld(): PrWorld {
     gh = {},
     noGh = false,
     status = "In Progress",
+    remoteName = "origin",
   }: PrStartOptions = {}) => {
     const { repo } = w;
     await writeFile(join(repo.main, ".featra", "config.yaml"), `version: 1\n${yaml}`);
@@ -98,11 +108,11 @@ export function prWorld(): PrWorld {
     w.remote = join(repo.root, "github.com", "acme", "app.git").replace(/\\/g, "/");
     await mkdir(w.remote, { recursive: true });
     repo.git(w.remote, "init", "-q", "--bare");
-    if (remote) repo.git(repo.main, "remote", "add", "origin", w.remote);
+    if (remote) repo.git(repo.main, "remote", "add", remoteName, w.remote);
     repo.git(repo.main, "branch", FEATURE_BRANCH);
     w.tree = repo.worktree(STORY_BRANCH, "story-1", FEATURE_BRANCH);
     await repo.write(w.tree, storyCard(status));
-    w.gh = await fakeGh(gh);
+    w.gh = await fakeGh({ remote: w.remote, ...gh });
     const deps = { ghCommand: noGh ? "gh-that-is-not-installed" : w.gh.command };
     w.settings = createCheckSettings({ scan: w.watches.scan, now: w.clock.now, ...deps });
     w.allowed.set([repo.main]);

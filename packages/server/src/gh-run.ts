@@ -18,7 +18,20 @@ export interface GhOptions {
 
 /** Characters cmd.exe reads even inside double quotes; an argument with one is not run on Windows. */
 const UNSAFE_ON_WINDOWS = /["%^!\r\n]/;
+/** An argument made only of these goes to cmd.exe as it is; any other is quoted. */
+const PLAIN_ON_WINDOWS = /^[\w./:{}@+-]+$/;
 const MAX_OUTPUT = 16 * 1024 * 1024;
+
+/**
+ * The command line that runs `gh <args>` through cmd.exe, which a `.cmd` shim needs: the program quoted when its path
+ * has a separator or a space, and each argument quoted unless it is plain. Null when a part has a character cmd.exe
+ * reads even inside quotes, so it is never run.
+ */
+export function windowsCommand(gh: string, args: readonly string[]): string | null {
+  if ([gh, ...args].some((a) => UNSAFE_ON_WINDOWS.test(a))) return null;
+  const program = /[\\/ ]/.test(gh) ? `"${gh}"` : gh;
+  return [program, ...args.map((a) => (PLAIN_ON_WINDOWS.test(a) ? a : `"${a}"`))].join(" ");
+}
 
 /** Runs `gh <args>` in `dir`. Null when it couldn't run at all (not installed, refused, timed out). */
 export function runGh(dir: string, args: string[], { gh = "gh", timeoutMs = 15_000, input }: GhOptions = {}) {
@@ -29,14 +42,12 @@ export function runGh(dir: string, args: string[], { gh = "gh", timeoutMs = 15_0
       if (err && (typeof code !== "number" || (isRecord(err) && err.killed === true))) return resolve(null);
       resolve({ code: typeof code === "number" ? code : 0, stdout: String(stdout), stderr: String(stderr) });
     };
-    // A .cmd shim on Windows needs the shell: a part with spaces or symbols is quoted, and one with a character cmd.exe
-    // reads even inside quotes is not run.
+    // A .cmd shim on Windows needs the shell (`windowsCommand`).
     let child;
     if (process.platform === "win32") {
-      if ([gh, ...args].some((a) => UNSAFE_ON_WINDOWS.test(a))) return resolve(null);
-      const program = /[\\/ ]/.test(gh) ? `"${gh}"` : gh;
-      const quoted = args.map((a) => (/^[\w./:=,{}@+-]+$/.test(a) ? a : `"${a}"`));
-      child = exec([program, ...quoted].join(" "), options, done);
+      const line = windowsCommand(gh, args);
+      if (line === null) return resolve(null);
+      child = exec(line, options, done);
     } else child = execFile(gh, args, options, done);
     child.on("error", () => resolve(null));
     if (input !== undefined) child.stdin?.end(input);
