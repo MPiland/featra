@@ -53,6 +53,10 @@ export interface StoryRow {
   stopped: boolean;
   /** Waiting in Acceptance for the user (STORY-23): the row, the card and the session offer Accept and Send back. */
   awaiting: boolean;
+  /** Verified and still in its own worktree (STORY-12): the row, the card and the session offer Merge. */
+  mergeable: boolean;
+  /** Merged into its feature (STORY-12): its session is history, with no Stop or Resume. */
+  merged: boolean;
 }
 
 export interface FeatureRow {
@@ -140,6 +144,8 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   ...(r.reported === true ? { reported: true as const } : {}),
   stopped: r.stopped === true,
   awaiting: r.awaiting === true,
+  mergeable: r.mergeable === true,
+  merged: r.merged === true,
 });
 
 const feature = (r: Record<string, unknown>): FeatureRow => {

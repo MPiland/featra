@@ -230,7 +230,7 @@ export function createChatManager({
   const send = (id: string, text: string) => sender.send(id, text);
   const claim = (c: Chat) => sender.claim(c);
 
-  const control = storyControl({ chat, open, provider, record, stories, notices, claim, listChanged, log });
+  const control = storyControl({ chat, open, provider, record, stories, notices, claim, listChanged, end, log });
 
   return {
     ...chatLookups(chats, chat, providers, same),
@@ -282,6 +282,12 @@ export function createChatManager({
     // Stop on a subagent ends it alone; on any other chat it ends the turn.
     stop: (id) => (subagents.is(id) ? subagents.stop(chat(id)) : control.stop(id)),
     archive: (id) => subagents.archive(chat(id)),
+    async askApproval(id, request) {
+      await open(id);
+      const ask = { ...request, chat: id, cwd: chat(id).cwd, forChat: false };
+      return (await desk.approve(ask, new AbortController().signal)).allow;
+    },
+    notify: (id, notice) => notices.tell(id, notice),
     // A story session's approval shown in its parent chat is answered from there too.
     approve: (id, tool, answer) => desk.answer(mirror.holder(chat(id).id, tool) ?? chat(id).id, tool, answer),
     answer: (id, tool, answers) => desk.reply(chat(id).id, tool, answers),

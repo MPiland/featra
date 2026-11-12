@@ -7,6 +7,7 @@ import type {
   MessageInput,
   ProposeInput,
   ReportInput,
+  RequestMergeInput,
   SpawnInput,
 } from "@featra/work-format";
 
@@ -26,6 +27,8 @@ export interface FeatraHost {
   message: (input: MessageInput) => Promise<{ story: string }>;
   /** The Dev Lead proposes the check command and linked-test command; the user confirms them in settings (STORY-56). */
   propose: (input: ProposeInput) => Promise<{ proposed: string[] }>;
+  /** The Dev Lead asks the user to merge a story into its feature; answers once the user is asked (STORY-12). */
+  requestMerge: (input: RequestMergeInput) => Promise<{ story: string }>;
 }
 
 export interface Tool {

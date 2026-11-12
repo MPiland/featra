@@ -9,6 +9,7 @@ import { StartFeature } from "./StartFeature.tsx";
 import { StoryChecks } from "./StoryChecks.tsx";
 import { StoryPr } from "./StoryPr.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
+import { MergeStory } from "./MergeStory.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
@@ -157,6 +158,16 @@ export function CardPane({
                   accept: (story) => work.acceptStory(dir, story),
                   sendBack: (story, reason, addCriterion) => work.sendBackStory(dir, story, reason, addCriterion),
                 }}
+              />
+            </div>
+          )}
+          {view.type === "story" && !readOnly && (
+            <div className="draft-actions">
+              <MergeStory
+                key={`merge-${id}`}
+                id={id}
+                mergeable={view.mergeable === true}
+                merge={(story) => work.mergeStory(dir, story)}
               />
             </div>
           )}

@@ -142,6 +142,7 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         forChat: covers !== null,
         ...(covers ? { covers } : {}),
         ...(request.subagent ? { subagent: request.subagent } : {}),
+        ...(request.story ? { story: request.story } : {}),
       };
       return hold<ToolDecision>(chat, id, signal, opening, (settle) => ({ kind: "tool", request, offer, settle }));
     },

@@ -3,7 +3,7 @@
  * what the card's history says last about it, so the one fact lives in one place and the history event is the mark.
  * Stop keeps the story's stage, and Resume clears the mark; neither touches the worktree.
  */
-import { appendHistory } from "./history.ts";
+import { appendHistory, isMerged } from "./history.ts";
 import type { Card } from "./types.ts";
 import type { Tone } from "./work-list-types.ts";
 
@@ -31,6 +31,7 @@ export const STOP_MESSAGES = {
   idle: (id: string) => `${id} isn't running.`,
   running: (id: string) => `${id} is running.`,
   queued: (id: string) => `${id} is waiting for a slot.`,
+  merged: (id: string) => `${id} is merged. Its session is history now.`,
 } as const;
 
 /** What a session's story-agent row says of it, for the rules on Stop and Resume. */
@@ -58,6 +59,7 @@ export function stopRefusal(card: Card | undefined, tone: Tone): string | null {
 export function resumeRefusal(card: Card | undefined, tone: Tone, turn: StoryTurn): string | null {
   if (!card) return STOP_MESSAGES.gone;
   if (card.type !== "story") return STOP_MESSAGES.notStory(card.id);
+  if (isMerged(card)) return STOP_MESSAGES.merged(card.id);
   if (!canResume(stoppedIn(card, tone), turn.stalled, tone)) return STOP_MESSAGES.notStopped(card.id);
   if (turn.running) return STOP_MESSAGES.running(card.id);
   return turn.queued ? STOP_MESSAGES.queued(card.id) : null;

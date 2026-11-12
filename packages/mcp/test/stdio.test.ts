@@ -23,6 +23,7 @@ describe("the Featra MCP over stdio", () => {
       "update_card",
       "message_session",
       "propose_check_command",
+      "request_merge",
     ]);
     const decision = (tools[0]?.description ?? "").toLowerCase();
     for (const cue of [

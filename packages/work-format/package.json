@@ -26,7 +26,8 @@
     "./inbox": "./src/inbox.ts",
     "./approvals": "./src/approvals.ts",
     "./questions": "./src/questions.ts",
-    "./tool-summary": "./src/tool-summary.ts"
+    "./tool-summary": "./src/tool-summary.ts",
+    "./merge-copy": "./src/merge-copy.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

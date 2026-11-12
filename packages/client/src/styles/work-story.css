@@ -39,6 +39,12 @@
   padding: 6px 16px;
 }
 
+/* Accept and Merge come and go with the story's state: an empty row takes no room (STORY-12). */
+.chat-accept:empty,
+.draft-actions:empty {
+  display: none;
+}
+
 .chat-accept .accept-story {
   margin-left: 0;
 }

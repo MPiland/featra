@@ -52,6 +52,8 @@ export * from "./card-report.ts";
 export * from "./story-notice.ts";
 export * from "./story-stop.ts";
 export * from "./acceptance.ts";
+export * from "./merge.ts";
+export * from "./merge-copy.ts";
 export * from "./checks-types.ts";
 export * from "./checks.ts";
 export * from "./ci-proof.ts";

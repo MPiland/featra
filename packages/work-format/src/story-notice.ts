@@ -6,13 +6,17 @@
 import type { ChatEvent, TurnOutcome } from "./chat-events.ts";
 import { parseId } from "./ids.ts";
 import type { Answers, Question } from "./questions.ts";
+import { isMerged } from "./history.ts";
 import { stoppedIn } from "./story-stop.ts";
 import type { Card } from "./types.ts";
 import { isRecord } from "./utils/guards.ts";
 import type { Tone } from "./work-list-types.ts";
 
-/** What a notice says happened: the turn ended, the user stopped it, it failed, or the session asks the Dev Lead. */
-export type NoticeOutcome = "ended" | "stopped" | "failed" | "asks";
+/**
+ * What a notice says happened: the turn ended, the user stopped it, it failed, or the session asks the Dev Lead; or,
+ * of a merge the Dev Lead asked for (STORY-12), it merged, the user declined it, or it didn't merge.
+ */
+export type NoticeOutcome = "ended" | "stopped" | "failed" | "asks" | "merged" | "merge declined" | "not merged";
 
 export interface Notice {
   story: string;
@@ -46,6 +50,7 @@ export const MESSAGE_MESSAGES = {
   stopped: (id: string) => `${id} is stopped. Only the user can resume it.`,
   working: (id: string) => `${id} is working. Its next notice says when it can be messaged.`,
   queued: (id: string) => `${id} is waiting for a slot. Its next notice says when it can be messaged.`,
+  merged: (id: string) => `${id} is merged. Its session is history now.`,
   sent: (id: string) => `Sent to ${id}. Its next notice tells you what it did.`,
 } as const;
 
@@ -88,6 +93,7 @@ export function messageRefusal(
 ): string | null {
   if (!card) return MESSAGE_MESSAGES.gone;
   if (card.type !== "story") return MESSAGE_MESSAGES.notStory(id);
+  if (isMerged(card)) return MESSAGE_MESSAGES.merged(id);
   if (session === null) return MESSAGE_MESSAGES.noSession(id);
   if (session.lead !== lead) return MESSAGE_MESSAGES.notLead(id);
   if (stoppedIn(card, tone)) return MESSAGE_MESSAGES.stopped(id);

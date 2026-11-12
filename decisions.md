@@ -1735,3 +1735,52 @@ ADR 0033 (proposed) records the design. Choices to confirm:
   default plus `testReportArtifact: test-report-unit`, because this repo now proves its criteria from CI (ruling 8).
   Still an exact match.
 - Other build choices confirmed. Download limits and re-run detection go to the roadmap.
+
+## 2026-11-12 — STORY-12 build choices (story agent, for the Dev Lead to confirm)
+
+- **When Merge is offered.** A story can merge when all of these hold:
+  - it is Verified;
+  - it is in review up to Acceptance, or already Done;
+  - its owner copy is its live worktree, checked out;
+  - it isn't merged yet.
+
+  Accept is not needed. The rule is `mergeRefusal` in work-format, which both the server and the Work list and card pane
+  use.
+
+- **GitHub mode needs a PR.** Whenever GitHub is usable (`githubUse`), Merge goes through the story's PR. A story with no
+  PR is refused ("Open its PR first."). It does not fall back to a local merge.
+- **Local merge with plumbing.** The local merge commit is made with `merge-tree --write-tree` and `commit-tree`. Its
+  parents are the feature tip, then the story tip, and the merged card is written into the tree. The feature branch then
+  moves by `merge --ff-only` where it is checked out, or by `update-ref` with the old value where it isn't. Local
+  changes in the feature checkout, or a branch that moved meanwhile, refuse with nothing changed. The lane is held only
+  for the local merge, not across `gh`.
+- **Head checks.**
+  - **GitHub:** the PR head must equal the local story tip. With `checksWhere: local`, the local checks must also have
+    settled on that tip.
+  - **Local:** `settledHead` (story-checks) must equal the tip. It is null while a run is in flight, and before any run
+    it is the head Featra saw on start.
+- **Dirty and working refusals.** Every uncommitted or untracked path in the worktree refuses, except the story's own
+  card. A session that is running or queued refuses.
+- **Conflicts.**
+  - On GitHub, `gh pr view --json mergeable` reporting CONFLICTING, or `gh pr merge` saying it can't be cleanly created,
+    is a conflict. The files then come from `merge-tree` of the fetched feature branch, and are empty if it can't tell.
+  - The story goes to the first active stage by `system` (`conflictedStory`), which also clears a Stopped mark.
+  - If sending to the session fails, the move is still recorded, and the failure is logged.
+- **After a GitHub merge.**
+  - The merged card is committed on the local feature branch. It goes on top of GitHub's merge commit (fast-forward when
+    the local branch is behind), or as a two-parent commit if the local branch moved on. It is not pushed.
+  - If that commit can't be made, nothing is removed, and the user is told to pull and merge again.
+  - The remote branch is deleted with `git push --delete`.
+- **Outside merges.** The PR poller re-reads a merged PR while its story still has a worktree and isn't merged, Done
+  stories included, and settles it through the same `settle`.
+- **The `story.merge` result.** It returns `{ remains }`: the notes for what couldn't be removed, shown in place of the
+  button.
+- **`request_merge` notice outcomes.** "merge declined" has an empty summary. "merged" has `<feature branch>.` plus
+  whatever remains. "not merged" carries the refusal or conflict sentence. A second ask while one waits is refused.
+- **The session after a merge.** `retire` stops a running turn and ends the agent. The chat stays and opens as its
+  transcript. Resume is not offered for a merged story.
+- **The client fake.** The client tests' fake card server now owns a started story in its worktree, and a merged one on
+  its feature branch, as the server does. This keeps the real `mergeRefusal` meaningful there.
+- **Open: no known head after a restart.** In local mode Featra doesn't know which commit the checks settled on after a
+  restart, so Merge is refused as stale until they run again. A Done story can't re-run its checks today. This is a
+  roadmap candidate.

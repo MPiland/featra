@@ -101,6 +101,13 @@ export interface ServerMethods {
    */
   "story.accept": { params: { dir: string; id: string }; result: null };
   /**
+   * Merges a Verified story into its feature branch with a merge commit (STORY-12): through its PR when the project uses
+   * GitHub, else in git. Afterwards its session stops, and its worktree and branches go. Refused with why when it can't
+   * merge; a conflict merges nothing, returns the story to In Progress and is refused with the files. `remains` says
+   * what was left behind (a worktree or branch that couldn't be removed); empty when it all went.
+   */
+  "story.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
+  /**
    * Runs a story's checks on this computer again now (STORY-56): the check command and the linked tests. Refused when
    * checks run in CI for the project or the story isn't in review. The result reaches the card through `card.view`.
    */

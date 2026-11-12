@@ -9,6 +9,7 @@ import { useChatControls } from "./use-chat-controls.ts";
 import { Transcript } from "./Transcript.tsx";
 import type { AcceptActions } from "../../card-pane.ts";
 import { AcceptStory } from "../work/AcceptStory.tsx";
+import { MergeStory, type MergeAction } from "../work/MergeStory.tsx";
 import { StoryStop, type StopActions, type StopState } from "../work/StoryStop.tsx";
 
 /** The chat the user opened: its id and the role it started from. */
@@ -37,6 +38,9 @@ export interface ChatViewProps {
     /** The story waits in Acceptance: Accept and Send back are offered at the end of the chat (STORY-23). */
     awaiting: boolean;
     acceptance: AcceptActions;
+    /** The story is Verified and can merge: Merge is offered beside Accept (STORY-12). */
+    mergeable: boolean;
+    merge: MergeAction;
   };
 }
 
@@ -112,9 +116,10 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
           onUndoLog: (entry) => chats.undoLog(chat.id, entry),
         }}
       />
-      {chat.story && story?.awaiting && (
+      {chat.story && story && (
         <div className="chat-accept">
-          <AcceptStory id={chat.story} actions={story.acceptance} />
+          {story.awaiting && <AcceptStory id={chat.story} actions={story.acceptance} />}
+          <MergeStory id={chat.story} mergeable={story.mergeable} merge={story.merge} />
         </div>
       )}
       {readOnly && (

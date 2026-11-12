@@ -6,7 +6,9 @@ import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
+import { MERGE_COPY } from "@featra/work-format/merge-copy";
 import { AcceptStory } from "./AcceptStory.tsx";
+import { MergeStory } from "./MergeStory.tsx";
 import { PrChip } from "./PrChip.tsx";
 import { StoryAgent, StoryAgentsContext } from "./story-agents.tsx";
 
@@ -62,6 +64,8 @@ function Story({ story }: { story: StoryRow }) {
           <StaleMark id={story.id} />
           <StoryAgent id={story.id} />
           {story.awaiting && <AcceptStory id={story.id} actions={agents.acceptance} into={below} />}
+          <MergeStory id={story.id} mergeable={story.mergeable} merge={agents.merge} />
+          {story.merged && <span className="meta"> · {MERGE_COPY.merged}</span>}
           {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
         </span>
         <span role="cell">

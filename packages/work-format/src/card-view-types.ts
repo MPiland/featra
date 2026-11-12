@@ -79,6 +79,10 @@ export interface CardView {
   awaiting?: true;
   /** True on an approved feature, which Start can give its branch (STORY-52); absent otherwise. */
   startable?: true;
+  /** True on a Verified story in its own worktree, which Merge can merge into its feature (STORY-12); absent otherwise. */
+  mergeable?: true;
+  /** True on a story merged into its feature (STORY-12); absent otherwise. */
+  merged?: true;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -208,6 +212,8 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...prOf(raw.prState),
     ...(raw.awaiting === true ? { awaiting: true as const } : {}),
     ...(raw.startable === true ? { startable: true as const } : {}),
+    ...(raw.mergeable === true ? { mergeable: true as const } : {}),
+    ...(raw.merged === true ? { merged: true as const } : {}),
   };
 }
 

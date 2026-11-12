@@ -40,8 +40,8 @@ function why(text: string): string {
     .filter(Boolean);
   return lines.find((l) => /^(error|fatal):/.test(l)) ?? lines[0] ?? "";
 }
-const because = (what: string, said: string) => (why(said) ? `${what}: ${why(said)}` : `${what}.`);
-const ghOptions = (deps: GithubPrDeps): GhOptions => ({ gh: deps.ghCommand, timeoutMs: deps.ghTimeoutMs });
+export const because = (what: string, said: string) => (why(said) ? `${what}: ${why(said)}` : `${what}.`);
+export const ghOptions = (deps: GithubPrDeps): GhOptions => ({ gh: deps.ghCommand, timeoutMs: deps.ghTimeoutMs });
 
 /**
  * Pushes the story's branch from its worktree to the project's GitHub remote, and first the feature branch when the

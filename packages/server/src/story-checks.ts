@@ -6,7 +6,15 @@
  * One run per worktree at a time: a request that arrives while one runs queues behind it (at most one, so a burst of
  * commits runs once more), and the run it makes stale is thrown away. Runs cost no tokens and never block the server.
  */
-import { CHECKS_COPY, checksApply, checksWhere, toIso, type CardChecks, type CheckOutcome } from "@featra/work-format";
+import {
+  CHECKS_COPY,
+  checksApply,
+  checksWhere,
+  toIso,
+  type CardChecks,
+  type CheckOutcome,
+  type OwnerLocation,
+} from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { ApiError } from "./api-error.ts";
 import { ownedIn } from "./card-actions.ts";
@@ -52,14 +60,17 @@ const NOTES = {
 const keyOf = (dir: string, id: string) => `${dir}\0${id}`;
 const blank = (): CardChecks => ({ running: false, idle: null, last: null, failedAcs: [], note: null });
 
+/** The commit the worktree `owner` is at, as `scan` read it. */
+const headIn = (scan: Scan, owner: OwnerLocation) =>
+  scan.collected.git.trees.find((t) => t.path === scan.collected.roots.get(locationKey(owner)))?.head ?? "";
+
 /** The stories of `scan` whose checks run in their own worktree now. */
 function reviewed(scan: Scan | null): Reviewed[] {
   if (!scan) return [];
-  const { config, git } = scan.collected;
+  const { config } = scan.collected;
   return scan.resolution.cards.flatMap(({ card, owner }) => {
     if (owner.kind !== "worktree" || !checksApply(card, config)) return [];
-    const head = git.trees.find((t) => t.path === scan.collected.roots.get(locationKey(owner)))?.head;
-    return [{ id: card.id, trigger: `${card.status}@${head ?? ""}` }];
+    return [{ id: card.id, trigger: `${card.status}@${headIn(scan, owner)}` }];
   });
 }
 
@@ -76,6 +87,8 @@ export function createStoryChecks({
 }: StoryChecksDeps) {
   const states = new Map<string, CardChecks>();
   const slots = new Map<string, { pending: boolean; settled: Promise<void> }>();
+  /** The commit each story's last recorded run checked: what its evidence is for (STORY-12). */
+  const checked = new Map<string, string>();
   const active = new Set<RunControl>();
   let closed = false;
   const isClosed = () => closed;
@@ -129,6 +142,7 @@ export function createStoryChecks({
       return null;
     }
     const checkCommand = trusted.command;
+    const head = headIn(scan, found.owned.owner);
     const before = states.get(keyOf(dir, id)) ?? blank();
     await show(dir, id, { ...before, running: true, idle: null });
     const main = await run(checkCommand, found.root);
@@ -148,6 +162,7 @@ export function createStoryChecks({
       states.delete(keyOf(dir, id));
       return null;
     }
+    checked.set(keyOf(dir, id), head);
     await show(dir, id, {
       running: false,
       idle: null,
@@ -224,6 +239,18 @@ export function createStoryChecks({
   return {
     /** What the card pane shows of story `id`'s checks, or undefined before any run or idle note. */
     checksFor: (dir: string, id: string): CardChecks | undefined => states.get(keyOf(dir, id)),
+
+    /**
+     * The commit story `id`'s evidence is for (STORY-12: a merge needs Verified for the commit it merges): the one its
+     * last run checked, else, before any run, the one its worktree was at when Featra started; null while a run is in
+     * flight, or when it isn't known.
+     */
+    settledHead(dir: string, id: string): string | null {
+      const key = keyOf(dir, id);
+      if (slots.has(key)) return null;
+      const trigger = seen.get(key);
+      return checked.get(key) ?? (trigger?.slice(trigger.lastIndexOf("@") + 1) || null);
+    },
 
     /** Runs the checks of story `id` again now (the card's Re-run); refused when they don't run here or the story isn't in review. */
     async rerun(dir: string, id: string): Promise<null> {

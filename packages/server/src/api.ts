@@ -28,6 +28,7 @@ import type { DraftReview } from "./draft-review.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
 import type { StoryAcceptance } from "./story-acceptance.ts";
+import type { StoryMerge } from "./story-merge.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import type { StoryChecks } from "./story-checks.ts";
 import type { StoryPrs } from "./story-prs.ts";
@@ -53,6 +54,8 @@ export interface ApiDeps {
   spawns: StorySpawn;
   stops: StoryStop;
   acceptance: StoryAcceptance;
+  /** Merges stories into their features (STORY-12). Without it `story.merge` is refused. */
+  merges?: Pick<StoryMerge, "merge">;
   checks: StoryChecks;
   checkSettings: CheckSettings;
   prs: Pick<StoryPrs, "prState" | "decorate" | "createPr" | "focus">;
@@ -95,6 +98,7 @@ export function createApi({
   spawns,
   stops,
   acceptance,
+  merges,
   checks,
   checkSettings,
   prs,
@@ -215,6 +219,12 @@ export function createApi({
         const p = cardParams(params);
         if (!p) throw new ApiError("Expected { dir, id }.");
         return acceptance.accept(allow(p.dir), p.id);
+      }
+      case "story.merge": {
+        const p = cardParams(params);
+        if (!p) throw new ApiError("Expected { dir, id }.");
+        if (!merges) throw new ApiError("Merging isn't available.");
+        return merges.merge(allow(p.dir), p.id);
       }
       case "story.rerunChecks": {
         const p = cardParams(params);

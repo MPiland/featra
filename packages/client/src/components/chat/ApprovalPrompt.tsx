@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
+import { REQUEST_MERGE_TOOL } from "@featra/work-format/merge-copy";
 import { CHAT_COPY } from "../../chats.ts";
+import { mergeAsk, MergeRequestPrompt } from "./MergeRequestPrompt.tsx";
 
 interface ApprovalPromptProps {
   name: string;
@@ -44,6 +46,8 @@ export function ApprovalPrompt({
     setBusy(false);
   }
   const deny = () => answer(reason.trim() ? { choice: "deny", reason: reason.trim() } : { choice: "deny" });
+  const merge = name === REQUEST_MERGE_TOOL ? mergeAsk(input) : null;
+  if (merge) return <MergeRequestPrompt {...merge} onAnswer={onAnswer} />;
 
   return (
     <div className="chat-approval" role="group" aria-label={`${CHAT_COPY.approve} ${name}`}>

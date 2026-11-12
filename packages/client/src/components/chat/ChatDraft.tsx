@@ -71,6 +71,7 @@ export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) 
               accept: (id) => work.acceptStory(view.dir, id),
               sendBack: (id, reason, addCriterion) => work.sendBackStory(view.dir, id, reason, addCriterion),
             },
+            merge: (id) => work.mergeStory(view.dir, id),
           }
         }
       />
