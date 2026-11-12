@@ -41,6 +41,8 @@ export interface CardBridge {
   acceptStory: (dir: string, id: string) => Promise<ReviewResult>;
   /** Sends a story in Acceptance back to its session with the reason, optionally as a new criterion (STORY-23). */
   sendBackStory: (dir: string, id: string, reason: string, addCriterion: boolean) => Promise<SendBackResult>;
+  /** Runs the story's checks again on this computer, whatever the last run said (STORY-56). */
+  rerunChecks: (dir: string, id: string) => Promise<ReviewResult>;
   /** Stops the story's running turn and marks it Stopped; its stage and worktree stay (STORY-53). */
   stopStory: (dir: string, id: string) => Promise<ReviewResult>;
   /** Goes on in the stopped story's session, and clears Stopped (STORY-53). */
@@ -107,7 +109,21 @@ export const CARD_COPY = {
   none: "None",
   evidence: "Evidence",
   marks: { reported: "Reported", verified: "Verified", proven: "Proven", accepted: "Accepted" },
-  proof: { passed: "Test passed", linked: "No result yet", none: "No test yet" } satisfies Record<AcProof, string>,
+  proof: {
+    passed: "Test passed",
+    failed: "Test failed",
+    linked: "No result yet",
+    none: "No test yet",
+  } satisfies Record<AcProof, string>,
+  checks: {
+    title: "Checks",
+    running: "Checks running…",
+    passed: "Checks passed",
+    failed: "Checks failed",
+    none: "No checks run yet",
+    rerun: "Re-run",
+    output: "Failing output",
+  },
   count: (done: number, total: number, what: string) => `${done} of ${total} ${what}`,
 } as const;
 
@@ -155,6 +171,7 @@ export function serverCards(server: ServerClient): CardBridge {
             : { ok: false, error: errorMessage(new Error("Featra gave an unexpected answer.")) },
         (err: unknown): StartStoryResult => ({ ok: false, error: errorMessage(err) }),
       ),
+    rerunChecks: (dir, id) => review(server.call("story.rerunChecks", { dir, id })),
     stopStory: (dir, id) => review(server.call("story.stop", { dir, id })),
     resumeStory: (dir, id) => review(server.call("story.resume", { dir, id })),
   };
@@ -175,6 +192,7 @@ export function noCards(error: string): CardBridge {
     reject: async () => ({ ok: false, error }),
     start: async () => ({ ok: false, error }),
     startStory: async () => ({ ok: false, error }),
+    rerunChecks: async () => ({ ok: false, error }),
     stopStory: async () => ({ ok: false, error }),
     resumeStory: async () => ({ ok: false, error }),
   };

@@ -81,6 +81,7 @@ describe("the MCP bundle", () => {
         "spawn_session",
         "update_card",
         "message_session",
+        "propose_check_command",
       ]);
 
       const logged = await call("tools/call", {

@@ -13,6 +13,7 @@ import {
   serializeCard,
   toIso,
   type CardEdit,
+  type CardChecks,
   type CardEditContext,
   type CardUpdateResult,
   type CardView,
@@ -31,6 +32,8 @@ export interface CardActionDeps {
   now: () => Date;
   /** The lane every card write goes through, shared with the draft writer so a draft and an edit never interleave. */
   lane?: CardLane;
+  /** What the server knows of a story's checks on this computer (STORY-56), for the view. */
+  checks?: (dir: string, id: string) => CardChecks | undefined;
 }
 
 const contextOf = (scan: Scan): CardEditContext => ({
@@ -45,9 +48,9 @@ export function ownedIn(scan: Scan | null, id: string) {
 }
 
 /** The pane's view of card `id` in `scan`, or null when there is no such card. */
-export function cardViewIn(scan: Scan | null, id: string): CardView | null {
+export function cardViewIn(scan: Scan | null, id: string, checks?: CardChecks): CardView | null {
   const found = ownedIn(scan, id);
-  return scan && found ? buildCardView(found.owned, found.root !== null, contextOf(scan)) : null;
+  return scan && found ? buildCardView(found.owned, found.root !== null, contextOf(scan), checks) : null;
 }
 
 export interface AtomicIo {
@@ -72,11 +75,11 @@ export async function writeAtomic(file: string, text: string, { rename: move = r
 
 export const fileIn = (root: string, path: string) => join(root, ...path.split("/"));
 
-export function createCardActions({ scan: scanDir, now, lane = createCardLane() }: CardActionDeps) {
+export function createCardActions({ scan: scanDir, now, lane = createCardLane(), checks }: CardActionDeps) {
   async function apply(dir: string, id: string, edit: CardEdit): Promise<CardUpdateResult> {
     const scan = await scanDir(dir);
     const found = ownedIn(scan, id);
-    const view = cardViewIn(scan, id);
+    const view = cardViewIn(scan, id, checks?.(dir, id));
     if (!scan || !found || !view) return { ok: false, error: "That card is gone.", view: null };
     if (view.readOnly || !found.root) return { ok: false, error: view.readOnly ?? "Can't edit it here.", view };
     const result = applyCardEdit(found.owned.card, edit, contextOf(scan), "user", toIso(now()));
@@ -87,7 +90,7 @@ export function createCardActions({ scan: scanDir, now, lane = createCardLane() 
     } catch (err) {
       return { ok: false, error: `Can't save the card: ${errorMessage(err)}`, view };
     }
-    const after = cardViewIn(await scanDir(dir), id);
+    const after = cardViewIn(await scanDir(dir), id, checks?.(dir, id));
     return after ? { ok: true, view: after } : { ok: false, error: "That card is gone.", view: null };
   }
 

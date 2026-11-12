@@ -7,6 +7,7 @@ import {
   type Stage,
   type StageCategory,
 } from "./types.ts";
+import { CHECKS_WHERE } from "./checks-types.ts";
 import { isOneOf, isRecord, toText } from "./utils/guards.ts";
 
 export const DEFAULT_STAGES: Stage[] = [
@@ -30,6 +31,9 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   uat: false,
   knowledge: "propose",
   maxStoryAgents: 3,
+  checksWhere: null,
+  checkCommand: null,
+  linkedTestCommand: null,
 };
 
 const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
@@ -37,6 +41,18 @@ const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
 export class ConfigError extends Error {}
 
 const BOOLEAN_KEYS = ["requireAccept", "worktrees", "mcp", "autoMerge", "uat"] as const;
+const COMMAND_KEYS = ["checkCommand", "linkedTestCommand"] as const;
+/** The longest check command a project can set, in characters. */
+export const COMMAND_MAX = 1000;
+
+/** A command the user confirmed: one line of text. */
+function commandText(key: string, value: unknown): string {
+  if (typeof value !== "string" || !value.trim() || /[\r\n\0]/.test(value) || value.length > COMMAND_MAX) {
+    throw new ConfigError(`${key} must be one line of text, at most ${COMMAND_MAX} characters, got ${toText(value)}`);
+  }
+  return value.trim();
+}
+
 const KNOWLEDGE: readonly KnowledgePermission[] = ["edit", "propose", "read-only"];
 export const isKnowledgePermission = (value: unknown): value is KnowledgePermission => isOneOf(KNOWLEDGE, value);
 const PROGRESS: readonly ProgressMode[] = ["stories", "tasks"];
@@ -95,6 +111,13 @@ export function configOverrides(text: string): Partial<ProjectConfig> {
     }
     out.maxStoryAgents = value;
   }
+  if ("checksWhere" in raw) {
+    if (!isOneOf(CHECKS_WHERE, raw.checksWhere)) {
+      throw new ConfigError(`checksWhere must be "ci" or "local", got ${toText(raw.checksWhere)}`);
+    }
+    out.checksWhere = raw.checksWhere;
+  }
+  for (const key of COMMAND_KEYS) if (key in raw) out[key] = commandText(key, raw[key]);
   return out;
 }
 
@@ -159,7 +182,9 @@ export function maxStoryAgents(configText: string | null, appDefault: number | u
 export const NEW_CONFIG = "# Featra project settings\nversion: 1\n";
 
 export function serializeConfig(config: ProjectConfig): string {
-  return "# Featra project settings\n" + stringify(config, { flowCollectionPadding: true });
+  // A key that is not set (null) stays out of the file, so the file only holds what someone chose.
+  const set = Object.fromEntries(Object.entries(config).filter(([, value]) => value !== null));
+  return "# Featra project settings\n" + stringify(set, { flowCollectionPadding: true });
 }
 
 /** The stages list, checked: every stage named once, in a known category, with at least one done stage. */

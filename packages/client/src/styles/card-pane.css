@@ -449,3 +449,37 @@ button.inline-text:hover {
   opacity: 0.6;
   cursor: default;
 }
+
+.proof-failed {
+  color: var(--bad);
+}
+
+.checks-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0;
+}
+
+.checks-status.bad {
+  color: var(--bad);
+}
+
+.checks-status code {
+  color: var(--tx3);
+  font-size: 12px;
+}
+
+/* The tail of a failing run scrolls inside the pane and keeps its line breaks. */
+.checks-output {
+  max-height: 240px;
+  margin: 8px 0 0;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

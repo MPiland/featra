@@ -15,6 +15,7 @@ import {
   type WorkSettings,
 } from "./settings.ts";
 import { noChats, type ChatBridge } from "./chats.ts";
+import { noChecks, type ChecksBridge } from "./checks-bridge.ts";
 import { noInbox, noNotifications, type InboxBridge, type NotificationsBridge } from "./inbox.ts";
 import { noRoles, type RolesBridge } from "./roles-bridge.ts";
 import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
@@ -26,6 +27,7 @@ import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
 export * from "./chats.ts";
+export * from "./checks-bridge.ts";
 export * from "./inbox.ts";
 export * from "./project-setup.ts";
 export * from "./projects.ts";
@@ -147,6 +149,8 @@ export interface FeatraBridge {
   readonly chats: ChatBridge;
   /** The project's roles and their edits, from the local server (STORY-6). */
   readonly roles: RolesBridge;
+  /** Where checks run and the check commands, from the local server (STORY-56). */
+  readonly checks: ChecksBridge;
   /** The requests waiting on the user past the Inbox wait, from the local server (STORY-7). */
   readonly inbox: InboxBridge;
   /** Desktop notifications for the requests that arrive (STORY-7); the host decides when to show one. */
@@ -270,6 +274,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
     work: noWork(NO_FOLDERS),
     chats: noChats(NO_FOLDERS),
     roles: noRoles(NO_FOLDERS),
+    checks: noChecks(NO_FOLDERS),
     inbox: noInbox(),
     notifications: noNotifications(),
     edit: (command) => {

@@ -4,6 +4,7 @@
  * `parseResponse`. Each connection is one chat's: the server knows which from the connection's token, never from the
  * params.
  */
+import type { ProposeInput } from "./checks.ts";
 import type { DraftInput, DraftResult } from "./card-draft-input.ts";
 import type { LogFile, LogInput } from "./knowledge-log.ts";
 import type { ReportInput } from "./card-report.ts";
@@ -33,6 +34,8 @@ export interface AgentMethods {
   "card.update": { params: ReportInput; result: { card: string; changes: string[] } };
   /** The Dev Lead tells a story's session something, which goes on its next turn; refused for any other chat (STORY-54). */
   "session.message": { params: MessageInput; result: { story: string } };
+  /** The Dev Lead proposes the project's check command and linked-test command for the user to confirm (STORY-56). */
+  "checks.propose": { params: ProposeInput; result: { proposed: string[] } };
 }
 export type AgentMethod = keyof AgentMethods;
 export const AGENT_METHODS = [
@@ -42,6 +45,7 @@ export const AGENT_METHODS = [
   "story.spawn",
   "card.update",
   "session.message",
+  "checks.propose",
 ] as const satisfies readonly AgentMethod[];
 
 export interface AgentRequest {

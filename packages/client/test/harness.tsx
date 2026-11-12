@@ -23,10 +23,11 @@ import {
   type WorkUpdate,
 } from "../src/bridge.ts";
 import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
-import type { Card } from "@featra/work-format";
+import type { Card, CardChecks, ChecksView } from "@featra/work-format";
 import type { CardBridge } from "../src/card-pane.ts";
-import { fakeCardServer } from "./card-server.ts";
+import { fakeCardServer, type ReviewAnswers } from "./card-server.ts";
 import { fakeChatServer, type ChatHost } from "./chat-server.ts";
+import { fakeChecksServer } from "./checks-server.ts";
 import { fakeRolesServer, type RolesHost } from "./roles-server.ts";
 import type { CopyActionResult } from "@featra/work-format/protocol";
 
@@ -38,12 +39,7 @@ export interface HostOptions extends ChatHost, RolesHost {
   /** What the card server answers to Send back. Default: sent and recorded. */
   sendBack?: CardBridge["sendBack"];
   /** What the card server answers to Approve and Reject. Default: it changes the cards as the server does. */
-  review?: Partial<
-    Pick<
-      CardBridge,
-      "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory" | "acceptStory" | "sendBackStory"
-    >
-  >;
+  review?: ReviewAnswers;
   /** Whether Start queues the story's session instead of starting it, as a project at its limit does. Default: starts. */
   queueStories?: boolean;
   closeToTray?: CloseToTraySupport;
@@ -80,6 +76,10 @@ export interface HostOptions extends ChatHost, RolesHost {
    * work-format, and the pane's edits change them. Overrides `work` for that folder.
    */
   cards?: Record<string, Card[]>;
+  /** What the server's checks say about a story's card, by story id: absent where CI runs them (STORY-56). */
+  cardChecks?: Record<string, CardChecks>;
+  /** Each folder's Checks section as the server answers it; the user's saves change it. */
+  checks?: Record<string, ChecksView>;
 }
 
 export { EDIT_AT } from "./card-server.ts";
@@ -132,6 +132,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     host.review,
     (dir, story, feature) => chats.addStory(dir, story, feature, host.queueStories === true),
     { turn: (dir, id) => chats.storyTurn(dir, id), drop: (dir, id) => chats.dropStory(dir, id) },
+    (_dir, id) => host.cardChecks?.[id],
   );
   const chats: ReturnType<typeof fakeChatServer> = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
@@ -234,6 +235,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     // Records which element had focus when the command reached the host: that is the field it acts on.
     chats: chats.bridge,
     roles: roles.bridge,
+    checks: fakeChecksServer(host.checks ?? {}, calls),
     inbox: chats.inbox.bridge,
     notifications: {
       asked: (item) => void calls.push(`notify:${item.chat}:${item.request.id}`),

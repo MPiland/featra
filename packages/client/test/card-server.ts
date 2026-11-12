@@ -23,11 +23,28 @@ import {
   stoppedStory,
   type StoryTurn,
   type Card,
+  type CardChecks,
   type CardView,
   type OwnedCard,
   type WorkList,
 } from "@featra/work-format";
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
+
+/** The card actions a test can set the server's answer to; each left out, the fake does what the server does. */
+export type ReviewAnswers = Partial<
+  Pick<
+    CardBridge,
+    | "approve"
+    | "reject"
+    | "start"
+    | "startStory"
+    | "stopStory"
+    | "resumeStory"
+    | "acceptStory"
+    | "sendBackStory"
+    | "rerunChecks"
+  >
+>;
 
 /** The time the fake server stamps on a card edit. */
 export const EDIT_AT = "2026-11-05T12:00:00Z";
@@ -46,12 +63,7 @@ export function fakeCardServer(
   /** What the server answers to Send back. */
   sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
   /** What the server answers to Approve and Reject; left out, the fake does what the server does to the cards. */
-  review: Partial<
-    Pick<
-      CardBridge,
-      "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory" | "acceptStory" | "sendBackStory"
-    >
-  > = {},
+  review: ReviewAnswers = {},
   /** The chat the server starts for a story, and whether it waits for a slot: what a Start makes besides the card change. */
   storySession: (dir: string, story: Card, feature: Card) => { chat: string; queued: boolean } = () => ({
     chat: "story-chat",
@@ -62,13 +74,15 @@ export function fakeCardServer(
     turn: () => ({ running: false, queued: false, stalled: false }),
     drop: () => {},
   },
+  /** What the server's checks say about a story's card: absent when CI runs them. */
+  checksOf: (dir: string, id: string) => CardChecks | undefined = () => undefined,
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
   const viewOf = (dir: string, id: string): CardView | null => {
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
-    return card ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }) : null;
+    return card ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id)) : null;
   };
   const listOf = (dir: string): WorkList | null => {
     const cards = cardSets.get(dir);
@@ -227,6 +241,11 @@ export function fakeCardServer(
       if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
       changed(dir, sentBackStory(card, DEFAULT_CONFIG, reason, addCriterion, "user", EDIT_AT));
       return { ok: true, recorded: true };
+    },
+    // Re-run is the server's to prove (the run, the lane): the fake records the call.
+    rerunChecks: async (dir, id) => {
+      calls.push(`rerunChecks:${dir}:${id}`);
+      return review.rerunChecks ? review.rerunChecks(dir, id) : { ok: true };
     },
     reject: async (dir, id) => {
       calls.push(`reject:${dir}:${id}`);

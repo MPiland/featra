@@ -109,4 +109,10 @@ export interface ProjectConfig {
   knowledge: KnowledgePermission;
   /** The most story sessions that run at once (STORY-9); the rest wait, Queued. */
   maxStoryAgents: number;
+  /** Where checks run (STORY-56); null until the user chooses, when the default applies (`defaultChecksWhere`). */
+  checksWhere: "ci" | "local" | null;
+  /** The command that runs the project's checks on this computer; null until the user confirms one. */
+  checkCommand: string | null;
+  /** The template that runs one linked test, with `{file}`, `{name}` and `{namePattern}`; null until confirmed. */
+  linkedTestCommand: string | null;
 }

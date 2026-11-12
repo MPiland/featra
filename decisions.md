@@ -1580,3 +1580,17 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   Send back returns to the first `active` stage, so renamed stages keep working.
 - Story and draft Send back share `sendThenRecord` and one set of refusal messages; the Work row respects read-only like
   the card pane; the Send back form opens below the Work row.
+
+## 2026-11-12 — STORY-56 build choices (story agent, for the Dev Lead to confirm)
+
+- **A linked test command template, proposed with the check command** (your design note): `linkedTestCommand`, for example `npx vitest run {file} -t {namePattern}`. `{file}`, `{name}` and `{namePattern}` are each one quoted argument; `{namePattern}` is the name escaped for a runner that reads `-t` as a pattern. Same Checks section, same confirm. Known limits: a vitest `-t` filter that matches nothing exits 0, so that criterion reads as passing; Playwright refs cannot be run by a vitest template, so they are left out like prose refs.
+- **Proposals are kept in the app's data folder, not in the project.** Why: a proposal is not a decision, and the committed config must hold only what the user confirmed. "Use this" fills the field; only Save writes `.featra/config.yaml`. A saved field drops its proposals.
+- **Checks apply to a story in the review stage or in Acceptance, not In Progress** (found by position, like acceptance). Why: a half-built story would fail on every commit.
+- **Triggers:** the move into review, a change of the worktree's HEAD, and Re-run. At startup the current HEAD is recorded and nothing runs. Evidence is written only on a change, so history does not grow with every run.
+- **Queue, not cancel** (my call). A request during a run sets one pending flag; the stale result is discarded and the run starts again. At most 2 runs go at once across the app. Why: a cancelled run may have been the commit's only result, and a result for old code would mislead.
+- **Linked tests run after the check command, whatever it said.** An AC is Proven only if every runnable ref passes; a missing file counts as a failure; an AC with no runnable ref is left unchanged. With no template set the card says so and the criteria stay as they are.
+- **Quoting is per platform.** POSIX single quotes. Windows double quotes, refusing `"`, `%`, `^`, `!` and line breaks rather than guessing at cmd.exe. The confirmed check command is run as typed.
+- **Where checks run** defaults from `github-detect.ts` (remote, workflows, `gh repo view --json visibility`, fixed argv). Unknown (no `gh`, signed out, failing) counts as not public.
+- **The server watches every allowed project's worktrees** for HEAD changes, permanently: a few more file watchers.
+- **`writeProjectValue` in the desktop settings store now delegates to the server's `config-writer`**, so the Checks section and the Workflow page share one writer.
+- **A failing linked test shows as "Test failed" on its criterion**, a new proof state beside passed, linked and none.

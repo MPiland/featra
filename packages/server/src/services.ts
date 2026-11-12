@@ -4,6 +4,8 @@ import { createApi, type Api } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
 import { createCardReport } from "./card-report.ts";
 import { createCardLane } from "./card-lane.ts";
+import { createCheckSettings } from "./check-settings.ts";
+import { createStoryChecks } from "./story-checks.ts";
 import { createChatManager } from "./chat-manager.ts";
 import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts";
 import { locateClaude } from "./claude-locate.ts";
@@ -57,6 +59,10 @@ export interface ServiceOptions {
   logs?: LogWriterDeps;
   /** How long Stop waits for a provider to end the turn it interrupts; ten seconds by default. */
   interruptMs?: number;
+  /** The GitHub CLI to ask whether a repo is public; the one on the PATH by default (STORY-56). */
+  ghCommand?: string;
+  /** How long a check command may run before it is killed (STORY-56). */
+  checkTimeoutMs?: number;
 }
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
@@ -75,6 +81,8 @@ export function createServices({
   mcpExecPath,
   logs,
   interruptMs,
+  ghCommand,
+  checkTimeoutMs,
 }: ServiceOptions): {
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
@@ -86,7 +94,18 @@ export function createServices({
   const copies = createCopyActions({ git: repoGit, scan: watches.scan, now });
   // One lane for every card write: a draft that allocates IDs and a card edit never interleave (ADR 0002).
   const lane = createCardLane();
-  const cards = createCardActions({ scan: watches.scan, now, lane });
+  const cards = createCardActions({ scan: watches.scan, now, lane, checks: (dir, id) => checks.checksFor(dir, id) });
+  const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand });
+  const checks = createStoryChecks({
+    scan: watches.scan,
+    observe: watches.observe,
+    allowed,
+    settings: checkSettings,
+    now,
+    lane,
+    log,
+    timeoutMs: checkTimeoutMs,
+  });
   const roles = createRoleRegistry({
     fs: roleFs,
     readers: [createClaudeReader(roleFs), createCodexReader(roleFs)],
@@ -128,6 +147,7 @@ export function createServices({
     spawns,
     reports,
     messages: createStoryMessage({ scan: watches.scan, chats }),
+    checkSettings,
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
@@ -146,6 +166,8 @@ export function createServices({
     spawns,
     stops,
     acceptance,
+    checks,
+    checkSettings,
     chats,
     roles,
     roleWatches,
@@ -156,6 +178,7 @@ export function createServices({
     agents,
     async close() {
       stopClosing();
+      checks.close();
       chats.close();
       await chats.flush();
       watches.close();

@@ -12,6 +12,7 @@ import {
   parseDraft,
   parseLogInput,
   parseMessageInput,
+  parseProposeInput,
   parseReportInput,
   parseSpawnInput,
   parseStartInput,
@@ -26,6 +27,7 @@ import { ApiError } from "./api-error.ts";
 import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { CardReport } from "./card-report.ts";
+import type { CheckSettings } from "./check-settings.ts";
 import type { DraftWriter } from "./draft-writer.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StoryMessage } from "./story-message.ts";
@@ -50,6 +52,9 @@ export const AGENT_MESSAGES = {
   updateReadOnly: "Updating cards is off: this project's knowledge setting is read-only.",
   noUpdate: "Updating cards isn't available.",
   noMessage: "Messaging a story isn't available.",
+  noPropose: "Proposing a check command isn't available.",
+  /** Checks are the project's to set up; a story session builds, it does not choose how it is judged. */
+  sessionPropose: "A story session can't propose check commands. Ask the Dev Lead.",
   /** A story session reports to its Dev Lead and is steered by it; it does not message sessions. */
   sessionMessage: "A story session can't message other story sessions. Ask the Dev Lead.",
   /** A story session is a worker: only the Dev Lead's chat puts agents on stories. */
@@ -82,6 +87,8 @@ export interface AgentBridgeDeps {
   reports?: CardReport;
   /** Sends the Dev Lead's messages to story sessions (STORY-54). Without it `session.message` is refused. */
   messages?: StoryMessage;
+  /** Keeps the Dev Lead's check-command proposals for the user to confirm (STORY-56). Without it `checks.propose` is refused. */
+  checkSettings?: Pick<CheckSettings, "propose">;
   newToken?: () => string;
 }
 
@@ -114,6 +121,7 @@ export function createAgentBridge({
   spawns,
   reports,
   messages,
+  checkSettings,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -205,6 +213,26 @@ export function createAgentBridge({
     return messages.send(dir, input.value, chat);
   }
 
+  async function propose(dir: string, story: boolean | undefined, params: unknown) {
+    if (story) throw new ApiError(AGENT_MESSAGES.sessionPropose);
+    // A proposal writes no card or knowledge file and applies nothing, so only the MCP's off switch applies.
+    const off = await mcpRefusal(dir);
+    if (off !== null) throw new ApiError(off);
+    if (!checkSettings) throw new ApiError(AGENT_MESSAGES.noPropose);
+    const input = parseProposeInput(params);
+    if (!input.ok) throw new ApiError(input.error);
+    const proposed: string[] = [];
+    if (input.value.command !== undefined) {
+      await checkSettings.propose(dir, "command", input.value.command);
+      proposed.push("command");
+    }
+    if (input.value.testCommand !== undefined) {
+      await checkSettings.propose(dir, "testCommand", input.value.testCommand);
+      proposed.push("testCommand");
+    }
+    return { proposed };
+  }
+
   return {
     setPort: (next) => {
       port = next;
@@ -257,6 +285,8 @@ export function createAgentBridge({
           return update(chat, info, params);
         case "session.message":
           return message(chat, info.dir, info.story, params);
+        case "checks.propose":
+          return propose(info.dir, info.story, params);
         case "log.append":
           return appendLog(chat, info.dir, info.cwd ?? info.dir, info.session, params);
         default:

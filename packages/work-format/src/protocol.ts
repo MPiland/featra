@@ -6,6 +6,7 @@
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
 import type { ApprovalChoice } from "./approvals.ts";
 import type { Answers } from "./questions.ts";
+import type { ChecksPatch, ChecksView } from "./checks-types.ts";
 import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
@@ -98,6 +99,15 @@ export interface ServerMethods {
    * when its evidence allows. Refused when the story isn't waiting in Acceptance or is already accepted.
    */
   "story.accept": { params: { dir: string; id: string }; result: null };
+  /**
+   * Runs a story's checks on this computer again now (STORY-56): the check command and the linked tests. Refused when
+   * checks run in CI for the project or the story isn't in review. The result reaches the card through `card.view`.
+   */
+  "story.rerunChecks": { params: { dir: string; id: string }; result: null };
+  /** Project settings' Checks section: where checks run, the commands, and the proposals waiting for the user (STORY-56). */
+  "checks.load": { params: { dir: string }; result: ChecksView };
+  /** Changes the Checks settings in the project's config (`null` clears one); answers with the section as it is after. */
+  "checks.set": { params: { dir: string; patch: ChecksPatch }; result: ChecksView };
   /**
    * Sends a story in Acceptance back to its session with the user's reason, as the user's message (STORY-23): logged in
    * history, the story In Progress again, and with `addCriterion` the reason a new acceptance criterion. Refused
@@ -230,6 +240,9 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "story.stop",
   "story.resume",
   "story.accept",
+  "story.rerunChecks",
+  "checks.load",
+  "checks.set",
   "story.sendBack",
   "draft.reject",
   "chat.roles",
