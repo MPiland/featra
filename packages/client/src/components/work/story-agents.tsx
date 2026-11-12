@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import { canResume, isStartable } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
-import type { StartStoryResult } from "../../card-pane.ts";
+import type { AcceptActions, StartStoryResult } from "../../card-pane.ts";
 import { WORK_COPY } from "../../work-list.ts";
 import { StoryStop, type StopActions } from "./StoryStop.tsx";
 import { useAction } from "./useAction.ts";
@@ -21,6 +21,8 @@ export interface StoryAgents {
   start: (id: string) => Promise<StartStoryResult>;
   open: (chat: string) => void;
   stops: StopActions;
+  /** Accept and Send back on a story waiting in Acceptance (STORY-23). */
+  acceptance: AcceptActions;
 }
 
 const NONE: StoryAgents = {
@@ -32,6 +34,7 @@ const NONE: StoryAgents = {
   running: () => false,
   stalled: () => false,
   stops: { stop: async () => ({ ok: true }), resume: async () => ({ ok: true }) },
+  acceptance: { accept: async () => ({ ok: true }), sendBack: async () => ({ ok: true, recorded: true }) },
 };
 
 export const StoryAgentsContext = createContext<StoryAgents>(NONE);

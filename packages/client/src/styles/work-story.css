@@ -21,3 +21,28 @@
 .prow .pn .story-agent {
   white-space: normal;
 }
+
+/* Accept and Send back on a story in Acceptance (STORY-23): in its row, its card pane and the end of its session. */
+.accept-story {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-start;
+  margin-left: 8px;
+}
+
+.draft-actions > .accept-story {
+  margin-left: 0;
+}
+
+.chat-accept {
+  padding: 6px 16px;
+}
+
+.chat-accept .accept-story {
+  margin-left: 0;
+}
+
+.send-back-criterion {
+  font-size: 12px;
+}

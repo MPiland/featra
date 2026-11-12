@@ -67,6 +67,10 @@ export function ChatDraft({ work, paneWidth, review, ...view }: ChatDraftProps) 
               stop: (id) => work.stopStory(view.dir, id),
               resume: (id) => work.resumeStory(view.dir, id),
             },
+            acceptance: {
+              accept: (id) => work.acceptStory(view.dir, id),
+              sendBack: (id, reason, addCriterion) => work.sendBackStory(view.dir, id, reason, addCriterion),
+            },
           }
         }
       />

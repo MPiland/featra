@@ -2,6 +2,7 @@
  * A card as the card pane shows it (ADR 0017): its text, evidence marks, each AC's proof, and the status and parent
  * moves the rules allow. Pure: built from the owner copies the server resolved.
  */
+import { awaitingAcceptance } from "./acceptance.ts";
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
@@ -61,6 +62,7 @@ export function buildCardView(owned: OwnedCard, checkedOut: boolean, ctx: CardEd
     stories: storiesOf(card, ctx.cards),
     owner: locationLabel(owned.owner),
     readOnly: readOnlyReason(owned, checkedOut, ctx.config.baseBranch),
+    ...(awaitingAcceptance(card, ctx.config) ? { awaiting: true as const } : {}),
     ...(notStartableReason(card, card.id) === null ? { startable: true as const } : {}),
     ...(draftChat === null
       ? {}

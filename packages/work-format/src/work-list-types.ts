@@ -48,6 +48,8 @@ export interface StoryRow {
   reported?: true;
   /** The user stopped its agent (STORY-53): the row shows Stopped and offers Resume. */
   stopped: boolean;
+  /** Waiting in Acceptance for the user (STORY-23): the row, the card and the session offer Accept and Send back. */
+  awaiting: boolean;
 }
 
 export interface FeatureRow {
@@ -128,6 +130,7 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   session: textOrNull(r.session),
   ...(r.reported === true ? { reported: true as const } : {}),
   stopped: r.stopped === true,
+  awaiting: r.awaiting === true,
 });
 
 const feature = (r: Record<string, unknown>): FeatureRow => {

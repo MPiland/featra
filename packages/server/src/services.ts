@@ -15,6 +15,7 @@ import { createDraftWriter } from "./draft-writer.ts";
 import { createFeatureStart } from "./feature-start.ts";
 import { createStoryMessage } from "./story-message.ts";
 import { createStorySpawn } from "./story-spawn.ts";
+import { createStoryAcceptance } from "./story-acceptance.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
@@ -105,6 +106,7 @@ export function createServices({
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
   const stops = createStoryStop({ scan: watches.scan, now, lane, chats, ...(interruptMs ? { interruptMs } : {}) });
+  const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
   const reports = createCardReport({
     scan: watches.scan,
@@ -143,6 +145,7 @@ export function createServices({
     starts,
     spawns,
     stops,
+    acceptance,
     chats,
     roles,
     roleWatches,

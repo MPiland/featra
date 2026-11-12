@@ -51,3 +51,4 @@ export * from "./story-start.ts";
 export * from "./card-report.ts";
 export * from "./story-notice.ts";
 export * from "./story-stop.ts";
+export * from "./acceptance.ts";

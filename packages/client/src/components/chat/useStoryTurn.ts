@@ -28,5 +28,6 @@ export function useStoryTurn(work: WorkBridge, { chats, chat, dir }: Pick<ChatVi
     stopped,
     resumable: row !== undefined && canResume(stopped, summary.stalled, row.tone),
     queued: summary.queued,
+    awaiting: row?.awaiting === true,
   };
 }

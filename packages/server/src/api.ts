@@ -6,6 +6,7 @@ import {
   dirParams,
   roleEditParams,
   sendBackParams,
+  storySendBackParams,
   setupParams,
   starter,
   unwatchParams,
@@ -25,6 +26,7 @@ import type { DraftActions } from "./draft-actions.ts";
 import type { DraftReview } from "./draft-review.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
+import type { StoryAcceptance } from "./story-acceptance.ts";
 import type { StoryStop } from "./story-stop.ts";
 import type { Git } from "./git.ts";
 import type { RoleRegistry } from "./role-registry.ts";
@@ -46,6 +48,7 @@ export interface ApiDeps {
   starts: FeatureStart;
   spawns: StorySpawn;
   stops: StoryStop;
+  acceptance: StoryAcceptance;
   chats: ChatManager;
   roles: RoleRegistry;
   roleWatches: RoleWatches;
@@ -84,6 +87,7 @@ export function createApi({
   starts,
   spawns,
   stops,
+  acceptance,
   chats,
   roles,
   roleWatches,
@@ -191,6 +195,16 @@ export function createApi({
         if (!p) throw new ApiError("Expected { dir, id }.");
         const dir = allow(p.dir);
         return method === "story.stop" ? stops.stop(dir, p.id) : stops.resume(dir, p.id);
+      }
+      case "story.accept": {
+        const p = cardParams(params);
+        if (!p) throw new ApiError("Expected { dir, id }.");
+        return acceptance.accept(allow(p.dir), p.id);
+      }
+      case "story.sendBack": {
+        const p = storySendBackParams(params);
+        if (!p) throw new ApiError("Expected { dir, id, reason }.");
+        return acceptance.sendBack(allow(p.dir), p.id, p.reason, p.addCriterion);
       }
       case "roles.watch": {
         const dir = project(params);

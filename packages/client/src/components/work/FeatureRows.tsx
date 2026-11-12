@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import type { FeatureRow, StoryRow, Tone } from "@featra/work-format/work-list";
 import { featureStatusLabel, WORK_COPY } from "../../work-list.ts";
 import { ChevronRightIcon } from "../icons.tsx";
@@ -6,7 +6,8 @@ import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
-import { StoryAgent } from "./story-agents.tsx";
+import { AcceptStory } from "./AcceptStory.tsx";
+import { StoryAgent, StoryAgentsContext } from "./story-agents.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
 
@@ -39,6 +40,7 @@ function Scope({ added, openBugs }: FeatureRow["scope"]) {
 function Story({ story }: { story: StoryRow }) {
   const { selected, paneId, open } = useCardSelection();
   const shown = selected === story.id;
+  const agents = useContext(StoryAgentsContext);
   return (
     <div className={shown ? "prow shown" : "prow"} role="row" data-card={story.id}>
       <span aria-hidden="true" />
@@ -55,6 +57,7 @@ function Story({ story }: { story: StoryRow }) {
         {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
         <StaleMark id={story.id} />
         <StoryAgent id={story.id} />
+        {story.awaiting && <AcceptStory id={story.id} actions={agents.acceptance} />}
         {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
       </span>
       <span role="cell">

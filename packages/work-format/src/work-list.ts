@@ -2,6 +2,7 @@
  * Builds the Work list from the owner copies: epics, their features, the features' stories, and the counts. Every
  * count comes from the rollups (ADR 0003) at the moment the list is built; nothing here is stored.
  */
+import { awaitingAcceptance } from "./acceptance.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { evidenceState } from "./evidence.ts";
@@ -92,6 +93,7 @@ function storyRow(card: Card, added: ReadonlySet<string>, config: ProjectConfig)
     session: card.sessions.at(-1) ?? null,
     ...(evidenceState(card).reported ? { reported: true as const } : {}),
     stopped: stoppedIn(card, tone),
+    awaiting: awaitingAcceptance(card, config),
   };
 }
 

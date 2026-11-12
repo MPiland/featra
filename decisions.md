@@ -1561,3 +1561,14 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   main goes to the Dev Lead to merge main in, never rebase.
 - **Order:** STORY-23 Accept or send back first (no GitHub needed), then STORY-11, STORY-56, STORY-57, STORY-12,
   STORY-58, STORY-13, STORY-14. FEAT-6 stays one feature of eight stories.
+
+## 2026-11-12 — STORY-23 build choices (story agent, for the Dev Lead to confirm)
+
+- **Stories only, in the stage named `Acceptance`.** Why: the criteria name stories and that stage; bugs and projects with another stage name show neither button until a ruling widens it. `awaitingAcceptance` is the one rule, computed on the server for the Work row and the card view.
+- **Accept on an unverified story records Accepted and stays in Acceptance.** Why: nothing writes Verified yet. `settleDone` is the pure rule that moves an accepted, Verified story to Done (via `checkTransition`); later Verified writes call it, by `system`.
+- **Send back is message first, then recorded, with one retry.** Why: as the FEAT-4 draft Send back; a failed write returns `recorded: false` rather than an error, since the agent already has the reason.
+- **A missing session refuses Send back.** Why: a reason nobody receives would be lost, so there is no silent fallback.
+- **Send back clears a Stopped mark.** Why: the user is directing the session again.
+- **The reason added as a criterion is collapsed to one line**, unchecked, with a `content` history event. The history keeps the reason as written.
+- **No confirmation on Accept or Send back.** Why: both are visible in history; a Send back asks for a reason already.
+- **Button labels include the story id** ("Accept STORY-5") so each is unique in the Work list.
