@@ -2,7 +2,7 @@
 id: STORY-23
 type: story
 title: Accept or send back a story
-status: In Review
+status: Acceptance
 parent: FEAT-6
 order: 1
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-23
+  - at: 2026-11-12T16:11:23Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

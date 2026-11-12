@@ -1573,3 +1573,10 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **No confirmation on Accept or Send back.** Why: both are visible in history; a Send back asks for a reason already.
 - **Send back's form opens below the Work row**, across its width, not in the name cell.
 - **Button labels include the story id** ("Accept STORY-5") so each is unique in the Work list.
+
+## 2026-11-12 — STORY-23 review rulings (dev-lead)
+
+- Build choices confirmed, except matching the acceptance stage by name: it is matched by position (`stageCeiling`), and
+  Send back returns to the first `active` stage, so renamed stages keep working.
+- Story and draft Send back share `sendThenRecord` and one set of refusal messages; the Work row respects read-only like
+  the card pane; the Send back form opens below the Work row.
