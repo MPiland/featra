@@ -1659,3 +1659,18 @@ The Dev Lead's review of 0194bbe, fixed in this story:
 - **Pushes** go to the remote GitHub was detected on (`origin` first), not always `origin`.
 - **A closed project** forgets its PR reads and notes, and a read that finishes after it closed records no evidence.
 - `App.tsx` and `bridge.ts` are under 300 lines (`usePrFocus`, `window-state.ts`).
+
+## 2026-11-12 — STORY-11 review rulings (dev-lead)
+
+- CI Verified is tied to the PR's head commit: a head that differs from the story branch's tip removes Verified and never
+  grants it, and every move into review pushes the story branch again (never forced) once it has a PR.
+- Verified comes from the repo's required checks (`gh pr checks --required`); only a repo with no required checks falls
+  back to all reported checks. A failed or cancelled check removes Verified; skipped counts as passed; running checks
+  change nothing.
+- Pushing an existing PR's branch on review happens even with "Open story PRs automatically" off: the setting governs
+  opening PRs, and keeping an open PR current is part of having one.
+- "The worktree's HEAD" means the story branch's tip, so it also works when the owner copy isn't a worktree.
+- The chip shows all checks while evidence uses required checks only; accepted for now, with a roadmap item to show the
+  difference.
+- Older `pr` values (`12`, `#12`) show as `#N` text with no link.
+- All other build choices confirmed.

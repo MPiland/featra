@@ -72,6 +72,9 @@ epics in `.featra/cards/`.
   about 11 specs (chat, chat-log, composer, draft, inbox, review-draft, chat-approvals, chat-questions, chat-list,
   chat-restore, roles), so a fix like BUG-17's has to be made in each.
 
+- **PR chip: required versus optional checks.** The chip reports every check while Verified uses only required checks,
+  so a Verified story can show "Checks failing" from an optional check. Show which checks are required. From STORY-11.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".
