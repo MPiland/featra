@@ -26,10 +26,12 @@ import type { AllowedProjects } from "./allowed-projects.ts";
 import { ApiError } from "./api-error.ts";
 import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
+import { createCiProven } from "./ci-proven.ts";
+import type { CiReportDeps } from "./ci-report.ts";
 import { recordEvidence } from "./check-evidence.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import { githubRemote } from "./github-detect.ts";
-import { createPr, openPrFor, pushStory, readPrAt, PR_NOTES, type GithubPrDeps } from "./github-prs.ts";
+import { createPr, openPrFor, pushStory, readPrAt, PR_NOTES } from "./github-prs.ts";
 import type { Timers } from "./inbox.ts";
 import { ciRead, headIsStale, UNVERIFY } from "./pr-ci.ts";
 import { createPrPoller } from "./pr-poller.ts";
@@ -38,7 +40,7 @@ import { baseOf, keyOf, seenOf, type ProjectSeen } from "./story-prs-seen.ts";
 import type { Scan } from "./work-scan.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
-export interface StoryPrsDeps extends GithubPrDeps {
+export interface StoryPrsDeps extends CiReportDeps {
   scan: (dir: string) => Promise<Scan | null>;
   observe: WorkWatches["observe"];
   allowed: Pick<AllowedProjects, "dirs" | "has" | "onChange">;
@@ -80,6 +82,7 @@ export function createStoryPrs(deps: StoryPrsDeps) {
   /** Evidence is recorded only for a project still watched. */
   const evidence = (dir: string, id: string, outcome: typeof UNVERIFY) =>
     closed || !seen.has(dir) ? false : recordEvidence({ scan: scanDir, lane, now }, dir, id, outcome);
+  const proven = createCiProven({ ...deps, record: evidence });
 
   /** Records the PR on the owner copy, unless someone set another `pr` there meanwhile: theirs stands. */
   const recordPr = (dir: string, id: string, url: string) =>
@@ -179,6 +182,7 @@ export function createStoryPrs(deps: StoryPrsDeps) {
       if (ci && checksApply(card, config)) {
         const outcome = await ciRead(dir, card, pr, last?.url === card.pr ? last.head : undefined, deps);
         await evidence(dir, card.id, outcome);
+        changed = (await proven.read(dir, card, config, pr)) || changed;
       }
     }
     if (changed) await push(dir);
@@ -219,6 +223,7 @@ export function createStoryPrs(deps: StoryPrsDeps) {
       stopPolling();
       seen.delete(dir);
       usable.delete(dir);
+      proven.forget(dir);
       for (const map of [read, notes])
         for (const key of map.keys()) if (key.startsWith(keyOf(dir, ""))) map.delete(key);
     };
@@ -237,8 +242,9 @@ export function createStoryPrs(deps: StoryPrsDeps) {
       const isOpening = opening.has(key);
       const create = usable.get(dir) === true && story.inReview && !story.pr && story.worktree && !isOpening;
       const note = notes.get(key) ?? null;
+      const report = proven.proofOf(dir, id);
       if (!status && !create && !isOpening && !note) return undefined;
-      return { status, create, opening: isOpening, note };
+      return { status, create, opening: isOpening, note, ...(report ? { report } : {}) };
     },
 
     /** The Work list with each story's PR state as last read. */

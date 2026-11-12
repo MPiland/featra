@@ -5,7 +5,7 @@ import { useAction } from "./useAction.ts";
 /**
  * The card's PR section (STORY-11): the PR chip once the story has a PR; while it has none, Create PR when GitHub is
  * usable and the story is in review in its worktree, "Opening PR…" while Featra pushes and opens it, and why the last
- * try failed.
+ * try failed; and what CI's test report didn't prove for the PR's head (STORY-57).
  */
 export function StoryPr({ view, onCreate }: { view: CardView; onCreate: () => Promise<ReviewResult> }) {
   const { busy, error, run } = useAction();
@@ -31,6 +31,18 @@ export function StoryPr({ view, onCreate }: { view: CardView; onCreate: () => Pr
         <p className="meta">{CARD_COPY.none}</p>
       )}
       {!view.pr && pr?.note && <p className="meta">{pr.note}</p>}
+      {view.pr && pr?.report && (pr.report.note || pr.report.reasons.length > 0) && (
+        <div role="group" aria-label={PR_COPY.report}>
+          {pr.report.note && <p className="meta">{pr.report.note}</p>}
+          {pr.report.reasons.length > 0 && (
+            <ul className="meta">
+              {pr.report.reasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {error && (
         <p className="card-error" role="alert">
           {error}

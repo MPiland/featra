@@ -25,10 +25,14 @@ export function readOnlyReason(owned: OwnedCard, checkedOut: boolean, baseBranch
   return `Check out ${branch} to edit it.`;
 }
 
-function proofOf(card: Card, provenAcs: readonly number[], failedAcs: readonly number[]) {
+/** Each AC's proof: from its evidence, then the last local run (STORY-56) or CI's report (STORY-57) that didn't prove it. */
+function proofOf(card: Card, provenAcs: readonly number[], checks?: CardChecks, prState?: CardPr) {
+  const failed = new Set([...(checks?.failedAcs ?? []), ...(prState?.report?.failedAcs ?? [])]);
+  const missing = new Set(prState?.report?.missingAcs ?? []);
   return (index: number): AcProof => {
     if (provenAcs.includes(index + 1)) return "passed";
-    if (failedAcs.includes(index + 1)) return "failed";
+    if (failed.has(index + 1)) return "failed";
+    if (missing.has(index + 1)) return "missing";
     return card.acs[index]?.test ? "linked" : "none";
   };
 }
@@ -56,7 +60,7 @@ export function buildCardView(
 ): CardView {
   const { card } = owned;
   const ev = evidenceState(card);
-  const proof = proofOf(card, ev.provenAcs, checks?.failedAcs ?? []);
+  const proof = proofOf(card, ev.provenAcs, checks, prState);
   const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   return {
     id: card.id,

@@ -65,8 +65,8 @@ export function parseJUnit(xml: string): JUnitCase[] {
   return cases;
 }
 
-/** What a report says of one linked test. */
-export type ProofResult = { proven: true } | { proven: false; reason: string };
+/** What a report says of one linked test; one not proven is `missing` when it didn't run (absent or skipped). */
+export type ProofResult = { proven: true } | { proven: false; reason: string; missing: boolean };
 
 /**
  * Whether `report` proves `ref`: it must hold a test whose full name equals the linked name, with no failure, error or
@@ -75,17 +75,22 @@ export type ProofResult = { proven: true } | { proven: false; reason: string };
  */
 export function proofFromReport(report: readonly JUnitCase[], ref: TestRef): ProofResult {
   if (ref.name === null) {
-    if (report.length === 0) return { proven: false, reason: "The report has no tests." };
-    const bad = report.find((c) => c.status !== "passed");
-    return bad
-      ? { proven: false, reason: `"${bad.name}" ${bad.status === "failed" ? "failed" : "was skipped"}.` }
-      : { proven: true };
+    if (report.length === 0) return { proven: false, reason: "The report has no tests.", missing: true };
+    const bad = worst(report);
+    return bad ? notPassed(bad.name, bad.status) : { proven: true };
   }
   const name = fullName(ref.name);
   const found = report.filter((c) => c.name === name);
-  if (found.length === 0) return { proven: false, reason: `No test named "${ref.name}" ran.` };
-  const bad = found.find((c) => c.status !== "passed");
-  return bad
-    ? { proven: false, reason: `"${ref.name}" ${bad.status === "failed" ? "failed" : "was skipped"}.` }
-    : { proven: true };
+  if (found.length === 0) return { proven: false, reason: `No test named "${ref.name}" ran.`, missing: true };
+  const bad = worst(found);
+  return bad ? notPassed(ref.name, bad.status) : { proven: true };
 }
+
+/** The first failed test, else the first skipped one; undefined when every one passed. */
+const worst = (cases: readonly JUnitCase[]) =>
+  cases.find((c) => c.status === "failed") ?? cases.find((c) => c.status !== "passed");
+
+const notPassed = (name: string, status: CaseStatus): ProofResult =>
+  status === "failed"
+    ? { proven: false, reason: `"${name}" failed.`, missing: false }
+    : { proven: false, reason: `"${name}" was skipped.`, missing: true };

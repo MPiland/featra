@@ -40,6 +40,35 @@ export interface FakeGhState {
   whileCreating?: { file: string; text: string };
   /** How long `gh pr view` takes to answer. */
   viewDelayMs?: number;
+  /** The repo's workflow runs (STORY-57). */
+  runs?: FakeRun[];
+  /** When set, downloading an artifact fails with this message. */
+  downloadFails?: string;
+}
+
+/** A workflow run of one commit, with its artifacts: each a map of a file's path inside it to the file's text. */
+export interface FakeRun {
+  id: number;
+  headSha: string;
+  /** `completed` by default. */
+  status?: "queued" | "in_progress" | "completed";
+  artifacts?: Record<string, Record<string, string>>;
+}
+
+const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+/** A JUnit report as vitest writes one: each test is `[file, full name with " > ", "passed" | "failed" | "skipped"]`. */
+export function junitXml(tests: readonly (readonly [string, string, "passed" | "failed" | "skipped"])[]): string {
+  const cases = tests.map(([file, name, status]) => {
+    const inner =
+      status === "failed"
+        ? `<failure message="expected true" type="AssertionError">at line 3</failure>`
+        : status === "skipped"
+          ? "<skipped/>"
+          : "";
+    return `    <testcase classname="${esc(file)}" name="${esc(name)}" time="0.01">${inner}</testcase>`;
+  });
+  return `<?xml version="1.0" encoding="UTF-8" ?>\n<testsuites name="vitest tests" tests="${tests.length}">\n  <testsuite name="tests">\n${cases.join("\n")}\n  </testsuite>\n</testsuites>\n`;
 }
 
 export interface GhCall {

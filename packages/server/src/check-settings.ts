@@ -3,7 +3,8 @@
  * what Featra and the Dev Lead propose. The values live in the project's `.featra/config.yaml`, which git can change,
  * so the app's data folder also keeps the commands the user last confirmed: a different one in the file shows as
  * changed and does not run until the user confirms it. Proposals are kept there too and never apply by themselves.
- * The section also says whether GitHub is usable and holds the story PR settings (STORY-11).
+ * The section also says whether GitHub is usable and holds the story PR settings (STORY-11) and the test report CI
+ * uploads (STORY-57).
  */
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -96,6 +97,8 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
       github: use,
       openStoryPrs: config.openStoryPrs,
       prRefreshMinutes: config.prRefreshMinutes,
+      testReportArtifact: config.testReportArtifact,
+      testReportFiles: config.testReportFiles,
       error,
     };
   }
@@ -121,6 +124,8 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
         ["linkedTestCommand", patch.testCommand],
         ["openStoryPrs", patch.openStoryPrs],
         ["prRefreshMinutes", patch.prRefreshMinutes],
+        ["testReportArtifact", patch.testReportArtifact],
+        ["testReportFiles", patch.testReportFiles],
       ] as const;
       for (const [key, value] of writes) {
         if (value === undefined) continue;

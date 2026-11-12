@@ -115,6 +115,7 @@ export const CARD_COPY = {
   proof: {
     passed: "Test passed",
     failed: "Test failed",
+    missing: "Not in the report",
     linked: "No result yet",
     none: "No test yet",
   } satisfies Record<AcProof, string>,
@@ -141,6 +142,7 @@ export const PR_COPY = {
     pending: "Checks running",
   } satisfies Record<Exclude<PrChecks, "none">, string>,
   mark: { passing: "✓", failing: "✗", pending: "…" } satisfies Record<Exclude<PrChecks, "none">, string>,
+  report: "Test report",
 } as const;
 
 const review = (call: Promise<unknown>): Promise<ReviewResult> =>

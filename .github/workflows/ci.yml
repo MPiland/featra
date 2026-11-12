@@ -24,6 +24,17 @@ jobs:
       - uses: ./.github/actions/setup
       - name: Format, lint, typecheck and unit tests
         run: pnpm check
+        env:
+          # A JUnit report of the unit tests as well, which Featra reads to prove criteria (STORY-57).
+          FEATRA_JUNIT: test-report/unit.xml
+      - name: Upload the unit test report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-unit
+          path: test-report
+          retention-days: 14
+          if-no-files-found: ignore
 
   e2e-windows:
     name: E2E (Windows)

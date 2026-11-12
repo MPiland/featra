@@ -7,7 +7,14 @@ import {
   type Stage,
   type StageCategory,
 } from "./types.ts";
-import { CHECKS_WHERE, isRefreshMinutes, PR_REFRESH_MAX } from "./checks-types.ts";
+import {
+  CHECKS_WHERE,
+  isRefreshMinutes,
+  isReportArtifact,
+  isReportFiles,
+  PR_REFRESH_MAX,
+  REPORT_RULES,
+} from "./checks-types.ts";
 import { isOneOf, isRecord, toText } from "./utils/guards.ts";
 
 export const DEFAULT_STAGES: Stage[] = [
@@ -36,6 +43,8 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   linkedTestCommand: null,
   openStoryPrs: true,
   prRefreshMinutes: 2,
+  testReportArtifact: null,
+  testReportFiles: null,
 };
 
 const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
@@ -129,6 +138,18 @@ export function configOverrides(text: string): Partial<ProjectConfig> {
     out.checksWhere = raw.checksWhere;
   }
   for (const key of COMMAND_KEYS) if (key in raw) out[key] = commandText(key, raw[key]);
+  if ("testReportArtifact" in raw) {
+    if (!isReportArtifact(raw.testReportArtifact)) {
+      throw new ConfigError(`testReportArtifact ${REPORT_RULES.artifact}, got ${toText(raw.testReportArtifact)}`);
+    }
+    out.testReportArtifact = raw.testReportArtifact;
+  }
+  if ("testReportFiles" in raw) {
+    if (!isReportFiles(raw.testReportFiles)) {
+      throw new ConfigError(`testReportFiles ${REPORT_RULES.files}, got ${toText(raw.testReportFiles)}`);
+    }
+    out.testReportFiles = raw.testReportFiles;
+  }
   return out;
 }
 

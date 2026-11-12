@@ -121,4 +121,11 @@ export interface ProjectConfig {
   openStoryPrs: boolean;
   /** How often open PRs are read again, in minutes (STORY-11). */
   prRefreshMinutes: number;
+  /**
+   * The workflow artifact CI uploads its JUnit report in (STORY-57), a name or a pattern such as `test-report-*`. Null
+   * until set, and Proven from CI is off until then.
+   */
+  testReportArtifact: string | null;
+  /** The report files inside the artifact, a glob; null reads every `.xml` file in it. */
+  testReportFiles: string | null;
 }

@@ -1,8 +1,10 @@
 // A stand-in for the GitHub CLI (STORY-11): the platform faked, never Featra's own logic. It keeps its GitHub in a JSON
 // file (FAKE_GH_STATE): whether it is signed in and the repo's PRs. Each call is appended to FAKE_GH_STATE + ".calls"
 // as one JSON line with its arguments and what came in on standard input. A PR's head commit is the tip of its branch
-// in the bare repository that stands in for GitHub (`remote`), as on GitHub.
+// in the bare repository that stands in for GitHub (`remote`), as on GitHub. Workflow runs (`runs`) belong to a commit and
+// hold artifacts, each a set of files that `run download` writes out as GitHub's CLI does.
 const fs = require("node:fs");
+const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 
 const statePath = process.env.FAKE_GH_STATE;
@@ -71,6 +73,23 @@ function bucketOf(check) {
   return "pending";
 }
 
+/** An artifact name matched against `run download -p`: `*` any characters, `?` one. */
+const matches = (pattern, name) =>
+  new RegExp(
+    `^${pattern
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+      .replaceAll("*", ".*")
+      .replaceAll("?", ".")}$`,
+  ).test(name);
+
+/** A workflow run as `gh run list --json` gives it. */
+const runView = (run) => ({
+  databaseId: run.id,
+  status: run.status ?? "completed",
+  conclusion: run.conclusion ?? "success",
+  headSha: run.headSha,
+});
+
 const [first, second] = args;
 if (first === "--version") {
   out("gh version 2.99.0 (fake)");
@@ -109,6 +128,31 @@ if (first === "--version") {
   write(state);
   const head = { sha: tipOf(body.head) ?? undefined, repo: { full_name: `${OWNER}/${REPO}` } };
   out({ number, html_url: pr.url, state: "open", draft: false, merged_at: null, head });
+} else if (first === "run" && second === "list") {
+  const commit = flag("--commit");
+  const limit = Number(flag("--limit") ?? 20);
+  out(
+    (state.runs ?? [])
+      .filter((r) => !commit || r.headSha === commit)
+      .slice(0, limit)
+      .map(runView),
+  );
+} else if (first === "run" && second === "download") {
+  if (state.downloadFails) fail(state.downloadFails);
+  const run = (state.runs ?? []).find((r) => String(r.id) === args[2]);
+  if (!run) fail(`HTTP 404: Not Found`);
+  const pattern = flag("-p");
+  const into = flag("-D") ?? ".";
+  const wanted = Object.entries(run.artifacts ?? {}).filter(([name]) => !pattern || matches(pattern, name));
+  if (wanted.length === 0) fail("no valid artifacts found to download");
+  // With a pattern, each artifact goes into a folder of its own name, as GitHub's CLI does.
+  for (const [name, files] of wanted) {
+    for (const [file, text] of Object.entries(files)) {
+      const to = path.join(into, name, file);
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.writeFileSync(to, text);
+    }
+  }
 } else {
   fail(`unknown command: ${args.join(" ")}`);
 }

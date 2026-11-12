@@ -46,6 +46,10 @@ export interface ChecksView {
   openStoryPrs: boolean;
   /** How often open PRs are read again, in minutes. */
   prRefreshMinutes: number;
+  /** The artifact CI uploads its JUnit report in (STORY-57); null until set, and Proven from CI is off until then. */
+  testReportArtifact: string | null;
+  /** The report files inside the artifact, a glob; null reads every `.xml` file in it. */
+  testReportFiles: string | null;
   /** Set when the project's config can't be read; nothing is changed then. */
   error: string | null;
 }
@@ -59,6 +63,8 @@ export interface ChecksPatch {
   confirm?: CheckField[];
   openStoryPrs?: boolean;
   prRefreshMinutes?: number;
+  testReportArtifact?: string | null;
+  testReportFiles?: string | null;
 }
 
 /** A finished run, for the card: its command, when it ended, and the tail of what it printed. */
@@ -87,6 +93,24 @@ export const PR_REFRESH_MAX = 60;
 /** A PR refresh interval: whole minutes from 1 to `PR_REFRESH_MAX`. */
 export const isRefreshMinutes = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= PR_REFRESH_MAX;
+/** What a test report setting may hold, said after its key. */
+export const REPORT_RULES = {
+  artifact: "must be an artifact name of letters, digits, '.', '_', '-', '*' or '?', at most 100 characters",
+  files: "must be a relative path or glob of letters, digits, '.', '_', '-', '/', '*' or '?', at most 200 characters",
+} as const;
+
+/**
+ * An artifact name or pattern safe to hand to `gh run download -p` as one argument on every platform. GitHub allows
+ * more in a name; a report artifact named outside this set needs renaming in the workflow.
+ */
+export const isReportArtifact = (v: unknown): v is string => typeof v === "string" && /^[\w.*?-]{1,100}$/.test(v);
+
+/** A glob for the report files inside the artifact: relative, and never out of it. */
+export const isReportFiles = (v: unknown): v is string =>
+  typeof v === "string" &&
+  /^[\w.*?/-]{1,200}$/.test(v) &&
+  !v.split("/").some((part) => part === ".." || part === "" || part === ".");
+
 const isField = (v: unknown): v is CheckField => v === "command" || v === "testCommand";
 const text = (v: unknown) => (typeof v === "string" ? v : "");
 const textOrNull = (v: unknown) => (typeof v === "string" && v ? v : null);
@@ -129,6 +153,8 @@ export function normalizeChecksView(raw: unknown): ChecksView {
     github: normalizeGithubUse(r.github),
     openStoryPrs: r.openStoryPrs !== false,
     prRefreshMinutes: isRefreshMinutes(r.prRefreshMinutes) ? r.prRefreshMinutes : 2,
+    testReportArtifact: isReportArtifact(r.testReportArtifact) ? r.testReportArtifact : null,
+    testReportFiles: isReportFiles(r.testReportFiles) ? r.testReportFiles : null,
     error: textOrNull(r.error),
   };
 }
@@ -154,6 +180,15 @@ export function parseChecksPatch(raw: unknown): ChecksPatch | null {
   if ("prRefreshMinutes" in raw) {
     if (!isRefreshMinutes(raw.prRefreshMinutes)) return null;
     patch.prRefreshMinutes = raw.prRefreshMinutes;
+  }
+  for (const [key, valid] of [
+    ["testReportArtifact", isReportArtifact],
+    ["testReportFiles", isReportFiles],
+  ] as const) {
+    if (!(key in raw)) continue;
+    const value = raw[key];
+    if (value !== null && !valid(value)) return null;
+    patch[key] = value;
   }
   if ("confirm" in raw) {
     if (!Array.isArray(raw.confirm) || !raw.confirm.every(isField)) return null;

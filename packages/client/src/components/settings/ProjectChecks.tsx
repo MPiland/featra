@@ -10,29 +10,38 @@ const WHERE = [
   { value: "local", label: COPY.local },
 ] as const;
 
-type Field = "command" | "testCommand";
+type Field = "command" | "testCommand" | "testReportArtifact" | "testReportFiles";
+const FIELDS = ["command", "testCommand", "testReportArtifact", "testReportFiles"] as const satisfies Field[];
+const EMPTY: Record<Field, string> = { command: "", testCommand: "", testReportArtifact: "", testReportFiles: "" };
+const draftOf = (view: ChecksView): Record<Field, string> => ({
+  command: view.command ?? "",
+  testCommand: view.testCommand ?? "",
+  testReportArtifact: view.testReportArtifact ?? "",
+  testReportFiles: view.testReportFiles ?? "",
+});
 
 /**
- * Project settings' Checks section (STORY-56): where checks run, the check command and the linked test command. A
- * command someone proposed is only filled in by "Use this"; nothing is applied until the user saves it.
+ * Project settings' Checks section (STORY-56): where checks run, the check command and the linked test command, and
+ * the test report CI uploads (STORY-57). A command someone proposed is only filled in by "Use this"; nothing is applied
+ * until the user saves it.
  */
 export function ProjectChecks({ checks, dir }: { checks: ChecksBridge; dir: string }) {
   // The section is kept with the folder it was read from, so switching folders shows nothing until the new one loads.
   const [loaded, setLoaded] = useState<{ dir: string; view: ChecksView } | null>(null);
-  const [draft, setDraft] = useState<Record<Field, string>>({ command: "", testCommand: "" });
+  const [draft, setDraft] = useState<Record<Field, string>>(EMPTY);
   const [saved, setSaved] = useState(false);
   const view = loaded && loaded.dir === dir ? loaded.view : null;
 
   const show = (next: ChecksView) => {
     setLoaded({ dir, view: next });
-    setDraft({ command: next.command ?? "", testCommand: next.testCommand ?? "" });
+    setDraft(draftOf(next));
   };
   useEffect(() => {
     let live = true;
     void checks.load(dir).then((next) => {
       if (!live) return;
       setLoaded({ dir, view: next });
-      setDraft({ command: next.command ?? "", testCommand: next.testCommand ?? "" });
+      setDraft(draftOf(next));
     });
     return () => {
       live = false;
@@ -47,9 +56,10 @@ export function ProjectChecks({ checks, dir }: { checks: ChecksBridge; dir: stri
     show(next);
     setSaved(next.error === null);
   };
-  const dirty = (["command", "testCommand"] as const).filter((f) => draft[f].trim() !== (view[f] ?? ""));
+  const dirty = FIELDS.filter((f) => draft[f].trim() !== (view[f] ?? ""));
   const save = () => change(Object.fromEntries(dirty.map((f) => [f, draft[f].trim() === "" ? null : draft[f].trim()])));
 
+  const unconfirmed = (f: Field) => view.unconfirmed.some((u) => u === f);
   const field = (f: Field, label: string, help: string) => (
     <SettingRow id={`checks-${f}`} label={label} help={help}>
       {(aria) => (
@@ -64,11 +74,15 @@ export function ProjectChecks({ checks, dir }: { checks: ChecksBridge; dir: stri
             spellCheck={false}
             onChange={(e) => setDraft({ ...draft, [f]: e.target.value })}
           />
-          {view.unconfirmed.includes(f) && (
+          {unconfirmed(f) && (
             <div className="setting-help">
               <span>{COPY.changed}: </span>
               <code>{view[f]}</code>{" "}
-              <button type="button" className="link" onClick={() => void change({ confirm: [f] })}>
+              <button
+                type="button"
+                className="link"
+                onClick={() => void change({ confirm: view.unconfirmed.filter((u) => u === f) })}
+              >
                 {COPY.confirm}
               </button>
             </div>
@@ -113,6 +127,8 @@ export function ProjectChecks({ checks, dir }: { checks: ChecksBridge; dir: stri
         </SettingRow>
         {field("command", COPY.command, COPY.commandHint)}
         {field("testCommand", COPY.testCommand, COPY.testHint)}
+        {field("testReportArtifact", COPY.reportArtifact, COPY.reportArtifactHint)}
+        {field("testReportFiles", COPY.reportFiles, COPY.reportFilesHint)}
         <div className="setting-row">
           <button type="button" className="btn primary" disabled={dirty.length === 0} onClick={() => void save()}>
             {COPY.save}
