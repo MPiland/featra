@@ -1,5 +1,13 @@
 /** The shapes every tool shares: what the host offers, what a tool is, and how it refuses. */
-import type { DraftInput, DraftResult, LoggedEntry, LogInput, ReportInput, SpawnInput } from "@featra/work-format";
+import type {
+  DraftInput,
+  DraftResult,
+  LoggedEntry,
+  LogInput,
+  MessageInput,
+  ReportInput,
+  SpawnInput,
+} from "@featra/work-format";
 
 /** What the tools reach the server through. */
 export interface FeatraHost {
@@ -13,6 +21,8 @@ export interface FeatraHost {
   spawn: (input: SpawnInput) => Promise<{ chat: string; queued: boolean }>;
   /** Reports progress on a card: the stage, ticks, tasks, a note and evidence links, all Reported (STORY-10). */
   update: (input: ReportInput) => Promise<{ card: string; changes: string[] }>;
+  /** The Dev Lead tells a story's session something, as its next turn (STORY-54). */
+  message: (input: MessageInput) => Promise<{ story: string }>;
 }
 
 export interface Tool {

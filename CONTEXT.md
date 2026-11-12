@@ -92,6 +92,10 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   goes on in the same session and clears the mark. A stopped session doesn't count toward the running-sessions cap.
 - **Story session view** — a story's session is read-only: the live transcript (with the agent's thinking, where the
   provider shows it) and no composer.
+- **Notice** — a short message Featra writes into the Dev Lead's chat when a story session ends a turn, stops, fails or
+  asks a question: written by the app (no model call), labelled as not from the user, and delivered together when the Dev
+  Lead is busy. The **Dev Lead of a story** is the chat that spawned it; it answers with `message_session`, which is
+  refused for a Stopped story.
 - **Orchestrator** — a session using the Dev Lead role. Shapes features with the user, drafts cards, spawns story
   sessions, reviews and merges.
 - **Agent instructions** — the user's own `CLAUDE.md` / `AGENTS.md`. Featra never edits them. Not the same as project

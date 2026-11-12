@@ -2,7 +2,7 @@
 id: BUG-18
 type: bug
 title: Agent card-update ordering test times out under load
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 10
 origin: bug
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-18
+  - at: 2026-11-12T00:02:42Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

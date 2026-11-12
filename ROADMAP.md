@@ -20,6 +20,12 @@ epics in `.featra/cards/`.
   way they do natively.
 - **Keep queued story sessions across a restart** (FEAT-5 keeps the queue in memory), or tell the Dev Lead the
   queue was cleared.
+  The same goes for story notices held for a busy Dev Lead: they live in memory and are lost across a restart (accepted
+  for STORY-54).
+- **Story notices in the Inbox when no Dev Lead is open:** a story whose Dev Lead is gone gets its ended, stopped and
+  failed notices shown to the user, as its questions already are.
+- **A per-story notice budget or back-off:** a Dev Lead and a story session can message each other without limit
+  (`message_session` and notices), and nothing stops a loop.
 - **Evidence in the card pane:** show an acceptance criterion's evidence link there (STORY-10 writes it to the card;
   the pane does not show it yet).
 - **Agents link tests to criteria** through `update_card` (today a criterion's `test:` link is written by hand, not by
@@ -50,6 +56,10 @@ epics in `.featra/cards/`.
   folders, as the watched path does (ADR 0016). Not M1 scope.
 - **Test hygiene:** the ordering case in `agent-card-update-review.test.ts` needs the STORY-6 session that the "who is
   calling" case spawns, so it fails when run alone; make each case build its own.
+
+- **Test hygiene:** a shared `startChat(page, role)` e2e helper. The picker-then-composer sequence is hand-rolled in
+  about 11 specs (chat, chat-log, composer, draft, inbox, review-draft, chat-approvals, chat-questions, chat-list,
+  chat-restore, roles), so a fix like BUG-17's has to be made in each.
 
 ## Before public release
 
