@@ -19,6 +19,8 @@ export interface FakeRun {
   interrupts: number;
   /** The task ids `stopTask` was asked to end (STORY-55). */
   stopped: string[];
+  /** Makes `stopTask` refuse, as the SDK does for a task that has just ended. */
+  stopFails: boolean;
   /** What an interrupt does besides counting: a test makes it fail or never finish, as a stuck provider does. */
   onInterrupt: (() => Promise<void>) | null;
   /** True once Featra has closed its input: the session is over. */
@@ -56,6 +58,7 @@ export function fakeQuery() {
       crash: (error) => out.push({ error }),
       interrupts: 0,
       stopped: [],
+      stopFails: false,
       onInterrupt: null,
       closed: false,
       updates: [],
@@ -101,6 +104,7 @@ export function fakeQuery() {
       },
       stopTask: async (task: string) => {
         run.stopped.push(task);
+        if (run.stopFails) throw new Error("No such task");
       },
     });
     return q;

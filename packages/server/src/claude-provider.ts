@@ -14,12 +14,12 @@ import {
   type ChatSettings,
   type PermissionMode,
   type Role,
+  type TurnOutcome,
 } from "@featra/work-format";
+import { claudeCanUseTool } from "./claude-approvals.ts";
 import { claudeControls, claudeSettings, sdkMode, thinkingOption } from "./claude-controls.ts";
 import { createClaudeTranslator, FAILED } from "./claude-messages.ts";
 import { createClaudeSubagents } from "./claude-subagents.ts";
-import { claudeQuestions, questionResult } from "./claude-question.ts";
-import { sessionRules, suggestedRule } from "./claude-rules.ts";
 import { loadSessionReader } from "./claude-sdk.ts";
 import { claudeHistory, type SessionReader } from "./claude-transcript.ts";
 import { createInputQueue, type InputQueue } from "./input-queue.ts";
@@ -163,44 +163,25 @@ function startSession(
   /** Settles when the agent of the latest `send` is running, or its start ended without one. */
   let started: Promise<void> = Promise.resolve();
 
-  const canUseTool: CanUseTool = async (name, toolInput, options) => {
-    const { signal, toolUseID, suppressAlwaysAllowRule, suggestions, agentID } = options;
-    // A subagent of the session asking: the request says which.
-    const from = subagents.labelOf(agentID);
-    const by = from ? { subagent: from } : {};
-    // The agent asks the user to choose: a card, not an approval.
-    const asked = claudeQuestions(name, toolInput);
-    if (asked && "refusal" in asked) return asked.refusal;
-    if (asked) {
-      const request = { id: toolUseID, name, questions: asked.questions, ...by };
-      return questionResult(toolInput, await ask(request, AbortSignal.any([signal, turn.signal])));
-    }
-    // Claude says not to offer an always-allow for this call: Allow for this chat isn't offered either.
-    const forChat = suppressAlwaysAllowRule !== true;
-    const rules = forChat ? sessionRules(suggestions) : [];
-    const suggested = suggestedRule(rules);
-    const request = { id: toolUseID, name, input: toolInput, forChat, ...(suggested ? { suggested } : {}), ...by };
-    const decision = await approve(request, AbortSignal.any([signal, turn.signal]));
-    // Allow for this chat on Claude's suggestion hands back the very rules suggested: Claude applies them.
-    const chosen = decision.allow && suggested !== null && decision.rule === suggested.rule;
-    return decision.allow
-      ? { behavior: "allow", updatedInput: decision.input, ...(chosen ? { updatedPermissions: rules } : {}) }
-      : { behavior: "deny", message: decision.message, ...(decision.interrupt ? { interrupt: true } : {}) };
-  };
+  const canUseTool = claudeCanUseTool({ subagents, approve, ask, signal: () => turn.signal });
 
   const relay = (e: ChatEvent) => {
-    if (e.type === "turn-end") open = false;
+    if (e.type === "turn-end") {
+      open = false;
+      // A foreground subagent can't outlive its turn; a background one goes on.
+      subagents.turnEnded(e.outcome);
+    }
     emit(e);
   };
 
-  const fail = (events: ChatEvent[]) => {
+  const fail = (events: ChatEvent[], subagentsEnd: TurnOutcome = "failed") => {
     // The agent is gone: a request it was waiting on ends before the turn does.
     turn.abort();
     input?.close();
     input = null;
     query = null;
     // Its subagents went with it.
-    subagents.endAll("failed");
+    subagents.endAll(subagentsEnd);
     for (const e of events) relay(e);
   };
 
@@ -258,7 +239,7 @@ function startSession(
       return;
     }
     // The agent ended on its own: a turn it left open fails, and the next message starts it again.
-    if (!closed && query === running) fail(mid ? [failed(FAILED), END_FAILED] : []);
+    if (!closed && query === running) fail(mid ? [failed(FAILED), END_FAILED] : [], open ? "failed" : "stopped");
   }
 
   return {
@@ -293,12 +274,15 @@ function startSession(
       settings = nextSettings;
     },
     stopSubagent: (id) => subagents.stop(id, query?.stopTask?.bind(query)),
+    forgetSubagent: (id) => subagents.forget(id),
     async interrupt() {
       if (!open) return;
       turn.abort();
       // Only a turn the agent is running reads its result as stopped; before that, run() ends it (stoppedEarly).
       if (!query) return;
       translator.interrupted();
+      // Stop on the session also ends the background subagents it spawned.
+      await subagents.stopAll(query.stopTask?.bind(query));
       await query.interrupt();
     },
     close() {

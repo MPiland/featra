@@ -57,6 +57,22 @@ describe("AC2: a story's question", { timeout: 30_000 }, () => {
     expect(noticesIn(lead.events())[0]).toContain("Which colour do you prefer? (Blue / Red)");
   });
 
+  it("names the subagent that asked, in the notice text", async () => {
+    const lead = await idleLead(w);
+    const child = await w.spawnAs(lead, "STORY-13");
+    const events = await w.window.watch(child.chat);
+    child.run.say(sdk.init(), sdk.taskStarted("task-9", "call-9"), sdk.assistant("m1", [sdk.text("marker")]));
+    // The messages are read in order: once the marker shows, the subagent is known.
+    await w.until(() => JSON.stringify(events()).includes("marker"));
+    await child.run.ask(ASK, { questions: [COLOUR] }, "q1", { agentID: "task-9" });
+    finish(child.run, "I need to know the colour.");
+    await w.until(() => noticesIn(lead.events()).length === 1);
+    expect(noticesIn(lead.events())).toEqual([
+      noticeMessage([{ story: "STORY-13", outcome: "asks", summary: askedSummary([[COLOUR]], ["Review the diff"]) }]),
+    ]);
+    expect(noticesIn(lead.events())[0]).toContain("Asked by the subagent Review the diff: Which colour");
+  });
+
   it("holds every question the turn asked, in one notice", async () => {
     const lead = await idleLead(w);
     const child = await w.spawnAs(lead, "STORY-12");

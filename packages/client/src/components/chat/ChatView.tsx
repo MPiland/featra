@@ -37,7 +37,7 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
   const [update, setUpdate] = useState<ChatUpdate>({ chat: EMPTY_CHAT, error: null });
   const [actionError, setActionError] = useState<string | null>(null);
   useEffect(() => chats.watch(chat.id, setUpdate), [chats, chat.id]);
-  const controls = useChatControls(chats, chat.id, dir, chat.role.id);
+  const controls = useChatControls(chats, chat.id, dir, chat.role.id, chat.subagent === undefined);
   const { items, running, model, usage } = update.chat;
   const settings = controls.state?.settings;
   // Once a setting has been changed here, the header shows what the chat now runs with.

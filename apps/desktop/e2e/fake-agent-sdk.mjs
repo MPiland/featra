@@ -36,6 +36,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { callMcpTool } from "./fake-mcp-client.mjs";
+import { questionTurn, subagentTurn } from "./fake-agent-turns.mjs";
 import { sessionLog } from "./fake-session-log.mjs";
 
 const MAIN = { parent_tool_use_id: null };
@@ -194,90 +195,8 @@ async function* reportTurn(options, text) {
   yield success("Done.");
 }
 
-const SUB_CALL = "toolu_agent_1";
-const SUB_TASK = "task_sub_1";
-/** A message of the subagent's own conversation, tagged with the call that started it and its task. */
-const inSub = (message) => ({ ...message, parent_tool_use_id: SUB_CALL, agent_id: SUB_TASK });
-
-/** The agent spawns a background subagent; its Bash needs approval (as itself), and it runs until stopTask ends it. */
-async function* subagentTurn(options, signal, waitForStop) {
-  yield assistant(`msg_${++seq}`, [
-    { type: "tool_use", id: SUB_CALL, name: "Agent", input: { description: "Review the diff" } },
-  ]);
-  yield {
-    ...MAIN,
-    type: "system",
-    subtype: "task_started",
-    task_id: SUB_TASK,
-    tool_use_id: SUB_CALL,
-    description: "Review the diff",
-    subagent_type: "reviewer",
-    task_type: "local_agent",
-    is_backgrounded: true,
-    prompt: "Review the diff.",
-  };
-  yield inSub(assistant(`msg_${++seq}`, [{ type: "text", text: "Reading the diff." }]));
-  const id = `toolu_sub_bash_${++seq}`;
-  const input = { command: "npm test" };
-  yield inSub(assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "Bash", input }]));
-  const decision = await options.canUseTool("Bash", input, {
-    signal,
-    toolUseID: id,
-    requestId: `request_${seq}`,
-    agentID: SUB_TASK,
-  });
-  const allowed = decision.behavior === "allow";
-  yield inSub(toolResult(id, allowed ? "ok" : decision.message, !allowed));
-  yield inSub(assistant(`msg_${++seq}`, [{ type: "text", text: "Tests ran, still reviewing." }]));
-  await waitForStop;
-  yield { ...MAIN, type: "system", subtype: "task_notification", task_id: SUB_TASK, status: "stopped", summary: "" };
-  yield* say("Subagent stopped.");
-  yield success("Done.");
-}
-
-const QUESTIONS = [
-  {
-    question: "Which colour do you prefer?",
-    header: "Colour",
-    options: [
-      { label: "Blue", description: "Calm" },
-      { label: "Red", description: "Loud" },
-    ],
-    multiSelect: false,
-  },
-  {
-    question: "Which features?",
-    header: "Features",
-    options: [
-      { label: "Search", description: "Find things" },
-      { label: "Export", description: "Get data out" },
-    ],
-    multiSelect: true,
-  },
-];
-
-/** An AskUserQuestion call, asked through canUseTool as the SDK asks; the tool's result says what the user chose. */
-async function* questionTurn(options, signal) {
-  const id = `toolu_ask_${++seq}`;
-  const input = { questions: QUESTIONS };
-  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "AskUserQuestion", input }]);
-  const decision = await options.canUseTool("AskUserQuestion", input, {
-    signal,
-    toolUseID: id,
-    requestId: `request_${seq}`,
-  });
-  const allowed = decision.behavior === "allow";
-  const given = allowed
-    ? Object.entries(decision.updatedInput.answers)
-        .map(([q, a]) => `"${q}"="${a}"`)
-        .join(", ")
-    : "";
-  yield toolResult(id, allowed ? given : decision.message, !allowed);
-  yield* say(allowed ? `Got: ${given}` : "No answer.");
-  yield success("Done.");
-}
-
 const nothing = () => {};
+const helpers = { MAIN, assistant, toolResult, say, success, next: () => ++seq, seq: () => seq };
 
 export function query({ prompt, options }) {
   const log = process.env.FEATRA_E2E_AGENT_LOG;
@@ -322,7 +241,7 @@ export function query({ prompt, options }) {
       } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {
         yield* slow(["The worktree is clean."], "Starting the story.");
       } else if (said.includes("subagent")) {
-        yield* subagentTurn(options, turn.signal, taskStopped);
+        yield* subagentTurn(helpers, options, turn.signal, taskStopped);
       } else if (said.includes("decide")) {
         yield* decideTurn(options);
       } else if (said.includes("draft")) {
@@ -330,7 +249,7 @@ export function query({ prompt, options }) {
       } else if (said.includes("tool")) {
         yield* toolTurn(options, turn.signal, said.includes("twice"));
       } else if (said.includes("question")) {
-        yield* questionTurn(options, turn.signal);
+        yield* questionTurn(helpers, options, turn.signal);
       } else if (said.includes("slow")) {
         yield* slow([], "Thinking it over");
       } else {

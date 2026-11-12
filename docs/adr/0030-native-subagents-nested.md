@@ -13,7 +13,9 @@ where the provider allows it and a label on what it asks.
 
 - **A subagent is an in-memory, read-only chat.** The session manager adds one chat per subagent to its map, with the same
   event log, watch and list row as any chat, and a `subagent: { parent, stoppable }` on its summary. It is never saved
-  (the provider owns the real record), and it is removed when its session ends or its project closes. Sending to it is
+  (the provider owns the real record). An ended subagent stays, marked ended, until the user archives it
+  (`chat.archive`), its session ends, its project closes, or more than 20 ended ones in a session push it out (the oldest
+  first); the adapter forgets it on the same rules. A task that starts again reopens the same chat. Sending to it is
   refused (`A subagent is read-only.`); its row never waits on the user.
 - **The provider reports, the manager shows.** The adapter seam gains `SubagentEvent` (`started`, `updated`, `event`,
   `ended`), `SessionOptions.subagent` and an optional `ProviderSession.stopSubagent`. No provider-specific word reaches the
@@ -29,10 +31,15 @@ where the provider allows it and a label on what it asks.
   so it gets no Stop (never a Stop that stops the session). `stoppable` is true only for a background subagent with a known
   task that has not ended, and flips when a `task_updated` moves it to the background. The client stops it through the
   existing `chat.stop`; the manager routes a subagent's id to the provider's `stopSubagent`, never to the session's turn.
+  Stop on the session also stops its background subagents through `stopTask`. A foreground subagent ends with its
+  session's turn, and a `task_updated` status of completed, failed or killed ends one.
 - **Approvals and questions stay in the session's chat, labelled.** The SDK's `canUseTool` options carry the asking
   subagent's `agentID` (sdk.d.ts, `CanUseTool`). The request, and the `approval` and `question` events, carry the
   subagent's label, and the prompt says `Asked by the subagent <label>`. They are not moved to the subagent's chat: the
   user answers them where the session already waits, and the waiting dot, the Inbox and the approval desk keep one path.
+  The Inbox and a story session's notice to the Dev Lead carry the label too.
+- **Worktrees are not exposed.** The SDK reports no worktree for a subagent, so Archive removes the row only; cleaning up
+  subagent worktrees is on the roadmap.
 - **Nesting is flat.** A subagent sits under its session, whichever row that is (a chat, a story session, or a feature
   group). A subagent of a subagent (`spawn_depth`, `parent_task_id`) is shown at the same level. A subagent whose session
   is not in the list gets a row of its own, so none goes missing.

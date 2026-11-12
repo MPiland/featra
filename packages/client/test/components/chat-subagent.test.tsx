@@ -95,3 +95,27 @@ describe("AC3: approvals and questions say which subagent asked", () => {
     expect(screen.queryByText(/Asked by the subagent/)).toBeNull();
   });
 });
+
+describe("an ended subagent stays nested until the user archives it", () => {
+  const archiveName = { name: CHAT_COPY.archiveSubagent("Review the diff") };
+
+  it("is marked ended, offers Archive only then, and Archive removes the row", async () => {
+    const { app, sub } = await spawned();
+    const list = await nest();
+    expect(within(list).queryByRole("button", archiveName)).toBeNull();
+    app.chats.endSubagent(sub);
+    expect(await within(list).findByText(CHAT_COPY.ended)).toBeTruthy();
+    await app.user.click(within(list).getByRole("button", archiveName));
+    expect(app.calls).toContain(`chat.archive:${sub}`);
+    await expect.poll(() => screen.queryByRole("list", { name: CHAT_COPY.subagentsOf("Developer") })).toBeNull();
+  });
+});
+
+describe("a subagent chat has no session controls", () => {
+  it("does not ask the host for the chat's controls", async () => {
+    const { app, sub } = await spawned();
+    await open(app);
+    await screen.findByRole("note");
+    expect(app.calls.filter((c) => c.startsWith("chat.controls:"))).not.toContain(`chat.controls:${sub}`);
+  });
+});

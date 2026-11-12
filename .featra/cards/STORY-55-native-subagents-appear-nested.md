@@ -40,6 +40,8 @@ As the user, I see the subagents any session spawns for itself, nested under it,
 
 - [x] A subagent spawned by a session appears nested under that session in the sidebar with its live transcript, read-only (tests: packages/server/test/chat-subagents.test.ts, packages/client/test/components/chat-subagent.test.tsx, apps/desktop/e2e/nested-subagents.spec.ts)
 - [x] Stop on a nested subagent stops only that subagent where the provider supports it (Claude background subagents); otherwise no Stop is shown (tests: chat-subagents.test.ts "AC2", claude-subagents.test.ts "Stop", chat-subagent.test.tsx "AC2", nested-subagents.spec.ts)
+- [x] An ended subagent stays nested, marked ended, until its session ends or it is archived; at most 20 ended per session, oldest dropped first (tests: chat-subagents.test.ts "what an ended subagent leaves", claude-subagents.test.ts, chat-subagent.test.tsx "ended subagent")
+- [x] Stop on a session also stops its background subagents (tests: chat-subagents.test.ts "Stop on the session", claude-subagents.test.ts)
 - [x] Tool approvals and questions from a subagent are labelled with that subagent (tests: chat-subagents.test.ts "AC3", packages/work-format/test/chat-subagent.test.ts, chat-subagent.test.tsx "AC3", nested-subagents.spec.ts)
 
 ## Tasks
@@ -62,3 +64,11 @@ foreground subagent is ended only with its turn, so it shows no Stop. Build choi
 decisions.md ("STORY-55 build choices") and ADR 0030. Restoring subagents after a restart is on the roadmap.
 
 The Playwright journey (`apps/desktop/e2e/nested-subagents.spec.ts`) is written and runs in CI only.
+
+Review rulings are in decisions.md ("STORY-55 review rulings"). Worktrees: the SDK does not expose a subagent's worktree.
+Evidence: `SDKTaskStartedMessage`, `task_updated` and the SubagentStart and SubagentStop hook inputs have no worktree
+path, and only the WorktreeCreate and WorktreeRemove hook inputs exist, with no subagent isolation field. Archive
+therefore removes the row only, and "clean up subagent worktrees" is on ROADMAP.md.
+
+UAT (user): the real claude message shapes are unverified against a real run. UAT includes one real foreground and one
+real background subagent run.

@@ -119,6 +119,8 @@ export interface ServerMethods {
   "chat.send": { params: { id: string; text: string }; result: null };
   /** Interrupts the running turn. */
   "chat.stop": { params: { id: string }; result: null };
+  /** Removes an ended subagent from its session's nest (STORY-55); refused for any other chat, or one still running. */
+  "chat.archive": { params: { id: string }; result: null };
   /**
    * Answers the tool request the chat waits on (STORY-45): Allow, Allow for this chat, or Deny with an optional
    * reason the agent is sent. Refused when the request isn't waiting.
@@ -223,6 +225,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "chat.configure",
   "chat.send",
   "chat.stop",
+  "chat.archive",
   "chat.approve",
   "chat.answer",
   "chat.undoLog",

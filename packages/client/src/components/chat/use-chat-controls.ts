@@ -15,12 +15,20 @@ export interface ChatControlsModel {
 }
 
 /** Loads a chat's controls once, and keeps the settings the server answers to each change. */
-export function useChatControls(chats: ChatBridge, id: string, dir: string, roleId: string): ChatControlsModel {
+export function useChatControls(
+  chats: ChatBridge,
+  id: string,
+  dir: string,
+  roleId: string,
+  /** False for a subagent (STORY-55): it runs with its session's settings, so there is nothing to ask the server. */
+  enabled = true,
+): ChatControlsModel {
   const [state, setState] = useState<ChatControlState | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [changed, setChanged] = useState<ReadonlySet<keyof ChatControlState["settings"]>>(new Set());
 
   useEffect(() => {
+    if (!enabled) return undefined;
     let live = true;
     void chats.controls(id).then((r) => live && r.ok && setState(r.state));
     void chats.roles(dir).then((all) => {
@@ -31,7 +39,7 @@ export function useChatControls(chats: ChatBridge, id: string, dir: string, role
     return () => {
       live = false;
     };
-  }, [chats, id, dir, roleId]);
+  }, [chats, id, dir, roleId, enabled]);
 
   const change = useCallback(
     async (next: SettingsChange) => {

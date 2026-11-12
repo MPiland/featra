@@ -3,7 +3,7 @@
  * and its approvals say who asked. Real session manager and Claude adapter; only the Agent SDK's `query` is fake.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { CHAT_MESSAGES, type ChatEvent } from "@featra/work-format";
+import { CHAT_MESSAGES, MAX_ENDED_SUBAGENTS, type ChatEvent, type Question } from "@featra/work-format";
 import { chat, closeChats, DIR } from "./chat-fixture.ts";
 import { sdk } from "./fake-query.ts";
 import { until } from "./until.ts";
@@ -135,5 +135,165 @@ describe("AC3: a subagent's approvals say which subagent asked", () => {
     await until(() => tool("t2") !== null);
     expect(tool("t1")).toMatchObject({ status: "pending", subagent: "Review the diff" });
     expect(tool("t2")).not.toHaveProperty("subagent");
+  });
+});
+
+const COLOUR: Question = {
+  question: "Which colour?",
+  header: "Colour",
+  options: [
+    { label: "Blue", description: "Calm" },
+    { label: "Red", description: "Loud" },
+  ],
+  multiSelect: false,
+};
+
+describe("AC3: a subagent's question says which subagent asked", () => {
+  it("makes a question event that carries the subagent's label, through the real adapter", async () => {
+    const { c, run } = await spawned();
+    const seen = () => c.events.filter((e) => e.type === "question");
+    void run.ask("AskUserQuestion", { questions: [COLOUR] }, "q1", { agentID: TASK });
+    await until(() => seen().length === 1);
+    expect(seen()[0]).toMatchObject({ type: "question", id: "q1", subagent: "Review the diff" });
+    void run.ask("AskUserQuestion", { questions: [COLOUR] }, "q2");
+    await until(() => seen().length === 2);
+    expect(seen()[1]).not.toHaveProperty("subagent");
+  });
+});
+
+describe("what an ended subagent leaves", () => {
+  it("stays nested, marked ended, with its transcript", async () => {
+    const { c, run, sub, watch } = await spawned();
+    run.say(sdk.taskDone(TASK, "completed"));
+    await until(() => !sub().running);
+    expect(c.manager.list(DIR)).toHaveLength(2);
+    expect(JSON.stringify(watch())).toContain("Looking at the diff.");
+  });
+
+  it("keeps the newest ended subagents of a session, dropping the oldest first", async () => {
+    const { c, run } = await spawned();
+    for (let i = 0; i <= MAX_ENDED_SUBAGENTS; i += 1) {
+      run.say(
+        sdk.taskStarted(`extra-${i}`, `extra-call-${i}`, { description: `Extra ${i}` }),
+        sdk.taskDone(`extra-${i}`, "completed"),
+      );
+    }
+    const titles = () => c.manager.list(DIR).flatMap((s) => (s.subagent && !s.running ? [s.title] : []));
+    await until(() => titles().includes(`Extra ${MAX_ENDED_SUBAGENTS}`));
+    expect(titles()).toHaveLength(MAX_ENDED_SUBAGENTS);
+    expect(titles()).not.toContain("Extra 0");
+    expect(titles()).toContain("Extra 1");
+    // The one still running is not an ended one: it stays.
+    expect(c.manager.list(DIR).filter((s) => s.subagent && s.running)).toHaveLength(1);
+    expect(c.manager.list(DIR).filter((s) => s.subagent && s.running)).toHaveLength(1);
+  });
+
+  it("is archived by the user, and only once it has ended", async () => {
+    const { c, run, sub } = await spawned();
+    expect(() => c.manager.archive(sub().id)).toThrow(CHAT_MESSAGES.noSubagentArchive);
+    expect(() => c.manager.archive(c.id)).toThrow(CHAT_MESSAGES.noSubagentArchive);
+    run.say(sdk.taskDone(TASK, "completed"));
+    await until(() => !sub().running);
+    const id = sub().id;
+    c.manager.archive(id);
+    expect(c.manager.list(DIR).filter((s) => s.subagent)).toEqual([]);
+    expect(() => c.manager.watch(id, () => {})).toThrow(CHAT_MESSAGES.noChat);
+  });
+
+  it("does not come back from a late message of an archived subagent", async () => {
+    const { c, run, sub } = await spawned();
+    run.say(sdk.taskDone(TASK, "completed"));
+    await until(() => !sub().running);
+    c.manager.archive(sub().id);
+    run.say(sdk.within(CALL, TASK, sdk.assistant("s9", [sdk.text("late")])), sdk.assistant("m2", [sdk.text("after")]));
+    await until(() => JSON.stringify(c.events).includes("after"));
+    expect(c.manager.list(DIR).filter((s) => s.subagent)).toEqual([]);
+  });
+
+  it("opens again, running and stoppable, when the same task starts again", async () => {
+    const { c, run, sub, watch } = await spawned();
+    run.say(sdk.taskDone(TASK, "completed"));
+    await until(() => !sub().running);
+    const id = sub().id;
+    run.say(sdk.taskStarted(TASK, CALL, { prompt: "Again." }));
+    await until(() => sub().running);
+    expect(sub()).toMatchObject({ id, subagent: { parent: c.id, stoppable: true } });
+    expect(c.manager.list(DIR).filter((s) => s.subagent)).toHaveLength(1);
+    expect(JSON.stringify(watch())).toContain("Looking at the diff.");
+    await c.manager.stop(id);
+    expect(run.stopped).toEqual([TASK]);
+  });
+});
+
+describe("how a subagent ends with its session", () => {
+  it("ends a foreground subagent with its session's turn, and leaves a background one", async () => {
+    const { c, run } = await spawned({ is_backgrounded: false });
+    run.say(sdk.taskStarted("t-bg", "c-bg", { description: "In the background" }));
+    await until(() => c.manager.list(DIR).filter((s) => s.subagent).length === 2);
+    run.say(sdk.success("Done."));
+    const rows = () => c.manager.list(DIR).filter((s) => s.subagent);
+    await until(() => rows().some((s) => !s.running));
+    expect(rows().map((s) => [s.title, s.running])).toEqual([
+      ["Review the diff", false],
+      ["In the background", true],
+    ]);
+  });
+
+  it("ends them as stopped when the agent exits quietly with no turn open", async () => {
+    const { c, run, sub, watch } = await spawned();
+    run.say(sdk.success("Done."));
+    await until(() => !c.view().running);
+    run.end();
+    await until(() => !sub().running);
+    expect(JSON.stringify(watch())).toContain('"outcome":"stopped"');
+  });
+
+  it("ends them as failed when the agent crashes mid-turn", async () => {
+    const { run, sub, watch } = await spawned();
+    run.crash(new Error("boom"));
+    await until(() => !sub().running);
+    expect(JSON.stringify(watch())).toContain('"outcome":"failed"');
+  });
+});
+
+describe("Stop on the session", () => {
+  it("also stops every background subagent it spawned, and not a foreground one", async () => {
+    const { c, run } = await spawned();
+    run.say(
+      sdk.taskStarted("t-fg", "c-fg", { description: "Foreground", is_backgrounded: false }),
+      sdk.taskStarted("t-bg2", "c-bg2", { description: "Second" }),
+    );
+    await until(() => c.manager.list(DIR).filter((s) => s.subagent).length === 3);
+    await c.manager.stop(c.id);
+    expect(run.interrupts).toBe(1);
+    expect(run.stopped.toSorted()).toEqual(["t-bg2", TASK].toSorted());
+  });
+
+  it("still ends the turn when a subagent's stop is refused", async () => {
+    const { c, run } = await spawned();
+    run.stopFails = true;
+    await c.manager.stop(c.id);
+    expect(run.interrupts).toBe(1);
+  });
+});
+
+describe("Stop racing the subagent's end", () => {
+  it("answers as for any subagent that can't be stopped", async () => {
+    const { c, run, sub } = await spawned();
+    run.stopFails = true;
+    await expect(c.manager.stop(sub().id)).rejects.toThrow(CHAT_MESSAGES.noSubagentStop);
+  });
+});
+
+describe("a task that is not a subagent", () => {
+  it("makes no chat, from its start or its own messages", async () => {
+    const { c, run } = await spawned();
+    run.say(
+      sdk.taskStarted("t-sh", "c-sh", { task_type: "local_bash" }),
+      sdk.within("c-sh", "t-sh", sdk.assistant("s7", [sdk.text("shell output")])),
+      sdk.assistant("m9", [sdk.text("marker")]),
+    );
+    await until(() => JSON.stringify(c.events).includes("marker"));
+    expect(c.manager.list(DIR).filter((s) => s.subagent)).toHaveLength(1);
   });
 });

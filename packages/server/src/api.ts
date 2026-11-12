@@ -212,6 +212,7 @@ export function createApi({
       case "chat.configure":
       case "chat.send":
       case "chat.stop":
+      case "chat.archive":
       case "chat.approve":
       case "chat.answer":
       case "chat.undoLog":

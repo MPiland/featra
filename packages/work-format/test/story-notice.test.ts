@@ -122,6 +122,13 @@ describe("summaries", () => {
     expect(long.length).toBeGreaterThan(NOTICE_SUMMARY_MAX);
   });
 
+  it("says which subagent asked a question, and leaves the session's own unlabelled", () => {
+    expect(askedSummary([[q("One?")], [q("Two?")]], ["Review the diff", undefined])).toBe(
+      "Asked by the subagent Review the diff: One? | Two?",
+    );
+    expect(askedSummary([[q("One?")]], [undefined])).toBe("One?");
+  });
+
   it("tells the session what the user answered", () => {
     expect(userAnswerMessage({ "Which?": ["A", "B"] })).toBe("The user answered your question:\n- Which? A, B");
   });

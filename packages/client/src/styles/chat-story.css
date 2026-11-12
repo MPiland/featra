@@ -6,3 +6,13 @@
 .chat-children .chat-group-name {
   padding-left: 10px;
 }
+
+.chat-children li {
+  display: flex;
+  align-items: center;
+}
+
+.chat-children li > .nav {
+  flex: 1;
+  min-width: 0;
+}

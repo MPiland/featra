@@ -144,7 +144,14 @@ export function createStoryNotices({ chats, open, send, askUser, log }: NoticeHo
       }
       // A question is what the Dev Lead needs to hear of a turn that ended on one; a stop or a failure outranks it.
       if (requests && outcome === "done") {
-        post(lead, { story: story.id, outcome: "asks", summary: askedSummary(requests.map((r) => r.questions)) });
+        post(lead, {
+          story: story.id,
+          outcome: "asks",
+          summary: askedSummary(
+            requests.map((r) => r.questions),
+            requests.map((r) => r.subagent),
+          ),
+        });
       } else {
         post(lead, { story: story.id, outcome: outcomeOf(outcome), summary: turnSummary(c.events ?? [], outcome) });
       }

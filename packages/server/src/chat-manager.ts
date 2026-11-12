@@ -281,6 +281,7 @@ export function createChatManager({
     ...control,
     // Stop on a subagent ends it alone; on any other chat it ends the turn.
     stop: (id) => (subagents.is(id) ? subagents.stop(chat(id)) : control.stop(id)),
+    archive: (id) => subagents.archive(chat(id)),
     // A story session's approval shown in its parent chat is answered from there too.
     approve: (id, tool, answer) => desk.answer(mirror.holder(chat(id).id, tool) ?? chat(id).id, tool, answer),
     answer: (id, tool, answers) => desk.reply(chat(id).id, tool, answers),

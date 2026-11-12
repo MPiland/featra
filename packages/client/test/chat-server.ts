@@ -147,6 +147,15 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
       calls.push(`chat.stop:${id}`);
       return host.stopError ?? null;
     },
+    // The server removes an ended subagent's row.
+    archive: async (id) => {
+      calls.push(`chat.archive:${id}`);
+      const row = rows.get(id);
+      if (!row?.summary.subagent || row.summary.running) return "A subagent still running can't be archived.";
+      rows.delete(id);
+      act(() => listChanged(row.dir));
+      return null;
+    },
     // The answer is recorded; what the server then tells the chat, the test emits as the agent would go on.
     approve: async (id, tool, answer: ApprovalAnswer) => {
       calls.push(`chat.approve:${id}:${tool}:${answer.choice}${answer.reason ? `:${answer.reason}` : ""}`);

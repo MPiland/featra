@@ -38,7 +38,7 @@ describe("AC5: the built-in roles", () => {
 describe("the chat protocol (ADR 0015, ADR 0018)", () => {
   it("has the chat methods and the chat.event push", () => {
     expect(SERVER_METHODS).toEqual(
-      expect.arrayContaining(["chat.roles", "chat.start", "chat.watch", "chat.send", "chat.stop"]),
+      expect.arrayContaining(["chat.roles", "chat.start", "chat.watch", "chat.send", "chat.stop", "chat.archive"]),
     );
     const push = { event: "chat.event", watch: 3, data: { type: "user", text: "hi" } };
     expect(parsePush(JSON.stringify(push))).toEqual(push);

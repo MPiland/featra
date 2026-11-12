@@ -50,6 +50,11 @@ test("a subagent nests under its session with a live read-only transcript, names
     await expect(sub.getByRole("button", { name: "Stop reviewer" })).toHaveCount(0);
     await chats.getByRole("button", { name: "spawn a subagent" }).click();
     await expect(log).toContainText("Subagent stopped.");
+
+    // The ended subagent stays nested, marked ended, until the user archives it.
+    await expect(nest).toContainText("Ended");
+    await chats.getByRole("button", { name: "Archive Review the diff" }).click();
+    await expect(nest).toHaveCount(0);
   } finally {
     await app.close();
     await userData.dispose();

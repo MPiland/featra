@@ -3,7 +3,10 @@
  * and otherwise under a group named after its feature. A subagent a session spawned for itself sits under that session
  * (STORY-55), whichever row the session is on. Pure, so the sidebar and its tests share one copy of the rule.
  */
-import type { ChatSummary } from "./chat-list.ts";
+import type { ChatList, ChatSummary, ProviderInfo } from "./chat-list.ts";
+
+/** The most ended subagents a session keeps listed; the oldest ended go first (STORY-55). */
+export const MAX_ENDED_SUBAGENTS = 20;
 
 /** A chat of the list with the story sessions nested under it, in the order given. */
 export interface ChatBranch {
@@ -59,4 +62,25 @@ export function nestChats(
     } else nested.branches.push({ chat, children: children.get(chat.id) ?? [] });
   }
   return nested;
+}
+
+export interface ChatGroup {
+  provider: ProviderInfo;
+  chats: ChatSummary[];
+}
+
+/**
+ * The list as the sidebar shows it: one group per installed provider, in the order the server lists them, plus any
+ * provider that isn't installed but still has chats (so none go missing). Newest chat first in each group.
+ */
+const newestFirst = (a: ChatSummary, b: ChatSummary) =>
+  b.startedAt.localeCompare(a.startedAt) || b.id.localeCompare(a.id);
+
+export function groupChats(list: ChatList): ChatGroup[] {
+  return list.providers
+    .map((provider) => ({
+      provider,
+      chats: list.chats.filter((c) => c.provider === provider.id).toSorted(newestFirst),
+    }))
+    .filter((g) => g.provider.installed || g.chats.length > 0);
 }

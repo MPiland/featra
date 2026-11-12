@@ -273,6 +273,8 @@ export const CHAT_MESSAGES = {
   subagent: "A subagent is read-only.",
   /** Stop on a subagent the provider can't stop on its own, or that has ended (STORY-55). */
   noSubagentStop: "This subagent can't be stopped.",
+  /** Archive on anything but a subagent that has ended (STORY-55). */
+  noSubagentArchive: "Only a subagent that has ended can be archived.",
   /** Stop or Resume on a story whose session isn't there: it never started, or was closed (STORY-53). */
   noSession: "This story has no session.",
 } as const;

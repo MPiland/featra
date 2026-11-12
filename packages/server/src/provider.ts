@@ -96,10 +96,10 @@ export interface McpServerSpec {
  * shows each subagent as a read-only transcript nested under the session.
  */
 export type SubagentEvent =
-  /** A subagent started. `stoppable` says `stopSubagent` can end it alone now. */
+  /** A subagent started, or one that ended started again (a resumed task). `stoppable` says `stopSubagent` can end it alone now. */
   | { type: "started"; id: string; label: string; kind: string | null; stoppable: boolean }
-  /** `stoppable` changed: a foreground subagent moved to the background. */
-  | { type: "updated"; id: string; stoppable: boolean }
+  /** `stoppable` changed (a foreground subagent moved to the background), or its announcement came after its messages and says what it is. */
+  | { type: "updated"; id: string; stoppable: boolean; label?: string; kind?: string | null }
   /** One event of the subagent's own transcript. */
   | { type: "event"; id: string; event: ChatEvent }
   /** The subagent ended on its own, was stopped, or its agent went away with it. */
@@ -166,6 +166,8 @@ export interface ProviderSession {
    * (Claude background subagents). A subagent's `stoppable` is true only while it can be. Its end comes as `ended`.
    */
   stopSubagent?: (id: string) => Promise<void>;
+  /** An ended subagent was archived: the adapter forgets it (STORY-55). */
+  forgetSubagent?: (id: string) => void;
   /** Ends the agent. */
   close: () => void;
   /** The provider's session id once the agent reported it, kept to resume the conversation (STORY-44). */

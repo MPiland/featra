@@ -1456,7 +1456,8 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   `parent_task_id` are ignored). Why: the sidebar stays one level deeper than a story session, not a tree.
 - **Subagents are not restored after a restart.** Roadmap: restore from `listSubagents` and `getSubagentMessages`.
 - **A resumed subagent with the same task id is ignored after it ends.** Why: the SDK re-registers resumed subagents in the
-  background, and showing a second chat for one task would mislead; rare, so not worth a rule yet.
+  background, and showing a second chat for one task would mislead; rare, so not worth a rule yet. (Corrected below: a
+  `task_started` for a known ended task reopens the same chat.)
 - **The header's model, effort and mode line is hidden for a subagent.** Why: it runs with its session's settings, which
   the subagent chat cannot change or truthfully report.
 - **Risk: message shapes are unverified against a real `claude`.** The adapter follows the SDK's types and is proved with
@@ -1473,3 +1474,35 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 
 - BUG-17 has no regression test: the failure needs a cold runner where `chat.start` takes over 5 s; the helper is test
   code and the product path is unchanged. A shared `startChat(page, role)` e2e helper goes on the roadmap, not done here.
+
+## 2026-11-11 — STORY-55 review rulings (dev-lead and user)
+
+- **Retention (user).** An ended subagent stays nested, marked ended, until its session ends or the project closes. A
+  session keeps at most 20 ended subagents (`MAX_ENDED_SUBAGENTS`), dropping the oldest ended first. Each ended row has
+  Archive (`chat.archive`), which removes it. The adapter prunes its task and call maps and translators on the same
+  rules, and a late message of an archived or dropped subagent makes no chat.
+- **Worktree cleanup (user).** The SDK does not report a subagent's worktree: task messages and the SubagentStart and
+  SubagentStop hook inputs carry no worktree path, and only WorktreeCreate and WorktreeRemove hook inputs mention
+  worktrees, with no subagent isolation field. So Archive removes only the row, and "clean up subagent worktrees" is on
+  the roadmap. Evidence is in the card.
+- **Stop on the session also stops its background subagents (user, finding 8).** Through `stopTask`, before the turn is
+  interrupted; one that refuses is skipped.
+- **Build choice 6 corrected (finding 3, C).** Identity is the task id. A `task_started` for a known ended task reopens the
+  same chat, running and stoppable, with its log; no second chat.
+- **Subagent ends (finding 2).** The session's turn ending ends every non-background subagent still running, with the
+  turn's outcome. `task_updated` with `patch.status` completed, failed or killed ends one (done, failed, stopped). A
+  message of a task that `isSubagentTask` rejected makes no chat.
+- **Finding 4.** The Inbox shows the subagent label for approvals and questions.
+- **Findings 5, 6, 7.** A server test runs the real adapter for AskUserQuestion with an `agentID`. A late `task_started` sets
+  background, kind and label and emits `updated`, and the row is then stoppable. A message naming both task and call
+  aliases the call to the known subagent.
+- **Findings 9, 10.** A quiet agent exit with no open turn ends subagents as stopped, not failed. A Stop that races the
+  subagent's end is rethrown as `noSubagentStop`.
+- **Findings 11 (D), 13, F.** A story session's subagent question still goes to the Dev Lead, with the label in the notice
+  text (`Asked by the subagent <label>: ...`). `chats.controls` is not called for a subagent chat. The copy "Asked by the
+  subagent <label>" stays.
+- **Finding 12.** `canUseTool` moved to `claude-approvals.ts`, the fake SDK's subagent and question turns to
+  `apps/desktop/e2e/fake-agent-turns.mjs`, and the `groupChats` rules to `chat-nest.ts`, so `chat-manager.ts` and
+  `chat-list.ts` are back to about 300 lines.
+- **E (open).** The real claude message shapes are unverified. The user's UAT will include one real foreground and one real
+  background subagent run.

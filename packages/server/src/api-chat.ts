@@ -91,6 +91,9 @@ export function createChatApi({ chats, roles, allowed, agents, allow, project }:
       case "chat.stop":
         await chats.stop(chat(params));
         return null;
+      case "chat.archive":
+        chats.archive(chat(params));
+        return null;
       case "chat.approve": {
         const p = chatApproveParams(params);
         if (!p) throw new ApiError("Expected { id, tool, choice, reason? }.");
