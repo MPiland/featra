@@ -72,16 +72,16 @@ test("Send a story back from its session, then Accept it: the reason reaches the
     await sendBack(session).click();
     const form = session.getByRole("form", { name: `Send back ${id}` });
     await expect(form.getByRole("button", { name: "Send" })).toBeDisabled();
-    await form.getByRole("textbox", { name: "Reason" }).fill("It loses the draft.");
+    await form.getByRole("textbox", { name: "Reason" }).fill("It loses my work.");
     await form.getByRole("checkbox", { name: "Add as acceptance criterion" }).check();
     await form.getByRole("button", { name: "Send" }).click();
     const log = page.getByRole("log", { name: "Chat" });
-    await expect(log).toContainText(`Sent back ${id}: It loses the draft.`);
-    await expect(log).toContainText(`You said: Sent back ${id}: It loses the draft.`);
+    await expect(log).toContainText(`Sent back ${id}: It loses my work.`);
+    await expect(log).toContainText(`You said: Sent back ${id}: It loses my work.`);
     await expect(accept(session)).toHaveCount(0);
     await expect.poll(card).toMatch(/field: sent-back/);
     expect(card()).toMatch(/status: In Progress/);
-    expect(card()).toContain("It loses the draft.");
+    expect(card()).toContain("It loses my work.");
 
     // The story comes back to Acceptance. AC2: Accept records Accepted by the user, with no confirmation.
     await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Work" }).click();
@@ -99,7 +99,7 @@ test("Send a story back from its session, then Accept it: the reason reaches the
     await expect(sendBack(pane(page, id))).toHaveCount(0);
     await row.getByRole("button", { name: `Open the session of ${id}` }).click();
     await expect(session).toBeVisible();
-    await expect(log).toContainText(`Sent back ${id}: It loses the draft.`);
+    await expect(log).toContainText(`Sent back ${id}: It loses my work.`);
     await expect(sendBack(session)).toHaveCount(0);
     await app.close();
   } finally {
