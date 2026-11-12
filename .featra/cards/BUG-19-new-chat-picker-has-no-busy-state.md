@@ -2,7 +2,7 @@
 id: BUG-19
 type: bug
 title: New chat picker has no busy state and can start two chats
-status: In Review
+status: Acceptance
 parent: FEAT-5
 order: 10
 origin: bug
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-19
+  - at: 2026-11-12T00:12:11Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

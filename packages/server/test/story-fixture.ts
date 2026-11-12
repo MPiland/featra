@@ -66,6 +66,8 @@ export interface WorldOptions {
   drafted?: boolean;
   /** How long Stop waits for the provider to end an interrupted turn. */
   interruptMs?: number;
+  /** The window watches the project's work, as the app does: card writes then reuse the watch's git answers (ADR 0016). */
+  watched?: boolean;
 }
 
 export async function storyWorld({
@@ -74,6 +76,7 @@ export async function storyWorld({
   linked = false,
   drafted = false,
   interruptMs,
+  watched = false,
 }: WorldOptions = {}) {
   const allowed = createAllowedProjects();
   const services = createServices({
@@ -124,6 +127,7 @@ export async function storyWorld({
   const window = await open();
   const started = await window.ask("feature.start", { dir, id: "FEAT-2" });
   if (started.ok !== true) throw new Error(`Feature didn't start: ${String(started.error)}`);
+  if (watched) await window.ask("work.watch", { dir });
   if (config) {
     await writeFile(join(dir, ".featra", "config.yaml"), `version: 1\n${config}`);
   }

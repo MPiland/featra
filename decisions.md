@@ -1439,6 +1439,33 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - Install from git, URLs and marketplace lists, and later a curated registry too.
 - Designed now, built after M1. Provider plugins stay as planned.
 
+## 2026-11-11 — BUG-18: card-write and Stop tests that fail under load (developer)
+
+- The ordering test "both land, whatever order they arrive in" is timing: card writes share one lane and every run
+  passed its assertions. The test world never watched the project, so each write did two unwatched git scans (about
+  0.65 s a write, 6.6 s in all). The world now watches, as the app does: 0.9 s, and no longer needs a longer limit
+  (24 of 24 parallel copies failed at 30 s before, passed in under 5 s after).
+- The Stop test "does not hold the card lane" no longer waits on real time: it takes the interrupt's bound timer over
+  and fires it when it says. No assertion changed.
+
+## 2026-11-11 — BUG-17: Draft chat's Message box missing (developer)
+
+- A one-off on the first e2e test of a cold Windows run (14.1 s against 5–6 s): the New chat picker was still open, so
+  the app behind it was inert and had no Message box. The cause is slowness, not a product bug; the trace was lost, so it
+  is not proven. `draftInNewChat` now waits for the picker to close, with its own 20 s limit, before the composer check.
+  No assertion changed.
+
+## 2026-11-11 — BUG-17 and BUG-18 review rulings (dev-lead)
+
+- BUG-18: the ordering test's cost was re-measured with no other load (0.65 s a write); the root cause is the unwatched
+  world, and the world now watches. A load time-out can't be a deterministic test, so the 24-copy repro and the 20 ms
+  Stop repro stand in for one.
+- Roadmap: reuse git state for lane writes on unwatched folders; the ordering case's dependency on "who is calling".
+- Product: the New chat picker shows no busy state while `chat.start` runs and its role button can be double-clicked into
+  two chats. Taken as BUG-19 after these two.
+- BUG-17 has no regression test: the failure needs a cold runner where `chat.start` takes over 5 s; the helper is test
+  code and the product path is unchanged. A shared `startChat(page, role)` e2e helper goes on the roadmap, not done here.
+
 ## 2026-11-11 — BUG-19: New chat picker busy state (developer)
 
 - While `chat.start` runs, the picker disables the role buttons and says "Starting…", so a double click makes one chat.
