@@ -225,7 +225,7 @@ export function fakeCardServer(
       const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
       const why = acceptanceRefusal(card, id, DEFAULT_CONFIG);
       if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      changed(dir, sentBackStory(card, reason, addCriterion, "user", EDIT_AT));
+      changed(dir, sentBackStory(card, DEFAULT_CONFIG, reason, addCriterion, "user", EDIT_AT));
       return { ok: true, recorded: true };
     },
     reject: async (dir, id) => {

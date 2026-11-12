@@ -43,6 +43,16 @@
   margin-left: 0;
 }
 
+/* Send back's form, opened below its story's row and across it. */
+.prow-below:empty {
+  display: none;
+}
+
+.prow-below {
+  grid-column: 1 / -1;
+  padding: 4px 16px 12px 40px;
+}
+
 .send-back-criterion {
   font-size: 12px;
 }

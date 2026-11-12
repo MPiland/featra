@@ -82,6 +82,8 @@ test("Send a story back from its session, then Accept it: the reason reaches the
     await expect.poll(card).toMatch(/field: sent-back/);
     expect(card()).toMatch(/status: In Progress/);
     expect(card()).toContain("It loses my work.");
+    // The reason is now a new, unchecked acceptance criterion.
+    expect(card()).toContain("- [ ] It loses my work.");
 
     // The story comes back to Acceptance. AC2: Accept records Accepted by the user, with no confirmation.
     await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Work" }).click();

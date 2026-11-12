@@ -7,7 +7,7 @@ import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { evidenceState, recordEvidence, SEND_BACK_MAX, setStatus, type Card } from "@featra/work-format";
 import { PROJECT, renderApp } from "../harness.tsx";
-import { cardOf } from "../work-fixtures.ts";
+import { cardOf, workList, type CardSpec } from "../work-fixtures.ts";
 
 afterEach(cleanup);
 
@@ -22,6 +22,8 @@ type App = ReturnType<typeof renderApp>;
 
 const rowOf = () => screen.getByRole("row", { name: /Spawn five/ });
 const story = (app: App) => app.cardsIn(PROJECT.dir).find((c) => c.id === "STORY-5") as Card;
+/** Where Send back's form opens for the row: just below it, not in its name cell. */
+const belowRow = () => rowOf().nextElementSibling as HTMLElement;
 const accept = (scope: HTMLElement) => within(scope).queryByRole("button", { name: "Accept STORY-5" });
 const sendBack = (scope: HTMLElement) => within(scope).queryByRole("button", { name: "Send back STORY-5" });
 
@@ -137,11 +139,13 @@ describe("AC3: Send back", () => {
 
   it("adds the reason as a new acceptance criterion when asked", async () => {
     const app = await waiting();
-    const row = rowOf();
-    await app.user.click(within(row).getByRole("button", { name: "Send back STORY-5" }));
-    await app.user.type(within(row).getByRole("textbox", { name: "Reason" }), "It loses the draft.");
-    await app.user.click(within(row).getByRole("checkbox", { name: "Add as acceptance criterion" }));
-    await app.user.click(within(row).getByRole("button", { name: "Send" }));
+    await app.user.click(within(rowOf()).getByRole("button", { name: "Send back STORY-5" }));
+    // The form opens below the row, across its width, and not in the row's name cell.
+    expect(within(rowOf()).queryByRole("form")).toBeNull();
+    const form = within(belowRow()).getByRole("form", { name: "Send back STORY-5" });
+    await app.user.type(within(form).getByRole("textbox", { name: "Reason" }), "It loses the draft.");
+    await app.user.click(within(form).getByRole("checkbox", { name: "Add as acceptance criterion" }));
+    await app.user.click(within(form).getByRole("button", { name: "Send" }));
     await waitFor(() => expect(app.calls).toContain(`sendBackStory:${PROJECT.dir}:STORY-5:It loses the draft.:true`));
     expect(story(app).acs.at(-1)).toEqual({ text: "It loses the draft.", done: false, test: null });
   });
@@ -161,9 +165,8 @@ describe("AC3: Send back", () => {
 
   it("takes a reason up to the limit and no more", async () => {
     const app = await waiting();
-    const row = rowOf();
-    await app.user.click(within(row).getByRole("button", { name: "Send back STORY-5" }));
-    const field = within(row).getByRole("textbox", { name: "Reason" }) as HTMLTextAreaElement;
+    await app.user.click(within(rowOf()).getByRole("button", { name: "Send back STORY-5" }));
+    const field = within(belowRow()).getByRole<HTMLTextAreaElement>("textbox", { name: "Reason" });
     expect(field.maxLength).toBe(SEND_BACK_MAX);
   });
 });
@@ -185,5 +188,31 @@ describe("AC4: after Accept", () => {
     expect(within(session).getByText("Ready for you.")).toBeTruthy();
     expect(sendBack(session)).toBeNull();
     expect(accept(session)).toBeNull();
+  });
+});
+
+describe("AC1: a story whose owner has no editable copy", () => {
+  const plan: CardSpec[] = [
+    { id: "FEAT-2", type: "feature", status: "active", title: "Delegation" },
+    { id: "STORY-5", type: "story", parent: "FEAT-2", status: "Acceptance", title: "Spawn five" },
+  ];
+  const show = async (canEdit: () => boolean) => {
+    const app = renderApp({ work: { [PROJECT.dir]: workList(plan, [], [], [], canEdit) } });
+    await screen.findByRole("region", { name: "Work list" });
+    await app.user.click(screen.getByRole("button", { name: "Delegation" }));
+    return rowOf();
+  };
+
+  it("shows neither in its Work row, as its card pane shows neither", async () => {
+    const row = await show(() => false);
+    expect(within(row).getByText("Acceptance")).toBeTruthy();
+    expect(accept(row)).toBeNull();
+    expect(sendBack(row)).toBeNull();
+  });
+
+  it("shows both in its Work row when it can be edited", async () => {
+    const row = await show(() => true);
+    expect(accept(row)).toBeTruthy();
+    expect(sendBack(row)).toBeTruthy();
   });
 });

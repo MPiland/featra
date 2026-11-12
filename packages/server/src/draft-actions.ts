@@ -1,16 +1,14 @@
 /**
  * What the user does to a draft from outside the pane's text fields (STORY-50). Send back tells the drafting chat why
  * the draft isn't right, then records that in the feature's history: one server method, so the client never writes
- * history itself. The message goes first, through the chat manager exactly as a typed message does (a busy or failed
- * chat refuses it), and history is written only once the chat has accepted it. Only the send and the history write
- * run in the card lane, so the agent's next revision queues behind them. The message is never sent twice: if the
- * history write fails (tried twice) the send-back still succeeds, saying it wasn't recorded.
+ * history itself. The message-then-record order, the lane and the retry are send-then-record.ts's.
  */
 import {
   needsReview,
   draftedBy,
   recordSentBack,
   SEND_BACK_MAX,
+  SEND_BACK_REFUSALS,
   sendBackMessage,
   serializeCard,
   toIso,
@@ -19,16 +17,16 @@ import { ApiError } from "./api-error.ts";
 import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import type { ChatManager } from "./chat-manager.ts";
+import { sendThenRecord, type SendBackResult } from "./send-then-record.ts";
 import type { Scan } from "./work-scan.ts";
 
 export const SEND_BACK_MESSAGES = {
-  noReason: "Say why you're sending it back.",
-  tooLong: `Keep it under ${SEND_BACK_MAX.toLocaleString("en-US")} characters.`,
-  gone: "That card is gone.",
+  ...SEND_BACK_REFUSALS,
   notDraft: (id: string) => `${id} isn't a draft.`,
   noChat: "The chat that drafted it is gone.",
-  readOnly: "Can't edit it here.",
 } as const;
+
+export type { SendBackResult };
 
 export interface DraftActionDeps {
   scan: (dir: string) => Promise<Scan | null>;
@@ -38,11 +36,6 @@ export interface DraftActionDeps {
   chats: Pick<ChatManager, "dirOf" | "open" | "send">;
   /** How a card reaches disk. Default: atomically. */
   write?: (file: string, text: string) => Promise<void>;
-}
-
-/** What a send-back answers: `recorded` is false when the chat has the message but the history write failed. */
-export interface SendBackResult {
-  recorded: boolean;
 }
 
 export function createDraftActions({
@@ -74,23 +67,13 @@ export function createDraftActions({
     return true;
   }
 
-  async function run(dir: string, id: string, reason: string): Promise<SendBackResult> {
-    // Opening a chat can be slow; it doesn't hold the lane.
-    await chats.open(await draftChat(dir, id));
-    return lane.exclusive(async () => {
-      chats.send(await draftChat(dir, id), sendBackMessage(id, reason));
-      // The chat has the message; only now does the history say so, onto the card as it is after the send. A failed
-      // write is tried once more, and never resends: the message is already there.
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          return { recorded: await record(dir, id, reason) };
-        } catch {
-          // Try once more, then report it as not recorded.
-        }
-      }
-      return { recorded: false };
+  const run = (dir: string, id: string, reason: string): Promise<SendBackResult> =>
+    sendThenRecord({
+      lane,
+      open: async () => chats.open(await draftChat(dir, id)),
+      send: async () => chats.send(await draftChat(dir, id), sendBackMessage(id, reason)),
+      record: () => record(dir, id, reason),
     });
-  }
 
   return {
     /** Sends `reason` to the chat that drafted feature `id`, then records the send-back in its history. */

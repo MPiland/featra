@@ -165,7 +165,7 @@ describe("Send back (AC3)", () => {
   const reason = "  It loses the draft\nwhen I close the pane.  ";
 
   it("returns the story to In Progress and logs the reason as written, by the user", () => {
-    const next = sentBackStory(waiting(), reason, false, "user", at(5));
+    const next = sentBackStory(waiting(), config, reason, false, "user", at(5));
     expect(next.status).toBe("In Progress");
     const events = next.history.slice(-2);
     expect(events[0]).toEqual({
@@ -181,7 +181,7 @@ describe("Send back (AC3)", () => {
 
   it("adds the reason as a new, unchecked acceptance criterion on one line, with a content event, when asked", () => {
     const base = { ...waiting(), acs: [{ text: "It opens", done: true, test: "a > b" }] };
-    const next = sentBackStory(base, reason, true, "user", at(5));
+    const next = sentBackStory(base, config, reason, true, "user", at(5));
     expect(next.acs).toEqual([
       { text: "It opens", done: true, test: "a > b" },
       { text: "It loses the draft when I close the pane.", done: false, test: null },
@@ -199,14 +199,14 @@ describe("Send back (AC3)", () => {
   it("clears a Stopped mark, since the user is directing the session again", () => {
     const stopped = stoppedStory(waiting(), "user", at(4));
     expect(isStopped(stopped)).toBe(true);
-    expect(isStopped(sentBackStory(stopped, "Fix it.", false, "user", at(5)))).toBe(false);
+    expect(isStopped(sentBackStory(stopped, config, "Fix it.", false, "user", at(5)))).toBe(false);
   });
 
   it("leaves the history before it untouched", () => {
     const before = waiting();
-    expect(sentBackStory(before, "Fix it.", true, "user", at(5)).history.slice(0, before.history.length)).toEqual(
-      before.history,
-    );
+    expect(
+      sentBackStory(before, config, "Fix it.", true, "user", at(5)).history.slice(0, before.history.length),
+    ).toEqual(before.history);
   });
 
   it("reads a criterion as one line", () => {
@@ -226,5 +226,52 @@ describe("Send back (AC3)", () => {
     });
     expect(storySendBackParams({ dir: "d", id: "STORY-1", reason: "x", addCriterion: true })?.addCriterion).toBe(true);
     expect(storySendBackParams({ dir: "d", id: "STORY-1" })).toBeNull();
+  });
+});
+
+const signOff = () => moves(story("STORY-1", "FEAT-1"), [1, "Building"], [2, "Sign-off"]);
+
+describe("a project that names its stages differently (the stage is found by position and category)", () => {
+  const renamed: ProjectConfig = {
+    ...config,
+    stages: [
+      { name: "Todo", category: "not-started" },
+      { name: "Building", category: "active" },
+      { name: "Checking", category: "active" },
+      { name: "Sign-off", category: "active" },
+      { name: "Shipped", category: "done" },
+    ],
+  };
+
+  it("waits in the last stage before the first done one, whatever it is called", () => {
+    expect(awaitingAcceptance(signOff(), renamed)).toBe(true);
+    expect(awaitingAcceptance(moves(story("STORY-1", "FEAT-1"), [1, "Checking"]), renamed)).toBe(false);
+    // A stage that happens to be called Acceptance is not the acceptance stage here.
+    expect(awaitingAcceptance(moves(story("STORY-1", "FEAT-1"), [1, "Acceptance"]), renamed)).toBe(false);
+  });
+
+  it("settles an accepted, verified story to the done stage", () => {
+    const next = acceptedStory(verified(signOff()), renamed, "user", at(5));
+    expect(next.status).toBe("Shipped");
+  });
+
+  it("sends a story back to the first active stage", () => {
+    const next = sentBackStory(signOff(), renamed, "Fix it.", false, "user", at(5));
+    expect(next.status).toBe("Building");
+    expect(next.history.at(-1)).toMatchObject({ field: "status", from: "Sign-off", to: "Building" });
+  });
+});
+
+describe("the Work row follows the card pane on read-only copies (AC1)", () => {
+  it("offers Accept and Send back only where the owner's copy can be edited", () => {
+    const card = waiting();
+    const owned = [{ card, owner: MAIN, shownFrom: MAIN, path: `${card.id}.md` }];
+    const rows = (canEdit?: () => boolean) =>
+      buildWorkList({ cards: owned, stale: [], problems: [] }, config, canEdit).epics.flatMap((e) =>
+        e.features.flatMap((f) => f.stories.map((s) => s.awaiting)),
+      );
+    expect(rows()).toEqual([true]);
+    expect(rows(() => true)).toEqual([true]);
+    expect(rows(() => false)).toEqual([false]);
   });
 });

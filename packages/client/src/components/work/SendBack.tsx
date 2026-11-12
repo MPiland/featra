@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import { SEND_BACK_MAX } from "@featra/work-format";
 import { CARD_COPY, type SendBackResult } from "../../card-pane.ts";
 
@@ -9,6 +10,8 @@ export interface SendBackProps {
   criterion?: boolean;
   /** Names the button and the form for assistive tech, where more than one card's Send back is on screen. */
   name?: string;
+  /** Where the form opens when it should not open beside its button (below a Work row); the button stays put. */
+  into?: HTMLElement | null;
   /** Why Send back can't be used now (its chat is gone), or null. The button is disabled and says so. */
   unavailable: string | null;
 }
@@ -22,7 +25,7 @@ const count = (n: number) => `${n.toLocaleString("en-US")} / ${SEND_BACK_MAX.toL
  * is empty or only spaces, or past the limit. A refusal is shown with the reason kept and focus back in the field, so it
  * can be sent again; if the chat has the message but history couldn't record it, the form closes and says so.
  */
-export function SendBack({ onSend, unavailable, criterion = false, name }: SendBackProps) {
+export function SendBack({ onSend, unavailable, criterion = false, name, into = null }: SendBackProps) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [addCriterion, setAddCriterion] = useState(false);
@@ -116,7 +119,7 @@ export function SendBack({ onSend, unavailable, criterion = false, name }: SendB
         )}
       </div>
     );
-  return (
+  const asking = (
     <form ref={form} className="send-back" aria-label={name ?? CARD_COPY.sendBackForm} onSubmit={(e) => void submit(e)}>
       <label className="sh" htmlFor={`${hint}-reason`}>
         {CARD_COPY.sendBackReason}
@@ -155,4 +158,5 @@ export function SendBack({ onSend, unavailable, criterion = false, name }: SendB
       </div>
     </form>
   );
+  return into ? createPortal(asking, into) : asking;
 }

@@ -7,7 +7,16 @@ import { useAction } from "./useAction.ts";
  * its Work row, from the same state. Both are the user's own action; Accept has no confirmation. A refusal shows in one
  * sentence next to the button, which stays. Send back asks for a reason, and offers it as a new acceptance criterion.
  */
-export function AcceptStory({ id, actions }: { id: string; actions: AcceptActions }) {
+export function AcceptStory({
+  id,
+  actions,
+  into,
+}: {
+  id: string;
+  actions: AcceptActions;
+  /** Where Send back's form opens, when not beside the buttons (below the story's Work row). */
+  into?: HTMLElement | null;
+}) {
   const { busy, error, run } = useAction();
   return (
     <span className="accept-story">
@@ -27,6 +36,7 @@ export function AcceptStory({ id, actions }: { id: string; actions: AcceptAction
       )}
       <SendBack
         criterion
+        into={into}
         name={CARD_COPY.sendBackOf(id)}
         unavailable={null}
         onSend={(reason, addCriterion) => actions.sendBack(id, reason, addCriterion)}

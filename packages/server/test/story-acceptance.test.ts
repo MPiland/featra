@@ -2,7 +2,7 @@
  * STORY-23: Accept and Send back on a story in Acceptance. Real repository, scanner, card lane and work-format rules;
  * only the chat manager (a platform) and the clock are fakes, and the fake keeps the real manager's refusals.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ACCEPT_MESSAGES,
   CHAT_MESSAGES,
@@ -26,6 +26,8 @@ let sent: { chat: string; text: string }[];
 let opened: string[];
 let session: string | null;
 let refuse: Error | null;
+/** What opening the session waits for; resolved unless a test holds it. */
+let opening: Promise<void>;
 const clock = new Date("2026-11-12T09:30:00Z");
 
 const read = async (id = "STORY-1"): Promise<Card> => parseCard(await repo.read(repo.main, id));
@@ -37,6 +39,7 @@ beforeEach(async () => {
   opened = [];
   session = "chat-1";
   refuse = null;
+  opening = Promise.resolve();
   diskWrite = writeAtomic;
   scanner = createScanner(createRepoGit());
   repo = await cardRepo();
@@ -49,7 +52,10 @@ beforeEach(async () => {
     write: (file, text) => diskWrite(file, text),
     chats: {
       storySession: () => session,
-      open: async (id) => void opened.push(id),
+      open: async (id) => {
+        opened.push(id);
+        await opening;
+      },
       send: (chat, text) => {
         if (refuse) throw refuse;
         sent.push({ chat, text });
@@ -61,6 +67,12 @@ afterEach(async () => {
   await scanner.close();
   await repo.dispose();
 });
+
+/** Each story row's `awaiting`, from a fresh scan. */
+const awaiting = async () =>
+  (await scanner.scan(repo.main))?.list.epics
+    .flatMap((e) => e.features.flatMap((f) => f.stories))
+    .map((s) => s.awaiting);
 
 const verify = async () =>
   repo.write(repo.main, recordEvidence(await read(), "verified", "system", "2026-11-12T08:00:00Z"));
@@ -216,5 +228,73 @@ describe("AC4: after Accept", () => {
     expect(await onDisk()).toBe(accepted);
     const list = (await scanner.scan(repo.main))?.list;
     expect(list?.epics.flatMap((e) => e.features.flatMap((f) => f.stories)).map((s) => s.awaiting)).toEqual([false]);
+  });
+});
+
+describe("a story owned by a worktree", () => {
+  let tree: string;
+  beforeEach(() => {
+    repo.git(repo.main, "branch", "feature/1");
+    tree = repo.worktree("story-1", "story-1", "feature/1");
+  });
+
+  it("writes Accept to the worktree's copy and leaves main's alone", async () => {
+    const main = await onDisk();
+    await acceptance.accept(repo.main, "STORY-1");
+    expect(parseCard(await repo.read(tree, "STORY-1")).history.at(-1)).toMatchObject({ field: "accepted", by: "user" });
+    expect(await onDisk()).toBe(main);
+  });
+
+  it("writes Send back to the worktree's copy and leaves main's alone", async () => {
+    const main = await onDisk();
+    await acceptance.sendBack(repo.main, "STORY-1", "Fix it.", true);
+    const saved = parseCard(await repo.read(tree, "STORY-1"));
+    expect(saved.status).toBe("In Progress");
+    expect(saved.acs.at(-1)).toMatchObject({ text: "Fix it.", done: false });
+    expect(await onDisk()).toBe(main);
+  });
+});
+
+describe("two actions at once on one story", () => {
+  it("refuses a Send back whose session was still opening when Accept landed: nothing sent", async () => {
+    let release: (() => void) | undefined;
+    opening = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const sending = acceptance.sendBack(repo.main, "STORY-1", "Fix it.", false);
+    await vi.waitFor(() => expect(opened).toEqual(["chat-1"]));
+    await acceptance.accept(repo.main, "STORY-1");
+    release?.();
+    await expect(sending).rejects.toThrow(ACCEPT_MESSAGES.accepted("STORY-1"));
+    expect(sent).toEqual([]);
+    expect((await read()).status).toBe("Acceptance");
+  });
+
+  it("lets one of two Accepts succeed and refuses the other, with one Accepted event", async () => {
+    const results = await Promise.allSettled([
+      acceptance.accept(repo.main, "STORY-1"),
+      acceptance.accept(repo.main, "STORY-1"),
+    ]);
+    expect(results.map((r) => r.status).toSorted()).toEqual(["fulfilled", "rejected"]);
+    const refusal = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+    expect(String(refusal.reason)).toContain(ACCEPT_MESSAGES.accepted("STORY-1"));
+    expect((await read()).history.filter((e) => e.field === "accepted")).toHaveLength(1);
+  });
+});
+
+describe("the Work row follows the card pane on a copy that can't be edited (AC1)", () => {
+  it("offers Accept and Send back when the owner's copy is checked out", async () => {
+    expect(await awaiting()).toEqual([true]);
+  });
+
+  it("offers neither when the story's owner is a feature branch with no working tree", async () => {
+    // A feature branch with work of its own is started, not merged.
+    repo.git(repo.main, "branch", "feature/1");
+    await repo.commitOn(
+      "feature/1",
+      (t) => repo.write(t, card("FEAT-1", "feature", null, "active", { notes: "started" })),
+      "start",
+    );
+    expect(await awaiting()).toEqual([false]);
   });
 });

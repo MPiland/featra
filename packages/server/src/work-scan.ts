@@ -2,7 +2,14 @@
  * One pass over a repository: collect every copy, resolve owners, build the Work list, and record the owners in the
  * index. Indexes stay open per repository (by git common dir) until the scanner closes.
  */
-import { buildWorkList, EMPTY_WORK_LIST, resolveCopies, type Resolution, type WorkList } from "@featra/work-format";
+import {
+  buildWorkList,
+  EMPTY_WORK_LIST,
+  readOnlyReason,
+  resolveCopies,
+  type Resolution,
+  type WorkList,
+} from "@featra/work-format";
 import { indexFile, openCardIndex, type CardIndex } from "./card-index.ts";
 import { collect, locationKey, type Collected, type GitState } from "./collect.ts";
 import type { RepoGit } from "./repo-git.ts";
@@ -38,7 +45,12 @@ export function createScanner(git: RepoGit): Scanner {
     const collected = await collect(dir, { git, index: indexOf }, reuse);
     if (!collected) return null;
     const resolution = resolveCopies(collected.copies, collected.state);
-    const list = buildWorkList(resolution, collected.config);
+    const { config } = collected;
+    const list = buildWorkList(
+      resolution,
+      config,
+      (owned) => readOnlyReason(owned, collected.roots.has(locationKey(owned.owner)), config.baseBranch) === null,
+    );
     list.problems.unshift(...collected.problems);
     indexOf(collected.paths).setOwners(
       resolution.cards.map((c) => ({
