@@ -1597,3 +1597,13 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - **The server watches every allowed project's worktrees** for HEAD changes, permanently: a few more file watchers.
 - **`writeProjectValue` in the desktop settings store now delegates to the server's `config-writer`**, so the Checks section and the Workflow page share one writer.
 - **A failing linked test shows as "Test failed" on its criterion**, a new proof state beside passed, linked and none.
+
+## 2026-11-12 — STORY-56 review rulings (dev-lead)
+
+- Proven never comes from an exit code: linked tests write a JUnit report through `{report}`, and a criterion is Proven
+  only when the report has a passed test whose full name equals the linked name. The JUnit parser lives in work-format for
+  STORY-57 to reuse.
+- Refs no template covers (end-to-end folders) get "No command runs this test" and are never counted as failed.
+- A check command changed through git does not run until the user confirms it.
+- Other build choices confirmed, with the unknown-visibility copy "Couldn't tell if it's public on GitHub, so checks run
+  on this computer."
