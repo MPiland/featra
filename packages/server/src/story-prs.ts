@@ -135,7 +135,10 @@ export function createStoryPrs(deps: StoryPrsDeps) {
     if (!card.pr || !card.branch || !remote) return;
     const pr = await readPrAt(dir, card.pr, deps);
     const ci = checksWhere(scan.collected.config, await settings.github(dir)) === "ci";
-    if (ci && pr && (await headIsStale(dir, card, pr, deps))) await evidence(dir, id, UNVERIFY);
+    if (ci && pr && (await headIsStale(dir, card, pr, deps))) {
+      await evidence(dir, id, UNVERIFY);
+      await proven.headMoved(dir, card, scan.collected.config);
+    }
     const note = await pushStory(found.root, remote, baseOf(scan, card), card.branch, deps);
     if (note !== null) notes.set(keyOf(dir, id), note);
     await push(dir);

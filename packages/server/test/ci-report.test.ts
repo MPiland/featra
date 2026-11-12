@@ -104,6 +104,24 @@ describe("reading CI's test report for a commit", { timeout: 30_000 }, () => {
     expect(await downloads()).toEqual([]);
   });
 
+  it("never waits on a run that is waiting for approval or a runner, and reads only finished runs", async () => {
+    for (const status of ["waiting", "requested", "pending"] as const) {
+      await gh.change((s) => {
+        s.runs = [
+          { id: 7, headSha: HEAD, artifacts: { "test-report": { "junit.xml": junitXml([[A, "works", "passed"]]) } } },
+          { id: 8, headSha: HEAD, status },
+        ];
+      });
+      const found = await read({ artifact: "test-report" });
+      expect(found).toEqual({
+        kind: "read",
+        reports: [[{ classname: A, name: "works", status: "passed" }]],
+        note: null,
+      });
+    }
+    expect((await downloads()).map((args) => args[2])).toEqual(["7", "7", "7"]);
+  });
+
   it("says when the commit has no runs, or none uploaded the report", async () => {
     expect(await read({ artifact: "test-report" })).toEqual({ kind: "read", reports: [], note: CI_PROOF_COPY.noRuns });
     await gh.change((s) => {

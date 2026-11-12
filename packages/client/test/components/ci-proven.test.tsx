@@ -5,7 +5,7 @@
  */
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { provenEvent, recordEvidence, type Card, type CardPr } from "@featra/work-format";
+import { CI_PROOF_COPY, provenEvent, recordEvidence, type Card, type CardPr } from "@featra/work-format";
 import { PROJECT, renderApp } from "../harness.tsx";
 import { cardOf, PLAN } from "../work-fixtures.ts";
 
@@ -73,7 +73,7 @@ describe("AC2, AC3: the card shows what CI's report proved", () => {
   });
 
   it("shows why there was no report to read", async () => {
-    const note = "CI uploaded no test report for this commit matching the one set in Project settings.";
+    const note = CI_PROOF_COPY.noReport;
     const { pane } = await openStory({
       ...REPORTED,
       report: { failedAcs: [], missingAcs: [2, 3], reasons: [], note },

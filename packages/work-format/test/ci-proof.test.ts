@@ -170,6 +170,61 @@ describe("what CI's report proves of a story (AC2, AC3)", () => {
   });
 });
 
+describe("test names joined by another runner's separator", () => {
+  it("reads Playwright's '›' like vitest's '>', in the report and in the link", () => {
+    const cases = parseJUnit(`<testsuites>
+      <testcase classname="${B}" name="journey › opens"/>
+      <testcase classname="${A}" name="group &gt; works"/>
+    </testsuites>`);
+    expect(cases.map((c) => c.name)).toEqual(["journey opens", "group works"]);
+    const card = storyWith([`${B}::journey > opens`, `${A}::group › works`, `${B}::journey›opens`]);
+    expect(ciProof(card, cases).acs).toEqual([
+      { ac: 1, passed: true },
+      { ac: 2, passed: true },
+      { ac: 3, passed: false },
+    ]);
+  });
+});
+
+const ambiguous = (ac: number, file: string) => `AC ${ac}: ${CI_PROOF_COPY.ambiguous(file)}`;
+
+describe("a report path that could be more than one linked file", () => {
+  const inA = "packages/a/test/inbox.test.ts";
+  const inB = "packages/b/test/inbox.test.ts";
+
+  it("never proves two links that share the report's shorter path, when one of the files is absent", () => {
+    const card = storyWith([`${inA}::inbox > opens`, `${inB}::inbox > opens`]);
+    const { acs, proof } = ciProof(card, [test("test/inbox.test.ts", "inbox opens")]);
+    expect(acs).toEqual([
+      { ac: 1, passed: false },
+      { ac: 2, passed: false },
+    ]);
+    expect(proof.missingAcs).toEqual([1, 2]);
+    expect(proof.reasons).toEqual([ambiguous(1, inA), ambiguous(2, inB)]);
+  });
+
+  it("never proves a link that two different shorter report paths could both be", () => {
+    const card = storyWith([`${inA}::inbox > opens`]);
+    const cases = [test("a/test/inbox.test.ts", "inbox opens"), test("test/inbox.test.ts", "inbox opens")];
+    const { acs, proof } = ciProof(card, cases);
+    expect(acs).toEqual([{ ac: 1, passed: false }]);
+    expect(proof.missingAcs).toEqual([1]);
+    expect(proof.reasons).toEqual([ambiguous(1, inA)]);
+  });
+
+  it("trusts the report's full path over a shorter one that may be another package's file", () => {
+    const card = storyWith([`${inA}::inbox > opens`]);
+    const cases = [test(inA, "inbox opens"), test("test/inbox.test.ts", "inbox opens", "failed")];
+    expect(ciProof(card, cases).acs).toEqual([{ ac: 1, passed: true }]);
+  });
+
+  it("reads one file's tests from runners on different machines as one", () => {
+    const card = storyWith([`${A}::works`]);
+    const cases = [test(`/home/runner/work/app/${A}`, "works"), test(`D:/a/app/${A}`, "works", "skipped")];
+    expect(ciProof(card, cases).acs).toEqual([{ ac: 1, passed: true }]);
+  });
+});
+
 describe("the report files inside the artifact", () => {
   it("reads every .xml file when no files are set", () => {
     expect(isReportFile(null, "junit.xml")).toBe(true);
@@ -207,6 +262,15 @@ describe("the test report setting (AC1)", () => {
       expect(isReportFiles(bad)).toBe(false);
     expect(() => configOverrides("testReportArtifact: 'a b'\n")).toThrow(ConfigError);
     expect(() => configOverrides("testReportFiles: ../junit.xml\n")).toThrow(ConfigError);
+  });
+
+  it("refuses a leading '-', which gh would read as an option", () => {
+    for (const bad of ["-p", "--help", "-test-report"]) expect(isReportArtifact(bad)).toBe(false);
+    for (const bad of ["-x.xml", "--output", "-reports/*.xml"]) expect(isReportFiles(bad)).toBe(false);
+    expect(isReportArtifact("test-report-")).toBe(true);
+    expect(isReportFiles("reports/-unit.xml")).toBe(true);
+    expect(() => configOverrides("testReportArtifact: -p\n")).toThrow(ConfigError);
+    expect(parseChecksPatch({ testReportFiles: "-x.xml" })).toBeNull();
   });
 
   it("takes a change from Project settings, where null clears it", () => {

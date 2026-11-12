@@ -1708,3 +1708,16 @@ ADR 0033 (proposed) records the design. Choices to confirm:
   (keeping `default`, plus `github-actions` on GitHub, so the log is unchanged). A new step uploads `test-report/` as
   `test-report-unit` on success or failure. Nothing else in the gate changed. This repo's config does not set
   `testReportArtifact` yet; turning it on for Featra itself is the Dev Lead's call.
+
+## 2026-11-12 — STORY-57 review fixes
+
+- A shorter (package-relative) classname proves a link only when nothing else could be meant; otherwise the test is
+  missing, as ambiguous. Reports are merged per resolved file, so one file under two runners' paths is one.
+- Proven goes as soon as the PR's head moves or the branch is past it, like Verified; the new head's report proves again.
+- Only queued or in-progress runs hold the read back; only completed runs are downloaded.
+- Playwright's `›` reads like `>` in links and reports.
+- The artifact and files settings refuse a leading `-`.
+- No-report note: "CI uploaded no test report matching Project settings."
+- Featra's own config sets `testReportArtifact: test-report-unit`.
+- vitest's junit `classnameTemplate` exists, but `{filepath}` writes the absolute path; the default classname is already
+  the path from the repository's root, so `vitest.config.ts` keeps it.

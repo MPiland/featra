@@ -32,10 +32,13 @@ const attr = (attrs: string, name: string) => {
 /** A tag, with quoted attribute values that may hold `>`. */
 const TAG = /<(\/?)(testcase|failure|error|skipped)\b((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/g;
 
-/** The names a runner prints as `describe > test` read as the words joined by single spaces. */
+/**
+ * The names a runner prints as `describe > test` (vitest) or `describe › test` (Playwright) read as the words joined by
+ * single spaces, so a link and a report name match whichever runner wrote them.
+ */
 export const fullName = (name: string) =>
   name
-    .split(/\s+>\s+/)
+    .split(/\s+[>›]\s+/)
     .join(" ")
     .trim();
 

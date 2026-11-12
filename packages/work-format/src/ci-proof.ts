@@ -13,9 +13,10 @@ import type { Card } from "./types.ts";
 
 export const CI_PROOF_COPY = {
   noRuns: "No CI runs for this commit, so there is no test report.",
-  noReport: "CI uploaded no test report for this commit matching the one set in Project settings.",
+  noReport: "CI uploaded no test report matching Project settings.",
   tooLarge: "Part of the test report was too large to read. Tests in that part count as missing.",
   noFile: (file: string) => `No test from ${file} ran.`,
+  ambiguous: (file: string) => `The report can't tell ${file} from another file.`,
 } as const;
 
 /** A path with `/` separators and no leading `./`. */
@@ -35,7 +36,7 @@ export function sameFile(classname: string, file: string): boolean {
 const RANK: Record<CaseStatus, number> = { skipped: 0, passed: 1, failed: 2 };
 
 /**
- * Several reports read as one. The same test (file and full name) in more than one keeps its worst result: a failure
+ * Several reports read as one, after each test's path is resolved to the linked file it is. The same test (file and full name) in more than one keeps its worst result: a failure
  * anywhere fails it, and a test skipped in one report but passed in another passed.
  */
 export function mergeReports(reports: readonly (readonly JUnitCase[])[]): JUnitCase[] {
@@ -48,9 +49,37 @@ export function mergeReports(reports: readonly (readonly JUnitCase[])[]): JUnitC
   return [...merged.values()];
 }
 
-/** What the reports say of one linked test, looked up in its own file. */
-export function ciProofOf(cases: readonly JUnitCase[], ref: TestRef): ProofResult {
-  const inFile = cases.filter((c) => sameFile(c.classname, ref.file));
+/** Whether `classname` is `file` only by being a shorter path that `file` ends with, so it may be another file. */
+const shorter = (classname: string, file: string) =>
+  norm(classname) !== norm(file) && norm(file).endsWith(`/${norm(classname)}`);
+
+/**
+ * The report's tests of the linked file `file`, read as one file whatever path each report gave it. A path that is the
+ * file, or longer, is trusted; a shorter one counts only when nothing else could be meant: no full path matched, it is
+ * the only shorter path that did, and no other file the card links ends with it. Null when it's ambiguous.
+ */
+function testsOf(cases: readonly JUnitCase[], file: string, linked: readonly string[]): JUnitCase[] | null {
+  const matched = cases.filter((c) => sameFile(c.classname, file));
+  const full = matched.filter((c) => !shorter(c.classname, file));
+  if (full.length === 0 && matched.length > 0) {
+    const paths = new Set(matched.map((c) => norm(c.classname)));
+    const [path = ""] = paths;
+    const others = linked.filter((f) => norm(f) !== norm(file));
+    if (paths.size > 1 || others.some((f) => sameFile(path, f))) return null;
+  }
+  return mergeReports([
+    (full.length > 0 ? full : matched).map(({ name, status }) => ({ classname: file, name, status })),
+  ]);
+}
+
+/** What the reports say of one linked test, looked up in its own file; `linked` is every file the card links. */
+export function ciProofOf(
+  cases: readonly JUnitCase[],
+  ref: TestRef,
+  linked: readonly string[] = [ref.file],
+): ProofResult {
+  const inFile = testsOf(cases, ref.file, linked);
+  if (inFile === null) return { proven: false, reason: CI_PROOF_COPY.ambiguous(ref.file), missing: true };
   if (ref.name === null && inFile.length === 0)
     return { proven: false, reason: CI_PROOF_COPY.noFile(ref.file), missing: true };
   return proofFromReport(inFile, ref);
@@ -70,17 +99,24 @@ export interface CiProofResult {
 export function ciProof(card: Card, cases: readonly JUnitCase[], note: string | null = null): CiProofResult {
   const acs: CiProofResult["acs"] = [];
   const proof: CiProof = { failedAcs: [], missingAcs: [], reasons: [], note };
+  const linked = card.acs.flatMap((criterion) => parseTestRefs(criterion.test).map((ref) => ref.file));
   card.acs.forEach((criterion, i) => {
     const refs = parseTestRefs(criterion.test);
     if (refs.length === 0) return;
     const ac = i + 1;
-    const not = refs.map((ref) => ciProofOf(cases, ref)).filter((p) => !p.proven);
+    const not = refs.map((ref) => ciProofOf(cases, ref, linked)).filter((p) => !p.proven);
     acs.push({ ac, passed: not.length === 0 });
     if (not.length === 0) return;
     (not.some((p) => !p.missing) ? proof.failedAcs : proof.missingAcs).push(ac);
     proof.reasons.push(`AC ${ac}: ${not.map((p) => p.reason).join(" ")}`);
   });
   return { acs, proof };
+}
+
+/** Every criterion of `card` that links a test, not proven: all CI's proof says once the PR's head has moved. */
+export function unprovenLinked(card: Card): CheckOutcome {
+  const acs = card.acs.flatMap((criterion, i) => (parseTestRefs(criterion.test).length > 0 ? [i + 1] : []));
+  return { passed: null, acs: acs.map((ac) => ({ ac, passed: false })) };
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.+^${}()|[\]\\]/g, String.raw`\$&`);

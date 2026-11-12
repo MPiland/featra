@@ -95,20 +95,24 @@ export const isRefreshMinutes = (v: unknown): v is number =>
   typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= PR_REFRESH_MAX;
 /** What a test report setting may hold, said after its key. */
 export const REPORT_RULES = {
-  artifact: "must be an artifact name of letters, digits, '.', '_', '-', '*' or '?', at most 100 characters",
-  files: "must be a relative path or glob of letters, digits, '.', '_', '-', '/', '*' or '?', at most 200 characters",
+  artifact:
+    "must be an artifact name of letters, digits, '.', '_', '-', '*' or '?', not starting with '-', at most 100 characters",
+  files:
+    "must be a relative path or glob of letters, digits, '.', '_', '-', '/', '*' or '?', not starting with '-', at most 200 characters",
 } as const;
 
 /**
  * An artifact name or pattern safe to hand to `gh run download -p` as one argument on every platform. GitHub allows
  * more in a name; a report artifact named outside this set needs renaming in the workflow.
  */
-export const isReportArtifact = (v: unknown): v is string => typeof v === "string" && /^[\w.*?-]{1,100}$/.test(v);
+export const isReportArtifact = (v: unknown): v is string =>
+  typeof v === "string" && /^[\w.*?-]{1,100}$/.test(v) && !v.startsWith("-");
 
 /** A glob for the report files inside the artifact: relative, and never out of it. */
 export const isReportFiles = (v: unknown): v is string =>
   typeof v === "string" &&
   /^[\w.*?/-]{1,200}$/.test(v) &&
+  !v.startsWith("-") &&
   !v.split("/").some((part) => part === ".." || part === "" || part === ".");
 
 const isField = (v: unknown): v is CheckField => v === "command" || v === "testCommand";

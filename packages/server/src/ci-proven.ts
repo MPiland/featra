@@ -7,7 +7,7 @@
  */
 import {
   ciProof,
-  mergeReports,
+  unprovenLinked,
   type Card,
   type CheckOutcome,
   type CiProof,
@@ -33,32 +33,52 @@ interface Head {
 export function createCiProven(deps: CiProvenDeps) {
   const heads = new Map<string, Head>();
 
+  /** Records every linked criterion of `card` not proven, and forgets its proof; true when the card showed one. */
+  async function unprove(dir: string, card: Card, known: Head | undefined): Promise<boolean> {
+    await deps.record(dir, card.id, unprovenLinked(card));
+    const shown = known?.proof != null;
+    if (known) Object.assign(known, { read: false, proof: null });
+    return shown;
+  }
+
   /**
    * Reads CI's report for `pr`'s head when its checks have finished and it wasn't read yet, and records what it
-   * proves. True when what the card shows changed.
+   * proves. A report proves only the commit it ran on, so a new head, or one the branch moved past, unproves every
+   * linked criterion at once, the way Verified goes; the new head's report proves them again. True when what the card
+   * shows changed.
    */
   async function read(dir: string, card: Card, config: ProjectConfig, pr: FoundPr): Promise<boolean> {
     const key = keyOf(dir, card.id);
     const artifact = config.testReportArtifact;
+    // A report proves only the commit it ran on. With no head (gh gave no headRefOid) there is no commit to tie a
+    // report to, so nothing is read and nothing is kept.
     if (!artifact || pr.head === null) return heads.delete(key);
-    let known = heads.get(key);
-    const moved = known?.head !== pr.head;
-    if (!known || moved) heads.set(key, (known = { head: pr.head, read: false, proof: null }));
+    const was = heads.get(key);
+    const moved = was !== undefined && was.head !== pr.head;
+    const known: Head = !was || moved ? { head: pr.head, read: false, proof: null } : was;
+    heads.set(key, known);
+    const stale = await headIsStale(dir, card, pr, deps);
+    const dropped = moved || stale ? (await unprove(dir, card, was)) || moved : false;
     // Checks running again on the same head (a re-run) mean a new report once they finish.
     if (pr.status.checks === "pending") known.read = false;
-    if (known.read || pr.status.checks === "pending" || pr.status.checks === "none") return moved;
-    if (await headIsStale(dir, card, pr, deps)) return moved;
+    if (stale || known.read || pr.status.checks === "pending" || pr.status.checks === "none") return dropped;
     const found = await readCiReports(dir, pr.head, { artifact, files: config.testReportFiles }, deps);
-    if (!found || found.kind === "running" || heads.get(key) !== known) return moved;
-    const { acs, proof } = ciProof(card, mergeReports(found.reports), found.note);
-    if (!(await deps.record(dir, card.id, { passed: null, acs }))) return moved;
+    if (!found || found.kind === "running" || heads.get(key) !== known) return dropped;
+    const { acs, proof } = ciProof(card, found.reports.flat(), found.note);
+    if (!(await deps.record(dir, card.id, { passed: null, acs }))) return dropped;
     known.read = true;
     known.proof = proof;
     return true;
   }
 
+  /** The story came back into review at a commit past its PR's head: what that head's report proved goes now. */
+  async function headMoved(dir: string, card: Card, config: ProjectConfig): Promise<void> {
+    if (config.testReportArtifact) await unprove(dir, card, heads.get(keyOf(dir, card.id)));
+  }
+
   return {
     read,
+    headMoved,
 
     /** What the card shows of story `id`'s CI report, once read for its PR's head. */
     proofOf: (dir: string, id: string): CiProof | undefined => heads.get(keyOf(dir, id))?.proof ?? undefined,

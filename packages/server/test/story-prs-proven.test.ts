@@ -218,6 +218,11 @@ describe("criteria the report didn't prove (AC3)", { timeout: 60_000 }, () => {
     const b = head();
     await w.moveOn("In Review");
     expect(w.repo.git(w.remote, "rev-parse", "featra/story-1-pr").trim()).toBe(b);
+    // Proven for A goes as soon as the head moves, before B's report is read.
+    expect(evidenceState(await w.read()).provenAcs).toEqual([]);
+    await after(2 * MINUTE);
+    expect(evidenceState(await w.read()).provenAcs).toEqual([]);
+    expect(await calls("run download")).toBe(1);
     const onlyOpens = junitXml([[FILE, "open > opens", "failed"]]);
     await ciAt(b, [checkRun("FAILURE")], [run(21, b, { "test-report-unit": { "junit.xml": onlyOpens } })]);
     await after(2 * MINUTE);
@@ -236,5 +241,24 @@ describe("criteria the report didn't prove (AC3)", { timeout: 60_000 }, () => {
       ],
       note: null,
     });
+  });
+
+  it("takes Proven away once the story's branch is past the PR's head, and the new head's report proves again", async () => {
+    const a = await inReview();
+    const passed = { "test-report-unit": { "junit.xml": report("passed", "passed") } };
+    await ciAt(a, [checkRun("SUCCESS")], [run(11, a, passed)]);
+    await after(2 * MINUTE);
+    expect(evidenceState(await w.read()).provenAcs).toEqual([1, 2]);
+    // A commit lands in the worktree and isn't pushed yet: A's report no longer proves the branch.
+    w.repo.commit(w.tree, "B");
+    const b = head();
+    await after(2 * MINUTE);
+    expect(evidenceState(await w.read()).provenAcs).toEqual([]);
+    expect(prOf()?.report).toBeUndefined();
+    // B is pushed and its checks pass with a report.
+    w.repo.git(w.tree, "push", "origin", `HEAD:featra/story-1-pr`);
+    await ciAt(b, [checkRun("SUCCESS")], [run(21, b, passed)]);
+    await after(2 * MINUTE);
+    expect(evidenceState(await w.read()).provenAcs).toEqual([1, 2]);
   });
 });

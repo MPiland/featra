@@ -51,7 +51,7 @@ export interface FakeRun {
   id: number;
   headSha: string;
   /** `completed` by default. */
-  status?: "queued" | "in_progress" | "completed";
+  status?: "queued" | "in_progress" | "waiting" | "requested" | "pending" | "completed";
   artifacts?: Record<string, Record<string, string>>;
 }
 

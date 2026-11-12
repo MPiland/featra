@@ -42,15 +42,20 @@ const MAX_REPORT_BYTES = 32 * 1024 * 1024;
 /** `gh run download` says one of these when a run has no artifact matching the pattern (older and newer `gh`). */
 const NO_ARTIFACT = /no (valid )?artifacts? (found|match)/i;
 
-/** The ids of a commit's runs, and whether all have finished; null when `gh` couldn't say. */
+/** A run that is going and will upload its artifacts. One waiting for approval or a runner may never start. */
+const GOING = new Set(["queued", "in_progress"]);
+const status = (run: Record<string, unknown>) => String(run.status).toLowerCase();
+
+/** The ids of a commit's finished runs, and whether any is still going; null when `gh` couldn't say. */
 async function runsOf(dir: string, head: string, options: GhOptions) {
   if (!/^[0-9a-f]{7,64}$/.test(head)) return null;
   const args = ["run", "list", "--commit", head, "--json", RUNS, "--limit", RUN_LIMIT];
   const answer = await ghJson(dir, args, options);
   if (!Array.isArray(answer)) return null;
   const runs = (answer as unknown[]).filter(isRecord);
-  const ids = runs.flatMap((r) => (typeof r.databaseId === "number" ? [r.databaseId] : []));
-  return { ids, finished: runs.every((r) => String(r.status).toLowerCase() === "completed") };
+  const done = runs.filter((r) => status(r) === "completed");
+  const ids = done.flatMap((r) => (typeof r.databaseId === "number" ? [r.databaseId] : []));
+  return { ids, finished: !runs.some((r) => GOING.has(status(r))) };
 }
 
 /** The report files under `folder`: `<run>/<artifact>/<path>`, matched on the path inside the artifact. */
@@ -66,7 +71,7 @@ async function reportFiles(folder: string, files: string | null): Promise<string
 }
 
 /**
- * The JUnit reports CI uploaded for `head`: `running` while any of its runs is going, null when `gh` couldn't list or
+ * The JUnit reports CI uploaded for `head`: `running` while any of its runs is queued or in progress, null when `gh` couldn't list or
  * download them (try again later). A run without the artifact adds nothing; none with it gives a note.
  */
 export async function readCiReports(
