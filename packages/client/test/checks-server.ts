@@ -14,6 +14,8 @@ export const NO_CHECKS: ChecksView = {
   github: { usable: false, missing: GITHUB_COPY.noRemote },
   openStoryPrs: true,
   prRefreshMinutes: 2,
+  testReportArtifact: null,
+  testReportFiles: null,
   error: null,
 };
 
@@ -25,6 +27,8 @@ function applied(now: ChecksView, patch: ChecksPatch): ChecksView {
     ...(patch.where === undefined ? {} : { where: patch.where ?? now.where, chosen: patch.where !== null }),
     ...(patch.command === undefined ? {} : { command: patch.command }),
     ...(patch.testCommand === undefined ? {} : { testCommand: patch.testCommand }),
+    ...(patch.testReportArtifact === undefined ? {} : { testReportArtifact: patch.testReportArtifact }),
+    ...(patch.testReportFiles === undefined ? {} : { testReportFiles: patch.testReportFiles }),
     ...(patch.openStoryPrs === undefined ? {} : { openStoryPrs: patch.openStoryPrs }),
     ...(patch.prRefreshMinutes === undefined ? {} : { prRefreshMinutes: patch.prRefreshMinutes }),
     proposals: now.proposals.filter((p) => !saved(p.field)),

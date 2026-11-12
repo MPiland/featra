@@ -28,6 +28,20 @@ export interface CardPr {
   opening: boolean;
   /** Why the last try to open it failed, else null. */
   note: string | null;
+  /** What CI's test report proved for the PR's head (STORY-57), once read; absent until then. */
+  report?: CiProof;
+}
+
+/** What the card says of the criteria CI's test report didn't prove (STORY-57). */
+export interface CiProof {
+  /** AC numbers (1-based) a linked test of which failed. */
+  failedAcs: number[];
+  /** AC numbers whose linked tests passed or are missing from the report (absent, or skipped), with none failed. */
+  missingAcs: number[];
+  /** One line for each of them: `AC n:` and why. */
+  reasons: string[];
+  /** Why there was no report to read for the commit, else null. */
+  note: string | null;
 }
 
 /** Whether Featra can use GitHub for a project: a GitHub remote and a signed-in `gh`. Local mode otherwise. */
@@ -70,13 +84,30 @@ export function normalizePrStatus(raw: unknown): PrStatus | null {
   return { state: raw.state, checks: isOneOf(PR_CHECKS, raw.checks) ? raw.checks : "none" };
 }
 
+const numbers = (v: unknown) =>
+  Array.isArray(v) ? (v as unknown[]).filter((n): n is number => typeof n === "number" && Number.isInteger(n)) : [];
+const texts = (v: unknown) =>
+  Array.isArray(v) ? (v as unknown[]).filter((t): t is string => typeof t === "string") : [];
+
+export function normalizeCiProof(raw: unknown): CiProof | undefined {
+  if (!isRecord(raw)) return undefined;
+  return {
+    failedAcs: numbers(raw.failedAcs),
+    missingAcs: numbers(raw.missingAcs),
+    reasons: texts(raw.reasons),
+    note: typeof raw.note === "string" && raw.note ? raw.note : null,
+  };
+}
+
 export function normalizeCardPr(raw: unknown): CardPr | undefined {
   if (!isRecord(raw)) return undefined;
+  const report = normalizeCiProof(raw.report);
   return {
     status: normalizePrStatus(raw.status),
     create: raw.create === true,
     opening: raw.opening === true,
     note: typeof raw.note === "string" && raw.note ? raw.note : null,
+    ...(report ? { report } : {}),
   };
 }
 

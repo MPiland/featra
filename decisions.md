@@ -1674,3 +1674,64 @@ The Dev Lead's review of 0194bbe, fixed in this story:
   difference.
 - Older `pr` values (`12`, `#12`) show as `#N` text with no link.
 - All other build choices confirmed.
+
+## 2026-11-12 — STORY-57 build choices (story agent, for the Dev Lead to confirm)
+
+ADR 0033 (proposed) records the design. Choices to confirm:
+
+- **Setting.** Two keys in `.featra/config.yaml`, edited in Project settings > Checks: `testReportArtifact` (an
+  artifact name or a `gh run download -p` pattern, so `test-report-*` merges per-OS reports) and `testReportFiles` (a
+  path or glob inside the artifact, every `.xml` when empty). Off until the artifact is set. Both are checked against a
+  safe character set; files can't use `..`, `.` or empty segments.
+- **When it reads.** Only when checks run in CI and the story is in review. Once per PR head, when the PR's checks
+  finish (passing or failing) and every workflow run of that head has completed. Checks going back to running on the
+  same head (a re-run) mean one more read once they finish. No read on the other polls, and never for a head that isn't
+  the story branch's tip. A failed `gh` call is tried again at the next poll.
+- **Fetching.** `gh run list --commit <sha> --json databaseId,status --limit 20`, then
+  `gh run download <id> -p <artifact> -D <temp>/<id>` per run, with fixed arguments through the shared `gh` runner. A run
+  without the artifact adds nothing ("no valid artifacts found" is not an error). The XML read is bounded to 32 MB in
+  total; files over the bound are skipped with a note. The temp folder is always removed.
+- **Refs to report names.** The linked file must be the report's `classname` (equal, or one path ends with the other,
+  which covers package-relative classnames), then the exact full name as for local runs. A link without a name needs
+  every test of that file to have passed. E2E refs count when the report has them. Playwright's JUnit uses `›`; such a
+  link must use the report's own name (noted in the ADR).
+- **Merge rule.** Failed anywhere fails; passed somewhere and failed nowhere passes; skipped everywhere is missing.
+- **Evidence.** `proven:<n>`/`unproven:<n>` by `system` through `recordEvidence`, only on change. Criteria without a
+  linked test are left alone. With no report for a head, every linked criterion is recorded unproven (missing), with a
+  note on the card.
+- **Head moves.** Proven given for an older head is not removed when the head moves; the new head's report decides,
+  once read. This differs from Verified, which is removed as soon as the head is stale. To confirm.
+- **Card.** A new proof state `missing` ("Not in the report", warning color) next to "Test failed". The PR section lists
+  each reason (for example `AC 2: "open saves" failed.`) and the note, under "Test report". Kept in memory with the
+  PR's state, not written to the card.
+- **Our CI.** The Gate step sets `FEATRA_JUNIT=test-report/unit.xml`; `vitest.config.ts` then adds the `junit` reporter
+  (keeping `default`, plus `github-actions` on GitHub, so the log is unchanged). A new step uploads `test-report/` as
+  `test-report-unit` on success or failure. Nothing else in the gate changed. This repo's config does not set
+  `testReportArtifact` yet; turning it on for Featra itself is the Dev Lead's call.
+
+## 2026-11-12 — STORY-57 review fixes
+
+- A shorter (package-relative) classname proves a link only when nothing else could be meant; otherwise the test is
+  missing, as ambiguous. Reports are merged per resolved file, so one file under two runners' paths is one.
+- Proven goes as soon as the PR's head moves or the branch is past it, like Verified; the new head's report proves again.
+- Only queued or in-progress runs hold the read back; only completed runs are downloaded.
+- Playwright's `›` reads like `>` in links and reports.
+- The artifact and files settings refuse a leading `-`.
+- No-report note: "CI uploaded no test report matching Project settings."
+- Featra's own config sets `testReportArtifact: test-report-unit`.
+- vitest's junit `classnameTemplate` exists, but `{filepath}` writes the absolute path; the default classname is already
+  the path from the repository's root, so `vitest.config.ts` keeps it.
+
+## 2026-11-12 — STORY-57 review rulings (dev-lead)
+
+- Proven from CI drops as soon as the PR head moves or is stale, like Verified; the new head's report proves again.
+- A report path that only matches a link by a shorter suffix counts only when it is unambiguous; otherwise the criterion
+  is missing with the reason that the report can't tell the files apart.
+- Only `queued` and `in_progress` runs hold the read back.
+- Report names and links share one normalizer, so Playwright's `›` and vitest's `>` read the same.
+- Our CI keeps vitest's default JUnit classname (the path from the repository root); `{filepath}` would be absolute and
+  machine-specific. Confirmed.
+- Approved changed expectation: `card.test.ts` "uses the default config" now expects Featra's own config to equal the
+  default plus `testReportArtifact: test-report-unit`, because this repo now proves its criteria from CI (ruling 8).
+  Still an exact match.
+- Other build choices confirmed. Download limits and re-run detection go to the roadmap.

@@ -213,7 +213,7 @@ describe("Featra's own backlog (real data)", () => {
     expect(validateCards(cards, config)).toEqual([]);
   });
 
-  it("uses the default config", () => {
-    expect(config).toEqual(DEFAULT_CONFIG);
+  it("uses the default config, reading CI's test report (STORY-57)", () => {
+    expect(config).toEqual({ ...DEFAULT_CONFIG, testReportArtifact: "test-report-unit" });
   });
 });

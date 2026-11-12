@@ -54,6 +54,7 @@ export * from "./story-stop.ts";
 export * from "./acceptance.ts";
 export * from "./checks-types.ts";
 export * from "./checks.ts";
+export * from "./ci-proof.ts";
 export * from "./check-commands.ts";
 export * from "./junit.ts";
 export * from "./prs-types.ts";

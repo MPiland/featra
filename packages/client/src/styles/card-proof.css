@@ -52,6 +52,10 @@
   color: var(--bad);
 }
 
+.proof-missing {
+  color: var(--warn);
+}
+
 .checks-status {
   display: flex;
   flex-wrap: wrap;

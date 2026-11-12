@@ -6,9 +6,12 @@ import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
 import { normalizeCardPr, type CardPr } from "./prs-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
-/** What is known about an AC's proof: its linked test passed or failed, a test is linked but hasn't run, or none is. */
-export type AcProof = "passed" | "failed" | "linked" | "none";
-const AC_PROOFS: readonly AcProof[] = ["passed", "failed", "linked", "none"];
+/**
+ * What is known about an AC's proof: its linked test passed or failed, CI's report doesn't have it (STORY-57), a test
+ * is linked but hasn't run, or none is.
+ */
+export type AcProof = "passed" | "failed" | "missing" | "linked" | "none";
+const AC_PROOFS: readonly AcProof[] = ["passed", "failed", "missing", "linked", "none"];
 
 export interface CardViewAc {
   text: string;

@@ -43,6 +43,11 @@ export const CHECKS_PAGE_COPY = {
   testCommand: "Linked test command",
   testHint:
     "Runs a criterion's linked tests, once per file. Use {file}, {namePattern} (or {name} for one test) and {report}: the runner must write a JUnit report there, or nothing is proven. Tests under e2e aren't run.",
+  reportArtifact: "CI test report",
+  reportArtifactHint:
+    "The artifact CI uploads with a JUnit XML report, for example test-report or test-report-*. When checks run in CI, its passed tests prove their criteria. Off until set.",
+  reportFiles: "Report files",
+  reportFilesHint: "A path or glob inside the artifact. Leave empty to read every .xml file.",
   changed: "Changed in the project's config",
   confirm: "Confirm",
   proposed: (source: string) => (source === "dev-lead" ? "Proposed by the Dev Lead" : "Found in package.json"),

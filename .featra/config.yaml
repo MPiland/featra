@@ -16,3 +16,4 @@ mcp: true
 autoMerge: false      # M1b
 uat: false            # M1b
 knowledge: propose    # edit | propose | read-only
+testReportArtifact: test-report-unit   # the JUnit report CI uploads (ci.yml), read to prove criteria

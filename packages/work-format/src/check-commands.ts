@@ -4,6 +4,7 @@
  * from the project's files. Pure.
  */
 import type { CheckProposal } from "./checks-types.ts";
+import { fullName } from "./junit.ts";
 import { isRecord } from "./utils/guards.ts";
 
 /** One linked test: a test file in the project and, when the link names one, the test's full name. */
@@ -32,10 +33,7 @@ export function parseTestRefs(link: string | null): TestRef[] {
     const rest = (span.split(";")[0] ?? "").replace(/[,\s]+$/, "");
     const quoted = /^\s+"([^"]*)"/.exec(rest)?.[1];
     const named = rest.startsWith("::") ? rest.slice(2) : undefined;
-    const name = (quoted ?? named ?? "")
-      .split(/\s+>\s+/)
-      .join(" ")
-      .trim();
+    const name = fullName(quoted ?? named ?? "");
     return { file: (m[1] ?? "").replaceAll("\\", "/"), name: name || null };
   });
 }

@@ -64,3 +64,4 @@ What becomes easier or harder, and what we must now do.
 | [0030](0030-native-subagents-nested.md)                   | Native subagents are read-only chats nested under their session       | accepted |
 | [0031](0031-local-checks.md)                              | Checks run on this computer, or in CI                                 | proposed |
 | [0032](0032-story-prs-through-the-users-gh.md)            | Story PRs through the user's `gh`                                     | proposed |
+| [0033](0033-proven-from-ci-test-reports.md)               | Proven from CI's test reports                                         | proposed |

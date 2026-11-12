@@ -21,6 +21,8 @@ const VIEW: ChecksView = {
   github: { usable: false, missing: GITHUB_COPY.noRemote },
   openStoryPrs: true,
   prRefreshMinutes: 2,
+  testReportArtifact: null,
+  testReportFiles: null,
   error: null,
 };
 
@@ -105,5 +107,30 @@ describe("AC5: what the linked test command may use", () => {
     expect(help.textContent).toContain("{report}");
     expect(help.textContent).toContain("JUnit");
     expect(help.textContent).toContain("e2e");
+  });
+});
+
+describe("STORY-57 AC1: the test report CI uploads", () => {
+  it("is empty until set, and saves the artifact and the report files", async () => {
+    const { section, user, calls } = await open({ ...VIEW, proposals: [] });
+    expect(input(section, "CI test report").value).toBe("");
+    expect(within(section).getByText(/Off until set/)).toBeTruthy();
+    await user.type(input(section, "CI test report"), "test-report-*");
+    await user.type(input(section, "Report files"), "junit.xml");
+    await user.click(within(section).getByRole("button", { name: "Save" }));
+    await waitFor(() =>
+      expect(calls).toContain(
+        `checks.set:${PROJECT.dir}:{"testReportArtifact":"test-report-*","testReportFiles":"junit.xml"}`,
+      ),
+    );
+    expect(await within(section).findByText("Saved")).toBeTruthy();
+  });
+
+  it("turns it off again when the artifact is emptied", async () => {
+    const { section, user, calls } = await open({ ...VIEW, proposals: [], testReportArtifact: "test-report" });
+    expect(input(section, "CI test report").value).toBe("test-report");
+    await user.clear(input(section, "CI test report"));
+    await user.click(within(section).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(calls).toContain(`checks.set:${PROJECT.dir}:{"testReportArtifact":null}`));
   });
 });
