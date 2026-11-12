@@ -2,7 +2,7 @@
 id: STORY-55
 type: story
 title: Native subagents appear nested
-status: Acceptance
+status: Done
 parent: FEAT-5
 order: 6
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-12T01:21:08Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-12T01:21:08Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description

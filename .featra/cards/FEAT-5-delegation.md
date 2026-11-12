@@ -2,7 +2,7 @@
 id: FEAT-5
 type: feature
 title: Delegation
-status: active
+status: done
 parent: EPIC-1
 order: 7
 origin: planned
@@ -18,6 +18,16 @@ history:
     from: approved
     to: active
     by: dev-lead
+  - at: 2026-11-12T01:21:09Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-12T01:21:09Z
+    field: status
+    from: active
+    to: done
+    by: user
 ---
 
 ## Description
@@ -27,3 +37,7 @@ Approved features get their own branch, and the Dev Lead delegates each story to
 ## Depends on
 
 - FEAT-4 Shaping
+
+## Notes
+
+- 2026-11-11: accepted by the user. UAT still to run one real foreground and one real background Claude subagent (STORY-55 is proved only with fakes).
