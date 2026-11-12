@@ -1,5 +1,5 @@
 // The local server's checks side, as a fake: each project's Checks section held in memory, changed by the user's saves.
-import { CHECKS_COPY, type ChecksPatch, type ChecksView } from "@featra/work-format";
+import { CHECKS_COPY, GITHUB_COPY, type ChecksPatch, type ChecksView } from "@featra/work-format";
 import type { ChecksBridge } from "../src/checks-bridge.ts";
 
 /** A project with no GitHub and nothing set: checks run on this computer, with no commands yet. */
@@ -11,6 +11,9 @@ export const NO_CHECKS: ChecksView = {
   testCommand: null,
   proposals: [],
   unconfirmed: [],
+  github: { usable: false, missing: GITHUB_COPY.noRemote },
+  openStoryPrs: true,
+  prRefreshMinutes: 2,
   error: null,
 };
 
@@ -22,6 +25,8 @@ function applied(now: ChecksView, patch: ChecksPatch): ChecksView {
     ...(patch.where === undefined ? {} : { where: patch.where ?? now.where, chosen: patch.where !== null }),
     ...(patch.command === undefined ? {} : { command: patch.command }),
     ...(patch.testCommand === undefined ? {} : { testCommand: patch.testCommand }),
+    ...(patch.openStoryPrs === undefined ? {} : { openStoryPrs: patch.openStoryPrs }),
+    ...(patch.prRefreshMinutes === undefined ? {} : { prRefreshMinutes: patch.prRefreshMinutes }),
     proposals: now.proposals.filter((p) => !saved(p.field)),
     unconfirmed: now.unconfirmed.filter((f) => !saved(f) && !patch.confirm?.includes(f)),
   };

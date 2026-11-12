@@ -7,7 +7,7 @@ import {
   type Stage,
   type StageCategory,
 } from "./types.ts";
-import { CHECKS_WHERE } from "./checks-types.ts";
+import { CHECKS_WHERE, isRefreshMinutes, PR_REFRESH_MAX } from "./checks-types.ts";
 import { isOneOf, isRecord, toText } from "./utils/guards.ts";
 
 export const DEFAULT_STAGES: Stage[] = [
@@ -34,13 +34,15 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   checksWhere: null,
   checkCommand: null,
   linkedTestCommand: null,
+  openStoryPrs: true,
+  prRefreshMinutes: 2,
 };
 
 const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
 
 export class ConfigError extends Error {}
 
-const BOOLEAN_KEYS = ["requireAccept", "worktrees", "mcp", "autoMerge", "uat"] as const;
+const BOOLEAN_KEYS = ["requireAccept", "worktrees", "mcp", "autoMerge", "uat", "openStoryPrs"] as const;
 const COMMAND_KEYS = ["checkCommand", "linkedTestCommand"] as const;
 /** The longest check command a project can set, in characters. */
 export const COMMAND_MAX = 1000;
@@ -110,6 +112,15 @@ export function configOverrides(text: string): Partial<ProjectConfig> {
       throw new ConfigError(`maxStoryAgents must be a whole number from 1, got ${toText(value)}`);
     }
     out.maxStoryAgents = value;
+  }
+  if ("prRefreshMinutes" in raw) {
+    const value = raw.prRefreshMinutes;
+    if (!isRefreshMinutes(value)) {
+      throw new ConfigError(
+        `prRefreshMinutes must be a whole number from 1 to ${PR_REFRESH_MAX}, got ${toText(value)}`,
+      );
+    }
+    out.prRefreshMinutes = value;
   }
   if ("checksWhere" in raw) {
     if (!isOneOf(CHECKS_WHERE, raw.checksWhere)) {

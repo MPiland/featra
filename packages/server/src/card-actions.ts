@@ -14,6 +14,7 @@ import {
   toIso,
   type CardEdit,
   type CardChecks,
+  type CardPr,
   type CardEditContext,
   type CardUpdateResult,
   type CardView,
@@ -34,6 +35,8 @@ export interface CardActionDeps {
   lane?: CardLane;
   /** What the server knows of a story's checks on this computer (STORY-56), for the view. */
   checks?: (dir: string, id: string) => CardChecks | undefined;
+  /** What the server knows of a story's PR (STORY-11), for the view. */
+  prState?: (dir: string, id: string) => CardPr | undefined;
 }
 
 const contextOf = (scan: Scan): CardEditContext => ({
@@ -48,9 +51,9 @@ export function ownedIn(scan: Scan | null, id: string) {
 }
 
 /** The pane's view of card `id` in `scan`, or null when there is no such card. */
-export function cardViewIn(scan: Scan | null, id: string, checks?: CardChecks): CardView | null {
+export function cardViewIn(scan: Scan | null, id: string, checks?: CardChecks, prState?: CardPr): CardView | null {
   const found = ownedIn(scan, id);
-  return scan && found ? buildCardView(found.owned, found.root !== null, contextOf(scan), checks) : null;
+  return scan && found ? buildCardView(found.owned, found.root !== null, contextOf(scan), checks, prState) : null;
 }
 
 export interface AtomicIo {
@@ -75,11 +78,13 @@ export async function writeAtomic(file: string, text: string, { rename: move = r
 
 export const fileIn = (root: string, path: string) => join(root, ...path.split("/"));
 
-export function createCardActions({ scan: scanDir, now, lane = createCardLane(), checks }: CardActionDeps) {
+export function createCardActions({ scan: scanDir, now, lane = createCardLane(), checks, prState }: CardActionDeps) {
+  const viewOf = (scan: Scan | null, dir: string, id: string) =>
+    cardViewIn(scan, id, checks?.(dir, id), prState?.(dir, id));
   async function apply(dir: string, id: string, edit: CardEdit): Promise<CardUpdateResult> {
     const scan = await scanDir(dir);
     const found = ownedIn(scan, id);
-    const view = cardViewIn(scan, id, checks?.(dir, id));
+    const view = viewOf(scan, dir, id);
     if (!scan || !found || !view) return { ok: false, error: "That card is gone.", view: null };
     if (view.readOnly || !found.root) return { ok: false, error: view.readOnly ?? "Can't edit it here.", view };
     const result = applyCardEdit(found.owned.card, edit, contextOf(scan), "user", toIso(now()));
@@ -90,7 +95,7 @@ export function createCardActions({ scan: scanDir, now, lane = createCardLane(),
     } catch (err) {
       return { ok: false, error: `Can't save the card: ${errorMessage(err)}`, view };
     }
-    const after = cardViewIn(await scanDir(dir), id, checks?.(dir, id));
+    const after = viewOf(await scanDir(dir), dir, id);
     return after ? { ok: true, view: after } : { ok: false, error: "That card is gone.", view: null };
   }
 

@@ -6,6 +6,7 @@ import { awaitingAcceptance } from "./acceptance.ts";
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
 import type { CardChecks } from "./checks-types.ts";
+import type { CardPr } from "./prs-types.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { notStartableReason } from "./card-start.ts";
 import { evidenceState } from "./evidence.ts";
@@ -43,13 +44,15 @@ const storiesOf = (card: Card, cards: readonly Card[]) =>
 
 /**
  * The pane's view of `owned`; `checkedOut` says whether the owner's location has a working tree. `checks` is what the
- * server knows of the story's checks on this computer (STORY-56), which the card itself doesn't keep.
+ * server knows of the story's checks on this computer (STORY-56), which the card itself doesn't keep; `prState` what it
+ * knows of the story's PR (STORY-11).
  */
 export function buildCardView(
   owned: OwnedCard,
   checkedOut: boolean,
   ctx: CardEditContext,
   checks?: CardChecks,
+  prState?: CardPr,
 ): CardView {
   const { card } = owned;
   const ev = evidenceState(card);
@@ -73,6 +76,7 @@ export function buildCardView(
     owner: locationLabel(owned.owner),
     readOnly: readOnlyReason(owned, checkedOut, ctx.config.baseBranch),
     ...(checks ? { checks } : {}),
+    ...(prState ? { prState } : {}),
     ...(awaitingAcceptance(card, ctx.config) ? { awaiting: true as const } : {}),
     ...(notStartableReason(card, card.id) === null ? { startable: true as const } : {}),
     ...(draftChat === null

@@ -1607,3 +1607,70 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - A check command changed through git does not run until the user confirms it.
 - Other build choices confirmed, with the unknown-visibility copy "Couldn't tell if it's public on GitHub, so checks run
   on this computer."
+
+## 2026-11-12 — STORY-11 build choices (story agent, for the Dev Lead to confirm)
+
+- **GitHub usable** means a GitHub remote, a `gh` that runs (`gh --version`), and `gh auth status --hostname github.com`
+  exiting 0. Only its exit code is read; nothing it prints is kept. The answer is cached for 60 seconds per project.
+  Local mode says the first thing missing in one line in Project settings' new Pull requests section.
+- **The two settings live in `.featra/config.yaml`**: `openStoryPrs` (default true) and `prRefreshMinutes` (whole
+  minutes, 1 to 60, default 2). They go through the Checks bridge (`checks.load` and `checks.set`), the same writer.
+- **A PR opens only on a move into review after Featra starts.** Stories already in review at startup are left alone and
+  offered Create PR. Why: opening PRs for every old story on first launch would surprise.
+- **Base is the feature branch** (`features[parent].branch`), else the repo's base branch. The feature branch is pushed
+  only when the remote lacks it. The story branch is pushed with `-u`; nothing is ever forced, and a rejected push shows
+  git's reason on the card.
+- **An open PR from the story's branch is adopted** (`gh pr list --head --base`, in the project's own repository, not a
+  fork's), so a PR the user opened by hand isn't duplicated. A new PR is created with `gh api repos/{owner}/{repo}/pulls --method POST --input -`, its title and body as
+  JSON on stdin, so card text never reaches a command line (ADR 0031's rule). Title `STORY-n: title`; body the user
+  story, the criteria as a checklist, and "Opened by Featra for STORY-n."
+- **The PR is recorded on the owner copy by `system`**, with a `pr` history event, through the card lane.
+- **Create PR** shows when GitHub is usable, the story is in review in its worktree with no PR, and nothing is opening;
+  also after a failure, with the failure as a note. It is offered whatever the automatic setting, so a failed or skipped
+  open can be retried.
+- **The repo's required checks count** (`gh pr checks --required`, Dev Lead ruling), or every reported check when the
+  repo requires none. Failure beats pending; skipped passes; pending or none changes nothing. Passing writes Verified,
+  failing removes it, only when `checksWhere` is CI, through the same `recordEvidence` the local checks use.
+- **One poller per project.** It reads at start, then every N minutes. Window focus asks the server (`prs.refresh`),
+  which settles a burst of focus changes for 1 second and reads once. Reads never overlap. Merged or closed PRs and the
+  PRs of done or cancelled stories aren't read again. Polling stops when the project closes; local mode reads nothing.
+- **The chip** is the PR number as a link (full URL in its title), the PR's state, and its checks: words on the card, a
+  mark with an accessible name on the Work row. The link opens in the OS browser through a new `app.openExternal`, which
+  takes only https links. A PR recorded before GitHub was usable still shows its number, without state.
+- **Tests fake `gh` with a script** (`packages/server/test/fake-gh.cjs`) given to the server as `ghCommand`, and the
+  remote is a bare repository whose path contains `github.com`, so detection passes and pushes stay on disk. The
+  Playwright journey puts the same fake `gh` first on the PATH. The Work list's fixture PR is now a URL, as cards record
+  it, so the existing tests' `#15` is the chip's label.
+
+## 2026-11-12 — STORY-11 review fixes
+
+The Dev Lead's review of 0194bbe, fixed in this story:
+
+- **Verified follows the commit.** `headRefOid` is read with the PR. When it isn't the story branch's tip, Verified is
+  removed and never granted; a head that moved since the last read removes Verified until its own checks pass. A story
+  with a PR has its branch pushed again (never forced) on every move into review, after removing Verified given for an
+  older commit.
+- **Required checks** (`gh pr checks --required --json bucket,name`), else every reported check. The chip still shows
+  every check.
+- **Older `pr` values** (`12`, `#12`) show as `#12` text with no link.
+- **Windows quoting**: any argument with a character outside `[\w./:{}@+-]` is quoted; commas and `=` were not.
+- **Recording the PR** leaves a `pr` someone set meanwhile alone.
+- **Adopting** needs the same base and the project's own repository.
+- **Pushes** go to the remote GitHub was detected on (`origin` first), not always `origin`.
+- **A closed project** forgets its PR reads and notes, and a read that finishes after it closed records no evidence.
+- `App.tsx` and `bridge.ts` are under 300 lines (`usePrFocus`, `window-state.ts`).
+
+## 2026-11-12 — STORY-11 review rulings (dev-lead)
+
+- CI Verified is tied to the PR's head commit: a head that differs from the story branch's tip removes Verified and never
+  grants it, and every move into review pushes the story branch again (never forced) once it has a PR.
+- Verified comes from the repo's required checks (`gh pr checks --required`); only a repo with no required checks falls
+  back to all reported checks. A failed or cancelled check removes Verified; skipped counts as passed; running checks
+  change nothing.
+- Pushing an existing PR's branch on review happens even with "Open story PRs automatically" off: the setting governs
+  opening PRs, and keeping an open PR current is part of having one.
+- "The worktree's HEAD" means the story branch's tip, so it also works when the owner copy isn't a worktree.
+- The chip shows all checks while evidence uses required checks only; accepted for now, with a roadmap item to show the
+  difference.
+- Older `pr` values (`12`, `#12`) show as `#N` text with no link.
+- All other build choices confirmed.

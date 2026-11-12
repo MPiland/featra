@@ -6,24 +6,17 @@
  * One run per worktree at a time: a request that arrives while one runs queues behind it (at most one, so a burst of
  * commits runs once more), and the run it makes stale is thrown away. Runs cost no tokens and never block the server.
  */
-import {
-  CHECKS_COPY,
-  checksApply,
-  checksWhere,
-  serializeCard,
-  toIso,
-  withCheckEvidence,
-  type CardChecks,
-  type CheckOutcome,
-} from "@featra/work-format";
+import { CHECKS_COPY, checksApply, checksWhere, toIso, type CardChecks, type CheckOutcome } from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { ApiError } from "./api-error.ts";
-import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
+import { ownedIn } from "./card-actions.ts";
+import { recordEvidence } from "./check-evidence.ts";
 import { locationKey } from "./collect.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { runCommand, type RunControl, type RunResult } from "./check-run.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import { LINKED_NOTES, runLinkedTests } from "./linked-tests.ts";
+import { watchProjects } from "./project-watch.ts";
 import type { Scan } from "./work-scan.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
@@ -119,14 +112,7 @@ export function createStoryChecks({
 
   /** The evidence of `outcome` on the story's owner copy, read fresh in the lane; false when the story left review. */
   const record = (dir: string, id: string, outcome: CheckOutcome) =>
-    lane.exclusive(async () => {
-      const scan = await scanDir(dir);
-      const found = ownedIn(scan, id);
-      if (!scan || !found?.root || !checksApply(found.owned.card, scan.collected.config)) return false;
-      const next = withCheckEvidence(found.owned.card, scan.collected.config, outcome, "system", toIso(now()));
-      if (next !== found.owned.card) await writeAtomic(fileIn(found.root, found.owned.path), serializeCard(next));
-      return true;
-    });
+    recordEvidence({ scan: scanDir, lane, now }, dir, id, outcome);
 
   /** One run: null when it ran, else why not. The result is written only if nothing newer was asked for meanwhile. */
   async function execute(dir: string, id: string, stale: () => boolean): Promise<string | null> {
@@ -209,7 +195,6 @@ export function createStoryChecks({
 
   // What each project's stories were last seen as, so a stage or HEAD that changed starts a run and nothing else does.
   const seen = new Map<string, string>();
-  const watching = new Map<string, () => void>();
 
   async function watchProject(dir: string) {
     let baseline = true;
@@ -229,29 +214,12 @@ export function createStoryChecks({
       }
     };
     const { value, stop } = await observe(dir, (scan) => reviewed(scan), consider);
-    if (closed || !allowed.has(dir)) return stop();
-    watching.set(dir, stop);
     consider(value);
     baseline = false;
+    return stop;
   }
 
-  const sync = () => {
-    for (const [dir, stop] of watching) {
-      if (allowed.has(dir)) continue;
-      stop();
-      watching.delete(dir);
-    }
-    for (const dir of allowed.dirs()) {
-      if (watching.has(dir) || closed) continue;
-      watching.set(dir, () => {});
-      watchProject(dir).catch((err: unknown) => {
-        watching.delete(dir);
-        log(`Checks can't watch ${dir}: ${err instanceof Error ? err.message : String(err)}`);
-      });
-    }
-  };
-  const stopSync = allowed.onChange(sync);
-  sync();
+  const projects = watchProjects(allowed, watchProject, log, "Checks");
 
   return {
     /** What the card pane shows of story `id`'s checks, or undefined before any run or idle note. */
@@ -271,9 +239,7 @@ export function createStoryChecks({
 
     close() {
       closed = true;
-      stopSync();
-      for (const stop of watching.values()) stop();
-      watching.clear();
+      projects.close();
       for (const control of active) control.cancel();
     },
   };

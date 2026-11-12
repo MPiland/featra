@@ -2,6 +2,7 @@
  * Where a project's checks run and what the card and Project settings show about them (STORY-56). Types and the
  * checks for data that crosses the socket only, so the client can import it without the card parser.
  */
+import { normalizeGithubUse, type GithubUse } from "./prs-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /** CI (the project's own pipeline, read through GitHub) or this computer (Featra runs the check command). */
@@ -39,6 +40,12 @@ export interface ChecksView {
   proposals: CheckProposal[];
   /** Commands in the project's config that the user hasn't confirmed here (changed through git, say). They don't run. */
   unconfirmed: CheckField[];
+  /** Whether GitHub is usable for the project, and what is missing when it isn't (STORY-11). */
+  github: GithubUse;
+  /** Whether a story's PR opens when it moves to review (STORY-11). */
+  openStoryPrs: boolean;
+  /** How often open PRs are read again, in minutes. */
+  prRefreshMinutes: number;
   /** Set when the project's config can't be read; nothing is changed then. */
   error: string | null;
 }
@@ -50,6 +57,8 @@ export interface ChecksPatch {
   testCommand?: string | null;
   /** Commands now in the project's config that the user confirms as they are. */
   confirm?: CheckField[];
+  openStoryPrs?: boolean;
+  prRefreshMinutes?: number;
 }
 
 /** A finished run, for the card: its command, when it ended, and the tail of what it printed. */
@@ -73,6 +82,11 @@ export interface CardChecks {
   note: string | null;
 }
 
+/** The longest wait between PR reads a project can set, in minutes. */
+export const PR_REFRESH_MAX = 60;
+/** A PR refresh interval: whole minutes from 1 to `PR_REFRESH_MAX`. */
+export const isRefreshMinutes = (v: unknown): v is number =>
+  typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= PR_REFRESH_MAX;
 const isField = (v: unknown): v is CheckField => v === "command" || v === "testCommand";
 const text = (v: unknown) => (typeof v === "string" ? v : "");
 const textOrNull = (v: unknown) => (typeof v === "string" && v ? v : null);
@@ -112,6 +126,9 @@ export function normalizeChecksView(raw: unknown): ChecksView {
         return field && source && typeof p.value === "string" && p.value ? [{ field, value: p.value, source }] : [];
       }),
     unconfirmed: (Array.isArray(r.unconfirmed) ? (r.unconfirmed as unknown[]) : []).filter(isField),
+    github: normalizeGithubUse(r.github),
+    openStoryPrs: r.openStoryPrs !== false,
+    prRefreshMinutes: isRefreshMinutes(r.prRefreshMinutes) ? r.prRefreshMinutes : 2,
     error: textOrNull(r.error),
   };
 }
@@ -129,6 +146,14 @@ export function parseChecksPatch(raw: unknown): ChecksPatch | null {
     const value = raw[key];
     if (value !== null && typeof value !== "string") return null;
     patch[key] = value;
+  }
+  if ("openStoryPrs" in raw) {
+    if (typeof raw.openStoryPrs !== "boolean") return null;
+    patch.openStoryPrs = raw.openStoryPrs;
+  }
+  if ("prRefreshMinutes" in raw) {
+    if (!isRefreshMinutes(raw.prRefreshMinutes)) return null;
+    patch.prRefreshMinutes = raw.prRefreshMinutes;
   }
   if ("confirm" in raw) {
     if (!Array.isArray(raw.confirm) || !raw.confirm.every(isField)) return null;

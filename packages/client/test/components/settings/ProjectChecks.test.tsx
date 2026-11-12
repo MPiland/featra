@@ -1,7 +1,7 @@
 /** STORY-56 (the user's side): Project settings' Checks section chooses where checks run and confirms the commands. */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { CHECKS_COPY, type ChecksView } from "@featra/work-format";
+import { CHECKS_COPY, GITHUB_COPY, type ChecksView } from "@featra/work-format";
 import { PROJECT, renderApp } from "../../harness.tsx";
 import { main, openSettings, WORK } from "./helpers.tsx";
 
@@ -18,6 +18,9 @@ const VIEW: ChecksView = {
     { field: "testCommand", value: "npx vitest run {file} -t {namePattern}", source: "dev-lead" },
   ],
   unconfirmed: [],
+  github: { usable: false, missing: GITHUB_COPY.noRemote },
+  openStoryPrs: true,
+  prRefreshMinutes: 2,
   error: null,
 };
 

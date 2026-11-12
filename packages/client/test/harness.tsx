@@ -84,6 +84,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     (dir, story, feature) => chats.addStory(dir, story, feature, host.queueStories === true),
     { turn: (dir, id) => chats.storyTurn(dir, id), drop: (dir, id) => chats.dropStory(dir, id) },
     (_dir, id) => host.cardChecks?.[id],
+    (_dir, id) => host.cardPrs?.[id],
   );
   const chats: ReturnType<typeof fakeChatServer> = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
@@ -181,6 +182,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
         calls.push(`discardCopy:${dir}:${key}`);
         return host.copyResult ?? { ok: true };
       },
+      refreshPrs: () => void calls.push("refreshPrs"),
       ...cards.bridge,
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.
@@ -201,6 +203,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       reload: () => void calls.push("reload"),
       toggleDevTools: () => void calls.push("toggleDevTools"),
       showLogs: () => void calls.push("showLogs"),
+      openExternal: (url) => void calls.push(`openExternal:${url}`),
       clearCacheAndRestart: () => void calls.push("clearCacheAndRestart"),
       resetAppData: () => void calls.push("resetAppData"),
       quit: () => void calls.push("quit"),

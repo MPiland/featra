@@ -24,6 +24,8 @@ import {
   type StoryTurn,
   type Card,
   type CardChecks,
+  withPrStatus,
+  type CardPr,
   type CardView,
   type OwnedCard,
   type WorkList,
@@ -43,6 +45,7 @@ export type ReviewAnswers = Partial<
     | "acceptStory"
     | "sendBackStory"
     | "rerunChecks"
+    | "createPr"
   >
 >;
 
@@ -76,17 +79,23 @@ export function fakeCardServer(
   },
   /** What the server's checks say about a story's card: absent when CI runs them. */
   checksOf: (dir: string, id: string) => CardChecks | undefined = () => undefined,
+  /** What the server knows of a story's PR (STORY-11): on its card, and its state on the story's Work row. */
+  prOf: (dir: string, id: string) => CardPr | undefined = () => undefined,
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
   const viewOf = (dir: string, id: string): CardView | null => {
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
-    return card ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id)) : null;
+    return card
+      ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id), prOf(dir, id))
+      : null;
   };
   const listOf = (dir: string): WorkList | null => {
     const cards = cardSets.get(dir);
-    return cards ? buildWorkList({ cards: cards.map(owned), stale: [], problems: [] }, DEFAULT_CONFIG) : null;
+    if (!cards) return null;
+    const list = buildWorkList({ cards: cards.map(owned), stale: [], problems: [] }, DEFAULT_CONFIG);
+    return withPrStatus(list, (id) => prOf(dir, id)?.status ?? undefined);
   };
   /** The server sees the folder's cards change: it pushes the list and each watched card. */
   const changed = (dir: string, card: Card) => {
@@ -246,6 +255,11 @@ export function fakeCardServer(
     rerunChecks: async (dir, id) => {
       calls.push(`rerunChecks:${dir}:${id}`);
       return review.rerunChecks ? review.rerunChecks(dir, id) : { ok: true };
+    },
+    // Create PR is the server's to prove (git, gh, the lane): the fake records the call.
+    createPr: async (dir, id) => {
+      calls.push(`createPr:${dir}:${id}`);
+      return review.createPr ? review.createPr(dir, id) : { ok: true };
     },
     reject: async (dir, id) => {
       calls.push(`reject:${dir}:${id}`);

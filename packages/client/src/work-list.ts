@@ -34,6 +34,8 @@ export interface WorkBridge extends CardBridge {
   applyCopy: (dir: string, key: string) => Promise<CopyActionResult>;
   /** Puts a stale copy back as git has it. */
   discardCopy: (dir: string, key: string) => Promise<CopyActionResult>;
+  /** Asks the server to read every open PR again soon: the window regained focus (STORY-11). */
+  refreshPrs: () => void;
 }
 
 export type ListFilter = "all" | WorkFilter;
@@ -135,6 +137,7 @@ export function serverWork(server: ServerClient): WorkBridge {
     },
     applyCopy: (dir, key) => server.call("work.applyCopy", { dir, key }).then(normalizeCopyActionResult, copyError),
     discardCopy: (dir, key) => server.call("work.discardCopy", { dir, key }).then(normalizeCopyActionResult, copyError),
+    refreshPrs: () => void server.call("prs.refresh", {}).catch(() => {}),
   };
 }
 
@@ -148,5 +151,6 @@ export function noWork(error: string): WorkBridge {
     },
     applyCopy: async () => ({ ok: false, error }),
     discardCopy: async () => ({ ok: false, error }),
+    refreshPrs() {},
   };
 }
