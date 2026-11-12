@@ -1461,3 +1461,15 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   the subagent chat cannot change or truthfully report.
 - **Risk: message shapes are unverified against a real `claude`.** The adapter follows the SDK's types and is proved with
   the fake `query` and the e2e fake SDK (CI), as every other adapter path is (ADR 0013). A first real run may need a fix.
+
+## 2026-11-11 — BUG-17: Draft chat's Message box missing (developer)
+
+- A one-off on the first e2e test of a cold Windows run (14.1 s against 5–6 s): the New chat picker was still open, so
+  the app behind it was inert and had no Message box. The cause is slowness, not a product bug; the trace was lost, so it
+  is not proven. `draftInNewChat` now waits for the picker to close, with its own 20 s limit, before the composer check.
+  No assertion changed.
+
+## 2026-11-11 — BUG-17 and BUG-18 review rulings (dev-lead)
+
+- BUG-17 has no regression test: the failure needs a cold runner where `chat.start` takes over 5 s; the helper is test
+  code and the product path is unchanged. A shared `startChat(page, role)` e2e helper goes on the roadmap, not done here.

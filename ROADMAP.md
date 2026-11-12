@@ -54,6 +54,10 @@ epics in `.featra/cards/`.
   terminals restricted, and macOS screen-recording and accessibility permissions. Linux under Wayland limits it. M1
   covers browser use only (STORY-40).
 
+- **Test hygiene:** a shared `startChat(page, role)` e2e helper. The picker-then-composer sequence is hand-rolled in
+  about 11 specs (chat, chat-log, composer, draft, inbox, review-draft, chat-approvals, chat-questions, chat-list,
+  chat-restore, roles), so a fix like BUG-17's has to be made in each.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".

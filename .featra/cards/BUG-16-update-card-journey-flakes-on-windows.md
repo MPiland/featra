@@ -2,7 +2,7 @@
 id: BUG-16
 type: bug
 title: Update-card journey flakes on Windows
-status: Acceptance
+status: Done
 parent: FEAT-5
 order: 8
 origin: bug
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-11T22:58:59Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-11T22:58:59Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
