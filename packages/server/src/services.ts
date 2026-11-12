@@ -150,7 +150,16 @@ export function createServices({
   });
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
-  const stops = createStoryStop({ scan: watches.scan, now, lane, chats, ...(interruptMs ? { interruptMs } : {}) });
+  // A story that is merging takes no message or Resume: its session is about to end (STORY-12).
+  const merging = (dir: string, id: string) => merges.isMerging(dir, id);
+  const stops = createStoryStop({
+    scan: watches.scan,
+    now,
+    lane,
+    chats,
+    merging,
+    ...(interruptMs ? { interruptMs } : {}),
+  });
   const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats });
   const merges = createStoryMerge({
     scan: watches.scan,
@@ -159,7 +168,7 @@ export function createServices({
     log,
     settings: checkSettings,
     chats,
-    checkedHead: (dir, id) => checks.settledHead(dir, id),
+    checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
     gitCommand,
     ghCommand,
   });
@@ -183,7 +192,7 @@ export function createServices({
     starts,
     spawns,
     reports,
-    messages: createStoryMessage({ scan: watches.scan, chats }),
+    messages: createStoryMessage({ scan: watches.scan, chats, merging }),
     checkSettings,
     merges: createMergeRequest({ scan: watches.scan, chats, merge: merges.merge, log }),
   });

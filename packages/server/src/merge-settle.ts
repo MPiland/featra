@@ -4,15 +4,17 @@
  * from then on, and the story's worktree and its local and remote branches go. Featra deletes the remote branch with
  * `git push --delete`, not `gh pr merge --delete-branch`, which also changes local checkouts.
  *
- * Nothing is lost: the worktree's changes were refused before a merge Featra made, and when the feature branch can't
- * take the card (after a merge on GitHub), the worktree stays, with the card that says it merged.
+ * Nothing is lost. The worktree is checked again once its session has ended, so a PR merged outside Featra, or a turn
+ * that ran meanwhile, never has its uncommitted work removed: the worktree stays, and the user is told. When the
+ * feature branch can't take the card (after a merge on GitHub), nothing changes, so merging again (or the PR poller)
+ * settles it later.
  */
-import { mergedStory, serializeCard, toIso } from "@featra/work-format";
+import { mergedStory, serializeCard, toIso, type Card } from "@featra/work-format";
 import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import type { CardLane } from "./card-lane.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { GithubRemote } from "./github-detect.ts";
-import { REMOVE_NOTES, type MergeGit } from "./merge-git.ts";
+import type { MergeGit } from "./merge-git.ts";
 import type { Scan } from "./work-scan.ts";
 
 export interface MergeSettleDeps {
@@ -31,7 +33,15 @@ export interface MergeResult {
 
 export const SETTLE_NOTES = {
   feature: (branch: string) => `${branch} couldn't take the card. Pull it, then merge again.`,
+  ahead: (branch: string, commits: number) =>
+    `${branch} is ${commits === 1 ? "one commit" : `${commits} commits`} ahead of GitHub; push it.`,
 } as const;
+
+/** The branch story `card` merges into: its feature's, while that isn't merged itself; null when there is none. */
+export function featureBranchOf(scan: Scan | null, card: Card | undefined): string | null {
+  const feature = card?.parent ? scan?.collected.state.features[card.parent] : undefined;
+  return feature && !feature.merged ? feature.branch : null;
+}
 
 /** The card commit's message on the feature branch, after a merge on GitHub. */
 const cardMessage = (id: string, into: string) => `${id}: merged into ${into}`;
@@ -39,7 +49,7 @@ const cardMessage = (id: string, into: string) => `${id}: merged into ${into}`;
 export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write = writeAtomic }: MergeSettleDeps) {
   /**
    * Commits the merged card onto the local feature branch, on top of the feature branch as GitHub has it now (which
-   * has the PR's merge commit). Null once done, else why not; nothing changes then.
+   * has the PR's merge commit). How far ahead of GitHub that leaves it, else why not; nothing changes then.
    */
   async function cardOnFeature(top: string, remote: string, into: string, path: string, text: string, id: string) {
     const remoteTip = await git.fetchTip(top, remote, into);
@@ -52,7 +62,8 @@ export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write 
         : [local, remoteTip];
     const made = await git.mergeCommit(top, { parents, path, text, message: cardMessage(id, into) });
     if ("conflicts" in made || !(await git.publish(top, into, made.commit, local))) return SETTLE_NOTES.feature(into);
-    return null;
+    const ahead = await git.git(top, ["rev-list", "--count", `${remoteTip}..${made.commit}`]);
+    return { ahead: Number(ahead.stdout.trim()) || 1 };
   }
 
   /**
@@ -68,19 +79,22 @@ export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write 
       if (!scan || !found?.root || found.owned.owner.kind !== "worktree") return { remains: [] };
       const { card, path, owner } = found.owned;
       const text = serializeCard(mergedStory(card, into, "system", toIso(now())));
-      await write(fileIn(found.root, path), text);
       const top = scan.collected.paths.top;
+      const remains: string[] = [];
       if (remote) {
-        const note = await cardOnFeature(top, remote.name, into, path, text, id);
-        if (note !== null) {
-          await scanDir(dir);
-          return { remains: [note, REMOVE_NOTES.folder(found.root)] };
-        }
+        // The card is written only once the feature branch has it: until then the story reads as not merged yet.
+        const made = await cardOnFeature(top, remote.name, into, path, text, id);
+        if (typeof made === "string") return { remains: [made] };
+        remains.push(SETTLE_NOTES.ahead(into, made.ahead));
       }
-      const { remains } = await git.removeStory(top, found.root, owner.branch, into);
-      if (remote) {
+      await write(fileIn(found.root, path), text);
+      const removed = await git.removeStory(top, found.root, path, owner.branch, into);
+      remains.push(...removed.remains);
+      if (removed.removed && remote) {
         const note = await git.deleteRemote(top, remote.name, owner.branch);
         if (note !== null) remains.push(note);
+      } else if (removed.removed) {
+        remains.push(...(await git.deleteFromRemotes(top, owner.branch)));
       }
       await scanDir(dir);
       return { remains };

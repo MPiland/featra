@@ -9,6 +9,9 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import type { GitOptions, Run } from "./git-run.ts";
 
+/** How long a file Windows still holds is retried before giving up: briefly, as `rm` does here. */
+export const BUSY_RETRY = { maxRetries: 20, retryDelay: 100 } as const;
+
 /** Runs git in `root` and throws when it fails. */
 export type Must = (root: string, args: string[], options?: GitOptions) => Promise<Run>;
 
@@ -56,6 +59,6 @@ export async function commitWithCard(must: Must, top: string, { tree, parents, p
     const args = ["commit-tree", written, ...parents.flatMap((p) => ["-p", p]), "-m", message];
     return (await must(top, args)).stdout.trim();
   } finally {
-    await rm(index, { force: true, maxRetries: 20, retryDelay: 100 });
+    await rm(index, { force: true, ...BUSY_RETRY });
   }
 }

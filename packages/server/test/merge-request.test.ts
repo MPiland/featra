@@ -3,10 +3,13 @@
  * call it) on a real repository in local mode; the chat manager, which shows the approval card and the notices, is
  * faked. The call answers once the user is asked; how it ends reaches the Dev Lead as a notice.
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { isMerged, MERGE_MESSAGES, parseCard, REQUEST_MERGE_MESSAGES, REQUEST_MERGE_TOOL } from "@featra/work-format";
 import { AGENT_MESSAGES, createAgentBridge } from "../src/agent-bridge.ts";
 import { createLogWriter } from "../src/log-writer.ts";
+import { createMergeRequest } from "../src/merge-request.ts";
+import { chat, closeChats } from "./chat-fixture.ts";
+import { until } from "./until.ts";
 import { FEATURE_BRANCH, LEAD, mergeWorld, STORY_BRANCH } from "./story-merge-world.ts";
 
 const m = mergeWorld();
@@ -69,6 +72,43 @@ describe("request_merge (AC3)", { timeout: 60_000 }, () => {
     await ask();
     await expect(ask()).rejects.toThrow(REQUEST_MERGE_MESSAGES.waiting("STORY-1"));
     expect(m.asked).toHaveLength(1);
+  });
+});
+
+describe("an ask whose Dev Lead chat ends (review fix)", { timeout: 60_000 }, () => {
+  afterEach(closeChats);
+
+  it("ends unanswered, so the next ask isn't refused as waiting, and merges nothing", async () => {
+    await m.start({ remote: false });
+    await m.verified();
+    // The real chat manager shows the approval card, in the chat that started the story.
+    const lead = await chat("developer");
+    const [row] = m.chats.list(w.repo.main);
+    const requests = createMergeRequest({
+      scan: w.watches.scan,
+      chats: {
+        storySession: m.chats.storySession,
+        list: () => [{ ...row!, story: { ...row!.story!, parent: lead.id } }],
+        askApproval: lead.manager.askApproval,
+        notify: lead.manager.notify,
+      },
+      merge: m.merges.merge,
+      log: () => {},
+    });
+    const askNow = () => requests.request(w.repo.main, { story: "STORY-1" }, lead.id);
+    await askNow();
+    await until(() => lead.events.some((e) => e.type === "approval"));
+    await expect(askNow()).rejects.toThrow(REQUEST_MERGE_MESSAGES.waiting("STORY-1"));
+    lead.manager.closeProjects(() => false);
+    let asked = false;
+    for (let i = 0; i < 200 && !asked; i++) {
+      asked = await askNow().then(
+        () => true,
+        () => new Promise<boolean>((r) => setTimeout(() => r(false), 25)),
+      );
+    }
+    expect(asked).toBe(true);
+    expect(m.hasBranch(STORY_BRANCH)).toBe(true);
   });
 });
 

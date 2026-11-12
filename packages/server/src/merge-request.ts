@@ -15,6 +15,7 @@ import {
 import { ApiError } from "./api-error.ts";
 import { ownedIn } from "./card-actions.ts";
 import type { ChatManager } from "./chat-manager.ts";
+import { featureBranchOf } from "./merge-settle.ts";
 import { keyOf } from "./story-prs-seen.ts";
 import type { StoryMerge } from "./story-merge.ts";
 import type { Scan } from "./work-scan.ts";
@@ -69,8 +70,7 @@ export function createMergeRequest({ scan: scanDir, chats, merge, log }: MergeRe
       const session = chats.storySession(dir, story);
       const row = session === null ? undefined : chats.list(dir).find((c) => c.id === session);
       if (!row || row.story?.parent !== lead) throw new ApiError(REQUEST_MERGE_MESSAGES.notLead(story));
-      const parent = found?.owned.card.parent;
-      const into = parent ? scan.collected.state.features[parent]?.branch : undefined;
+      const into = featureBranchOf(scan, found?.owned.card);
       if (!into) throw new ApiError(MERGE_MESSAGES.noFeature(story));
       const key = keyOf(dir, story);
       if (waiting.has(key)) throw new ApiError(REQUEST_MERGE_MESSAGES.waiting(story));

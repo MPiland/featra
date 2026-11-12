@@ -12,6 +12,7 @@ import {
   checksWhere,
   conflictedStory,
   conflictMessage,
+  evidenceState,
   GITHUB_COPY,
   mergeCommitMessage,
   mergedStory,
@@ -30,8 +31,10 @@ import type { CheckSettings } from "./check-settings.ts";
 import { githubRemote, type GithubRemote } from "./github-detect.ts";
 import { mergePr, prMergeable } from "./github-merge.ts";
 import { readPrAt, type GithubPrDeps } from "./github-prs.ts";
+import type { runGit } from "./git-run.ts";
 import { createMergeGit } from "./merge-git.ts";
-import { createMergeSettle, type MergeResult } from "./merge-settle.ts";
+import { createMergeSettle, featureBranchOf, type MergeResult } from "./merge-settle.ts";
+import { ciRead } from "./pr-ci.ts";
 import { sendThenRecord } from "./send-then-record.ts";
 import { keyOf } from "./story-prs-seen.ts";
 import type { Scan } from "./work-scan.ts";
@@ -43,9 +46,14 @@ export interface StoryMergeDeps extends GithubPrDeps {
   log: (message: string) => void;
   settings: Pick<CheckSettings, "github" | "githubUse">;
   chats: Pick<ChatManager, "storySession" | "list" | "open" | "send" | "retire">;
-  /** The commit story `id`'s local checks last settled on, or null while they run or before they have (story-checks). */
-  checkedHead: (dir: string, id: string) => string | null;
+  /**
+   * The commit story `id`'s local checks last settled on, else `stored`, the one its card recorded; null while they
+   * run (story-checks' `settledHead`).
+   */
+  checkedHead: (dir: string, id: string, stored: string | null) => string | null;
   write?: (file: string, text: string) => Promise<void>;
+  /** The platform's git, which a test may stand in for. */
+  gitRun?: typeof runGit;
 }
 
 /** How an attempt ended: merged into `into` (through `remote` on GitHub), or stopped on the conflicting `files`. */
@@ -66,7 +74,7 @@ interface Ready {
 export function createStoryMerge(deps: StoryMergeDeps) {
   const { scan: scanDir, now, log, settings, chats, checkedHead, write = writeAtomic } = deps;
   const lane = deps.lane ?? createCardLane();
-  const git = createMergeGit(deps.gitCommand);
+  const git = createMergeGit(deps.gitCommand, deps.gitRun);
   const { settle } = createMergeSettle({ scan: scanDir, now, lane, chats, git, write });
   const merging = new Set<string>();
 
@@ -78,23 +86,27 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     const refusal = mergeRefusal(found?.owned, id, config, found?.root != null);
     if (refusal !== null || !found?.root) throw new ApiError(refusal ?? MERGE_MESSAGES.readOnly);
     const { card, path } = found.owned;
-    const feature = card.parent ? scan.collected.state.features[card.parent] : undefined;
+    const into = featureBranchOf(scan, card);
     const top = scan.collected.paths.top;
     const tip = card.branch ? await git.commitOf(top, `refs/heads/${card.branch}`) : null;
-    if (!feature || feature.merged || !tip) throw new ApiError(MERGE_MESSAGES.noFeature(id));
+    if (!into || !tip) throw new ApiError(MERGE_MESSAGES.noFeature(id));
     const session = chats.storySession(dir, id);
     const row = session === null ? undefined : chats.list(dir).find((c) => c.id === session);
     if (row?.running || row?.queued) throw new ApiError(MERGE_MESSAGES.working(id));
     const dirty = await git.uncommitted(found.root, path);
     if (dirty.length > 0) throw new ApiError(MERGE_MESSAGES.dirty(id, dirty));
-    return { card, config, top, path, into: feature.branch, tip };
+    return { card, config, top, path, into, tip };
   }
+
+  /** Whether the local checks settled on `r`'s tip, here or (before a restart) as its card recorded. */
+  const checkedTip = (dir: string, id: string, r: Ready) =>
+    checkedHead(dir, id, evidenceState(r.card).checkedHead) === r.tip;
 
   /** The merge commit into the feature branch, made and published in the lane on the card as it is then. */
   const mergeLocally = (dir: string, id: string): Promise<Attempt> =>
     lane.exclusive(async () => {
       const r = await ready(dir, id);
-      if (checkedHead(dir, id) !== r.tip) throw new ApiError(MERGE_MESSAGES.stale(id));
+      if (!checkedTip(dir, id, r)) throw new ApiError(MERGE_MESSAGES.stale(id));
       const old = await git.commitOf(r.top, `refs/heads/${r.into}`);
       if (!old) throw new ApiError(MERGE_MESSAGES.noFeature(id));
       const text = serializeCard(mergedStory(r.card, r.into, "system", toIso(now())));
@@ -122,15 +134,22 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     if (!pr) throw new ApiError(`${MERGE_MESSAGES.failed}.`);
     if (pr.status.state === "merged") return { kind: "merged", into: r.into, remote };
     if (pr.status.state === "closed") throw new ApiError(MERGE_MESSAGES.prClosed(id));
-    const local = checksWhere(r.config, await settings.github(dir)) === "local";
-    if (pr.head !== r.tip || (local && checkedHead(dir, id) !== r.tip)) throw new ApiError(MERGE_MESSAGES.stale(id));
+    if (pr.head !== r.tip) throw new ApiError(MERGE_MESSAGES.stale(id));
+    if (checksWhere(r.config, await settings.github(dir)) === "local") {
+      if (!checkedTip(dir, id, r)) throw new ApiError(MERGE_MESSAGES.stale(id));
+    } else if ((await ciRead(dir, r.card, pr, undefined, deps)).passed !== true) {
+      // CI's checks, read now: the poller's last read may be for a commit pushed before this one.
+      throw new ApiError(MERGE_MESSAGES.stale(id));
+    }
     const outcome =
       (await prMergeable(dir, pr.url, deps)) === "CONFLICTING"
         ? { conflict: true as const }
         : await mergePr(dir, pr.url, r.tip, deps);
     if (outcome === null) return { kind: "merged", into: r.into, remote };
     if ("error" in outcome) throw new ApiError(outcome.error);
-    return { kind: "conflict", into: r.into, files: await conflictsOnGithub(r.top, remote.name, r.into, r.tip) };
+    const files = await conflictsOnGithub(r.top, remote.name, r.into, r.tip);
+    if (files.length === 0) throw new ApiError(MERGE_MESSAGES.conflictUnknown(id));
+    return { kind: "conflict", into: r.into, files };
   }
 
   /** The story back in its first active stage, by system, once its session has the files. Throws what the user is told. */
@@ -189,8 +208,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     const key = keyOf(dir, id);
     if (merging.has(key)) return;
     const scan = await scanDir(dir);
-    const card = ownedIn(scan, id)?.owned.card;
-    const into = card?.parent ? scan?.collected.state.features[card.parent]?.branch : undefined;
+    const into = featureBranchOf(scan, ownedIn(scan, id)?.owned.card);
     const remote = await githubRemote(dir, deps.gitCommand);
     if (!into || !remote) return;
     try {
@@ -201,7 +219,10 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     }
   }
 
-  return { merge, merged };
+  /** Whether story `id` is merging now: its session takes no message or Resume meanwhile. */
+  const isMerging = (dir: string, id: string) => merging.has(keyOf(dir, id));
+
+  return { merge, merged, isMerging };
 }
 
 export type StoryMerge = ReturnType<typeof createStoryMerge>;

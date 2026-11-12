@@ -135,6 +135,7 @@ if (first === "--version") {
   const pr = state.prs.find((p) => p.url === args[2]);
   if (!pr) fail("GraphQL: Could not resolve to a PullRequest");
   if (!args.includes("--merge")) fail("fake gh: only merge commits");
+  if (state.mergeFails) fail(state.mergeFails);
   if (pr.state !== "OPEN") fail(`Pull request #${pr.number} is not open`);
   const head = tipOf(pr.head);
   if (flag("--match-head-commit") !== head) fail("GraphQL: Head branch was modified. Review and try the merge again.");

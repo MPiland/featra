@@ -71,6 +71,8 @@ export interface World {
   /** The story reaches review in its worktree, as a session's report would write it; the checks then run. */
   toReview: (status?: string, extra?: Partial<Card>) => Promise<void>;
   start: (options?: StartOptions) => Promise<void>;
+  /** Featra restarts: the checks close, and new ones start on the project as it is now, which is their baseline. */
+  restart: () => Promise<void>;
   read: () => Promise<Card>;
   /** The lines of a file of the worktree, empty when there is none. */
   lines: (name: string) => Promise<string[]>;
@@ -94,6 +96,7 @@ export const linked = (...tests: (string | null)[]): Partial<Card> => ({
 export function checksWorld(): World {
   let allowed: AllowedProjects;
   let scanner: ReturnType<typeof createScanner>;
+  let make: () => StoryChecks;
   const w = {} as World;
 
   w.inTree = (name) => join(w.tree, name);
@@ -131,17 +134,25 @@ export function checksWorld(): World {
     allowed.set([repo.main]);
     w.settings = createCheckSettings({ scan: w.watches.scan, now: () => clock });
     if (confirm) await w.settings.set(repo.main, { confirm: ["command", "testCommand"] });
-    w.checks = createStoryChecks({
-      scan: scan ? scan(w.watches.scan) : w.watches.scan,
-      observe: w.watches.observe,
-      allowed,
-      settings: w.settings,
-      now: () => clock,
-      log: () => {},
-      timeoutMs: 30_000,
-    });
+    make = () =>
+      createStoryChecks({
+        scan: scan ? scan(w.watches.scan) : w.watches.scan,
+        observe: w.watches.observe,
+        allowed,
+        settings: w.settings,
+        now: () => clock,
+        log: () => {},
+        timeoutMs: 30_000,
+      });
+    w.checks = make();
     // The watch starts, so what is in review now is the baseline and only a change runs.
     await w.watches.watch(repo.main, () => {});
+    await until(() => true);
+  };
+
+  w.restart = async () => {
+    w.checks.close();
+    w.checks = make();
     await until(() => true);
   };
 

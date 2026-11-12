@@ -1783,4 +1783,26 @@ ADR 0033 (proposed) records the design. Choices to confirm:
   its feature branch, as the server does. This keeps the real `mergeRefusal` meaningful there.
 - **Open: no known head after a restart.** In local mode Featra doesn't know which commit the checks settled on after a
   restart, so Merge is refused as stale until they run again. A Done story can't re-run its checks today. This is a
-  roadmap candidate.
+  roadmap candidate. Resolved by the review fixes below: the card records the checked commit.
+
+## 2026-11-12 — STORY-12 review fixes
+
+- **The checked commit is on the card.** A passing or failing run records `checked:<commit>` in the card's evidence
+  history when the commit it checked changes. `settledHead` is the checks' own memory, else the card's commit; never the
+  head seen on start. After a restart Merge works on that commit, a Done story included, and refuses any other.
+- **CI mode reads CI again at Merge.** Besides the PR head equalling the tip, the PR's checks for that head must pass,
+  read through `ciRead` when Merge is clicked.
+- **No turn mid-merge, and a second look after it.** `message_session` and Resume refuse while the story merges. After
+  the session is retired, settle checks the worktree again; anything uncommitted besides the card keeps the worktree and
+  its branch, and is said. This is what protects a PR merged on GitHub outside Featra.
+- **The card waits for the feature branch.** After a GitHub merge the worktree's card is written as merged only once the
+  feature branch has the card commit, so "Pull it, then merge again" and the poller's retry both work.
+- **Smaller fixes.**
+  - Only "cannot be cleanly created" or "merge conflict" from `gh pr merge` is a conflict; anything else is an error.
+  - A conflict with no files found is an error, not a stage move.
+  - git older than 2.38 refuses with "Merging needs git 2.38 or later."
+  - A local merge deletes the story's branch from each remote that has it, or lists it when the remote can't be reached.
+  - Worktree removal retries briefly while Windows holds a file (card-commit's retry).
+  - The remains say how far the local feature branch is ahead of GitHub.
+  - `featureBranchOf` is the one feature-branch lookup.
+  - chat-manager.ts is under 300 lines (`chat-approvals.ts`).

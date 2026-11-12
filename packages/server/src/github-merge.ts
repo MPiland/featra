@@ -21,7 +21,7 @@ export async function prMergeable(dir: string, url: string, deps: GithubPrDeps =
 }
 
 /** What GitHub says when a PR's merge commit can't be made cleanly. */
-const CONFLICT = /not mergeable|merge conflict|cannot be cleanly created/i;
+const CONFLICT = /cannot be cleanly created|merge conflict/i;
 
 /** Merges the PR at `url` with a merge commit, at `head` only. Null once merged; else that it conflicts, or why not. */
 export async function mergePr(

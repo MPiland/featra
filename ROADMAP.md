@@ -79,9 +79,6 @@ epics in `.featra/cards/`.
   and run one after another, which can hold up the PR poll. From STORY-57.
 - **CI test reports: re-run detection.** A re-run that finishes within one poll interval is missed; compare the run's
   attempt or `updatedAt` instead of watching for pending. From STORY-57.
-- **Merge after a restart in local mode.** Featra doesn't remember which commit the local checks settled on, so after
-  a restart Merge is refused as stale until the checks run again, and a Done story can't re-run them. Keep the
-  checked head with the evidence, or let Re-run apply to a Done story that isn't merged. From STORY-12.
 
 ## Before public release
 

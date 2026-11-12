@@ -34,6 +34,12 @@ export const MERGE_MESSAGES = {
   notReady: (id: string, status: string) => `${id} is ${status}. A story merges from review on.`,
   notVerified: (id: string) => `${id} isn't Verified.`,
   merging: (id: string) => `${id} is already merging.`,
+  /** A message or Resume asked while the story merges: its session is about to end. */
+  busy: (id: string) => `${id} is merging. Try again once it's done.`,
+  oldGit: "Merging needs git 2.38 or later.",
+  /** GitHub says the PR conflicts, but the files that do couldn't be found: nothing is moved back. */
+  conflictUnknown: (id: string) =>
+    `GitHub says ${id}'s PR conflicts, but Featra couldn't tell which files. Check the PR.`,
   working: (id: string) => `${id} is working. Stop it or wait for its turn to end.`,
   dirty: (id: string, files: readonly string[]) =>
     `${id} has uncommitted changes: ${fileList(files)}. Commit them first.`,

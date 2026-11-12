@@ -9,6 +9,7 @@ import {
   buildWorkList,
   conflictedStory,
   conflictMessage,
+  evidenceState,
   fileList,
   isMerged,
   MAIN,
@@ -26,6 +27,7 @@ import {
   resumeRefusal,
   serializeCard,
   STOP_MESSAGES,
+  withCheckEvidence,
   type Card,
   type OwnedCard,
   type OwnerLocation,
@@ -168,5 +170,36 @@ describe("request_merge input (AC3)", () => {
 
   it.each([{}, { story: "FEAT-1" }, { story: 4 }, null])("refuses %j", (input) => {
     expect(parseRequestMergeInput(input)).toEqual({ ok: false, error: REQUEST_MERGE_MESSAGES.badStory });
+  });
+});
+
+/** The card once a run of its checks settled on commit `head` with `passed`, at minute `n`. */
+const ran = (card: Card, passed: boolean | null, head: string | undefined, n: number) =>
+  withCheckEvidence(card, config, { passed, acs: [], head }, "system", at(n));
+
+describe("the commit Verified is for (review fix: a merge after a restart)", () => {
+  it("is recorded with the verdict, by system, and read back from the history", () => {
+    const next = ran(inReview(), true, "aaa111", 5);
+    expect(next.history.slice(-2)).toMatchObject([
+      { field: "evidence", to: "checked:aaa111", by: "system" },
+      { field: "evidence", to: "verified", by: "system" },
+    ]);
+    expect(evidenceState(next)).toMatchObject({ verified: true, checkedHead: "aaa111" });
+    expect(evidenceState(parseCard(serializeCard(next))).checkedHead).toBe("aaa111");
+  });
+
+  it("follows a new commit that passes while Verified stays, and is recorded only when it changes", () => {
+    const first = ran(inReview(), true, "aaa111", 5);
+    const again = ran(first, true, "aaa111", 6);
+    expect(again).toBe(first);
+    const moved = ran(first, true, "bbb222", 7);
+    expect(moved.history.at(-1)).toMatchObject({ field: "evidence", to: "checked:bbb222" });
+    expect(evidenceState(moved).checkedHead).toBe("bbb222");
+  });
+
+  it("isn't recorded by a run whose check command didn't run", () => {
+    const first = ran(inReview(), true, "aaa111", 5);
+    expect(ran(first, null, "bbb222", 6)).toBe(first);
+    expect(evidenceState(inReview()).checkedHead).toBeNull();
   });
 });

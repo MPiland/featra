@@ -18,11 +18,12 @@ import {
 } from "@featra/work-format";
 import { projectKey } from "./allowed-projects.ts";
 import { createApprovalDesk } from "./approval-desk.ts";
+import { chatApprovals } from "./chat-approvals.ts";
 import { composerOf, configureChat, controlState } from "./chat-composer.ts";
 import { ChatError } from "./chat-error.ts";
 import type { ChatManager, ChatManagerDeps } from "./chat-manager-types.ts";
 import { createListWatchers, tellAll } from "./chat-list-watch.ts";
-import { chatSaver, memoryChatStore, savedHistory, withWindow } from "./chat-store.ts";
+import { chatSaver, loadRefusal, memoryChatStore, savedHistory, withWindow } from "./chat-store.ts";
 import { chatsToSave, closeProjects, restoreChats } from "./chat-projects.ts";
 import { restored, type Chat } from "./chat-state.ts";
 import { createStoryRunner } from "./chat-stories.ts";
@@ -156,13 +157,7 @@ export function createChatManager({
     // Closed while reading: the chat is opened afresh when its project is back.
     if (c.events !== null || c.closed) return;
     c.events = withWindow(events, c.window);
-    c.refusal = gone
-      ? CHAT_MESSAGES.gone
-      : !adapter
-        ? CHAT_MESSAGES.noProvider
-        : !role
-          ? CHAT_MESSAGES.unknownRole
-          : null;
+    c.refusal = loadRefusal(gone, adapter, role);
     if (adapter && role && !gone) c.agent = agentFor(c, adapter, role);
   }
 
@@ -282,15 +277,8 @@ export function createChatManager({
     // Stop on a subagent ends it alone; on any other chat it ends the turn.
     stop: (id) => (subagents.is(id) ? subagents.stop(chat(id)) : control.stop(id)),
     archive: (id) => subagents.archive(chat(id)),
-    async askApproval(id, request) {
-      await open(id);
-      const ask = { ...request, chat: id, cwd: chat(id).cwd, forChat: false };
-      return (await desk.approve(ask, new AbortController().signal)).allow;
-    },
+    ...chatApprovals(desk, mirror, chat, open),
     notify: (id, notice) => notices.tell(id, notice),
-    // A story session's approval shown in its parent chat is answered from there too.
-    approve: (id, tool, answer) => desk.answer(mirror.holder(chat(id).id, tool) ?? chat(id).id, tool, answer),
-    answer: (id, tool, answers) => desk.reply(chat(id).id, tool, answers),
     report(id, event) {
       const c = chats.get(id);
       if (c && c.events !== null && !c.closed) record(c, event);

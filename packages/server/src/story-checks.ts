@@ -157,7 +157,7 @@ export function createStoryChecks({
     if (stale() || closed) return null;
     const passed = main.code === 0;
     const output = passed ? linked.failures : `${main.timedOut ? "Timed out.\n" : ""}${main.output}`;
-    if (!(await record(dir, id, { passed, acs: linked.acs }))) {
+    if (!(await record(dir, id, { passed, acs: linked.acs, head: head || undefined }))) {
       // The story left review while this ran: there is nothing to show for it.
       states.delete(keyOf(dir, id));
       return null;
@@ -242,14 +242,13 @@ export function createStoryChecks({
 
     /**
      * The commit story `id`'s evidence is for (STORY-12: a merge needs Verified for the commit it merges): the one its
-     * last run checked, else, before any run, the one its worktree was at when Featra started; null while a run is in
-     * flight, or when it isn't known.
+     * last run here checked, else `stored`, the one its card recorded (a run before a restart); null while a run is in
+     * flight, or when neither is known. Never the commit Featra merely saw on start: nothing checked that.
      */
-    settledHead(dir: string, id: string): string | null {
+    settledHead(dir: string, id: string, stored: string | null): string | null {
       const key = keyOf(dir, id);
       if (slots.has(key)) return null;
-      const trigger = seen.get(key);
-      return checked.get(key) ?? (trigger?.slice(trigger.lastIndexOf("@") + 1) || null);
+      return checked.get(key) ?? stored;
     },
 
     /** Runs the checks of story `id` again now (the card's Re-run); refused when they don't run here or the story isn't in review. */

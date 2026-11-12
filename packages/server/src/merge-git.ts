@@ -5,7 +5,10 @@
  * value. A conflict, a dirty target or a branch that moved meanwhile leaves every branch and file as it was. Nothing
  * here forces, rebases or runs `git commit`.
  */
-import { commitWithCard, type Must } from "./card-commit.ts";
+import { setTimeout as sleep } from "node:timers/promises";
+import { MERGE_MESSAGES } from "@featra/work-format";
+import { ApiError } from "./api-error.ts";
+import { BUSY_RETRY, commitWithCard, type Must } from "./card-commit.ts";
 import { failed, runGit, type GitOptions } from "./git-run.ts";
 
 /** A merge's tree, or the files that conflict. */
@@ -23,13 +26,22 @@ export interface MergeCommitInput {
 export interface RemovedStory {
   /** What couldn't be removed, as the user is told it. */
   remains: string[];
+  /** Whether the worktree went: when it stays, so do the branches. */
+  removed: boolean;
 }
 
 export const REMOVE_NOTES = {
   folder: (path: string) => `The worktree ${path} is still there.`,
   branch: (branch: string) => `The branch ${branch} is still there.`,
   remote: (branch: string) => `The remote branch ${branch} is still there.`,
+  kept: (path: string) => `The worktree ${path} has uncommitted changes, so it's still there.`,
 } as const;
+
+/** What git says when Windows still holds a file in a folder it removes. */
+const BUSY = /busy|being used by another process|permission denied|directory not empty/i;
+
+/** What a git before 2.38, whose `merge-tree` has no `--write-tree`, says to it. */
+const OLD_MERGE_TREE = /usage: git merge-tree/i;
 
 /** `git status -z` entries as paths: a rename or copy carries its old path as the next entry, which is skipped. */
 function statusPaths(out: string): string[] {
@@ -43,8 +55,9 @@ function statusPaths(out: string): string[] {
   return paths;
 }
 
-export function createMergeGit(gitCommand = "git") {
-  const git = (root: string, args: string[], options?: GitOptions) => runGit(gitCommand, root, args, options);
+/** `run` is the platform's git: runGit, unless a test stands in for an old or busy one. */
+export function createMergeGit(gitCommand = "git", run = runGit) {
+  const git = (root: string, args: string[], options?: GitOptions) => run(gitCommand, root, args, options);
   const must: Must = async (root, args, options) => {
     const r = await git(root, args, options);
     if (r.code !== 0) throw failed(`git ${args[0] ?? ""}`, r);
@@ -86,6 +99,7 @@ export function createMergeGit(gitCommand = "git") {
     const [tree = "", ...files] = r.stdout.split(/\r?\n/).filter(Boolean);
     if (r.code === 0) return { tree };
     if (r.code === 1) return { conflicts: [...new Set(files)] };
+    if (OLD_MERGE_TREE.test(r.stderr)) throw new ApiError(MERGE_MESSAGES.oldGit);
     throw failed("git merge-tree", r);
   }
 
@@ -116,22 +130,43 @@ export function createMergeGit(gitCommand = "git") {
     return (await git(checkout, ["merge", "--ff-only", "--no-stat", "--quiet", commit])).code === 0;
   }
 
+  /** `git worktree remove --force`, tried again briefly while Windows still holds a file in it; true once gone. */
+  async function removeFolder(top: string, folder: string): Promise<boolean> {
+    for (let tries = 0; ; tries++) {
+      const r = await git(top, ["worktree", "remove", "--force", folder]);
+      if (r.code === 0) return true;
+      if (tries >= BUSY_RETRY.maxRetries || !BUSY.test(r.stderr)) return false;
+      await sleep(BUSY_RETRY.retryDelay);
+    }
+  }
+
   /**
    * Removes a merged story's worktree and its local branch, which must be in `into`'s history. What can't go stays,
-   * and is said. The worktree's own changes were checked before the merge, so only what git ignores is left to lose.
+   * and is said. A worktree with uncommitted changes besides its card (`card`) stays whole, branch too, so `--force`
+   * only ever discards the card, which the feature branch has. Only what git ignores is left to lose.
    */
-  async function removeStory(top: string, folder: string, branch: string, into: string): Promise<RemovedStory> {
+  async function removeStory(
+    top: string,
+    folder: string,
+    card: string,
+    branch: string,
+    into: string,
+  ): Promise<RemovedStory> {
     const remains: string[] = [];
-    if ((await git(top, ["worktree", "remove", "--force", folder])).code !== 0) {
+    if ((await uncommitted(folder, card)).length > 0) {
+      remains.push(REMOVE_NOTES.kept(folder), REMOVE_NOTES.branch(branch));
+      return { remains, removed: false };
+    }
+    if (!(await removeFolder(top, folder))) {
       remains.push(REMOVE_NOTES.folder(folder), REMOVE_NOTES.branch(branch));
-      return { remains };
+      return { remains, removed: false };
     }
     const tip = await commitOf(top, `refs/heads/${branch}`);
     const inFeature = tip !== null && (await isAncestor(top, tip, `refs/heads/${into}`));
     if (tip !== null && (!inFeature || (await git(top, ["branch", "-D", branch])).code !== 0)) {
       remains.push(REMOVE_NOTES.branch(branch));
     }
-    return { remains };
+    return { remains, removed: true };
   }
 
   /** Deletes `branch` on `remote`; one already gone counts as deleted. Null once gone, else what to tell the user. */
@@ -139,6 +174,26 @@ export function createMergeGit(gitCommand = "git") {
     const r = await git(top, ["push", remote, "--delete", branch]);
     if (r.code === 0 || /remote ref does not exist/i.test(r.stderr)) return null;
     return REMOVE_NOTES.remote(branch);
+  }
+
+  /**
+   * Deletes `branch` from every remote that has it, after a merge made without GitHub. A remote that can't be
+   * reached, but whose copy Featra fetched before, is said; one that doesn't have it is left alone.
+   */
+  async function deleteFromRemotes(top: string, branch: string): Promise<string[]> {
+    const remains = new Set<string>();
+    const remotes = (await git(top, ["remote"])).stdout.split(/\r?\n/).filter(Boolean);
+    for (const remote of remotes) {
+      const listed = await git(top, ["ls-remote", "--heads", remote, `refs/heads/${branch}`]);
+      if (listed.code !== 0) {
+        if (await commitOf(top, `refs/remotes/${remote}/${branch}`)) remains.add(REMOVE_NOTES.remote(branch));
+        continue;
+      }
+      if (listed.stdout.trim() === "") continue;
+      const note = await deleteRemote(top, remote, branch);
+      if (note !== null) remains.add(note);
+    }
+    return [...remains];
   }
 
   /** Fetches `branch` from `remote`; the commit it is at there, or null when it couldn't. */
@@ -160,6 +215,7 @@ export function createMergeGit(gitCommand = "git") {
     publish,
     removeStory,
     deleteRemote,
+    deleteFromRemotes,
     fetchTip,
   };
 }
