@@ -79,7 +79,8 @@ export const PLAN: CardSpec[] = [
     acs: [1, 3],
     tasks: [4, 6],
     title: "Open a folder",
-    pr: "#15",
+    // A PR is recorded as its URL; the window shows its number (STORY-11).
+    pr: "https://github.com/acme/app/pull/15",
   },
   { id: "STORY-3", type: "story", parent: "FEAT-2", status: "In Review", acs: [4, 4], title: "Home feature list" },
   { id: "STORY-4", type: "story", parent: "FEAT-3", status: "New", title: "Draw the chart" },

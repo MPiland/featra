@@ -105,6 +105,14 @@ export interface ServerMethods {
    * checks run in CI for the project or the story isn't in review. The result reaches the card through `card.view`.
    */
   "story.rerunChecks": { params: { dir: string; id: string }; result: null };
+  /**
+   * Pushes a story's branch and opens its PR against the feature branch through the user's `gh` (STORY-11), or adopts
+   * the open PR from that branch. Refused in local mode, outside review, or when the story has a PR; a push or `gh`
+   * failure is refused with its reason, which the card also shows.
+   */
+  "story.createPr": { params: { dir: string; id: string }; result: null };
+  /** The window regained focus: every open project reads its open PRs again soon (STORY-11). */
+  "prs.refresh": { params: Record<string, never>; result: null };
   /** Project settings' Checks section: where checks run, the commands, and the proposals waiting for the user (STORY-56). */
   "checks.load": { params: { dir: string }; result: ChecksView };
   /** Changes the Checks settings in the project's config (`null` clears one); answers with the section as it is after. */

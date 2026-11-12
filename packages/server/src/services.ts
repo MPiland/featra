@@ -6,6 +6,8 @@ import { createCardReport } from "./card-report.ts";
 import { createCardLane } from "./card-lane.ts";
 import { createCheckSettings } from "./check-settings.ts";
 import { createStoryChecks } from "./story-checks.ts";
+import { createStoryPrs } from "./story-prs.ts";
+import { systemTimers, type Timers } from "./inbox.ts";
 import { createChatManager } from "./chat-manager.ts";
 import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts";
 import { locateClaude } from "./claude-locate.ts";
@@ -63,6 +65,8 @@ export interface ServiceOptions {
   ghCommand?: string;
   /** How long a check command may run before it is killed (STORY-56). */
   checkTimeoutMs?: number;
+  /** The timers PR reads wait on (STORY-11); the real ones by default. */
+  prTimers?: Timers;
 }
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
@@ -83,6 +87,7 @@ export function createServices({
   interruptMs,
   ghCommand,
   checkTimeoutMs,
+  prTimers = systemTimers(),
 }: ServiceOptions): {
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
@@ -94,7 +99,13 @@ export function createServices({
   const copies = createCopyActions({ git: repoGit, scan: watches.scan, now });
   // One lane for every card write: a draft that allocates IDs and a card edit never interleave (ADR 0002).
   const lane = createCardLane();
-  const cards = createCardActions({ scan: watches.scan, now, lane, checks: (dir, id) => checks.checksFor(dir, id) });
+  const cards = createCardActions({
+    scan: watches.scan,
+    now,
+    lane,
+    checks: (dir, id) => checks.checksFor(dir, id),
+    prState: (dir, id) => prs.prState(dir, id),
+  });
   const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand });
   const checks = createStoryChecks({
     scan: watches.scan,
@@ -105,6 +116,18 @@ export function createServices({
     lane,
     log,
     timeoutMs: checkTimeoutMs,
+  });
+  const prs = createStoryPrs({
+    scan: watches.scan,
+    observe: watches.observe,
+    allowed,
+    settings: checkSettings,
+    now,
+    timers: prTimers,
+    lane,
+    log,
+    gitCommand,
+    ghCommand,
   });
   const roles = createRoleRegistry({
     fs: roleFs,
@@ -168,6 +191,7 @@ export function createServices({
     acceptance,
     checks,
     checkSettings,
+    prs,
     chats,
     roles,
     roleWatches,
@@ -179,6 +203,9 @@ export function createServices({
     async close() {
       stopClosing();
       checks.close();
+      prs.close();
+      // A project watch still starting finishes against open watches, then stops itself.
+      await prs.idle();
       chats.close();
       await chats.flush();
       watches.close();

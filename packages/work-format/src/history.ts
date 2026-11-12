@@ -31,6 +31,12 @@ export function recordEvidence(card: Card, to: string, by: string, at: string): 
   return change(card, "evidence", null, to, by, at);
 }
 
+/** Records the story's PR (STORY-11): its URL, by `system`. A no-op when it is the same one. */
+export function setPr(card: Card, to: string, by: string, at: string): Card {
+  if (card.pr === to) return card;
+  return { ...change(card, "pr", card.pr, to, by, at), pr: to };
+}
+
 /** Records the user's Accept (or its withdrawal). */
 export function recordAcceptance(card: Card, accepted: boolean, by: string, at: string): Card {
   return change(card, "accepted", null, accepted ? "accepted" : "withdrawn", by, at);

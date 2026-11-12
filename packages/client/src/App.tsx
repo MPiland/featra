@@ -25,6 +25,7 @@ import { useProjectSetup } from "./components/useProjectSetup.tsx";
 import { useShortcuts } from "./components/useShortcuts.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
+import { ExternalLinkContext } from "./components/work/PrChip.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import { canGoBack, canGoForward, currentView, entryChat, entryView, initialNav, leaveChats } from "./navigation.ts";
 import { useAppNav } from "./use-app-nav.ts";
@@ -187,12 +188,19 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
 
   useShortcuts(bridge.platform, actions);
 
+  // Open PRs are read again soon after the window regains focus (STORY-11); the server settles a burst into one read.
+  useEffect(() => {
+    const focused = () => bridge.work.refreshPrs();
+    window.addEventListener("focus", focused);
+    return () => window.removeEventListener("focus", focused);
+  }, [bridge]);
+
   useEffect(() => {
     document.title = `Featra · ${title}`;
   }, [title]);
 
   return (
-    <>
+    <ExternalLinkContext.Provider value={bridge.app.openExternal}>
       <div className="shell" inert={dialog !== null || projectDialog !== null}>
         <TitleBar
           bridge={bridge}
@@ -289,6 +297,6 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
         onClose={() => setDialog(null)}
         onReset={() => bridge.app.resetAppData()}
       />
-    </>
+    </ExternalLinkContext.Provider>
   );
 }

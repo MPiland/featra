@@ -3,6 +3,7 @@
  * the owner copies (ADR 0003). Types and the client-side check only, so the client can import it without the card
  * parser.
  */
+import { normalizePrStatus, type PrStatus } from "./prs-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /** How a status reads at a glance: the colour of its dot and its slice of a bar. */
@@ -40,6 +41,8 @@ export interface StoryRow {
   criteria: Count;
   tasks: Count;
   pr: string | null;
+  /** The PR's state and checks as last read (STORY-11); left out before the first read. */
+  prStatus?: PrStatus;
   /** Who works on it (STORY-9): the card's agent and model, and the chat that is its latest session. Null until started. */
   agent: string | null;
   model: string | null;
@@ -115,6 +118,11 @@ const progress = (raw: unknown): ProgressCount => ({ ...count(raw), label: text(
 const tone = (v: unknown): Tone => (isOneOf(TONES, v) ? v : "idle");
 const bar = (raw: unknown) => list(raw, (s): Segment => ({ tone: tone(s.tone), count: num(s.count) }));
 
+const prStatusOf = (raw: unknown): { prStatus?: PrStatus } => {
+  const prStatus = normalizePrStatus(raw);
+  return prStatus ? { prStatus } : {};
+};
+
 const story = (r: Record<string, unknown>): StoryRow => ({
   id: text(r.id),
   type: r.type === "bug" ? "bug" : "story",
@@ -125,6 +133,7 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   criteria: count(r.criteria),
   tasks: count(r.tasks),
   pr: textOrNull(r.pr),
+  ...prStatusOf(r.prStatus),
   agent: textOrNull(r.agent),
   model: textOrNull(r.model),
   session: textOrNull(r.session),

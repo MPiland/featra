@@ -3,6 +3,7 @@
  * the checks for data that crosses the socket only, so the client can import it without the card parser.
  */
 import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
+import { normalizeCardPr, type CardPr } from "./prs-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /** What is known about an AC's proof: its linked test passed or failed, a test is linked but hasn't run, or none is. */
@@ -69,6 +70,8 @@ export interface CardView {
   draftStories?: number;
   /** A story's checks on this computer (STORY-56): running, the last result and its output; absent when CI runs them. */
   checks?: CardChecks;
+  /** A story's PR (STORY-11): its state and checks, and Create PR; absent when GitHub isn't usable for the project. */
+  prState?: CardPr;
   /** True on a story waiting in Acceptance, which Accept and Send back apply to (STORY-23); absent otherwise. */
   awaiting?: true;
   /** True on an approved feature, which Start can give its branch (STORY-52); absent otherwise. */
@@ -160,6 +163,11 @@ const checksOf = (raw: unknown): { checks?: CardChecks } => {
   return checks ? { checks } : {};
 };
 
+const prOf = (raw: unknown): { prState?: CardPr } => {
+  const prState = normalizeCardPr(raw);
+  return prState ? { prState } : {};
+};
+
 /** A view from the socket, read defensively; null when there is no card. */
 export function normalizeCardView(raw: unknown): CardView | null {
   if (!isRecord(raw) || typeof raw.id !== "string" || !raw.id) return null;
@@ -194,6 +202,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(typeof raw.draftChat === "string" && raw.draftChat ? { draftChat: raw.draftChat } : {}),
     ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
     ...checksOf(raw.checks),
+    ...prOf(raw.prState),
     ...(raw.awaiting === true ? { awaiting: true as const } : {}),
     ...(raw.startable === true ? { startable: true as const } : {}),
   };

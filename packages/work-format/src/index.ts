@@ -56,3 +56,5 @@ export * from "./checks-types.ts";
 export * from "./checks.ts";
 export * from "./check-commands.ts";
 export * from "./junit.ts";
+export * from "./prs-types.ts";
+export * from "./prs.ts";

@@ -47,6 +47,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "story.resume",
   "story.accept",
   "story.rerunChecks",
+  "story.createPr",
+  "prs.refresh",
   "checks.load",
   "checks.set",
   "story.sendBack",

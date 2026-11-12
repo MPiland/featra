@@ -15,16 +15,7 @@ export interface ChecksBridge {
   set: (dir: string, patch: ChecksPatch) => Promise<ChecksView>;
 }
 
-const failed = (error: string): ChecksView => ({
-  where: "local",
-  chosen: false,
-  reason: "",
-  command: null,
-  testCommand: null,
-  proposals: [],
-  unconfirmed: [],
-  error,
-});
+const failed = (error: string): ChecksView => ({ ...normalizeChecksView(null), error });
 
 const read = (call: Promise<unknown>) => call.then(normalizeChecksView, (err: unknown) => failed(errorMessage(err)));
 
@@ -58,5 +49,16 @@ export const CHECKS_PAGE_COPY = {
   use: "Use this",
   save: "Save",
   saved: "Saved",
+  loading: "Loading…",
+} as const;
+
+/** Project settings' Pull requests section (STORY-11). */
+export const PRS_PAGE_COPY = {
+  title: "Pull requests",
+  open: "Open story PRs automatically",
+  openHint: "When a story moves to review, push its branch and open its PR against the feature branch.",
+  minutes: "Refresh open PRs every",
+  minutesHint: "Minutes, from 1 to 60. Open PRs are also read when Featra regains focus.",
+  minutesInvalid: "Use whole minutes from 1 to 60.",
   loading: "Loading…",
 } as const;

@@ -56,3 +56,42 @@
 .send-back-criterion {
   font-size: 12px;
 }
+
+/* A story's PR chip (STORY-11): its number links to the PR, then its state and its checks. */
+.pr-chip {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+  white-space: nowrap;
+}
+
+.pr-chip a {
+  color: var(--acc);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+
+.pr-chip a:hover {
+  text-decoration: underline;
+}
+
+.pr-state {
+  color: var(--tx3);
+}
+
+.pr-state.pr-merged {
+  color: var(--pur);
+}
+
+.pr-checks.checks-passing {
+  color: var(--ok);
+}
+
+.pr-checks.checks-failing {
+  color: var(--bad);
+}
+
+.pr-checks.checks-pending {
+  color: var(--warn);
+}

@@ -11,6 +11,7 @@ import {
   type CardView,
 } from "@featra/work-format/card-view";
 import { errorMessage, isRecord } from "@featra/work-format/guards";
+import type { PrChecks, PrState } from "@featra/work-format/prs";
 import type { ServerClient } from "./server-client.ts";
 
 export type { CardEdit, CardUpdateResult, CardView };
@@ -47,6 +48,8 @@ export interface CardBridge {
   stopStory: (dir: string, id: string) => Promise<ReviewResult>;
   /** Goes on in the stopped story's session, and clears Stopped (STORY-53). */
   resumeStory: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Pushes the story's branch and opens its PR through the user's gh (STORY-11). */
+  createPr: (dir: string, id: string) => Promise<ReviewResult>;
 }
 
 /** The chat the story's agent runs in, and whether it waits for a free slot; or why it didn't start. */
@@ -127,6 +130,19 @@ export const CARD_COPY = {
   count: (done: number, total: number, what: string) => `${done} of ${total} ${what}`,
 } as const;
 
+/** A story's PR on its card and its Work row (STORY-11). */
+export const PR_COPY = {
+  create: "Create PR",
+  opening: "Opening PR…",
+  state: { open: "Open", draft: "Draft", merged: "Merged", closed: "Closed" } satisfies Record<PrState, string>,
+  checks: {
+    passing: "Checks passing",
+    failing: "Checks failing",
+    pending: "Checks running",
+  } satisfies Record<Exclude<PrChecks, "none">, string>,
+  mark: { passing: "✓", failing: "✗", pending: "…" } satisfies Record<Exclude<PrChecks, "none">, string>,
+} as const;
+
 const review = (call: Promise<unknown>): Promise<ReviewResult> =>
   call.then(
     (): ReviewResult => ({ ok: true }),
@@ -174,6 +190,7 @@ export function serverCards(server: ServerClient): CardBridge {
     rerunChecks: (dir, id) => review(server.call("story.rerunChecks", { dir, id })),
     stopStory: (dir, id) => review(server.call("story.stop", { dir, id })),
     resumeStory: (dir, id) => review(server.call("story.resume", { dir, id })),
+    createPr: (dir, id) => review(server.call("story.createPr", { dir, id })),
   };
 }
 
@@ -195,5 +212,6 @@ export function noCards(error: string): CardBridge {
     rerunChecks: async () => ({ ok: false, error }),
     stopStory: async () => ({ ok: false, error }),
     resumeStory: async () => ({ ok: false, error }),
+    createPr: async () => ({ ok: false, error }),
   };
 }

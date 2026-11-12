@@ -15,7 +15,7 @@ import {
   type SettingsSnapshot,
 } from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
-import { isOneOf, toText } from "@featra/work-format";
+import { httpsLink, isOneOf, toText } from "@featra/work-format";
 import { pickFolder } from "./folder-dialog.ts";
 import { closeToTraySupport, type Lifecycle } from "./lifecycle.ts";
 import type { Log } from "./log.ts";
@@ -134,6 +134,13 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
       if (e2e) testHooks.shownInFolder.push(log.file);
       else shell.showItemInFolder(log.file);
     });
+  });
+  ipcMain.on(IPC.appOpenExternal, (_e, url: unknown) => {
+    // Only an https link reaches the OS browser; nothing else the window sends is opened.
+    const link = httpsLink(url);
+    if (!link) return;
+    if (e2e) testHooks.openedExternal.push(link);
+    else void shell.openExternal(link);
   });
   ipcMain.on(IPC.appClearCacheAndRestart, () => void clearCacheAndRestart(troubleshoot));
   ipcMain.on(IPC.appResetAppData, () => void resetAppData(troubleshoot));

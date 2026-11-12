@@ -7,6 +7,7 @@ import { DraftReview } from "./DraftReview.tsx";
 import { SendBack } from "./SendBack.tsx";
 import { StartFeature } from "./StartFeature.tsx";
 import { StoryChecks } from "./StoryChecks.tsx";
+import { StoryPr } from "./StoryPr.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
@@ -188,10 +189,7 @@ export function CardPane({
         <AcSection view={view} save={save} />
         <TaskSection view={view} save={save} />
         <TextSection view={view} save={save} field="notes" title={CARD_COPY.notes} placeholder={CARD_COPY.notesEmpty} />
-        <section className="card-sec" aria-label={CARD_COPY.pr}>
-          <h3 className="sh">{CARD_COPY.pr}</h3>
-          <p>{view.pr ?? <span className="meta">{CARD_COPY.none}</span>}</p>
-        </section>
+        <StoryPr view={view} onCreate={() => work.createPr(dir, id)} />
       </>
     );
   }

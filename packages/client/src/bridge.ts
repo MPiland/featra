@@ -3,6 +3,7 @@
  * remote control) gets the fallback below. The UI never talks to Electron any other way.
  */
 import { isRecord } from "@featra/work-format/guards";
+import { httpsLink } from "@featra/work-format/prs";
 import {
   DEFAULT_APP_SETTINGS,
   normalizeAppSettings,
@@ -162,6 +163,8 @@ export interface FeatraBridge {
     toggleDevTools: () => void;
     /** Shows the main process's log file in the OS file manager. */
     showLogs: () => void;
+    /** Opens an https link (a story's PR) in the OS browser; anything else is ignored. */
+    openExternal: (url: string) => void;
     /** Clears Chromium's HTTP cache, then restarts the app. */
     clearCacheAndRestart: () => void;
     /** Deletes stored state (window chrome, app state, web storage, cache), then restarts. Logs are kept. */
@@ -187,6 +190,7 @@ export const IPC = {
   appReload: "app:reload",
   appToggleDevTools: "app:toggle-devtools",
   appShowLogs: "app:show-logs",
+  appOpenExternal: "app:open-external",
   appClearCacheAndRestart: "app:clear-cache-and-restart",
   appResetAppData: "app:reset-app-data",
   appQuit: "app:quit",
@@ -285,6 +289,10 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       reload: () => window.location.reload(),
       toggleDevTools() {},
       showLogs() {},
+      openExternal: (url) => {
+        const link = httpsLink(url);
+        if (link) window.open(link, "_blank", "noopener,noreferrer");
+      },
       clearCacheAndRestart() {},
       resetAppData() {},
       quit() {},

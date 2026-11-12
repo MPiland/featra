@@ -30,6 +30,7 @@ import type { StorySpawn } from "./story-spawn.ts";
 import type { StoryAcceptance } from "./story-acceptance.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import type { StoryChecks } from "./story-checks.ts";
+import type { StoryPrs } from "./story-prs.ts";
 import type { StoryStop } from "./story-stop.ts";
 import type { Git } from "./git.ts";
 import type { RoleRegistry } from "./role-registry.ts";
@@ -54,6 +55,7 @@ export interface ApiDeps {
   acceptance: StoryAcceptance;
   checks: StoryChecks;
   checkSettings: CheckSettings;
+  prs: Pick<StoryPrs, "prState" | "decorate" | "createPr" | "focus">;
   chats: ChatManager;
   roles: RoleRegistry;
   roleWatches: RoleWatches;
@@ -95,6 +97,7 @@ export function createApi({
   acceptance,
   checks,
   checkSettings,
+  prs,
   chats,
   roles,
   roleWatches,
@@ -134,12 +137,17 @@ export function createApi({
       }
       case "work.watch": {
         const dir = project(params);
-        const { list, stop } = await watches.watch(dir, (next) => {
-          // A project closed since: say nothing more about it.
-          if (allowed.has(dir)) connection.push("work.list", id, next);
-        });
+        // The rows carry each story's PR state as last read (STORY-11), which a new read changes without a file event.
+        const { value, stop } = await watches.observe(
+          dir,
+          (_scan, list) => prs.decorate(dir, list),
+          (next) => {
+            // A project closed since: say nothing more about it.
+            if (allowed.has(dir)) connection.push("work.list", id, next);
+          },
+        );
         connection.keep(id, stop);
-        return list;
+        return value;
       }
       case "work.unwatch": {
         const p = unwatchParams(params);
@@ -161,7 +169,7 @@ export function createApi({
         const dir = allow(p.dir);
         const { value, stop } = await watches.observe(
           dir,
-          (scan) => cardViewIn(scan, p.id, checks.checksFor(dir, p.id)),
+          (scan) => cardViewIn(scan, p.id, checks.checksFor(dir, p.id), prs.prState(dir, p.id)),
           (next) => {
             if (allowed.has(dir)) connection.push("card.view", id, next);
           },
@@ -213,6 +221,14 @@ export function createApi({
         if (!p) throw new ApiError("Expected { dir, id }.");
         return checks.rerun(allow(p.dir), p.id);
       }
+      case "story.createPr": {
+        const p = cardParams(params);
+        if (!p) throw new ApiError("Expected { dir, id }.");
+        return prs.createPr(allow(p.dir), p.id);
+      }
+      case "prs.refresh":
+        prs.focus();
+        return null;
       case "checks.load":
         return checkSettings.load(project(params));
       case "checks.set": {

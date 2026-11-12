@@ -3,6 +3,7 @@
  * what Featra and the Dev Lead propose. The values live in the project's `.featra/config.yaml`, which git can change,
  * so the app's data folder also keeps the commands the user last confirmed: a different one in the file shows as
  * changed and does not run until the user confirms it. Proposals are kept there too and never apply by themselves.
+ * The section also says whether GitHub is usable and holds the story PR settings (STORY-11).
  */
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -16,10 +17,11 @@ import {
   type ChecksPatch,
   type ChecksView,
   type GithubDetection,
+  type GithubUse,
   type ProjectConfig,
 } from "@featra/work-format";
 import { writeConfigValue } from "./config-writer.ts";
-import { detectGithub, type GithubDeps } from "./github-detect.ts";
+import { detectGithub, detectGithubUse, type GithubDeps } from "./github-detect.ts";
 import { commandStore } from "./command-store.ts";
 import type { Scan } from "./work-scan.ts";
 
@@ -45,16 +47,21 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
   const proposed = commandStore(dataDir, "check-proposals.json");
   const confirmed = commandStore(dataDir, "check-confirmed.json");
   const confirm = (dir: string, field: CheckField, value: string | null) => confirmed.set(dir, field, value);
-  const detected = new Map<string, { at: number; found: Promise<GithubDetection> }>();
-
-  /** What Featra found about GitHub in `dir`, asked again after a minute. */
-  function github(dir: string): Promise<GithubDetection> {
-    const hit = detected.get(dir);
-    if (hit && now().getTime() - hit.at < DETECT_TTL_MS) return hit.found;
-    const found = detectGithub(dir, deps);
-    detected.set(dir, { at: now().getTime(), found });
-    return found;
-  }
+  /** A detection per project, asked again after a minute. */
+  const cached = <T>(detect: (dir: string) => Promise<T>) => {
+    const detected = new Map<string, { at: number; found: Promise<T> }>();
+    return (dir: string): Promise<T> => {
+      const hit = detected.get(dir);
+      if (hit && now().getTime() - hit.at < DETECT_TTL_MS) return hit.found;
+      const found = detect(dir);
+      detected.set(dir, { at: now().getTime(), found });
+      return found;
+    };
+  };
+  /** What Featra found about GitHub in `dir`: remote, workflows, visibility. */
+  const github = cached<GithubDetection>((dir) => detectGithub(dir, deps));
+  /** Whether GitHub is usable in `dir` for story PRs (STORY-11), and what is missing when it is not. */
+  const githubUse = cached<GithubUse>((dir) => detectGithubUse(dir, deps));
 
   /** The commands of the config that the user has confirmed (the only ones that run), and which are not confirmed. */
   async function changed(dir: string, config: ProjectConfig) {
@@ -70,7 +77,7 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
   }
 
   async function view(dir: string, config: ProjectConfig, error: string | null): Promise<ChecksView> {
-    const found = await github(dir);
+    const [found, use] = await Promise.all([github(dir), githubUse(dir)]);
     const fallback = defaultChecksWhere(found);
     const theirs = await proposed.get(dir);
     const dev = (["command", "testCommand"] as const).flatMap((field): CheckProposal[] =>
@@ -86,6 +93,9 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
       testCommand: config.linkedTestCommand,
       proposals,
       unconfirmed: (await changed(dir, config)).unconfirmed,
+      github: use,
+      openStoryPrs: config.openStoryPrs,
+      prRefreshMinutes: config.prRefreshMinutes,
       error,
     };
   }
@@ -98,6 +108,7 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
 
   return {
     github,
+    githubUse,
     /** The commands the user has confirmed, which are the only ones that run, and which are not confirmed yet. */
     confirmed: changed,
     load: (dir: string) => load(dir),
@@ -108,10 +119,12 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
         ["checksWhere", patch.where],
         ["checkCommand", patch.command],
         ["linkedTestCommand", patch.testCommand],
+        ["openStoryPrs", patch.openStoryPrs],
+        ["prRefreshMinutes", patch.prRefreshMinutes],
       ] as const;
       for (const [key, value] of writes) {
         if (value === undefined) continue;
-        const { error } = await writeConfigValue(dir, key, value);
+        const { error } = await writeConfigValue<keyof ProjectConfig>(dir, key, value);
         if (error !== null) return load(dir, error);
       }
       // What the user saved or confirmed is what they now trust, and a saved command is no longer a proposal.

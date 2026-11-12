@@ -1607,3 +1607,37 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
 - A check command changed through git does not run until the user confirms it.
 - Other build choices confirmed, with the unknown-visibility copy "Couldn't tell if it's public on GitHub, so checks run
   on this computer."
+
+## 2026-11-12 — STORY-11 build choices (story agent, for the Dev Lead to confirm)
+
+- **GitHub usable** means a GitHub remote, a `gh` that runs (`gh --version`), and `gh auth status --hostname github.com`
+  exiting 0. Only its exit code is read; nothing it prints is kept. The answer is cached for 60 seconds per project.
+  Local mode says the first thing missing in one line in Project settings' new Pull requests section.
+- **The two settings live in `.featra/config.yaml`**: `openStoryPrs` (default true) and `prRefreshMinutes` (whole
+  minutes, 1 to 60, default 2). They go through the Checks bridge (`checks.load` and `checks.set`), the same writer.
+- **A PR opens only on a move into review after Featra starts.** Stories already in review at startup are left alone and
+  offered Create PR. Why: opening PRs for every old story on first launch would surprise.
+- **Base is the feature branch** (`features[parent].branch`), else the repo's base branch. The feature branch is pushed
+  only when the remote lacks it. The story branch is pushed with `-u`; nothing is ever forced, and a rejected push shows
+  git's reason on the card.
+- **An open PR from the story's branch is adopted** (`gh pr list --head`), so a PR the user opened by hand isn't
+  duplicated. A new PR is created with `gh api repos/{owner}/{repo}/pulls --method POST --input -`, its title and body as
+  JSON on stdin, so card text never reaches a command line (ADR 0031's rule). Title `STORY-n: title`; body the user
+  story, the criteria as a checklist, and "Opened by Featra for STORY-n."
+- **The PR is recorded on the owner copy by `system`**, with a `pr` history event, through the card lane.
+- **Create PR** shows when GitHub is usable, the story is in review in its worktree with no PR, and nothing is opening;
+  also after a failure, with the failure as a note. It is offered whatever the automatic setting, so a failed or skipped
+  open can be retried.
+- **Every check `gh pr view` lists counts as required.** `gh` can't tell which are required without another call per
+  check run. Failure beats pending; pending or none changes nothing. Passing writes Verified, failing removes it, only
+  when `checksWhere` is CI, through the same `recordEvidence` the local checks use.
+- **One poller per project.** It reads at start, then every N minutes. Window focus asks the server (`prs.refresh`),
+  which settles a burst of focus changes for 1 second and reads once. Reads never overlap. Merged or closed PRs and the
+  PRs of done or cancelled stories aren't read again. Polling stops when the project closes; local mode reads nothing.
+- **The chip** is the PR number as a link (full URL in its title), the PR's state, and its checks: words on the card, a
+  mark with an accessible name on the Work row. The link opens in the OS browser through a new `app.openExternal`, which
+  takes only https links. A PR recorded before GitHub was usable still shows its number, without state.
+- **Tests fake `gh` with a script** (`packages/server/test/fake-gh.cjs`) given to the server as `ghCommand`, and the
+  remote is a bare repository whose path contains `github.com`, so detection passes and pushes stay on disk. The
+  Playwright journey puts the same fake `gh` first on the PATH. The Work list's fixture PR is now a URL, as cards record
+  it, so the existing tests' `#15` is the chip's label.

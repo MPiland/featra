@@ -19,7 +19,8 @@ export type HistoryField =
   | "sent-back"
   | "stopped"
   | "queued"
-  | "report";
+  | "report"
+  | "pr";
 export const HISTORY_FIELDS: readonly HistoryField[] = [
   "status",
   "parent",
@@ -30,6 +31,7 @@ export const HISTORY_FIELDS: readonly HistoryField[] = [
   "report",
   "stopped",
   "queued",
+  "pr",
 ];
 
 /** Append-only record of a change, written at the card's owner (ADR 0002). */
@@ -115,4 +117,8 @@ export interface ProjectConfig {
   checkCommand: string | null;
   /** The template that runs one linked test, with `{file}`, `{name}` and `{namePattern}`; null until confirmed. */
   linkedTestCommand: string | null;
+  /** Whether a story's PR is opened when it moves to review (STORY-11); off, the card offers Create PR. */
+  openStoryPrs: boolean;
+  /** How often open PRs are read again, in minutes (STORY-11). */
+  prRefreshMinutes: number;
 }

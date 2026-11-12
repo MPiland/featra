@@ -7,6 +7,7 @@ import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
+import { PrChip } from "./PrChip.tsx";
 import { StoryAgent, StoryAgentsContext } from "./story-agents.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
@@ -68,7 +69,13 @@ function Story({ story }: { story: StoryRow }) {
         </span>
         <span role="cell">{ticks(story.criteria)}</span>
         <span role="cell">{ticks(story.tasks)}</span>
-        <span role="cell">{story.pr ?? <span className="meta">{WORK_COPY.none}</span>}</span>
+        <span role="cell">
+          {story.pr ? (
+            <PrChip url={story.pr} status={story.prStatus} compact />
+          ) : (
+            <span className="meta">{WORK_COPY.none}</span>
+          )}
+        </span>
       </div>
       <div role="none" ref={setBelow} className="prow-below" />
     </>
