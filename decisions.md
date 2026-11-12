@@ -1721,3 +1721,17 @@ ADR 0033 (proposed) records the design. Choices to confirm:
 - Featra's own config sets `testReportArtifact: test-report-unit`.
 - vitest's junit `classnameTemplate` exists, but `{filepath}` writes the absolute path; the default classname is already
   the path from the repository's root, so `vitest.config.ts` keeps it.
+
+## 2026-11-12 — STORY-57 review rulings (dev-lead)
+
+- Proven from CI drops as soon as the PR head moves or is stale, like Verified; the new head's report proves again.
+- A report path that only matches a link by a shorter suffix counts only when it is unambiguous; otherwise the criterion
+  is missing with the reason that the report can't tell the files apart.
+- Only `queued` and `in_progress` runs hold the read back.
+- Report names and links share one normalizer, so Playwright's `›` and vitest's `>` read the same.
+- Our CI keeps vitest's default JUnit classname (the path from the repository root); `{filepath}` would be absolute and
+  machine-specific. Confirmed.
+- Approved changed expectation: `card.test.ts` "uses the default config" now expects Featra's own config to equal the
+  default plus `testReportArtifact: test-report-unit`, because this repo now proves its criteria from CI (ruling 8).
+  Still an exact match.
+- Other build choices confirmed. Download limits and re-run detection go to the roadmap.

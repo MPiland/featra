@@ -2,7 +2,7 @@
 id: STORY-57
 type: story
 title: Proven from a CI test report
-status: In Review
+status: Acceptance
 parent: FEAT-6
 order: 4
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-57
+  - at: 2026-11-12T21:17:13Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

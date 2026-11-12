@@ -75,6 +75,11 @@ epics in `.featra/cards/`.
 - **PR chip: required versus optional checks.** The chip reports every check while Verified uses only required checks,
   so a Verified story can show "Checks failing" from an optional check. Show which checks are required. From STORY-11.
 
+- **CI test reports: download limits.** Only the XML read is size-limited; downloads have no total size or time limit
+  and run one after another, which can hold up the PR poll. From STORY-57.
+- **CI test reports: re-run detection.** A re-run that finishes within one poll interval is missed; compare the run's
+  attempt or `updatedAt` instead of watching for pending. From STORY-57.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".
