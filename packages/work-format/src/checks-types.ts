@@ -12,7 +12,7 @@ export const CHECKS_WHERE: readonly ChecksWhere[] = ["ci", "local"];
 export interface GithubDetection {
   remote: boolean;
   workflows: boolean;
-  /** Null when it couldn't be told: `gh` missing, signed out, or failing. Treated as not public. */
+  /** Null when it couldn't be told: `gh` missing, signed out, or failing. Checks then run on this computer. */
   public: boolean | null;
 }
 
@@ -37,6 +37,8 @@ export interface ChecksView {
   command: string | null;
   testCommand: string | null;
   proposals: CheckProposal[];
+  /** Commands in the project's config that the user hasn't confirmed here (changed through git, say). They don't run. */
+  unconfirmed: CheckField[];
   /** Set when the project's config can't be read; nothing is changed then. */
   error: string | null;
 }
@@ -46,6 +48,8 @@ export interface ChecksPatch {
   where?: ChecksWhere | null;
   command?: string | null;
   testCommand?: string | null;
+  /** Commands now in the project's config that the user confirms as they are. */
+  confirm?: CheckField[];
 }
 
 /** A finished run, for the card: its command, when it ended, and the tail of what it printed. */
@@ -69,6 +73,7 @@ export interface CardChecks {
   note: string | null;
 }
 
+const isField = (v: unknown): v is CheckField => v === "command" || v === "testCommand";
 const text = (v: unknown) => (typeof v === "string" ? v : "");
 const textOrNull = (v: unknown) => (typeof v === "string" && v ? v : null);
 
@@ -106,6 +111,7 @@ export function normalizeChecksView(raw: unknown): ChecksView {
         const source = p.source === "package.json" || p.source === "dev-lead" ? p.source : null;
         return field && source && typeof p.value === "string" && p.value ? [{ field, value: p.value, source }] : [];
       }),
+    unconfirmed: (Array.isArray(r.unconfirmed) ? (r.unconfirmed as unknown[]) : []).filter(isField),
     error: textOrNull(r.error),
   };
 }
@@ -123,6 +129,10 @@ export function parseChecksPatch(raw: unknown): ChecksPatch | null {
     const value = raw[key];
     if (value !== null && typeof value !== "string") return null;
     patch[key] = value;
+  }
+  if ("confirm" in raw) {
+    if (!Array.isArray(raw.confirm) || !raw.confirm.every(isField)) return null;
+    patch.confirm = [...new Set<CheckField>(raw.confirm)];
   }
   return patch;
 }

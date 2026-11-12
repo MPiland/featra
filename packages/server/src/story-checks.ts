@@ -6,29 +6,24 @@
  * One run per worktree at a time: a request that arrives while one runs queues behind it (at most one, so a burst of
  * commits runs once more), and the run it makes stale is thrown away. Runs cost no tokens and never block the server.
  */
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import {
   CHECKS_COPY,
   checksApply,
   checksWhere,
-  parseTestRefs,
   serializeCard,
-  testCommand,
   toIso,
   withCheckEvidence,
-  type Card,
   type CardChecks,
   type CheckOutcome,
-  type ProjectConfig,
 } from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { ApiError } from "./api-error.ts";
 import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { locationKey } from "./collect.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
-import { runCommand, tail, type RunControl, type RunResult } from "./check-run.ts";
+import { runCommand, type RunControl, type RunResult } from "./check-run.ts";
 import type { CheckSettings } from "./check-settings.ts";
+import { LINKED_NOTES, runLinkedTests } from "./linked-tests.ts";
 import type { Scan } from "./work-scan.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
@@ -36,11 +31,11 @@ export interface StoryChecksDeps {
   scan: (dir: string) => Promise<Scan | null>;
   observe: WorkWatches["observe"];
   allowed: Pick<AllowedProjects, "dirs" | "has" | "onChange">;
-  settings: Pick<CheckSettings, "github">;
+  settings: Pick<CheckSettings, "github" | "confirmed">;
   now: () => Date;
   lane?: CardLane;
   log: (message: string) => void;
-  /** How many worktrees run at once; two by default. */
+  /** How many commands run at once, across all stories and projects; two by default. */
   limit?: number;
   /** How long one command may run before it is killed. */
   timeoutMs?: number;
@@ -53,9 +48,12 @@ interface Reviewed {
 }
 
 const NOTES = {
-  noTemplate: "Linked tests didn't run. Set a linked test command in Project settings.",
   gone: "That story isn't in review here.",
   ci: "Checks run in CI for this project.",
+  checkChanged:
+    "The check command was changed in the project's config. Confirm it in Project settings; nothing runs until then.",
+  testChanged: "The linked test command was changed in the project's config. Confirm it in Project settings.",
+  failed: "Checks couldn't run: ",
 } as const;
 
 const keyOf = (dir: string, id: string) => `${dir}\0${id}`;
@@ -119,51 +117,15 @@ export function createStoryChecks({
     if (!closed) await scanDir(dir);
   };
 
-  /** Each acceptance criterion's linked tests, run with the project's template; an AC is Proven only if all pass. */
-  async function linkedTests(card: Card, config: ProjectConfig, root: string) {
-    const refs = card.acs.map((ac) => parseTestRefs(ac.test));
-    if (!refs.some((r) => r.length)) return { acs: [], failures: "", note: null };
-    const template = config.linkedTestCommand;
-    if (!template) return { acs: [], failures: "", note: NOTES.noTemplate };
-    const results = new Map<string, { ok: boolean; output: string }>();
-    const notes: string[] = [];
-    const acs: CheckOutcome["acs"][number][] = [];
-    const failures: string[] = [];
-    for (const [i, list] of refs.entries()) {
-      let allPassed = list.length > 0;
-      for (const ref of list) {
-        const label = `${ref.file}${ref.name ? `::${ref.name}` : ""}`;
-        const made = testCommand(template, ref);
-        let result = results.get(label);
-        if (!result) {
-          if (!made.ok) {
-            notes.push(`AC ${i + 1}: ${made.reason}`);
-            result = { ok: false, output: made.reason };
-          } else if (!existsSync(join(root, ref.file))) {
-            result = { ok: false, output: `${ref.file} is not in this worktree.` };
-          } else {
-            const r = await run(made.command, root);
-            result = { ok: r.code === 0, output: r.output };
-          }
-          results.set(label, result);
-        }
-        if (!result.ok) allPassed = false;
-        if (!result.ok) failures.push(`AC ${i + 1}: ${label}\n${tail(result.output, 3000)}`);
-      }
-      if (list.length) acs.push({ ac: i + 1, passed: allPassed });
-    }
-    return { acs, failures: failures.join("\n\n"), note: notes.join(" ") || null };
-  }
-
-  /** The evidence of `outcome` on the story's owner copy, read fresh in the lane; false when the story moved on. */
+  /** The evidence of `outcome` on the story's owner copy, read fresh in the lane; false when the story left review. */
   const record = (dir: string, id: string, outcome: CheckOutcome) =>
     lane.exclusive(async () => {
       const scan = await scanDir(dir);
       const found = ownedIn(scan, id);
-      if (!scan || !found?.root || !checksApply(found.owned.card, scan.collected.config)) return;
+      if (!scan || !found?.root || !checksApply(found.owned.card, scan.collected.config)) return false;
       const next = withCheckEvidence(found.owned.card, scan.collected.config, outcome, "system", toIso(now()));
-      if (next === found.owned.card) return;
-      await writeAtomic(fileIn(found.root, found.owned.path), serializeCard(next));
+      if (next !== found.owned.card) await writeAtomic(fileIn(found.root, found.owned.path), serializeCard(next));
+      return true;
     });
 
   /** One run: null when it ran, else why not. The result is written only if nothing newer was asked for meanwhile. */
@@ -174,19 +136,32 @@ export function createStoryChecks({
     if (!scan || !config || !found?.root || found.owned.owner.kind !== "worktree") return NOTES.gone;
     if (!checksApply(found.owned.card, config)) return NOTES.gone;
     if (checksWhere(config, await settings.github(dir)) !== "local") return NOTES.ci;
-    const { checkCommand } = config;
-    if (!checkCommand) {
-      await show(dir, id, { ...blank(), idle: CHECKS_COPY.noCommand });
+    const trusted = await settings.confirmed(dir, config);
+    if (config.checkCommand === null || trusted.command === null) {
+      const idle = config.checkCommand === null ? CHECKS_COPY.noCommand : NOTES.checkChanged;
+      await show(dir, id, { ...blank(), idle });
       return null;
     }
+    const checkCommand = trusted.command;
     const before = states.get(keyOf(dir, id)) ?? blank();
     await show(dir, id, { ...before, running: true, idle: null });
     const main = await run(checkCommand, found.root);
-    const linked = await linkedTests(found.owned.card, config, found.root);
+    const linked = await runLinkedTests({
+      card: found.owned.card,
+      template: trusted.testCommand,
+      without: config.linkedTestCommand === null ? LINKED_NOTES.noTemplate : NOTES.testChanged,
+      root: found.root,
+      run,
+      stale,
+    });
     if (stale() || closed) return null;
     const passed = main.code === 0;
     const output = passed ? linked.failures : `${main.timedOut ? "Timed out.\n" : ""}${main.output}`;
-    await record(dir, id, { passed, acs: linked.acs });
+    if (!(await record(dir, id, { passed, acs: linked.acs }))) {
+      // The story left review while this ran: there is nothing to show for it.
+      states.delete(keyOf(dir, id));
+      return null;
+    }
     await show(dir, id, {
       running: false,
       idle: null,
@@ -213,7 +188,16 @@ export function createStoryChecks({
         try {
           refusal = await execute(dir, id, () => mine.pending);
         } catch (err) {
-          log(`Checks for ${id} failed: ${err instanceof Error ? err.message : String(err)}`);
+          const why = err instanceof Error ? err.message : String(err);
+          log(`Checks for ${id} failed: ${why}`);
+          // A run that threw must not leave the card saying it is still running.
+          states.set(key, {
+            ...(states.get(key) ?? blank()),
+            running: false,
+            idle: null,
+            note: `${NOTES.failed}${why}`,
+          });
+          await scanDir(dir).catch(() => null);
           refusal = null;
         }
       } while (mine.pending && !isClosed());
@@ -231,7 +215,12 @@ export function createStoryChecks({
     let baseline = true;
     const consider = (items: Reviewed[]) => {
       const present = new Set(items.map((s) => keyOf(dir, s.id)));
-      for (const key of seen.keys()) if (key.startsWith(`${dir}\0`) && !present.has(key)) seen.delete(key);
+      for (const key of seen.keys()) {
+        if (!key.startsWith(`${dir}\0`) || present.has(key)) continue;
+        seen.delete(key);
+        // A story that left review has no checks to show (one still running is cleared when it ends).
+        if (!slots.has(key)) states.delete(key);
+      }
       for (const s of items) {
         const key = keyOf(dir, s.id);
         const changed = seen.get(key) !== s.trigger;

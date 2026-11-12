@@ -18,6 +18,7 @@ export const CHECKS_COPY = {
   noGithub: "Not on GitHub, so checks run on this computer.",
   noWorkflows: "No GitHub workflows, so checks run on this computer.",
   notPublic: "Private on GitHub, where CI minutes are limited, so checks run on this computer.",
+  unknown: "Couldn't tell if it's public on GitHub, so checks run on this computer.",
   notFeatra: "This folder isn't a Featra project.",
   noCommand: "No check command yet. Set one in Project settings.",
 } as const;
@@ -26,7 +27,8 @@ export const CHECKS_COPY = {
 export function defaultChecksWhere(found: GithubDetection): { where: ChecksWhere; reason: string } {
   if (!found.remote) return { where: "local", reason: CHECKS_COPY.noGithub };
   if (!found.workflows) return { where: "local", reason: CHECKS_COPY.noWorkflows };
-  if (found.public !== true) return { where: "local", reason: CHECKS_COPY.notPublic };
+  if (found.public === null) return { where: "local", reason: CHECKS_COPY.unknown };
+  if (!found.public) return { where: "local", reason: CHECKS_COPY.notPublic };
   return { where: "ci", reason: CHECKS_COPY.ci };
 }
 

@@ -17,6 +17,7 @@ const VIEW: ChecksView = {
     { field: "command", value: "pnpm test", source: "package.json" },
     { field: "testCommand", value: "npx vitest run {file} -t {namePattern}", source: "dev-lead" },
   ],
+  unconfirmed: [],
   error: null,
 };
 
@@ -71,5 +72,35 @@ describe("AC2: the user confirms or edits the proposed command", () => {
     const { section } = await open({ ...VIEW, error: "checkCommand must be one line." });
     expect((await within(section).findByRole("alert")).textContent).toBe("checkCommand must be one line.");
     expect(screen.getByRole("heading", { name: "Checks" })).toBeTruthy();
+  });
+});
+
+describe("AC3: a command that git changed in the project's config", () => {
+  const CHANGED: ChecksView = { ...VIEW, command: "pnpm run evil", proposals: [], unconfirmed: ["command"] };
+
+  it("is shown as changed, and runs only once the user confirms it", async () => {
+    const { section, user, calls } = await open(CHANGED);
+    expect(within(section).getByText("Changed in the project's config:")).toBeTruthy();
+    expect(within(section).getByText("pnpm run evil", { selector: "code" })).toBeTruthy();
+    await user.click(within(section).getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(calls).toContain(`checks.set:${PROJECT.dir}:{"confirm":["command"]}`));
+    await waitFor(() => expect(within(section).queryByRole("button", { name: "Confirm" })).toBeNull());
+    expect(input(section, "Check command").value).toBe("pnpm run evil");
+  });
+
+  it("shows nothing about a command the user has confirmed", async () => {
+    const { section } = await open({ ...CHANGED, unconfirmed: [] });
+    expect(within(section).queryByRole("button", { name: "Confirm" })).toBeNull();
+  });
+});
+
+describe("AC5: what the linked test command may use", () => {
+  it("tells the placeholders, that a JUnit report is needed and that e2e tests aren't run", async () => {
+    const { section } = await open();
+    const help = within(section).getByText(/Runs a criterion's linked tests/);
+    expect(help.textContent).toContain("{namePattern}");
+    expect(help.textContent).toContain("{report}");
+    expect(help.textContent).toContain("JUnit");
+    expect(help.textContent).toContain("e2e");
   });
 });

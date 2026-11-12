@@ -12,7 +12,6 @@ import {
   parseDraft,
   parseLogInput,
   parseMessageInput,
-  parseProposeInput,
   parseReportInput,
   parseSpawnInput,
   parseStartInput,
@@ -28,6 +27,7 @@ import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { CardReport } from "./card-report.ts";
 import type { CheckSettings } from "./check-settings.ts";
+import { proposeChecks } from "./check-propose.ts";
 import type { DraftWriter } from "./draft-writer.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StoryMessage } from "./story-message.ts";
@@ -219,18 +219,7 @@ export function createAgentBridge({
     const off = await mcpRefusal(dir);
     if (off !== null) throw new ApiError(off);
     if (!checkSettings) throw new ApiError(AGENT_MESSAGES.noPropose);
-    const input = parseProposeInput(params);
-    if (!input.ok) throw new ApiError(input.error);
-    const proposed: string[] = [];
-    if (input.value.command !== undefined) {
-      await checkSettings.propose(dir, "command", input.value.command);
-      proposed.push("command");
-    }
-    if (input.value.testCommand !== undefined) {
-      await checkSettings.propose(dir, "testCommand", input.value.testCommand);
-      proposed.push("testCommand");
-    }
-    return { proposed };
+    return proposeChecks(checkSettings, dir, params);
   }
 
   return {

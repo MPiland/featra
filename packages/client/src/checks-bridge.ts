@@ -22,6 +22,7 @@ const failed = (error: string): ChecksView => ({
   command: null,
   testCommand: null,
   proposals: [],
+  unconfirmed: [],
   error,
 });
 
@@ -49,7 +50,10 @@ export const CHECKS_PAGE_COPY = {
   command: "Check command",
   commandHint: "Runs in the story's worktree. For example: pnpm test",
   testCommand: "Linked test command",
-  testHint: "Runs each criterion's linked test. Use {file} and {name}.",
+  testHint:
+    "Runs a criterion's linked tests, once per file. Use {file}, {namePattern} (or {name} for one test) and {report}: the runner must write a JUnit report there, or nothing is proven. Tests under e2e aren't run.",
+  changed: "Changed in the project's config",
+  confirm: "Confirm",
   proposed: (source: string) => (source === "dev-lead" ? "Proposed by the Dev Lead" : "Found in package.json"),
   use: "Use this",
   save: "Save",

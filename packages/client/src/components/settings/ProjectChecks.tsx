@@ -64,6 +64,15 @@ export function ProjectChecks({ checks, dir }: { checks: ChecksBridge; dir: stri
             spellCheck={false}
             onChange={(e) => setDraft({ ...draft, [f]: e.target.value })}
           />
+          {view.unconfirmed.includes(f) && (
+            <div className="setting-help">
+              <span>{COPY.changed}: </span>
+              <code>{view[f]}</code>{" "}
+              <button type="button" className="link" onClick={() => void change({ confirm: [f] })}>
+                {COPY.confirm}
+              </button>
+            </div>
+          )}
           {view.proposals
             .filter((p) => p.field === f)
             .map((p) => (

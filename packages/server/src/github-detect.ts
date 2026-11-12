@@ -50,9 +50,12 @@ export function repoIsPublic(dir: string, gh = "gh", timeout = 15_000): Promise<
         resolve(null);
       }
     };
-    // A .cmd shim on Windows needs the shell. The command is fixed text, so nothing from a card or the page is in it.
-    if (process.platform === "win32") exec(`${gh} repo view --json visibility`, options, done);
-    else execFile(gh, ["repo", "view", "--json", "visibility"], options, done);
+    // A .cmd shim on Windows needs the shell. The command is fixed text, so nothing from a card or the page is in it;
+    // a path to the program is quoted, so a path with spaces still runs and one with a quote is not run.
+    if (process.platform === "win32") {
+      if (/["%^!\r\n]/.test(gh)) return resolve(null);
+      exec(`${/[\\/ ]/.test(gh) ? `"${gh}"` : gh} repo view --json visibility`, options, done);
+    } else execFile(gh, ["repo", "view", "--json", "visibility"], options, done);
   });
 }
 

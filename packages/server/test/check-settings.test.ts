@@ -87,6 +87,16 @@ describe("GitHub detection (AC1)", () => {
     expect(await detectGithub(repo.main, { ghCommand: "gh-that-is-not-installed" })).toMatchObject({ public: null });
   });
 
+  it("runs a gh whose path has a space in it, and refuses one with a quote in it", async () => {
+    if (!win) return;
+    await onGithub();
+    const spaced = join(bin, "with space");
+    await mkdir(spaced);
+    await writeFile(join(spaced, "gh.cmd"), '@echo off\r\necho {"visibility":"PUBLIC"}\r\n');
+    expect(await detectGithub(repo.main, { ghCommand: join(spaced, "gh.cmd") })).toMatchObject({ public: true });
+    expect(await detectGithub(repo.main, { ghCommand: 'gh" & echo x & "' })).toMatchObject({ public: null });
+  });
+
   it("has no remote or no workflows without asking gh anything it doesn't need", async () => {
     await fakeGh('{"visibility":"PUBLIC"}');
     expect(await detectGithub(repo.main)).toEqual({ remote: false, workflows: false, public: null });
@@ -97,6 +107,10 @@ describe("GitHub detection (AC1)", () => {
     expect(await detectGithub(repo.main)).toMatchObject({ remote: true, workflows: false });
   });
 });
+
+const configFile = () => join(repo.main, ".featra", "config.yaml");
+const setCommand = (command: string) =>
+  writeFile(configFile(), `version: 1\ncheckCommand: ${JSON.stringify(command)}\n`);
 
 describe("Project settings' Checks section (AC1, AC2)", () => {
   let settings: CheckSettings;
@@ -122,6 +136,23 @@ describe("Project settings' Checks section (AC1, AC2)", () => {
     });
   });
 
+  it("says it couldn't tell when gh fails or is missing, and runs on this computer", async () => {
+    await onGithub();
+    await fakeGh("not signed in", 1);
+    expect(await settings.load(repo.main)).toMatchObject({
+      where: "local",
+      chosen: false,
+      reason: CHECKS_COPY.unknown,
+    });
+    const none = createCheckSettings({
+      scan: scanner.scan,
+      now: () => new Date(),
+      ghCommand: "gh-that-is-not-installed",
+    });
+    expect(await none.load(repo.main)).toMatchObject({ where: "local", reason: CHECKS_COPY.unknown });
+    expect(CHECKS_COPY.unknown).toBe("Couldn't tell if it's public on GitHub, so checks run on this computer.");
+  });
+
   it("defaults to this computer without GitHub", async () => {
     expect(await settings.load(repo.main)).toMatchObject({ where: "local", reason: CHECKS_COPY.noGithub });
   });
@@ -144,7 +175,11 @@ describe("Project settings' Checks section (AC1, AC2)", () => {
     expect(view.command).toBeNull();
     expect(view.proposals).toEqual([
       { field: "command", value: "pnpm test", source: "package.json" },
-      { field: "testCommand", value: "pnpm exec vitest run {file} -t {namePattern}", source: "package.json" },
+      {
+        field: "testCommand",
+        value: "pnpm exec vitest run {file} -t {namePattern} --reporter=junit --outputFile={report}",
+        source: "package.json",
+      },
     ]);
   });
 
@@ -181,6 +216,54 @@ describe("Project settings' Checks section (AC1, AC2)", () => {
     } finally {
       await rm(dataDir, { recursive: true, force: true });
     }
+  });
+
+  describe("a command that git changed in the project's config", () => {
+    it("is shown as changed and is not one that runs, until the user confirms it", async () => {
+      await setCommand("node evil.js");
+      const view = await settings.load(repo.main);
+      expect(view).toMatchObject({ command: "node evil.js", unconfirmed: ["command"] });
+      const config = (await scanner.scan(repo.main))?.collected.config;
+      expect(config && (await settings.confirmed(repo.main, config))).toMatchObject({ command: null });
+      const after = await settings.set(repo.main, { confirm: ["command"] });
+      expect(after.unconfirmed).toEqual([]);
+      const again = (await scanner.scan(repo.main))?.collected.config;
+      expect(again && (await settings.confirmed(repo.main, again))).toMatchObject({ command: "node evil.js" });
+    });
+
+    it("is changed again when the file holds a different command from the confirmed one", async () => {
+      await settings.set(repo.main, { command: "pnpm test", testCommand: "run {file} {report}" });
+      expect((await settings.load(repo.main)).unconfirmed).toEqual([]);
+      await writeFile(
+        configFile(),
+        "version: 1\ncheckCommand: pnpm test && curl evil\nlinkedTestCommand: run {file} {report}\n",
+      );
+      expect((await settings.load(repo.main)).unconfirmed).toEqual(["command"]);
+      const config = (await scanner.scan(repo.main))?.collected.config;
+      expect(config && (await settings.confirmed(repo.main, config))).toMatchObject({
+        command: null,
+        testCommand: "run {file} {report}",
+      });
+    });
+
+    it("is trusted once the user saves a value in Project settings, which is what they typed", async () => {
+      const view = await settings.set(repo.main, { command: "pnpm run check" });
+      expect(view).toMatchObject({ command: "pnpm run check", unconfirmed: [] });
+    });
+
+    it("keeps what the user confirmed in the app's data folder across restarts", async () => {
+      const dataDir = await mkdtemp(join(tmpdir(), "featra-data-"));
+      try {
+        const deps = { scan: scanner.scan, now: () => new Date(), dataDir };
+        await createCheckSettings(deps).set(repo.main, { command: "pnpm test" });
+        expect((await createCheckSettings(deps).load(repo.main)).unconfirmed).toEqual([]);
+        expect((await createCheckSettings({ ...deps, dataDir: undefined }).load(repo.main)).unconfirmed).toEqual([
+          "command",
+        ]);
+      } finally {
+        await rm(dataDir, { recursive: true, force: true });
+      }
+    });
   });
 
   it("refuses a command that is empty, has a line break or is too long, and changes nothing", async () => {

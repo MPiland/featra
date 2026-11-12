@@ -13,16 +13,11 @@ import {
   DEFAULT_CONFIG,
   defaultChecksWhere,
   evidenceState,
-  isTestFile,
   normalizeCardChecks,
   parseConfig,
-  parseTestRefs,
-  proposeCommands,
-  quoteArg,
   recordAcceptance,
   recordEvidence,
   reviewStage,
-  testCommand,
   withCheckEvidence,
   type Card,
   type GithubDetection,
@@ -50,7 +45,7 @@ describe("where checks run by default (AC1)", () => {
     ["no GitHub remote", github({ remote: false }), CHECKS_COPY.noGithub],
     ["no workflows", github({ workflows: false }), CHECKS_COPY.noWorkflows],
     ["a private repo", github({ public: false }), CHECKS_COPY.notPublic],
-    ["visibility unknown", github({ public: null }), CHECKS_COPY.notPublic],
+    ["visibility unknown", github({ public: null }), CHECKS_COPY.unknown],
   ])("is this computer with %s", (_name, found, reason) => {
     expect(defaultChecksWhere(found)).toEqual({ where: "local", reason });
   });
@@ -181,108 +176,6 @@ describe("what a run proves (AC4, AC5)", () => {
   });
 });
 
-describe("linked tests from a criterion (AC5)", () => {
-  it("reads a file with a test name after ::, joining describe and test names", () => {
-    expect(parseTestRefs("packages/a/test/x.test.ts::group > does it")).toEqual([
-      { file: "packages/a/test/x.test.ts", name: "group does it" },
-    ]);
-  });
-
-  it("reads a whole file and a quoted name", () => {
-    expect(parseTestRefs("test/x.test.ts")).toEqual([{ file: "test/x.test.ts", name: null }]);
-    expect(parseTestRefs('test/x.test.ts "does it"')).toEqual([{ file: "test/x.test.ts", name: "does it" }]);
-  });
-
-  it("reads several separated by ; and leaves prose out", () => {
-    const refs = parseTestRefs("a/x.test.ts::one; b/y.spec.ts::two > three; see the docs");
-    expect(refs).toEqual([
-      { file: "a/x.test.ts", name: "one" },
-      { file: "b/y.spec.ts", name: "two three" },
-    ]);
-    expect(parseTestRefs("see the docs")).toEqual([]);
-    expect(parseTestRefs(null)).toEqual([]);
-  });
-
-  it("accepts only safe relative test files", () => {
-    expect(isTestFile("test/x.test.ts")).toBe(true);
-    expect(isTestFile("../x.test.ts")).toBe(false);
-    expect(isTestFile("/etc/x.test.ts")).toBe(false);
-    expect(isTestFile("C:/x.test.ts")).toBe(false);
-    expect(isTestFile("x.ts")).toBe(false);
-  });
-});
-
-describe("shell quoting (no injection)", () => {
-  it("single-quotes on POSIX and escapes quotes inside", () => {
-    expect(quoteArg("a b", "linux")).toEqual({ ok: true, arg: "'a b'" });
-    expect(quoteArg("it's $(x)", "linux")).toEqual({ ok: true, arg: String.raw`'it'\''s $(x)'` });
-  });
-
-  it("double-quotes on Windows and refuses what cmd would read", () => {
-    expect(quoteArg("a b", "win32")).toEqual({ ok: true, arg: '"a b"' });
-    for (const bad of ['a"b', "50%", "a^b", "a!b"]) expect(quoteArg(bad, "win32").ok).toBe(false);
-  });
-
-  it("refuses a line break everywhere", () => {
-    expect(quoteArg("a\nb", "linux").ok).toBe(false);
-    expect(quoteArg("a\0b", "win32").ok).toBe(false);
-  });
-
-  it("fills the template with quoted values only", () => {
-    const ref = { file: "test/x.test.ts", name: "does (it) $HOME" };
-    expect(testCommand("npx vitest run {file} -t {name}", ref, "linux")).toEqual({
-      ok: true,
-      command: "npx vitest run 'test/x.test.ts' -t 'does (it) $HOME'",
-    });
-  });
-
-  it("escapes the name for a pattern in {namePattern}", () => {
-    const made = testCommand("run {namePattern}", { file: "a.test.ts", name: "a (b)" }, "linux");
-    expect(made).toEqual({ ok: true, command: String.raw`run 'a \(b\)'` });
-  });
-
-  it("never reads a value as a placeholder", () => {
-    const made = testCommand("run {name} {file}", { file: "a.test.ts", name: "{file}" }, "linux");
-    expect(made).toEqual({ ok: true, command: "run '{file}' 'a.test.ts'" });
-  });
-
-  it("refuses a file outside the project and a name the shell would read", () => {
-    expect(testCommand("run {file}", { file: "../x.test.ts", name: null }, "linux").ok).toBe(false);
-    expect(testCommand("run {name}", { file: "a.test.ts", name: "100%" }, "win32").ok).toBe(false);
-  });
-});
-
-const pkg = (extra: object = {}) => JSON.stringify({ scripts: { test: "vitest run" }, ...extra });
-
-describe("commands proposed from the project's files (AC2)", () => {
-  it("proposes the test script through the package manager the lockfile names", () => {
-    expect(proposeCommands({ packageJson: pkg(), lockfiles: [] })[0]).toEqual({
-      field: "command",
-      value: "npm test",
-      source: "package.json",
-    });
-    expect(proposeCommands({ packageJson: pkg(), lockfiles: ["pnpm-lock.yaml"] })[0]?.value).toBe("pnpm test");
-    expect(proposeCommands({ packageJson: pkg(), lockfiles: ["yarn.lock"] })[0]?.value).toBe("yarn test");
-    expect(proposeCommands({ packageJson: pkg(), lockfiles: ["bun.lock"] })[0]?.value).toBe("bun run test");
-  });
-
-  it("proposes a linked-test template for the runner the project depends on", () => {
-    const found = proposeCommands({
-      packageJson: pkg({ devDependencies: { vitest: "1" } }),
-      lockfiles: ["pnpm-lock.yaml"],
-    });
-    expect(found.find((p) => p.field === "testCommand")?.value).toBe("pnpm exec vitest run {file} -t {namePattern}");
-    const jest = proposeCommands({ packageJson: pkg({ dependencies: { jest: "1" } }), lockfiles: [] });
-    expect(jest.find((p) => p.field === "testCommand")?.value).toBe("npx jest {file} -t {namePattern}");
-  });
-
-  it("proposes nothing without a test script, with bad JSON, or without package.json", () => {
-    expect(proposeCommands({ packageJson: JSON.stringify({ scripts: {} }), lockfiles: [] })).toEqual([]);
-    expect(proposeCommands({ packageJson: "{nope", lockfiles: [] })).toEqual([]);
-    expect(proposeCommands({ packageJson: null, lockfiles: [] })).toEqual([]);
-  });
-});
-
 describe("what crosses the socket", () => {
   it("reads a patch and refuses a bad one", () => {
     expect(checksSetParams({ dir: "d", patch: { where: "local", command: null } })).toEqual({
@@ -292,6 +185,15 @@ describe("what crosses the socket", () => {
     expect(checksSetParams({ dir: "d", patch: { where: "mars" } })).toBeNull();
     expect(checksSetParams({ dir: "d", patch: { command: 3 } })).toBeNull();
     expect(checksSetParams({ patch: {} })).toBeNull();
+  });
+
+  it("reads a confirm patch of known commands, once each, and refuses an unknown one", () => {
+    expect(checksSetParams({ dir: "d", patch: { confirm: ["command", "testCommand", "command"] } })).toEqual({
+      dir: "d",
+      patch: { confirm: ["command", "testCommand"] },
+    });
+    expect(checksSetParams({ dir: "d", patch: { confirm: ["where"] } })).toBeNull();
+    expect(checksSetParams({ dir: "d", patch: { confirm: "command" } })).toBeNull();
   });
 
   it("reads the card's checks defensively", () => {

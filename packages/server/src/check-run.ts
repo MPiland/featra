@@ -51,8 +51,11 @@ export function runCommand(command: string, cwd: string, timeoutMs = RUN_TIMEOUT
     detached: process.platform !== "win32",
     stdio: ["ignore", "pipe", "pipe"],
   });
-  const take = (chunk: Buffer) => {
-    output = tail(output + chunk.toString("utf8"), OUTPUT_TAIL * 2);
+  // Decoded as a stream, so a character split across two chunks is not broken.
+  child.stdout.setEncoding("utf8");
+  child.stderr.setEncoding("utf8");
+  const take = (chunk: string) => {
+    output = tail(output + chunk, OUTPUT_TAIL * 2);
   };
   child.stdout.on("data", take);
   child.stderr.on("data", take);

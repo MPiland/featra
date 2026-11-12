@@ -61,29 +61,77 @@ export function quoteArg(value: string, platform: string = process.platform): Qu
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
 
+/** A linked test file and the names linked in it, for one run of the file. No names: the whole file runs. */
+export interface FileTests {
+  file: string;
+  names: readonly string[];
+}
+
+/** The linked tests by file, so a file is run once however many of its tests are linked; a whole-file link wins. */
+export function groupByFile(refs: readonly TestRef[]): FileTests[] {
+  const files = new Map<string, { whole: boolean; names: Set<string> }>();
+  for (const ref of refs) {
+    const group = files.get(ref.file) ?? { whole: false, names: new Set<string>() };
+    if (ref.name === null) group.whole = true;
+    else group.names.add(ref.name);
+    files.set(ref.file, group);
+  }
+  return [...files].map(([file, { whole, names }]) => ({ file, names: whole ? [] : [...names] }));
+}
+
+/**
+ * Whether the project's linked test command can run a test file. Browser and end-to-end suites (under an `e2e`,
+ * `playwright` or `cypress` folder) have their own runners, which one template for unit tests can't stand in for.
+ */
+export const runsWithTemplate = (file: string): boolean => !/(^|\/)(e2e|playwright|cypress)\//i.test(file);
+
+/** Whether the template writes a JUnit report; without one a linked test can't be proven. */
+export const writesReport = (template: string): boolean => template.includes("{report}");
+
 export type TestCommand = { ok: true; command: string } | { ok: false; reason: string };
 
 /**
- * The command that runs `ref`, from the project's template. `{file}` is the test file, `{name}` the test's name and
- * `{namePattern}` the same escaped for a runner that reads `-t` as a pattern; each is one quoted argument, and the
- * template is the only text that is not. A link with no name gives an empty name, which runners read as every test.
- * Placeholders are filled in one pass, so a value is never read as a placeholder.
+ * The command that runs the linked tests of one file, from the project's template. `{file}` is the test file, `{name}`
+ * the one linked test's name, `{namePattern}` the names escaped for a runner that reads `-t` as a pattern (several are
+ * alternatives), and `{report}` the path the runner writes its JUnit report to. Each is one quoted argument, and the
+ * template is the only text that is not. No names gives an empty name, which runners read as every test. Placeholders
+ * are filled in one pass, so a value is never read as a placeholder.
  */
-export function testCommand(template: string, ref: TestRef, platform: string = process.platform): TestCommand {
-  if (!isTestFile(ref.file)) return { ok: false, reason: `${ref.file} isn't a test file inside the project` };
+export function fileCommand(
+  template: string,
+  { file, names }: FileTests,
+  platform: string = process.platform,
+  report?: string,
+): TestCommand {
+  if (!isTestFile(file)) return { ok: false, reason: `${file} isn't a test file inside the project` };
+  if (names.length > 1 && /\{name\}/.test(template)) {
+    return { ok: false, reason: `${file} links several tests, which {name} can't name. Use {namePattern}.` };
+  }
+  if (report === undefined && writesReport(template)) return { ok: false, reason: "There is no place for the report." };
   const values: Record<string, string> = {
-    file: ref.file,
-    name: ref.name ?? "",
-    namePattern: escapeRegExp(ref.name ?? ""),
+    file,
+    name: names[0] ?? "",
+    namePattern: names.map(escapeRegExp).join("|"),
+    report: report ?? "",
   };
   let refused: string | null = null;
-  const command = template.replace(/\{(file|name|namePattern)\}/g, (_all, key: string) => {
+  const command = template.replace(/\{(file|name|namePattern|report)\}/g, (_all, key: string) => {
     const quoted = quoteArg(values[key] ?? "", platform);
-    if (!quoted.ok) refused ??= `The test's ${key === "file" ? "file" : "name"} ${quoted.reason}.`;
+    if (!quoted.ok)
+      refused ??= `The test's ${key === "file" ? "file" : key === "report" ? "report path" : "name"} ${quoted.reason}.`;
     return quoted.ok ? quoted.arg : "";
   });
   return refused === null ? { ok: true, command } : { ok: false, reason: refused };
 }
+
+/** The command that runs one linked test: `fileCommand` for a file with that one name. */
+export const testCommand = (
+  template: string,
+  ref: TestRef,
+  platform: string = process.platform,
+  report?: string,
+): TestCommand =>
+  fileCommand(template, { file: ref.file, names: ref.name === null ? [] : [ref.name] }, platform, report);
 
 /** What Featra reads of the project's files to propose commands: `package.json` and which lockfiles are there. */
 export interface ProjectFiles {
@@ -91,9 +139,9 @@ export interface ProjectFiles {
   lockfiles: readonly string[];
 }
 
+// Only a runner that can write a JUnit report to a path of our choosing can prove a linked test (ADR 0031).
 const RUNNERS = [
-  { dep: "vitest", template: "npx vitest run {file} -t {namePattern}" },
-  { dep: "jest", template: "npx jest {file} -t {namePattern}" },
+  { dep: "vitest", template: "npx vitest run {file} -t {namePattern} --reporter=junit --outputFile={report}" },
 ] as const;
 
 const NPM = { test: "npm test", exec: "npx" };

@@ -55,3 +55,4 @@ export * from "./acceptance.ts";
 export * from "./checks-types.ts";
 export * from "./checks.ts";
 export * from "./check-commands.ts";
+export * from "./junit.ts";

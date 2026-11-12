@@ -20,6 +20,8 @@ beforeAll(async () => {
 });
 afterAll(() => w.close());
 
+const confirmCommand = () => w.window.ask("checks.set", { dir: w.dir, patch: { confirm: ["command"] } });
+
 const load = async () => (await w.window.ask("checks.load", { dir: w.dir })).result as ChecksView;
 
 describe("the Dev Lead proposes a check command (AC2)", { timeout: 30_000 }, () => {
@@ -74,6 +76,13 @@ describe("the Dev Lead proposes a check command (AC2)", { timeout: 30_000 }, () 
 });
 
 describe("a story reaching review (AC3, AC4)", { timeout: 60_000 }, () => {
+  it("shows the config's check command as changed until the user confirms it, through checks.set", async () => {
+    expect((await load()).unconfirmed).toEqual(["command"]);
+    const set = await confirmCommand();
+    expect((set.result as ChecksView).unconfirmed).toEqual([]);
+    expect((await load()).unconfirmed).toEqual([]);
+  });
+
   it("runs the check command, then the card pane hears the failing output, and Re-run runs it again", async () => {
     const lead = await idleLead(w);
     await w.spawnAs(lead, "STORY-5");

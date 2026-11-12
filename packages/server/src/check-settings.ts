@@ -1,11 +1,11 @@
 /**
  * Project settings' Checks section (STORY-56): where checks run, the check command and the linked-test command, with
- * what Featra and the Dev Lead propose. Confirmed values live in the project's `.featra/config.yaml`. Proposals never
- * do: they are kept in the app's data folder until the user confirms one, and nothing applies one by itself.
+ * what Featra and the Dev Lead propose. The values live in the project's `.featra/config.yaml`, which git can change,
+ * so the app's data folder also keeps the commands the user last confirmed: a different one in the file shows as
+ * changed and does not run until the user confirms it. Proposals are kept there too and never apply by themselves.
  */
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { isRecord } from "@featra/work-format/guards";
 import {
   CHECKS_COPY,
   DEFAULT_CONFIG,
@@ -19,27 +19,9 @@ import {
   type ProjectConfig,
 } from "@featra/work-format";
 import { writeConfigValue } from "./config-writer.ts";
-import { projectKey } from "./allowed-projects.ts";
 import { detectGithub, type GithubDeps } from "./github-detect.ts";
-import { createJsonStore, type JsonStore } from "./json-store.ts";
+import { commandStore } from "./command-store.ts";
 import type { Scan } from "./work-scan.ts";
-
-/** What the Dev Lead proposed for each project, by project key. */
-type Proposed = Record<string, Partial<Record<CheckField, string>>>;
-
-const normalizeProposed = (raw: unknown): Proposed => {
-  const out: Proposed = {};
-  if (typeof raw !== "object" || raw === null) return out;
-  for (const [key, value] of Object.entries(raw)) {
-    if (!isRecord(value)) continue;
-    const { command, testCommand } = value;
-    out[key] = {
-      ...(typeof command === "string" && command ? { command } : {}),
-      ...(typeof testCommand === "string" && testCommand ? { testCommand } : {}),
-    };
-  }
-  return out;
-};
 
 export interface CheckSettingsDeps extends GithubDeps {
   scan: (dir: string) => Promise<Scan | null>;
@@ -60,15 +42,9 @@ async function fromFiles(dir: string): Promise<CheckProposal[]> {
 
 export function createCheckSettings(deps: CheckSettingsDeps) {
   const { scan, now, dataDir } = deps;
-  const store: JsonStore<Proposed> | null = dataDir
-    ? createJsonStore(dataDir, "check-proposals.json", normalizeProposed)
-    : null;
-  let memory: Proposed = {};
-  const proposed = () => (store ? store.load() : Promise.resolve(memory));
-  const save = async (next: Proposed) => {
-    memory = next;
-    if (store) await store.save(next);
-  };
+  const proposed = commandStore(dataDir, "check-proposals.json");
+  const confirmed = commandStore(dataDir, "check-confirmed.json");
+  const confirm = (dir: string, field: CheckField, value: string | null) => confirmed.set(dir, field, value);
   const detected = new Map<string, { at: number; found: Promise<GithubDetection> }>();
 
   /** What Featra found about GitHub in `dir`, asked again after a minute. */
@@ -80,10 +56,23 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
     return found;
   }
 
+  /** The commands of the config that the user has confirmed (the only ones that run), and which are not confirmed. */
+  async function changed(dir: string, config: ProjectConfig) {
+    const known = await confirmed.get(dir);
+    const current = { command: config.checkCommand, testCommand: config.linkedTestCommand };
+    const fields = ["command", "testCommand"] as const;
+    const ok = (f: CheckField) => (current[f] !== null && current[f] === known[f] ? current[f] : null);
+    return {
+      command: ok("command"),
+      testCommand: ok("testCommand"),
+      unconfirmed: fields.filter((f) => current[f] !== null && current[f] !== known[f]),
+    };
+  }
+
   async function view(dir: string, config: ProjectConfig, error: string | null): Promise<ChecksView> {
     const found = await github(dir);
     const fallback = defaultChecksWhere(found);
-    const theirs = (await proposed())[projectKey(dir)] ?? {};
+    const theirs = await proposed.get(dir);
     const dev = (["command", "testCommand"] as const).flatMap((field): CheckProposal[] =>
       theirs[field] ? [{ field, value: theirs[field], source: "dev-lead" }] : [],
     );
@@ -96,6 +85,7 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
       command: config.checkCommand,
       testCommand: config.linkedTestCommand,
       proposals,
+      unconfirmed: (await changed(dir, config)).unconfirmed,
       error,
     };
   }
@@ -108,6 +98,8 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
 
   return {
     github,
+    /** The commands the user has confirmed, which are the only ones that run, and which are not confirmed yet. */
+    confirmed: changed,
     load: (dir: string) => load(dir),
 
     /** Writes the changed settings to the project's config; the first one the file refuses stops it and is reported. */
@@ -122,22 +114,21 @@ export function createCheckSettings(deps: CheckSettingsDeps) {
         const { error } = await writeConfigValue(dir, key, value);
         if (error !== null) return load(dir, error);
       }
-      // A confirmed command is no longer a proposal.
-      const mine = { ...(await proposed()) };
-      const key = projectKey(dir);
-      const theirs = { ...mine[key] };
-      if (patch.command !== undefined) delete theirs.command;
-      if (patch.testCommand !== undefined) delete theirs.testCommand;
-      await save({ ...mine, [key]: theirs });
-      await scan(dir);
+      // What the user saved or confirmed is what they now trust, and a saved command is no longer a proposal.
+      const config = (await scan(dir))?.collected.config;
+      const current = { command: config?.checkCommand ?? null, testCommand: config?.linkedTestCommand ?? null };
+      for (const field of ["command", "testCommand"] as const) {
+        if (patch[field] !== undefined) {
+          await proposed.set(dir, field, null);
+          await confirm(dir, field, patch[field]);
+        } else if (patch.confirm?.includes(field) && config) await confirm(dir, field, current[field]);
+      }
       return load(dir);
     },
 
     /** Puts the Dev Lead's proposal in the project's settings. It is only shown there, until the user confirms it. */
     async propose(dir: string, field: CheckField, value: string): Promise<void> {
-      const mine = await proposed();
-      const key = projectKey(dir);
-      await save({ ...mine, [key]: { ...mine[key], [field]: value } });
+      await proposed.set(dir, field, value);
       await scan(dir);
     },
   };

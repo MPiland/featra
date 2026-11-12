@@ -10,6 +10,7 @@ export const NO_CHECKS: ChecksView = {
   command: null,
   testCommand: null,
   proposals: [],
+  unconfirmed: [],
   error: null,
 };
 
@@ -22,6 +23,7 @@ function applied(now: ChecksView, patch: ChecksPatch): ChecksView {
     ...(patch.command === undefined ? {} : { command: patch.command }),
     ...(patch.testCommand === undefined ? {} : { testCommand: patch.testCommand }),
     proposals: now.proposals.filter((p) => !saved(p.field)),
+    unconfirmed: now.unconfirmed.filter((f) => !saved(f) && !patch.confirm?.includes(f)),
   };
 }
 
