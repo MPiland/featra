@@ -31,12 +31,14 @@ As a builder, I can follow a short, skippable setup when I create or open a proj
 - [ ] After New project or Open folder, an optional guided setup runs; every step can be skipped
 - [ ] Steps cover git init, `.featra/`, knowledge files, Artifact folders, acceptance proof and role presets
 - [ ] Skipping leaves the project usable with defaults
+- [ ] A step asks where checks run (CI or this computer), explains in plain words what CI is, and says that private GitHub repos have limited free CI minutes
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
+
 - 2026-11-06: The one-screen setup page (git, `.featra/`, knowledge files, starter `.gitignore`, Workflow settings)
   moved forward into FEAT-2 as STORY-42 at the user's request. This story now adds its remaining sections to that
   page: artifact folders, acceptance proof, role presets and agent instructions.
