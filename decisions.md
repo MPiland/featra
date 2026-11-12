@@ -1465,3 +1465,8 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   two chats. Taken as BUG-19 after these two.
 - BUG-17 has no regression test: the failure needs a cold runner where `chat.start` takes over 5 s; the helper is test
   code and the product path is unchanged. A shared `startChat(page, role)` e2e helper goes on the roadmap, not done here.
+
+## 2026-11-11 — BUG-19: New chat picker busy state (developer)
+
+- While `chat.start` runs, the picker disables the role buttons and says "Starting…", so a double click makes one chat.
+  If the start is refused the roles come back, with the reason.

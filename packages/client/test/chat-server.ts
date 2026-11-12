@@ -40,6 +40,8 @@ export interface ChatHost {
   roles?: Role[];
   /** What `chat.start` refuses with, if anything. */
   startError?: string;
+  /** `chat.start` waits until `releaseStart()`: a server that is slow to answer. */
+  slowStart?: boolean;
   /** What `chat.send` refuses with, if anything. */
   sendError?: string;
   /** What `chat.stop` refuses with, if anything. */
@@ -64,6 +66,13 @@ export interface ChatHost {
   now?: () => string;
 }
 
+/** A promise the test opens by hand. */
+function gate() {
+  let open!: () => void;
+  const opened = new Promise<void>((resolve) => (open = resolve));
+  return { opened, open };
+}
+
 export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   const logs = new Map<string, ChatEvent[]>();
   const watchers = new Map<string, Set<(u: ChatUpdate) => void>>();
@@ -73,6 +82,7 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   const providers = host.providers ?? [CLAUDE_INSTALLED];
   const now = host.now ?? (() => new Date(Date.UTC(2026, 10, 9, 10, 0, rows.size)).toISOString());
   const inbox = fakeInboxServer();
+  const startGate = gate();
   let listsSent = 0;
   const listOf = (dir: string): ChatListUpdate => ({
     list: { providers, chats: [...rows.values()].filter((r) => r.dir === dir).map((r) => r.summary) },
@@ -122,6 +132,7 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     roles: async () => host.roles ?? [...BUILT_IN_ROLES],
     start: async (dir, role, card = host.chatCards?.[role]) => {
       calls.push(`chat.start:${dir}:${role}`);
+      if (host.slowStart) await startGate.opened;
       if (host.startError) return { ok: false, error: host.startError };
       const id = `chat-${logs.size + 1}`;
       logs.set(id, []);
@@ -185,6 +196,8 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
   };
   return {
     bridge,
+    /** Lets a slow `chat.start` answer. */
+    releaseStart: () => act(async () => startGate.open()),
     /** The Inbox side: the clock the test moves, and what is watching. */
     inbox,
     /** The agent says something: the server pushes each event to the chat's watchers. */

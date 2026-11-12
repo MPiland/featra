@@ -80,6 +80,7 @@ export const CHAT_COPY = {
   storySessions: (lead: string) => `Story sessions of ${lead}`,
   roles: "Roles",
   noRoles: "No roles to start from.",
+  starting: "Starting…",
   ask: "Ask",
   composer: "Message",
   placeholder: "Message the agent",
