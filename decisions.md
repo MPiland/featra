@@ -1818,3 +1818,17 @@ ADR 0033 (proposed) records the design. Choices to confirm:
   new run. ADR 0004 lists `checked:<commit>`; ADR 0034 says the stored commit has the same trust as `verified`.
 - **The ahead note is said only when counted.** A failed `rev-list --count` leaves the note out instead of guessing.
 - Tested: GitHub saying it conflicts while git finds no files is an error and moves nothing.
+
+## 2026-11-12 — STORY-12 review rulings (dev-lead)
+
+- Nothing is lost by a merge: settle re-checks the worktree after the session is retired and keeps it, with a note,
+  when anything but the card is uncommitted; messages, Send back and Resume are refused while the story merges.
+- Merge needs Verified for the current tip: local mode uses the commit the checks recorded (`checked:<commit>`, stored on
+  the card so it survives a restart); CI mode re-reads CI for the PR head.
+- A conflict on GitHub with no conflicting files found is an error and the story stays put.
+- A remote story branch is deleted only when its commit is in the feature branch, with a lease; otherwise it stays and
+  the user is told.
+- After a GitHub merge the local feature branch is ahead of GitHub by the merged card until the user pushes; the
+  remains say so.
+- The two changed item-14 test expectations are stricter, not weaker. Approved.
+- Other build choices confirmed.

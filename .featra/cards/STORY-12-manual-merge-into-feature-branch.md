@@ -2,7 +2,7 @@
 id: STORY-12
 type: story
 title: Merge a story into its feature
-status: In Review
+status: Acceptance
 parent: FEAT-6
 order: 5
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-12
+  - at: 2026-11-12T23:50:15Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
