@@ -2,7 +2,7 @@
 id: BUG-21
 type: bug
 title: PR refresh test counts reads before the first one is made
-status: Acceptance
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-13T18:32:35Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-13T18:32:35Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
