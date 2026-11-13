@@ -8,6 +8,7 @@ import { mergeRefusal } from "./merge.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { evidenceState } from "./evidence.ts";
+import { acceptedFeature, featureAcceptRefusal } from "./feature-end.ts";
 import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";
 import type { OwnedCard, Resolution } from "./owner-copies.ts";
@@ -107,6 +108,10 @@ function storyRow(
   };
 }
 
+/** Whether the feature's end applies: Accept is open to it, or it is accepted and Merge to main waits (STORY-14). */
+const ending = (feature: Card, cards: readonly Card[], config: ProjectConfig) =>
+  acceptedFeature(feature) || featureAcceptRefusal(feature, feature.id, cards, config) === null;
+
 function featureRow(
   feature: Card | null,
   stories: Card[],
@@ -132,6 +137,7 @@ function featureRow(
     status: feature?.status ?? null,
     draftedBy: (feature && draftedBy(feature)) || undefined,
     review: feature && needsReview(feature) ? true : undefined,
+    ...(feature && ending(feature, cards, config) ? { ending: true as const } : {}),
     tone: feature ? featureTone(feature.status) : "idle",
     filters: featureFilters(feature?.status ?? null, tones, feature ? needsReview(feature) : false),
     progress: feature

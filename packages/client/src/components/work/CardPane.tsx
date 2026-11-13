@@ -11,6 +11,7 @@ import { StoryPr } from "./StoryPr.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
 import { MergeStory } from "./MergeStory.tsx";
 import { AbandonStory } from "./AbandonStory.tsx";
+import { FeatureEnd } from "./FeatureEnd.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
@@ -92,6 +93,8 @@ export function CardPane({
   if (!view) body = <p className="meta">{card.loading ? CARD_COPY.loading : CARD_COPY.gone}</p>;
   else {
     const readOnly = view.readOnly !== null;
+    // A feature's end acts on its branch wherever it is: its checks and PR aren't edits to its card.
+    const feature = view.type === "feature";
     const status = view.statusOptions.find((o) => o.value === view.status)?.label ?? view.status;
     body = (
       <>
@@ -182,6 +185,16 @@ export function CardPane({
               />
             </div>
           )}
+          {view.type === "feature" && (
+            <div className="draft-actions">
+              <FeatureEnd
+                key={`end-${id}`}
+                id={id}
+                end={view.featureEnd}
+                actions={{ accept: () => work.acceptFeature(dir, id), merge: () => work.mergeFeature(dir, id) }}
+              />
+            </div>
+          )}
           {view.startable && (
             <div className="draft-actions">
               <StartFeature
@@ -206,12 +219,16 @@ export function CardPane({
         />
         {onOpen && <StoriesSection stories={view.stories} onOpen={onOpen} />}
         {view.checks && (
-          <StoryChecks checks={view.checks} readOnly={readOnly} onRerun={() => work.rerunChecks(dir, id)} />
+          <StoryChecks
+            checks={view.checks}
+            readOnly={readOnly && !feature}
+            onRerun={() => (feature ? work.rerunFeatureChecks(dir, id) : work.rerunChecks(dir, id))}
+          />
         )}
         <AcSection view={view} save={save} />
         <TaskSection view={view} save={save} />
         <TextSection view={view} save={save} field="notes" title={CARD_COPY.notes} placeholder={CARD_COPY.notesEmpty} />
-        <StoryPr view={view} onCreate={() => work.createPr(dir, id)} />
+        <StoryPr view={view} onCreate={() => (feature ? work.createFeaturePr(dir, id) : work.createPr(dir, id))} />
       </>
     );
   }

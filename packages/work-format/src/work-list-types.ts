@@ -69,6 +69,11 @@ export interface FeatureRow {
   draftedBy?: string;
   /** A draft an agent made, waiting on the user: the row shows a Review badge. Left out otherwise. */
   review?: true;
+  /**
+   * A feature in progress that Accept applies to, or that is accepted (STORY-14): the row opens its card, where Accept
+   * and Merge to main are. Left out otherwise.
+   */
+  ending?: true;
   tone: Tone;
   filters: WorkFilter[];
   progress: ProgressCount;
@@ -158,6 +163,7 @@ const feature = (r: Record<string, unknown>): FeatureRow => {
     status: textOrNull(r.status),
     draftedBy: typeof r.draftedBy === "string" ? r.draftedBy : undefined,
     review: r.review === true ? true : undefined,
+    ...(r.ending === true ? { ending: true as const } : {}),
     tone: tone(r.tone),
     filters: Array.isArray(r.filters) ? r.filters.filter((f): f is WorkFilter => isOneOf(WORK_FILTERS, f)) : [],
     progress: progress(r.progress),

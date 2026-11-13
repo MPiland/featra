@@ -29,7 +29,8 @@
     "./tool-summary": "./src/tool-summary.ts",
     "./merge-copy": "./src/merge-copy.ts",
     "./abandon-copy": "./src/abandon-copy.ts",
-    "./bug-copy": "./src/bug-copy.ts"
+    "./bug-copy": "./src/bug-copy.ts",
+    "./feature-end-copy": "./src/feature-end-copy.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

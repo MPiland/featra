@@ -4,6 +4,7 @@
  */
 import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
 import { normalizeCardPr, type CardPr } from "./prs-types.ts";
+import { normalizeFeatureEnd, type CardFeatureEnd } from "./feature-end-copy.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /**
@@ -83,6 +84,8 @@ export interface CardView {
   mergeable?: true;
   /** True on a story that isn't merged or done, which Abandon can end (STORY-58); absent otherwise. */
   abandonable?: true;
+  /** A feature in progress: its Accept and Merge to main (STORY-14); absent otherwise. */
+  featureEnd?: CardFeatureEnd;
   /** True on a story merged into its feature (STORY-12); absent otherwise. */
   merged?: true;
   /** Why the card can't be edited here, or null when it can. */
@@ -172,6 +175,11 @@ const checksOf = (raw: unknown): { checks?: CardChecks } => {
   return checks ? { checks } : {};
 };
 
+const featureEndOf = (raw: unknown): { featureEnd?: CardFeatureEnd } => {
+  const featureEnd = normalizeFeatureEnd(raw);
+  return featureEnd ? { featureEnd } : {};
+};
+
 const prOf = (raw: unknown): { prState?: CardPr } => {
   const prState = normalizeCardPr(raw);
   return prState ? { prState } : {};
@@ -212,6 +220,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
     ...checksOf(raw.checks),
     ...prOf(raw.prState),
+    ...featureEndOf(raw.featureEnd),
     ...(raw.awaiting === true ? { awaiting: true as const } : {}),
     ...(raw.startable === true ? { startable: true as const } : {}),
     ...(raw.mergeable === true ? { mergeable: true as const } : {}),

@@ -42,6 +42,7 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   checkCommand: null,
   linkedTestCommand: null,
   openStoryPrs: true,
+  openFeaturePrs: true,
   prRefreshMinutes: 2,
   testReportArtifact: null,
   testReportFiles: null,
@@ -51,7 +52,15 @@ const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
 
 export class ConfigError extends Error {}
 
-const BOOLEAN_KEYS = ["requireAccept", "worktrees", "mcp", "autoMerge", "uat", "openStoryPrs"] as const;
+const BOOLEAN_KEYS = [
+  "requireAccept",
+  "worktrees",
+  "mcp",
+  "autoMerge",
+  "uat",
+  "openStoryPrs",
+  "openFeaturePrs",
+] as const;
 const COMMAND_KEYS = ["checkCommand", "linkedTestCommand"] as const;
 /** The longest check command a project can set, in characters. */
 export const COMMAND_MAX = 1000;

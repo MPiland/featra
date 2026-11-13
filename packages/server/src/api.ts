@@ -22,6 +22,7 @@ import { ApiError } from "./api-error.ts";
 import { createChatApi } from "./api-chat.ts";
 import { createBugApi } from "./api-bugs.ts";
 import { createStoryEndApi } from "./api-story-end.ts";
+import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
 import type { BugFiling } from "./bug-filing.ts";
 import { cardViewIn, type CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
@@ -62,6 +63,8 @@ export interface ApiDeps {
   merges?: Pick<StoryMerge, "merge">;
   /** Abandons stories (STORY-58). Without it `story.abandonCheck` and `story.abandon` are refused. */
   abandons?: Pick<StoryAbandon, "check" | "abandon">;
+  /** Accepts and merges features (STORY-14). Without it the `feature.*` ending methods are refused. */
+  features?: FeatureApiDeps["features"];
   /** Files bugs from Work's New bug (STORY-13). Without it `bug.propose` and `bug.file` are refused. */
   bugs?: Pick<BugFiling, "propose" | "file">;
   /** Why a story's session takes no message from the user now: it is merging or being abandoned. */
@@ -110,6 +113,7 @@ export function createApi({
   acceptance,
   merges,
   abandons,
+  features,
   bugs,
   busy,
   checks,
@@ -143,6 +147,7 @@ export function createApi({
   };
   const storyEnd = createStoryEndApi({ merges, abandons, allow });
   const bugApi = createBugApi({ bugs, allow });
+  const featureApi = createFeatureApi({ features, card });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
@@ -194,7 +199,14 @@ export function createApi({
         const dir = allow(p.dir);
         const { value, stop } = await watches.observe(
           dir,
-          (scan) => cardViewIn(scan, p.id, checks.checksFor(dir, p.id), prs.prState(dir, p.id)),
+          (scan) =>
+            cardViewIn(
+              scan,
+              p.id,
+              checks.checksFor(dir, p.id) ?? features?.checksFor(dir, p.id),
+              prs.prState(dir, p.id) ?? features?.prState(dir, p.id),
+              features?.mergeState(dir, p.id),
+            ),
           (next) => {
             if (allowed.has(dir)) connection.push("card.view", id, next);
           },
@@ -231,12 +243,18 @@ export function createApi({
       case "bug.propose":
       case "bug.file":
         return bugApi(method, params);
+      case "feature.accept":
+      case "feature.createPr":
+      case "feature.rerunChecks":
+      case "feature.merge":
+        return featureApi(method, params);
       case "story.rerunChecks":
         return checks.rerun(...card(params));
       case "story.createPr":
         return prs.createPr(...card(params));
       case "prs.refresh":
         prs.focus();
+        features?.focus();
         return null;
       case "checks.load":
         return checkSettings.load(project(params));

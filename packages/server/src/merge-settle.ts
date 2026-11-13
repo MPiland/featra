@@ -43,31 +43,40 @@ export function featureBranchOf(scan: Scan | null, card: Card | undefined): stri
   return feature && !feature.merged ? feature.branch : null;
 }
 
-/** The card commit's message on the feature branch, after a merge on GitHub. */
-const cardMessage = (id: string, into: string) => `${id}: merged into ${into}`;
+/** The card commit's message on the branch a card merged into, after a merge on GitHub. */
+export const cardMessage = (id: string, into: string) => `${id}: merged into ${into}`;
+
+/**
+ * Commits a merged card onto the local branch `into`, on top of `into` as GitHub has it now (which has the PR's merge
+ * commit): a story's card on its feature branch (STORY-12), a feature's on main (STORY-14). How far ahead of GitHub that
+ * leaves it (null when git couldn't count), else why not; nothing changes then.
+ */
+export async function cardOnBranch(
+  git: MergeGit,
+  top: string,
+  remote: string,
+  into: string,
+  card: { path: string; text: string; id: string },
+): Promise<string | { ahead: number | null }> {
+  const remoteTip = await git.fetchTip(top, remote, into);
+  const local = await git.commitOf(top, `refs/heads/${into}`);
+  if (!remoteTip || !local) return SETTLE_NOTES.feature(into);
+  const parents = (await git.isAncestor(top, local, remoteTip))
+    ? [remoteTip]
+    : (await git.isAncestor(top, remoteTip, local))
+      ? [local]
+      : [local, remoteTip];
+  const message = cardMessage(card.id, into);
+  const made = await git.mergeCommit(top, { parents, path: card.path, text: card.text, message });
+  if ("conflicts" in made || !(await git.publish(top, into, made.commit, local))) {
+    return SETTLE_NOTES.feature(into);
+  }
+  const ahead = await git.git(top, ["rev-list", "--count", `${remoteTip}..${made.commit}`]);
+  const commits = Number(ahead.stdout.trim());
+  return { ahead: ahead.code === 0 && commits > 0 ? commits : null };
+}
 
 export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write = writeAtomic }: MergeSettleDeps) {
-  /**
-   * Commits the merged card onto the local feature branch, on top of the feature branch as GitHub has it now (which
-   * has the PR's merge commit). How far ahead of GitHub that leaves it (null when git couldn't count), else why not;
-   * nothing changes then.
-   */
-  async function cardOnFeature(top: string, remote: string, into: string, path: string, text: string, id: string) {
-    const remoteTip = await git.fetchTip(top, remote, into);
-    const local = await git.commitOf(top, `refs/heads/${into}`);
-    if (!remoteTip || !local) return SETTLE_NOTES.feature(into);
-    const parents = (await git.isAncestor(top, local, remoteTip))
-      ? [remoteTip]
-      : (await git.isAncestor(top, remoteTip, local))
-        ? [local]
-        : [local, remoteTip];
-    const made = await git.mergeCommit(top, { parents, path, text, message: cardMessage(id, into) });
-    if ("conflicts" in made || !(await git.publish(top, into, made.commit, local))) return SETTLE_NOTES.feature(into);
-    const ahead = await git.git(top, ["rev-list", "--count", `${remoteTip}..${made.commit}`]);
-    const commits = Number(ahead.stdout.trim());
-    return { ahead: ahead.code === 0 && commits > 0 ? commits : null };
-  }
-
   /**
    * Settles story `id`, merged into `into`: on GitHub through `remote`, or locally (null), where the merge commit has
    * the card already. Does nothing for a story whose worktree is gone.
@@ -85,7 +94,7 @@ export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write 
       const remains: string[] = [];
       if (remote) {
         // The card is written only once the feature branch has it: until then the story reads as not merged yet.
-        const made = await cardOnFeature(top, remote.name, into, path, text, id);
+        const made = await cardOnBranch(git, top, remote.name, into, { path, text, id });
         if (typeof made === "string") return { remains: [made] };
         if (made.ahead !== null) remains.push(SETTLE_NOTES.ahead(into, made.ahead));
       }

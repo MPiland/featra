@@ -86,6 +86,8 @@ epics in `.featra/cards/`.
 - request_merge reports "cancelled" when the asking chat ends before the user answers.
 - Notices about a request reach the Dev Lead even after its chat has ended.
 
+- A feature merged to main with git outside Featra in local mode becomes Done.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".

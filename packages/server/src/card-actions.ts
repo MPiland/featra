@@ -18,6 +18,7 @@ import {
   type CardEditContext,
   type CardUpdateResult,
   type CardView,
+  type FeatureMergeState,
 } from "@featra/work-format";
 import { retryBusy } from "./busy-retry.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
@@ -37,6 +38,8 @@ export interface CardActionDeps {
   checks?: (dir: string, id: string) => CardChecks | undefined;
   /** What the server knows of a story's PR (STORY-11), for the view. */
   prState?: (dir: string, id: string) => CardPr | undefined;
+  /** Whether an accepted feature can merge to main now (STORY-14), for the view. */
+  merge?: (dir: string, id: string) => FeatureMergeState | undefined;
 }
 
 const contextOf = (scan: Scan): CardEditContext => ({
@@ -51,9 +54,17 @@ export function ownedIn(scan: Scan | null, id: string) {
 }
 
 /** The pane's view of card `id` in `scan`, or null when there is no such card. */
-export function cardViewIn(scan: Scan | null, id: string, checks?: CardChecks, prState?: CardPr): CardView | null {
+export function cardViewIn(
+  scan: Scan | null,
+  id: string,
+  checks?: CardChecks,
+  prState?: CardPr,
+  merge?: FeatureMergeState,
+): CardView | null {
   const found = ownedIn(scan, id);
-  return scan && found ? buildCardView(found.owned, found.root !== null, contextOf(scan), checks, prState) : null;
+  return scan && found
+    ? buildCardView(found.owned, found.root !== null, contextOf(scan), checks, prState, merge)
+    : null;
 }
 
 export interface AtomicIo {
@@ -78,9 +89,16 @@ export async function writeAtomic(file: string, text: string, { rename: move = r
 
 export const fileIn = (root: string, path: string) => join(root, ...path.split("/"));
 
-export function createCardActions({ scan: scanDir, now, lane = createCardLane(), checks, prState }: CardActionDeps) {
+export function createCardActions({
+  scan: scanDir,
+  now,
+  lane = createCardLane(),
+  checks,
+  prState,
+  merge,
+}: CardActionDeps) {
   const viewOf = (scan: Scan | null, dir: string, id: string) =>
-    cardViewIn(scan, id, checks?.(dir, id), prState?.(dir, id));
+    cardViewIn(scan, id, checks?.(dir, id), prState?.(dir, id), merge?.(dir, id));
   async function apply(dir: string, id: string, edit: CardEdit): Promise<CardUpdateResult> {
     const scan = await scanDir(dir);
     const found = ownedIn(scan, id);

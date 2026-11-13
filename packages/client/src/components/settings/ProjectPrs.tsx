@@ -7,8 +7,9 @@ import { Switch } from "../controls/Switch.tsx";
 import { SettingsGroup } from "./SettingsGroup.tsx";
 
 /**
- * Project settings' Pull requests section (STORY-11): whether a story's PR opens when it moves to review, how often
- * open PRs are read again, and, in local mode, the one line on what GitHub is missing.
+ * Project settings' Pull requests section (STORY-11): whether a story's PR opens when it moves to review and a
+ * feature's when it is accepted (STORY-14), how often open PRs are read again, and, in local mode, the one line on
+ * what GitHub is missing.
  */
 export function ProjectPrs({ checks, dir }: { checks: ChecksBridge; dir: string }) {
   const [loaded, setLoaded] = useState<{ dir: string; view: ChecksView } | null>(null);
@@ -60,6 +61,16 @@ export function ProjectPrs({ checks, dir }: { checks: ChecksBridge; dir: string 
               labelledBy={aria.labelledBy}
               describedBy={aria.describedBy}
               onChange={(openStoryPrs) => void change({ openStoryPrs })}
+            />
+          )}
+        </SettingRow>
+        <SettingRow id="prs-open-feature" label={COPY.openFeature} help={COPY.openFeatureHint}>
+          {(aria) => (
+            <Switch
+              checked={view.openFeaturePrs}
+              labelledBy={aria.labelledBy}
+              describedBy={aria.describedBy}
+              onChange={(openFeaturePrs) => void change({ openFeaturePrs })}
             />
           )}
         </SettingRow>

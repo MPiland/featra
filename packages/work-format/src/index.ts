@@ -65,3 +65,5 @@ export * from "./check-commands.ts";
 export * from "./junit.ts";
 export * from "./prs-types.ts";
 export * from "./prs.ts";
+export * from "./feature-end.ts";
+export * from "./feature-end-copy.ts";

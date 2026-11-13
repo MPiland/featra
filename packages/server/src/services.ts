@@ -6,6 +6,7 @@ import { createCardReport } from "./card-report.ts";
 import { createCardLane } from "./card-lane.ts";
 import { createCheckSettings } from "./check-settings.ts";
 import { createStoryChecks } from "./story-checks.ts";
+import { createFeatureEnd } from "./feature-end.ts";
 import { createStoryPrs } from "./story-prs.ts";
 import { systemTimers, type Timers } from "./inbox.ts";
 import { createChatManager } from "./chat-manager.ts";
@@ -109,8 +110,9 @@ export function createServices({
     scan: watches.scan,
     now,
     lane,
-    checks: (dir, id) => checks.checksFor(dir, id),
-    prState: (dir, id) => prs.prState(dir, id),
+    checks: (dir, id) => checks.checksFor(dir, id) ?? features.checksFor(dir, id),
+    prState: (dir, id) => prs.prState(dir, id) ?? features.prState(dir, id),
+    merge: (dir, id) => features.mergeState(dir, id),
   });
   const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand });
   const checks = createStoryChecks({
@@ -189,6 +191,20 @@ export function createServices({
     ghCommand,
     ending,
   });
+  const features = createFeatureEnd({
+    scan: watches.scan,
+    observe: watches.observe,
+    allowed,
+    settings: checkSettings,
+    chats,
+    now,
+    timers: prTimers,
+    lane,
+    log,
+    gitCommand,
+    ghCommand,
+    checkTimeoutMs,
+  });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
   const bugs = createBugFiling({ scan: watches.scan, now, lane, gitCommand });
   const reports = createCardReport({
@@ -234,6 +250,7 @@ export function createServices({
     acceptance,
     merges,
     abandons,
+    features,
     bugs,
     busy,
     checks,
@@ -251,8 +268,10 @@ export function createServices({
       stopClosing();
       checks.close();
       prs.close();
+      features.close();
       // A project watch still starting finishes against open watches, then stops itself.
       await prs.idle();
+      await features.idle();
       chats.close();
       await chats.flush();
       watches.close();

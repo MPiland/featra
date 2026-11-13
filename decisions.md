@@ -2000,3 +2000,94 @@ report-bug.test.ts expects `subject: Bug "..."` and no `story` on the approval (
 - report_bug says "not filed: the request was cancelled" when the Dev Lead's chat ends before the user answers. Today the notice can't reach a closed chat; noted on the roadmap.
 - Approved expectation changes: tool lists gain `report_bug`; routing tests pass the story's state; the order test asserts a literal; report-bug expects `subject`.
 - Roadmap: Work filter chips for the project bug list; a cancelled outcome for request_merge; delivering notices to a chat that ended.
+
+## 2026-11-12 — STORY-14 build choices (story agent, for the Dev Lead to confirm)
+
+ADR 0037 records the design. Choices made while building it:
+
+1. **Accept, then the PR, in one write.** With GitHub usable and `openFeaturePrs` on, Accept pushes the feature
+   branch and opens (or adopts) its PR first, then records `accepted` and the PR on the feature branch in one card
+   commit. If the PR can't open, Accept is still recorded and the card offers Create PR.
+2. **`openFeaturePrs`** is a project config key (default true) beside `openStoryPrs`, in Project settings' Pull
+   requests section as "Open feature PRs automatically".
+3. **Feature cards write `pr`.** `serializeCard` wrote `pr` only for stories and bugs, so a feature's PR was lost on
+   write. It is now written for a feature once it has one (regression test in work-format feature-end.test.ts, which
+   fails on the old code); features without a PR serialize as before.
+4. **Local checks run in a temporary detached worktree** at the feature branch's tip, removed after; the verdict is
+   kept in memory per commit, so a restart runs them again. CI checks are read from the feature's PR at that commit.
+5. **The facts Merge to main waits on are read fresh** on the PR interval, on focus, and when the feature branch or
+   main moves, only for accepted features. Precedence of the reason shown: conflicts, behind main, no PR, PR closed,
+   branch ahead on GitHub, then checks.
+6. **A feature branch that GitHub's copy is behind on is pushed** during that read (never forced), so the PR's head is
+   the local tip and CI runs on it. One with commits GitHub has and this computer doesn't blocks the merge.
+7. **Main moving on:** a notice with outcome `behind main` goes to the Dev Lead once per main commit, naming
+   conflicting files. The Dev Lead is the chat that drafted the feature, else the parent chat of a story session
+   under it. Featra never merges main in itself.
+8. **Local merge publishes main only when its checkout is clean** (`publish(..., clean=true)`); otherwise it refuses
+   with "main has local changes. Commit or stash them, then merge again." and main is untouched.
+9. **Done only by the merge,** by `system`, with `merged` and the PR in its history. After a GitHub merge the Done card
+   is a commit on local main on top of GitHub's merge commit, and how far main is ahead of GitHub is said.
+10. **Ownership moves to main by itself** once main has the branch's tip and the branch isn't checked out; nothing is
+    copied. A checkout of the feature branch keeps its cards there and the merge says so. Feature branches are kept.
+11. **Open on the feature row.** An active feature's card couldn't be opened from Work (Open was only on approved
+    features), so Accept was unreachable. The row now offers Open once the feature's end applies (Accept is open to it,
+    or it is accepted). start-feature.spec.ts's "no Open FEAT-2 on an active feature" still holds: that feature has
+    no stories done.
+12. **A Done feature isn't "merged"** on its card view: `merged: true` is for stories merged into their feature only.
+13. **Splits for the lint limits:** feature-end.ts (end, Accept, PR, merge), feature-facts.ts (the facts and the
+    notice), feature-merge.ts, feature-checks.ts, feature-pr.ts, feature-look.ts; the client's fake feature actions
+    are in test/card-server-features.ts.
+
+**Changed existing assertions:** none. Existing fakes gained the new parameters (card-server's `mergeOf`,
+checks-server's `openFeaturePrs`, ProjectChecks.test.tsx's view gains `openFeaturePrs`).
+
+**Roadmap, not now:** deleting merged feature branches; a Dev Lead for features with none found.
+
+### STORY-14 Dev Lead review rulings, applied (PR #47)
+
+1. **B1, judged commits.** Reading the facts returns `Judged { facts, tip, baseTip }`. Merge to main, in the card
+   lane, refuses `moved` when the feature branch or local main isn't at what was judged; on GitHub also when the PR's
+   head isn't the judged tip, and `gh pr merge --match-head-commit` gets the judged tip. The check no longer pushes;
+   the read pushes a branch GitHub is behind on before judging (`pushBehind`).
+2. **B2, outside merges once.** Settling is skipped when main's copy of the card is already Done and merged. A PR
+   merged at a head other than the local tip gets the PR fact `merged`, which blocks first with "Its PR merged without
+   this computer's latest commits." and is never settled. The settle notice adds "main is N commits ahead of GitHub; push it.".
+3. **Should-fix 2, main's checkout.** Build choice 8 (clean checkout) is replaced: the fact `baseBusy` is main's
+   uncommitted files that the merge changes, plus the card's path (feature-base.ts). It shows before the button is on
+   and is checked in the lane before the local publish and before `gh pr merge`. Featra's own card edits elsewhere
+   don't block. `publish` and `cardOnBranch` lost their `clean` parameter.
+4. **Should-fix 3, BUG-20.** Test links whose names have balanced parentheses read as none. Filed as BUG-20 under
+   FEAT-6 (origin bug), fixed in card.ts with a regression test that failed first. STORY-12, 13, 14 and 58 now resolve
+   17 of 17 acceptance-criterion links (0 before).
+5. **Should-fix 4.** The Dev Lead's notice is recorded as told only once `notify` succeeds.
+6. **Should-fix 5.** Tests for Accept retried after its PR opened and its card write failed, the checks' worktree
+   removed after a failed and a hung run, GitHub ahead blocking without a push, and the notice with no Dev Lead.
+7. **Nits.** `safeBranch` and a full refspec on the push; verdicts keyed by tip and check command; `active.delete` in
+   a finally; `git worktree prune` before each run; one refusal (`noBranch`) for a missing branch; Create PR in local
+   mode refuses with GitHub's `noRemote`; `aria-describedby` on the disabled Merge button; "Checking…" before the first
+   read; the configured base branch in "Merge to <base>"; the orphan JSDoc removed; the client fake-rule test unlinked
+   from AC5 (AC5 links the server tests).
+8. **Rulings recorded:** Open on the feature row is approved; the notice lists the first three files, then "and N
+   more"; dropping the notice with no Dev Lead is fine (finding one is on the roadmap).
+9. **Should-fix 1 withdrawn** (Dev Lead ruling). An accepted feature can still be set Done by hand through
+   `checkTransition`, and evidence.test.ts keeps expecting that. Until a local-mode merge made with the git CLI makes
+   the feature Done (roadmap), setting Done by hand is the only way to close a feature merged outside Featra.
+10. **Verdicts keyed by tip and command** have a test: a passed run at the same commit doesn't count once the check
+    command changes (it fails with the key on the tip alone).
+
+**Changed assertions in this PR's own tests:** feature-end-local's "leaves main alone" now puts an untracked file the
+merge would overwrite on main (an unrelated local change no longer blocks); expected feature ends gain `base: "main"`;
+an accepted feature with no facts yet expects "Checking…" instead of no reason; the client's Merge label takes the base.
+
+**Roadmap, not now:** a local-mode merge to main made with the git CLI making the feature Done.
+
+## 2026-11-13 — STORY-14 review rulings (dev-lead)
+
+- Build choices and ADR 0037 confirmed, as amended by the review.
+- Merge to main merges only the commit whose checks passed. When the feature branch, local main or the PR head moved after the checks, it is refused with `moved`. The auto-push happens while reading, before the checks are judged, never between the checks and the merge.
+- Settling a merge done outside Featra happens once. A PR merged at a head other than the local tip is never settled; the card says why.
+- Main's checkout blocks a merge only when the merge would overwrite one of its uncommitted files. Featra's own uncommitted card edits on main are normal and don't block. The reason shows before the button is on.
+- Withdrawn: refusing a manual `active → done` on a feature. Until a git CLI merge in local mode makes the feature Done, manual Done is the user's way to close it. `evidence.test.ts:133` is unchanged.
+- BUG-20 (test links with parentheses read as none) is fixed in this PR with a regression test; 17 of 17 AC links on STORY-12, 13, 14 and 58 now resolve.
+- Approved changes to this PR's own test expectations: `base: "main"` on feature-end objects, "Checking…" before the first read, the base name in the Merge label, and the "leaves main alone" test using an overlapping file.
+- Roadmap: a local-mode git CLI merge to main makes the feature Done.
