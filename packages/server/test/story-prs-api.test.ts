@@ -120,6 +120,10 @@ describe("Create PR and the PR chip's data (AC2, AC3, AC4)", { timeout: 60_000 }
     const before = await reads();
     // The first read, when watching starts, is counted before the refresh (BUG-21).
     expect(before).toBe(1);
+    // Only the first read is slow to start: the race is about it, and slow reads after it only slow the test.
+    await gh.change((s) => {
+      s.viewStartDelayMs = 0;
+    });
     expect(await ask("prs.refresh", {})).toBeNull();
     clock.advance(1_000);
     await expect.poll(reads, { timeout: 10_000 }).toBe(before + 1);

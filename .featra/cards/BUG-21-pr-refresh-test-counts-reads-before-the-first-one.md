@@ -2,7 +2,7 @@
 id: BUG-21
 type: bug
 title: PR refresh test counts reads before the first one is made
-status: Acceptance
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-13T18:32:35Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-13T18:32:35Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -55,3 +65,6 @@ taken then was 0, and the first read and the refresh's read together made 2 wher
 
 Fix: the test waits until the story's PR reads as open and both pollers' timers are set (2), and checks the count is 1
 before the refresh. After the refresh it waits for both timers again before moving the clock.
+
+Follow-up in PR #50: only the first read is slow to start. With every read slow to start, the test ran past its
+timeouts on a loaded machine (a local gate).

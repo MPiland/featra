@@ -86,8 +86,9 @@ test("Abandon a story: it warns, closes the PR, removes its worktree and branche
     const closed = (await gh.calls()).find((c) => c.args.slice(0, 2).join(" ") === "pr close");
     expect(closed?.args).toEqual(["pr", "close", "https://github.com/acme/app/pull/1"]);
     expect((await gh.load()).prs[0]?.state).toBe("CLOSED");
-    expect(git(repo.dir, "branch", "--list", branch)).toBe("");
-    expect(git(remote, "branch", "--list", branch)).toBe("");
+    // The branches go after the folder, the local one and then origin's: wait for each (BUG-22).
+    await expect.poll(() => git(repo.dir, "branch", "--list", branch), { timeout: 30_000 }).toBe("");
+    await expect.poll(() => git(remote, "branch", "--list", branch), { timeout: 30_000 }).toBe("");
     expect(git(repo.dir, "log", "-1", "--format=%s", "feature/2-shaping")).toBe(`${id}: abandoned, kept as Cancelled`);
     await expect(row).toContainText("Cancelled", { timeout: 30_000 });
     await app.close();
