@@ -221,6 +221,17 @@ describe("what a failure leaves (review Should-fix 5)", { timeout: 60_000 }, () 
     expect(w.tip(FEATURE_BRANCH)).toBe(local);
   });
 
+  it("doesn't count a passed run at the same commit once the check command changes (review nit)", async () => {
+    await mergeable(false);
+    const tip = w.tip(FEATURE_BRANCH);
+    await w.settings.set(dir(), { command: 'node -e "process.exit(1)"' });
+    await w.poll();
+    await w.settle();
+    expect(w.tip(FEATURE_BRANCH)).toBe(tip);
+    expect(state()).toEqual({ mergeable: false, blocked: m.failed });
+    await expect(merge()).rejects.toThrow(m.failed);
+  });
+
   it("gives Create PR in local mode the reason it has none", async () => {
     await w.start({ remote: false });
     await accept();

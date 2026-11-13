@@ -2069,9 +2069,11 @@ checks-server's `openFeaturePrs`, ProjectChecks.test.tsx's view gains `openFeatu
    from AC5 (AC5 links the server tests).
 8. **Rulings recorded:** Open on the feature row is approved; the notice lists the first three files, then "and N
    more"; dropping the notice with no Dev Lead is fine (finding one is on the roadmap).
-9. **Should-fix 1 held.** Refusing active → done through `checkTransition` ("Merge it to main") contradicts an
-   existing assertion: evidence.test.ts expects `checkTransition(recordAcceptance(feature), "done", …)` to be ok. Per
-   the rule on assertions, it is not changed; reported to the Dev Lead for a ruling.
+9. **Should-fix 1 withdrawn** (Dev Lead ruling). An accepted feature can still be set Done by hand through
+   `checkTransition`, and evidence.test.ts keeps expecting that. Until a local-mode merge made with the git CLI makes
+   the feature Done (roadmap), setting Done by hand is the only way to close a feature merged outside Featra.
+10. **Verdicts keyed by tip and command** have a test: a passed run at the same commit doesn't count once the check
+    command changes (it fails with the key on the tip alone).
 
 **Changed assertions in this PR's own tests:** feature-end-local's "leaves main alone" now puts an untracked file the
 merge would overwrite on main (an unrelated local change no longer blocks); expected feature ends gain `base: "main"`;
