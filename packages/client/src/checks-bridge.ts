@@ -62,6 +62,8 @@ export const PRS_PAGE_COPY = {
   title: "Pull requests",
   open: "Open story PRs automatically",
   openHint: "When a story moves to review, push its branch and open its PR against the feature branch.",
+  openFeature: "Open feature PRs automatically",
+  openFeatureHint: "When you accept a feature, push its branch and open its PR to main.",
   minutes: "Refresh open PRs every",
   minutesHint: "Minutes, from 1 to 60. Open PRs are also read when Featra regains focus.",
   minutesInvalid: "Use whole minutes from 1 to 60.",

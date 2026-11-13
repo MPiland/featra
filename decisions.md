@@ -2000,3 +2000,45 @@ report-bug.test.ts expects `subject: Bug "..."` and no `story` on the approval (
 - report_bug says "not filed: the request was cancelled" when the Dev Lead's chat ends before the user answers. Today the notice can't reach a closed chat; noted on the roadmap.
 - Approved expectation changes: tool lists gain `report_bug`; routing tests pass the story's state; the order test asserts a literal; report-bug expects `subject`.
 - Roadmap: Work filter chips for the project bug list; a cancelled outcome for request_merge; delivering notices to a chat that ended.
+
+## 2026-11-12 — STORY-14 build choices (story agent, for the Dev Lead to confirm)
+
+ADR 0037 records the design. Choices made while building it:
+
+1. **Accept, then the PR, in one write.** With GitHub usable and `openFeaturePrs` on, Accept pushes the feature
+   branch and opens (or adopts) its PR first, then records `accepted` and the PR on the feature branch in one card
+   commit. If the PR can't open, Accept is still recorded and the card offers Create PR.
+2. **`openFeaturePrs`** is a project config key (default true) beside `openStoryPrs`, in Project settings' Pull
+   requests section as "Open feature PRs automatically".
+3. **Feature cards write `pr`.** `serializeCard` wrote `pr` only for stories and bugs, so a feature's PR was lost on
+   write. It is now written for a feature once it has one (regression test in work-format feature-end.test.ts, which
+   fails on the old code); features without a PR serialize as before.
+4. **Local checks run in a temporary detached worktree** at the feature branch's tip, removed after; the verdict is
+   kept in memory per commit, so a restart runs them again. CI checks are read from the feature's PR at that commit.
+5. **The facts Merge to main waits on are read fresh** on the PR interval, on focus, and when the feature branch or
+   main moves, only for accepted features. Precedence of the reason shown: conflicts, behind main, no PR, PR closed,
+   branch ahead on GitHub, then checks.
+6. **A feature branch that GitHub's copy is behind on is pushed** during that read (never forced), so the PR's head is
+   the local tip and CI runs on it. One with commits GitHub has and this computer doesn't blocks the merge.
+7. **Main moving on:** a notice with outcome `behind main` goes to the Dev Lead once per main commit, naming
+   conflicting files. The Dev Lead is the chat that drafted the feature, else the parent chat of a story session
+   under it. Featra never merges main in itself.
+8. **Local merge publishes main only when its checkout is clean** (`publish(..., clean=true)`); otherwise it refuses
+   with "main has local changes. Commit or stash them, then merge again." and main is untouched.
+9. **Done only by the merge,** by `system`, with `merged` and the PR in its history. After a GitHub merge the Done card
+   is a commit on local main on top of GitHub's merge commit, and how far main is ahead of GitHub is said.
+10. **Ownership moves to main by itself** once main has the branch's tip and the branch isn't checked out; nothing is
+    copied. A checkout of the feature branch keeps its cards there and the merge says so. Feature branches are kept.
+11. **Open on the feature row.** An active feature's card couldn't be opened from Work (Open was only on approved
+    features), so Accept was unreachable. The row now offers Open once the feature's end applies (Accept is open to it,
+    or it is accepted). start-feature.spec.ts's "no Open FEAT-2 on an active feature" still holds: that feature has
+    no stories done.
+12. **A Done feature isn't "merged"** on its card view: `merged: true` is for stories merged into their feature only.
+13. **Splits for the lint limits:** feature-end.ts (end, Accept, PR, merge), feature-facts.ts (the facts and the
+    notice), feature-merge.ts, feature-checks.ts, feature-pr.ts, feature-look.ts; the client's fake feature actions
+    are in test/card-server-features.ts.
+
+**Changed existing assertions:** none. Existing fakes gained the new parameters (card-server's `mergeOf`,
+checks-server's `openFeaturePrs`, ProjectChecks.test.tsx's view gains `openFeaturePrs`).
+
+**Roadmap, not now:** deleting merged feature branches; a Dev Lead for features with none found.

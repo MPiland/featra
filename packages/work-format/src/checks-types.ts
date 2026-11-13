@@ -44,6 +44,8 @@ export interface ChecksView {
   github: GithubUse;
   /** Whether a story's PR opens when it moves to review (STORY-11). */
   openStoryPrs: boolean;
+  /** Whether an accepted feature's PR to main opens (STORY-14). */
+  openFeaturePrs: boolean;
   /** How often open PRs are read again, in minutes. */
   prRefreshMinutes: number;
   /** The artifact CI uploads its JUnit report in (STORY-57); null until set, and Proven from CI is off until then. */
@@ -62,6 +64,7 @@ export interface ChecksPatch {
   /** Commands now in the project's config that the user confirms as they are. */
   confirm?: CheckField[];
   openStoryPrs?: boolean;
+  openFeaturePrs?: boolean;
   prRefreshMinutes?: number;
   testReportArtifact?: string | null;
   testReportFiles?: string | null;
@@ -156,6 +159,7 @@ export function normalizeChecksView(raw: unknown): ChecksView {
     unconfirmed: (Array.isArray(r.unconfirmed) ? (r.unconfirmed as unknown[]) : []).filter(isField),
     github: normalizeGithubUse(r.github),
     openStoryPrs: r.openStoryPrs !== false,
+    openFeaturePrs: r.openFeaturePrs !== false,
     prRefreshMinutes: isRefreshMinutes(r.prRefreshMinutes) ? r.prRefreshMinutes : 2,
     testReportArtifact: isReportArtifact(r.testReportArtifact) ? r.testReportArtifact : null,
     testReportFiles: isReportFiles(r.testReportFiles) ? r.testReportFiles : null,
@@ -177,9 +181,11 @@ export function parseChecksPatch(raw: unknown): ChecksPatch | null {
     if (value !== null && typeof value !== "string") return null;
     patch[key] = value;
   }
-  if ("openStoryPrs" in raw) {
-    if (typeof raw.openStoryPrs !== "boolean") return null;
-    patch.openStoryPrs = raw.openStoryPrs;
+  for (const key of ["openStoryPrs", "openFeaturePrs"] as const) {
+    if (!(key in raw)) continue;
+    const value = raw[key];
+    if (typeof value !== "boolean") return null;
+    patch[key] = value;
   }
   if ("prRefreshMinutes" in raw) {
     if (!isRefreshMinutes(raw.prRefreshMinutes)) return null;

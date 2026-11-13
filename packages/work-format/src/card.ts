@@ -125,6 +125,9 @@ export function serializeCard(card: Card): string {
       branch: card.branch,
       pr: card.pr,
     });
+  } else if (card.type === "feature" && card.pr !== null) {
+    // A feature's PR to main (STORY-14, ADR 0037); written only once it has one, so other features read as before.
+    fm.pr = card.pr;
   }
   fm.created = card.created;
   fm.history = card.history.map((h) => ({ at: h.at, field: h.field, from: h.from, to: h.to, by: h.by }));

@@ -20,6 +20,7 @@ const VIEW: ChecksView = {
   unconfirmed: [],
   github: { usable: false, missing: GITHUB_COPY.noRemote },
   openStoryPrs: true,
+  openFeaturePrs: true,
   prRefreshMinutes: 2,
   testReportArtifact: null,
   testReportFiles: null,

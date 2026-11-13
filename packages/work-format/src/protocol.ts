@@ -128,6 +128,21 @@ export interface ServerMethods {
    * checks run in CI for the project or the story isn't in review. The result reaches the card through `card.view`.
    */
   "story.rerunChecks": { params: { dir: string; id: string }; result: null };
+  /**
+   * Accepts a feature in progress once every story and bug under it is Done or Cancelled (STORY-14): with "Open feature
+   * PRs automatically" on and GitHub usable, its branch is pushed and its PR to the base opened first. The user's only.
+   */
+  "feature.accept": { params: { dir: string; id: string }; result: null };
+  /** Pushes an accepted feature's branch and opens (or adopts) its PR to the base (STORY-14). Refused in local mode. */
+  "feature.createPr": { params: { dir: string; id: string }; result: null };
+  /** Runs an accepted feature's checks on this computer again, at the commit its branch is at (STORY-14). */
+  "feature.rerunChecks": { params: { dir: string; id: string }; result: null };
+  /**
+   * Merges an accepted feature into the base with a merge commit (STORY-14): through its PR when the project uses
+   * GitHub, else in git. Refused with why while something stops it. The feature is then Done and the base owns its
+   * cards; `remains` says what was left to do.
+   */
+  "feature.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
   /** Where a bug believed to come from `cause` (or null) would go (STORY-13): the proposal and every place it can go. */
   "bug.propose": { params: { dir: string; cause: string | null }; result: BugPlacements };
   /**

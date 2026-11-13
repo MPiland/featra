@@ -14,6 +14,7 @@ import {
   buildWorkList,
   DEFAULT_CONFIG,
   draftStories,
+  type FeatureMergeState,
   isMerged,
   isStopped,
   MAIN,
@@ -37,6 +38,7 @@ import {
   type WorkList,
 } from "@featra/work-format";
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
+import { featureEndFakes, type FeatureActions } from "./card-server-features.ts";
 
 /** The card actions a test can set the server's answer to; each left out, the fake does what the server does. */
 export type ReviewAnswers = Partial<
@@ -55,6 +57,7 @@ export type ReviewAnswers = Partial<
     | "mergeStory"
     | "abandonCheck"
     | "abandonStory"
+    | FeatureActions
   >
 >;
 
@@ -103,6 +106,8 @@ export function fakeCardServer(
   checksOf: (dir: string, id: string) => CardChecks | undefined = () => undefined,
   /** What the server knows of a story's PR (STORY-11): on its card, and its state on the story's Work row. */
   prOf: (dir: string, id: string) => CardPr | undefined = () => undefined,
+  /** Whether the server finds an accepted feature can merge to main now, and why not (STORY-14). */
+  mergeOf: (dir: string, id: string) => FeatureMergeState | undefined = () => undefined,
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -110,7 +115,14 @@ export function fakeCardServer(
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
     return card
-      ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id), prOf(dir, id))
+      ? buildCardView(
+          owned(card),
+          true,
+          { config: DEFAULT_CONFIG, cards },
+          checksOf(dir, id),
+          prOf(dir, id),
+          mergeOf(dir, id),
+        )
       : null;
   };
   const listOf = (dir: string): WorkList | null => {
@@ -294,6 +306,7 @@ export function fakeCardServer(
       changed(dir, mergedStory(card, featureBranch(card), "system", EDIT_AT));
       return { ok: true, remains: [] };
     },
+    ...featureEndFakes({ cardsIn: (dir) => cardSets.get(dir) ?? [], changed, calls, review, at: EDIT_AT }),
     // Abandoning is the server's to prove (the session, git, gh): the fake refuses with work-format's rule and, unless
     // a test sets the answer, warns of nothing but the card, then keeps it as Cancelled or deletes it.
     abandonCheck: async (dir, id) => {

@@ -43,6 +43,17 @@ describe("AC2: Open story PRs automatically", () => {
   });
 });
 
+describe("STORY-14 AC2: Open feature PRs automatically", () => {
+  it("is on by default and the user turns it off", async () => {
+    const { section, user, calls } = await open();
+    const toggle = within(section).getByRole("switch", { name: "Open feature PRs automatically" });
+    expect(isOn(toggle)).toBe(true);
+    await user.click(toggle);
+    await waitFor(() => expect(calls).toContain(`checks.set:${PROJECT.dir}:{"openFeaturePrs":false}`));
+    expect(isOn(toggle)).toBe(false);
+  });
+});
+
 describe("AC4: how often open PRs are read again", () => {
   it("shows 2 minutes by default and saves a new interval", async () => {
     const { section, user, calls } = await open();

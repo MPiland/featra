@@ -122,8 +122,9 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               {WORK_COPY.reviewDraft}
             </button>
           )}
-          {feature.status === "approved" && feature.id && (
-            // An approved feature has no story to open it from: this opens its card, where Start is (STORY-52).
+          {(feature.status === "approved" || feature.ending) && feature.id && (
+            // A feature has no story to open it from: this opens its card, where Start is (STORY-52), or Accept and
+            // Merge to main once its end applies (STORY-14).
             <button
               type="button"
               className="review-draft"
