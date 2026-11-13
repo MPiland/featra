@@ -1900,3 +1900,13 @@ before its fix.
   and bugs use `Cancelled`. So `c.status !== "cancelled"` is right, and "Cancelled" would never match a feature. The
   existing `rollup.test.ts` "counts done features, excluding cancelled" already proves cancelled features are left out
   of epic bars; no change made.
+
+## 2026-11-12 — STORY-58 review rulings (dev-lead)
+
+- The abandon warning lists commits that are only on the story's branch. A commit counts as safe when it is on the feature branch or on any remote branch other than the story's own.
+- Order of steps: stop the turn, re-check, close the PR, then in the card lane re-check, retire, write the card and remove. A failed PR close leaves the session running.
+- A New story owned by a feature branch that isn't checked out can be abandoned. The card is changed on that branch with git plumbing.
+- Approved expectation change: in the owner-copies test, `stale` is no longer `[]`. An uncommitted edit to an older copy of a card its owner deleted is reported as stale, as ADR 0002 requires. Unedited older copies stay silent.
+- Abandon adds Merge's "N commits ahead of GitHub; push it." note. Both use one `deleteRemote`, which takes a `safe(tip)` check.
+- Retracted ruling (item 11): `epicProgress` comparing with lowercase `"cancelled"` is correct. Feature statuses are the lowercase container statuses, and rollup.test.ts already proves cancelled features are left out.
+- Roadmap: abandoning a story in a worktree that has no feature.
