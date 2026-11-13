@@ -65,3 +65,6 @@ taken then was 0, and the first read and the refresh's read together made 2 wher
 
 Fix: the test waits until the story's PR reads as open and both pollers' timers are set (2), and checks the count is 1
 before the refresh. After the refresh it waits for both timers again before moving the clock.
+
+Follow-up in PR #50: only the first read is slow to start. With every read slow to start, the test ran past its
+timeouts on a loaded machine (a local gate).
