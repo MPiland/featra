@@ -83,6 +83,7 @@ describe("the MCP bundle", () => {
         "message_session",
         "propose_check_command",
         "request_merge",
+        "report_bug",
       ]);
 
       const logged = await call("tools/call", {

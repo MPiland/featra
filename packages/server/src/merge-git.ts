@@ -134,6 +134,27 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
     return (await git(checkout, ["merge", "--ff-only", "--no-stat", "--quiet", commit])).code === 0;
   }
 
+  /**
+   * Writes the card at `input.path` (its text, or null to delete it) on `branch` with a commit made by plumbing, so no
+   * checkout is touched unless it has the branch, which then fast-forwards (STORY-58's feature-branch write, shared with
+   * STORY-13's bug filing). "same" when the branch has the card so already, and nothing is committed; "missing" when
+   * there is no such branch; "busy", with nothing changed, when the branch can't take it (local changes in the way, or
+   * it moved meanwhile).
+   */
+  async function commitCardOn(
+    top: string,
+    branch: string,
+    input: Omit<MergeCommitInput, "parents">,
+  ): Promise<"made" | "same" | "missing" | "busy"> {
+    const old = await commitOf(top, `refs/heads/${branch}`);
+    if (!old) return "missing";
+    const made = await mergeCommit(top, { ...input, parents: [old] });
+    if ("conflicts" in made) return "busy";
+    const trees = (await git(top, ["rev-parse", `${made.commit}^{tree}`, `${old}^{tree}`])).stdout.split(/\r?\n/);
+    if (trees[0] === trees[1]) return "same";
+    return (await publish(top, branch, made.commit, old)) ? "made" : "busy";
+  }
+
   /** `git worktree remove --force`, tried again briefly while Windows still holds a file in it; true once gone. */
   async function removeFolder(top: string, folder: string): Promise<boolean> {
     for (let tries = 0; ; tries++) {
@@ -244,6 +265,7 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
     mergeTree,
     mergeCommit,
     publish,
+    commitCardOn,
     removeFolder,
     removeStory,
     remoteTip,

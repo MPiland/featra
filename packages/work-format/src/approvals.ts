@@ -16,6 +16,8 @@ export type AllowScope = "once" | "chat";
 export interface ApprovalAnswer {
   choice: ApprovalChoice;
   reason?: string;
+  /** For an approval the app asks with choices (STORY-13's bug placement): the one the user picked, with Allow. */
+  option?: string;
 }
 
 /** The longest Deny reason the agent is sent. */
@@ -30,13 +32,15 @@ export function denyMessage(reason?: string | null): string {
 /** What a request that ended unanswered (Stop, the chat closing, the agent cancelling it) tells the agent. */
 export const APPROVAL_CANCELLED = "The request was cancelled before the user answered.";
 
-/** The `{ id, tool, choice, reason? }` params of `chat.approve`, or null. */
+/** The `{ id, tool, choice, reason?, option? }` params of `chat.approve`, or null. */
 export function chatApproveParams(params: unknown): { id: string; tool: string; answer: ApprovalAnswer } | null {
   if (!isRecord(params)) return null;
-  const { id, tool, choice, reason } = params;
+  const { id, tool, choice, reason, option } = params;
   if (typeof id !== "string" || !id || typeof tool !== "string" || !tool) return null;
   if (!isOneOf(APPROVAL_CHOICES, choice)) return null;
   if (reason !== undefined && typeof reason !== "string") return null;
+  if (option !== undefined && (typeof option !== "string" || !option)) return null;
   const why = choice === "deny" && reason?.trim() ? reason.trim() : undefined;
-  return { id, tool, answer: why ? { choice, reason: why } : { choice } };
+  if (why) return { id, tool, answer: { choice, reason: why } };
+  return { id, tool, answer: choice === "allow" && option ? { choice, option } : { choice } };
 }

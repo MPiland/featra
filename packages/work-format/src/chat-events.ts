@@ -261,6 +261,8 @@ export const CHAT_MESSAGES = {
   onceOnly: "This call can only be allowed once.",
   /** An answer that doesn't answer every question the way it asks (STORY-46). */
   badAnswer: "Answer every question.",
+  /** An Allow whose option isn't one the request offers (STORY-13's bug placement), or one for a request with none. */
+  badOption: "Pick one of the choices offered.",
   /** A story session on a role whose provider has no runner for it (STORY-9). */
   noRunner: "This role's agent can't run story sessions yet.",
   /** A story session still waiting for a free slot: nothing can be sent to it (STORY-9). */

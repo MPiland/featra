@@ -50,6 +50,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "story.abandonCheck",
   "story.abandon",
   "story.rerunChecks",
+  "bug.propose",
+  "bug.file",
   "story.createPr",
   "prs.refresh",
   "checks.load",

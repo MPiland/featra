@@ -4,6 +4,8 @@ import type { CopyActionResult } from "@featra/work-format/protocol";
 import type { WorkList } from "@featra/work-format/work-list";
 import type { CloseToTraySupport, ProjectRef, ProjectSetup, SetupItemId, WorkOverrides } from "../src/bridge.ts";
 import type { CardBridge } from "../src/card-pane.ts";
+import type { FiledBug } from "../src/bugs.ts";
+import type { BugPlacements } from "@featra/work-format/bug-copy";
 import type { ReviewAnswers } from "./card-server.ts";
 import type { ChatHost } from "./chat-server.ts";
 import type { RolesHost } from "./roles-server.ts";
@@ -44,6 +46,10 @@ export interface HostOptions extends ChatHost, RolesHost {
   work?: Record<string, WorkList>;
   /** What apply and discard answer. Default: ok. */
   copyResult?: CopyActionResult;
+  /** What the server proposes for a bug, by suspected cause ("" for none). Default: only the project bug list. */
+  bugPlacements?: Record<string, BugPlacements>;
+  /** What filing a bug answers. Default: filed as BUG-1. */
+  filedBug?: FiledBug;
   /**
    * Each folder's cards, owned by main and checked out: the Work list and the card pane are built from them by
    * work-format, and the pane's edits change them. Overrides `work` for that folder.

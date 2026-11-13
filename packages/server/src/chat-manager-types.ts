@@ -26,7 +26,10 @@ export interface McpAttach {
   release: (chat: string) => void;
 }
 
-/** A request the app asks the user for an agent: the row it shows as, and the story it is about. */
+/**
+ * A request the app asks the user for an agent: the row it shows as, and what it is about: the story to merge, or the
+ * bug reported (STORY-13). Having a subject keeps it open past the turn that asked.
+ */
 export interface AppApproval {
   id: string;
   name: string;
@@ -59,6 +62,11 @@ export interface ChatManager {
    * chat's agent ends first.
    */
   askApproval: (id: string, request: AppApproval) => Promise<boolean>;
+  /**
+   * As `askApproval`, for a request that offers `choices` (STORY-13's `report_bug`): the input the user allowed, with
+   * the `option` they picked when they picked one; null when they deny it, or the chat's agent ends first.
+   */
+  askChoice: (id: string, request: AppApproval) => Promise<Record<string, unknown> | null>;
   /** Puts a notice in the Dev Lead's chat `id`, as story sessions' notices are (STORY-12: how a merge it asked for went). */
   notify: (id: string, notice: Notice) => void;
   /** Takes a story session that is queued and has never started out of the queue, and forgets it. False if it isn't one. */

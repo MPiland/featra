@@ -1910,3 +1910,49 @@ before its fix.
 - Abandon adds Merge's "N commits ahead of GitHub; push it." note. Both use one `deleteRemote`, which takes a `safe(tip)` check.
 - Retracted ruling (item 11): `epicProgress` comparing with lowercase `"cancelled"` is correct. Feature statuses are the lowercase container statuses, and rollup.test.ts already proves cancelled features are left out.
 - Roadmap: abandoning a story in a worktree that has no feature.
+
+## 2026-11-12 — STORY-13 build choices (story agent, for the Dev Lead to confirm)
+
+- **Places are keys:** `project`, `feature:FEAT-N` and `task:STORY-N`. `bugPlacements` offers, in order:
+  - a bug under each feature whose status is active;
+  - a task on each story or bug in an active stage;
+  - the project list.
+
+  `routeProblem` picks the proposal. `takesBug` and `takesTask` are now exported from bugs.ts, and both use them.
+  ADR 0036.
+
+- **Done stays Done by construction.** A Done feature or a finished story is never a choice. `bug.file` checks the
+  place again at Create, so a feature that went Done in the meantime is refused (`placeGone`) and never written to.
+- **The changed place rides on the approval.** `chat.approve` has a new optional `option`, kept only with Allow. The
+  desk refuses an option that isn't one of the `choices` in the request's input (`badOption`) and keeps the card
+  waiting.
+- **report_bug has request_merge's shape.** It answers once the user is asked. Its notice says one of:
+  - "filed: BUG-N under FEAT-X.", "filed: BUG-N on the project bug list." or "filed: a task on STORY-N.";
+  - "declined";
+  - "not filed:" and why.
+
+  Its approval's `story` is `Bug "title"`, which keeps the card past the Dev Lead's turn, as a merge request's does.
+  Story sessions are refused with "Tell the Dev Lead what you found."
+
+- **Who files.** New bug is `by: user`. The Dev Lead's bugs are `by: session:<lead>` (`spawner`).
+- **Where it's written.**
+  - Owner checked out: the file is written there, uncommitted. A new card uses `createExclusive` and reallocates its
+    ID on a name clash.
+  - Owner not checked out (a started feature's branch, or main when main isn't the checkout): one plumbing commit via
+    `commitCardOn`, with the message `BUG-N: bug filed` or `STORY-N: bug task added`. `commitCardOn` is extracted from
+    STORY-58's Abandon, which now uses it too.
+- **IDs** are allocated past every copy's IDs, so a bug on a feature branch and one on main never share a number.
+- **The task text** is `Fix bug: <title>`. It is logged as a `content` event on tasks, like a card pane edit.
+- **The bug card** starts at the first stage, with `origin: bug`. Its description is the user's text, then
+  "Suspected cause: ID title". No new frontmatter field.
+- **Work list shape.** `WorkList.bugs` holds bugs with no feature. It is optional and left out when empty, so existing
+  list assertions are unchanged. The no-feature row now holds only stories. Work shows "Project bugs" after the epics,
+  with "No project bugs" when the list is empty. Bug rows show a bug icon (role img, "Bug"), both under features and on
+  the list.
+- **New bug** is a button above the list. The form's cause select lists features, then story and bug rows in Work's
+  order. The placement is asked for again on every cause change.
+- **Bug found while building, with a regression test.** `fileBug` added a task with `test: null`, a field tasks don't
+  have, so the card in memory differed from the one written. The server test failed first. The task is now
+  `{ text, done: false }`.
+- **Changed existing assertions:** mcp `stdio.test.ts` and desktop `mcp-bundle.test.ts` list the tools, and `report_bug` is appended to their expected
+  list.

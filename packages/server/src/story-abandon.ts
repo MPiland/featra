@@ -148,16 +148,11 @@ export function createStoryAbandon(deps: StoryAbandonDeps) {
     const there = scan.collected.copies.find(
       (c) => c.card?.id === id && sameLocation(c.location, { kind: "feature", branch: feature }),
     );
-    const old = await git.commitOf(top, `refs/heads/${feature}`);
-    if (!old) throw new ApiError(ABANDON_MESSAGES.noFeature(id));
     const drop = there && there.path !== owned.path ? [there.path] : [];
     const message = abandonCommitMessage(id, keep);
-    const made = await git.mergeCommit(top, { parents: [old], path: owned.path, text, message, drop });
-    if ("conflicts" in made) throw new ApiError(ABANDON_MESSAGES.featureBusy(feature));
-    const trees = (await git.git(top, ["rev-parse", `${made.commit}^{tree}`, `${old}^{tree}`])).stdout.split(/\r?\n/);
-    if (trees[0] !== trees[1] && !(await git.publish(top, feature, made.commit, old))) {
-      throw new ApiError(ABANDON_MESSAGES.featureBusy(feature));
-    }
+    const done = await git.commitCardOn(top, feature, { path: owned.path, text, message, drop });
+    if (done === "missing") throw new ApiError(ABANDON_MESSAGES.noFeature(id));
+    if (done === "busy") throw new ApiError(ABANDON_MESSAGES.featureBusy(feature));
     return aheadNote(dir, top, feature);
   }
 

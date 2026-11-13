@@ -20,7 +20,9 @@ import type { AllowedProjects } from "./allowed-projects.ts";
 import type { AgentBridge } from "./agent-bridge.ts";
 import { ApiError } from "./api-error.ts";
 import { createChatApi } from "./api-chat.ts";
+import { createBugApi } from "./api-bugs.ts";
 import { createStoryEndApi } from "./api-story-end.ts";
+import type { BugFiling } from "./bug-filing.ts";
 import { cardViewIn, type CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
@@ -60,6 +62,8 @@ export interface ApiDeps {
   merges?: Pick<StoryMerge, "merge">;
   /** Abandons stories (STORY-58). Without it `story.abandonCheck` and `story.abandon` are refused. */
   abandons?: Pick<StoryAbandon, "check" | "abandon">;
+  /** Files bugs from Work's New bug (STORY-13). Without it `bug.propose` and `bug.file` are refused. */
+  bugs?: Pick<BugFiling, "propose" | "file">;
   /** Why a story's session takes no message from the user now: it is merging or being abandoned. */
   busy?: (dir: string, id: string) => string | null;
   checks: StoryChecks;
@@ -106,6 +110,7 @@ export function createApi({
   acceptance,
   merges,
   abandons,
+  bugs,
   busy,
   checks,
   checkSettings,
@@ -131,6 +136,7 @@ export function createApi({
     return p;
   };
   const storyEnd = createStoryEndApi({ merges, abandons, allow });
+  const bugApi = createBugApi({ bugs, allow });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
@@ -233,6 +239,9 @@ export function createApi({
       case "story.abandonCheck":
       case "story.abandon":
         return storyEnd(method, params);
+      case "bug.propose":
+      case "bug.file":
+        return bugApi(method, params);
       case "story.rerunChecks": {
         const p = cardParams(params);
         if (!p) throw new ApiError("Expected { dir, id }.");

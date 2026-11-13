@@ -196,7 +196,13 @@ export function buildWorkList(
   });
 
   const loose = features.filter((f) => !f.parent || !epicIds.has(f.parent)).map(rowOf);
-  const orphans = items.filter((s) => !s.parent || !featureIds.has(s.parent));
+  const featureless = items.filter((s) => !s.parent || !featureIds.has(s.parent));
+  // A bug under no feature is on the project bug list (STORY-13), not in the no-feature row.
+  const orphans = featureless.filter((s) => s.type !== "bug");
+  const bugs = featureless
+    .filter((s) => s.type === "bug")
+    .toSorted(byOrder)
+    .map((b) => storyRow(b, new Set(), config, editable, mergeable));
   if (orphans.length) loose.push(featureRow(null, orphans, cards, config, editable, mergeable));
   if (loose.length) {
     const tones = loose.filter((f) => f.id !== null && f.status !== "cancelled").map((f) => f.tone);
@@ -217,5 +223,5 @@ export function buildWorkList(
     owner: locationLabel(s.owner),
     path: s.path,
   }));
-  return { epics: rows, stale, problems: resolution.problems };
+  return { epics: rows, stale, problems: resolution.problems, ...(bugs.length ? { bugs } : {}) };
 }

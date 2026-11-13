@@ -104,6 +104,8 @@ export interface WorkList {
   epics: EpicRow[];
   stale: StaleRow[];
   problems: string[];
+  /** The project bug list (STORY-13): bugs under no feature, which no feature row holds. Left out when there are none. */
+  bugs?: StoryRow[];
 }
 
 export const EMPTY_WORK_LIST: WorkList = { epics: [], stale: [], problems: [] };
@@ -184,9 +186,11 @@ const staleRow = (r: Record<string, unknown>): StaleRow => ({
 
 export function normalizeWorkList(raw: unknown): WorkList {
   const r = isRecord(raw) ? raw : {};
+  const bugs = list(r.bugs, story);
   return {
     epics: list(r.epics, epic),
     stale: list(r.stale, staleRow),
     problems: Array.isArray(r.problems) ? r.problems.filter((p): p is string => typeof p === "string") : [],
+    ...(bugs.length ? { bugs } : {}),
   };
 }

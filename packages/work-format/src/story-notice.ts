@@ -14,9 +14,20 @@ import type { Tone } from "./work-list-types.ts";
 
 /**
  * What a notice says happened: the turn ended, the user stopped it, it failed, or the session asks the Dev Lead; or,
- * of a merge the Dev Lead asked for (STORY-12), it merged, the user declined it, or it didn't merge.
+ * of a merge the Dev Lead asked for (STORY-12), it merged, the user declined it, or it didn't merge; or, of a bug the
+ * Dev Lead reported (STORY-13), it was filed, the user cancelled it, or it couldn't be filed.
  */
-export type NoticeOutcome = "ended" | "stopped" | "failed" | "asks" | "merged" | "merge declined" | "not merged";
+export type NoticeOutcome =
+  | "ended"
+  | "stopped"
+  | "failed"
+  | "asks"
+  | "merged"
+  | "merge declined"
+  | "not merged"
+  | "filed"
+  | "declined"
+  | "not filed";
 
 export interface Notice {
   story: string;

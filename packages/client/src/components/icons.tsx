@@ -87,6 +87,13 @@ export const RestoreIcon = () => (
     <path d="M9 9V6a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-3" />
   </Icon>
 );
+/** A beetle: the row is a bug (STORY-13). */
+export const BugIcon = () => (
+  <Icon size={14} name="bug">
+    <rect x="8" y="7" width="8" height="12" rx="4" />
+    <path d="M10 7a2 2 0 0 1 4 0M12 11v8M4 9l4 2M20 9l-4 2M4 15h4M20 15h-4M5 20l3-2M19 20l-3-2" />
+  </Icon>
+);
 export const CloseIcon = () => (
   <Icon>
     <path d="M6 6l12 12M18 6L6 18" />
