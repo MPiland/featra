@@ -1,12 +1,14 @@
 /**
  * The Featra MCP calls only the Dev Lead's chat may make, never a story session's: messaging a story's session
- * (STORY-54), proposing a check command (STORY-56), and asking the user to merge a story (STORY-12). None writes a card
+ * (STORY-54), proposing a check command (STORY-56), asking the user to merge a story (STORY-12), and reporting a bug for
+ * the user to place (STORY-13). None writes a card
  * or knowledge file on its own, so only the MCP's off switch applies (the read-only setting withholds the whole MCP at
  * `attach` anyway).
  */
-import { parseMessageInput, parseRequestMergeInput } from "@featra/work-format";
+import { parseBugReport, parseMessageInput, parseRequestMergeInput } from "@featra/work-format";
 import { AGENT_MESSAGES } from "./agent-messages.ts";
 import { ApiError } from "./api-error.ts";
+import type { BugRequest } from "./bug-request.ts";
 import { proposeChecks } from "./check-propose.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import type { MergeRequest } from "./merge-request.ts";
@@ -18,9 +20,10 @@ export interface LeadCallDeps {
   messages?: StoryMessage;
   checkSettings?: Pick<CheckSettings, "propose">;
   merges?: MergeRequest;
+  bugs?: BugRequest;
 }
 
-export function createLeadCalls({ mcpRefusal, messages, checkSettings, merges }: LeadCallDeps) {
+export function createLeadCalls({ mcpRefusal, messages, checkSettings, merges, bugs }: LeadCallDeps) {
   /** Refuses a story session with `sessionRefusal`, and any chat when the MCP is off. */
   async function lead(dir: string, story: boolean | undefined, sessionRefusal: string) {
     if (story) throw new ApiError(sessionRefusal);
@@ -49,6 +52,14 @@ export function createLeadCalls({ mcpRefusal, messages, checkSettings, merges }:
       const input = parseRequestMergeInput(params);
       if (!input.ok) throw new ApiError(input.error);
       return merges.request(dir, input.value, chat);
+    },
+
+    async reportBug(chat: string, dir: string, story: boolean | undefined, params: unknown) {
+      await lead(dir, story, AGENT_MESSAGES.sessionBug);
+      if (!bugs) throw new ApiError(AGENT_MESSAGES.noBug);
+      const input = parseBugReport(params);
+      if (!input.ok) throw new ApiError(input.error);
+      return bugs.report(dir, input.value, chat);
     },
   };
 }

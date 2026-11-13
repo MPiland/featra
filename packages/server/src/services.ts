@@ -24,6 +24,8 @@ import { createStoryMerge } from "./story-merge.ts";
 import { createStoryAbandon } from "./story-abandon.ts";
 import { createStoryEnding } from "./story-ending.ts";
 import { createMergeRequest } from "./merge-request.ts";
+import { createBugFiling } from "./bug-filing.ts";
+import { createBugRequest } from "./bug-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
@@ -188,6 +190,7 @@ export function createServices({
     ending,
   });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
+  const bugs = createBugFiling({ scan: watches.scan, now, lane, gitCommand });
   const reports = createCardReport({
     scan: watches.scan,
     now,
@@ -210,6 +213,7 @@ export function createServices({
     messages: createStoryMessage({ scan: watches.scan, chats, busy }),
     checkSettings,
     merges: createMergeRequest({ scan: watches.scan, chats, merge: merges.merge, log }),
+    bugs: createBugRequest({ chats, bugs, log }),
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
@@ -230,6 +234,7 @@ export function createServices({
     acceptance,
     merges,
     abandons,
+    bugs,
     busy,
     checks,
     checkSettings,

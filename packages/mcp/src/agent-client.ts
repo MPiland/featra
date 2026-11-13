@@ -108,6 +108,11 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       if (!isRecord(result) || typeof result.story !== "string") throw new Error("Featra gave an unexpected answer.");
       return { story: result.story };
     },
+    async reportBug(input) {
+      const result = await call("bug.report", input);
+      if (!isRecord(result) || result.asked !== true) throw new Error("Featra gave an unexpected answer.");
+      return { asked: true };
+    },
     async propose(input) {
       const result = await call("checks.propose", input);
       const proposed = isRecord(result) && Array.isArray(result.proposed) ? result.proposed.map(String) : null;

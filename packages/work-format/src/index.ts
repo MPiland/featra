@@ -6,6 +6,8 @@ export * from "./ownership.ts";
 export * from "./rollup.ts";
 export * from "./evidence.ts";
 export * from "./bugs.ts";
+export * from "./bug-copy.ts";
+export * from "./bug-filing.ts";
 export * from "./ids.ts";
 export * from "./validate.ts";
 export * from "./utils/guards.ts";

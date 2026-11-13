@@ -4,7 +4,7 @@
  * manager, the clock and (where a step must fail) git's runner are faked.
  */
 import { describe, expect, it } from "vitest";
-import { atRisk, CANCELLED } from "@featra/work-format";
+import { ABANDON_MESSAGES, atRisk, CANCELLED } from "@featra/work-format";
 import { REMOVE_NOTES } from "../src/merge-git.ts";
 import { runGit } from "../src/git-run.ts";
 import { abandonWorld, FEATURE_BRANCH, STORY_BRANCH } from "./story-abandon-world.ts";
@@ -62,6 +62,29 @@ describe("a story its feature branch owns (review fix)", { timeout: 60_000 }, ()
     await a.abandon(false, token, "STORY-2");
     expect(a.cardOn(FEATURE_BRANCH, "STORY-2")).toBeNull();
     expect((await a.scan())?.resolution.cards.map((c) => c.card.id)).not.toContain("STORY-2");
+  });
+});
+
+describe("a feature branch that moved after the scan (STORY-13 review)", { timeout: 60_000 }, () => {
+  it("refuses the abandon, and a task edit committed there meanwhile is kept", async () => {
+    await a.start({ remote: false });
+    await story2OnFeature();
+    const { token } = await a.check("STORY-2");
+    const edited = { ...a.cardOn(FEATURE_BRANCH, "STORY-2")!, tasks: [{ text: "Keep me", done: false }] };
+    let moved = false;
+    // Between abandon's scan and its commit: someone commits a task edit to STORY-2 on the feature branch.
+    m.gitRun = async (command, root, args, options) => {
+      if (!moved && args[0] === "rev-parse" && args.includes(`refs/heads/${FEATURE_BRANCH}^{commit}`)) {
+        moved = true;
+        await w.repo.commitOn(FEATURE_BRANCH, (tree) => w.repo.write(tree, edited), "STORY-2: task added");
+      }
+      return runGit(command, root, args, options);
+    };
+    const tip = () => m.tip(FEATURE_BRANCH);
+    await expect(a.abandon(true, token, "STORY-2")).rejects.toThrow(ABANDON_MESSAGES.featureMoved(FEATURE_BRANCH));
+    expect(moved).toBe(true);
+    expect(w.repo.git(w.repo.main, "log", "-1", "--format=%s", tip()).trim()).toBe("STORY-2: task added");
+    expect(a.cardOn(FEATURE_BRANCH, "STORY-2")).toMatchObject({ status: "New", tasks: [{ text: "Keep me" }] });
   });
 });
 

@@ -1,7 +1,9 @@
 /**
- * The scripted turns of fake-agent-sdk.mjs that need more than a reply: a background subagent (STORY-55) and an
- * AskUserQuestion. Each takes the SDK fake's message builders as `h`, so the numbering and token use stay in one place.
+ * The scripted turns of fake-agent-sdk.mjs that need more than a reply: a background subagent (STORY-55), an
+ * AskUserQuestion and a report_bug (STORY-13). Each takes the SDK fake's message builders as `h`, so the numbering and
+ * token use stay in one place.
  */
+import { callMcpTool } from "./fake-mcp-client.mjs";
 
 const SUB_CALL = "toolu_agent_1";
 const SUB_TASK = "task_sub_1";
@@ -85,5 +87,29 @@ export async function* questionTurn(h, options, signal) {
     : "";
   yield toolResult(id, allowed ? given : decision.message, !allowed);
   yield* say(allowed ? `Got: ${given}` : "No answer.");
+  yield success("Done.");
+}
+
+/** The bug the fake Dev Lead reports: blamed on FEAT-2, so Featra proposes it under that feature while it is started. */
+export const REPORTED_BUG = {
+  title: "Flaky save",
+  description: "Save sometimes shows an error, then works.",
+  cause: "FEAT-2",
+};
+
+/** Reports a bug through the Featra MCP's report_bug, as the Dev Lead would; the call answers once the user is asked. */
+export async function* reportBugTurn(h, options) {
+  const { assistant, toolResult, say, success, next } = h;
+  const spec = options.mcpServers?.featra;
+  if (!spec) {
+    yield* say("No Featra MCP.");
+    yield success("No Featra MCP.");
+    return;
+  }
+  const id = `toolu_mcp_${next()}`;
+  yield assistant(`msg_${next()}`, [{ type: "tool_use", id, name: "mcp__featra__report_bug", input: REPORTED_BUG }]);
+  const result = await callMcpTool(spec, "report_bug", REPORTED_BUG);
+  yield toolResult(id, result.text, result.isError);
+  yield* say(`Tool said: ${result.text}`);
   yield success("Done.");
 }

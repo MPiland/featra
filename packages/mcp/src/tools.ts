@@ -20,6 +20,7 @@ import {
 import { ToolRefusal, type FeatraHost, type Tool } from "./tool-types.ts";
 import { MESSAGE_SESSION } from "./message-session.ts";
 import { REQUEST_MERGE } from "./request-merge.ts";
+import { REPORT_BUG } from "./report-bug.ts";
 import { PROPOSE_CHECK_COMMAND } from "./propose-check-command.ts";
 import { UPDATE_CARD } from "./update-card.ts";
 
@@ -230,4 +231,5 @@ export const TOOLS: readonly Tool[] = [
   MESSAGE_SESSION,
   PROPOSE_CHECK_COMMAND,
   REQUEST_MERGE,
+  REPORT_BUG,
 ];

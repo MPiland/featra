@@ -14,6 +14,8 @@ import { SelectedCard } from "./card-selection.tsx";
 import { CardPane } from "./CardPane.tsx";
 import { PaneHandle, type ChosenWidth } from "./PaneHandle.tsx";
 import { Epic } from "./Epic.tsx";
+import { NewBug } from "./NewBug.tsx";
+import { ProjectBugs } from "./ProjectBugs.tsx";
 import { ReviewDraft } from "./review-draft.tsx";
 import { StoryAgentsContext, type StoryAgents } from "./story-agents.tsx";
 import { useDockedPane } from "./useDockedPane.ts";
@@ -62,6 +64,7 @@ export function WorkList(props: {
     for (const epic of update?.list.epics ?? [])
       for (const f of epic.features)
         for (const story of f.stories) rows.set(story.id, { story, featureActive: f.status === "active" });
+    for (const bug of update?.list.bugs ?? []) rows.set(bug.id, { story: bug, featureActive: false });
     return {
       row: (id) => rows.get(id) ?? null,
       queued: (id) => chats.some((c) => c.story?.id === id && c.queued === true),
@@ -93,7 +96,7 @@ export function WorkList(props: {
   const counts = filterCounts(list?.epics ?? []);
   let body;
   if (!list) body = <p className="meta">{WORK_COPY.loading}</p>;
-  else if (!list.epics.length) body = <p className="meta">{WORK_COPY.empty}</p>;
+  else if (!list.epics.length && !list.bugs?.length) body = <p className="meta">{WORK_COPY.empty}</p>;
   else {
     body = (
       <>
@@ -118,6 +121,7 @@ export function WorkList(props: {
                 {epics.map((e) => (
                   <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
                 ))}
+                <ProjectBugs bugs={list.bugs ?? []} />
               </StoryAgentsContext.Provider>
             </ReviewDraft.Provider>
           </SelectedCard.Provider>
@@ -156,6 +160,7 @@ export function WorkList(props: {
             onDiscard={(key) => work.discardCopy(project.dir, key)}
           />
         )}
+        {list && <NewBug bugs={work} dir={project.dir} list={list} />}
         {body}
       </section>
       {selected && (

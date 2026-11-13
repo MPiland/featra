@@ -1,7 +1,9 @@
 import { useState } from "react";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
+import { bugAsk, REPORT_BUG_TOOL } from "@featra/work-format/bug-copy";
 import { REQUEST_MERGE_TOOL } from "@featra/work-format/merge-copy";
 import { CHAT_COPY } from "../../chats.ts";
+import { BugReportPrompt } from "./BugReportPrompt.tsx";
 import { mergeAsk, MergeRequestPrompt } from "./MergeRequestPrompt.tsx";
 
 interface ApprovalPromptProps {
@@ -48,6 +50,8 @@ export function ApprovalPrompt({
   const deny = () => answer(reason.trim() ? { choice: "deny", reason: reason.trim() } : { choice: "deny" });
   const merge = name === REQUEST_MERGE_TOOL ? mergeAsk(input) : null;
   if (merge) return <MergeRequestPrompt {...merge} onAnswer={onAnswer} />;
+  const bug = name === REPORT_BUG_TOOL ? bugAsk(input) : null;
+  if (bug) return <BugReportPrompt {...bug} onAnswer={onAnswer} />;
 
   return (
     <div className="chat-approval" role="group" aria-label={`${CHAT_COPY.approve} ${name}`}>

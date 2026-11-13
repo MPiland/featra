@@ -25,6 +25,8 @@ export interface WorktreeInfo {
 
 export interface BranchInfo {
   name: string;
+  /** The commit the branch is at. */
+  head: string;
   /** Whether the tip is in the base branch (`git for-each-ref --merged`). */
   inBase: boolean;
 }
@@ -108,13 +110,17 @@ export function createRepoGit(command = "git"): RepoGit {
     async branches(top, base) {
       // Side by side: each git start adds to every scan, about 200 ms apiece on Windows under load (BUG-5).
       const [listed, merged] = await Promise.all([
-        ok(top, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]),
+        ok(top, ["for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]),
         run(top, ["for-each-ref", `--merged=refs/heads/${base}`, "--format=%(refname:short)", "refs/heads"]),
       ]);
-      const all = listed.split("\n");
+      const all = listed.split("\n").filter(Boolean);
       // No base branch yet (no commits): nothing is in it.
       const inBase = new Set(merged.code === 0 ? merged.stdout.split("\n") : []);
-      return all.filter(Boolean).map((name) => ({ name, inBase: inBase.has(name) }));
+      return all.map((line) => {
+        const [head = "", ...rest] = line.split(" ");
+        const name = rest.join(" ");
+        return { name, head, inBase: inBase.has(name) };
+      });
     },
     async defaultBranch(top) {
       const listed = await run(top, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]);

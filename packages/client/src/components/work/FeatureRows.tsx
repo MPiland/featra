@@ -1,7 +1,7 @@
 import { useContext, useState } from "react";
 import type { FeatureRow, StoryRow, Tone } from "@featra/work-format/work-list";
 import { featureStatusLabel, WORK_COPY } from "../../work-list.ts";
-import { ChevronRightIcon } from "../icons.tsx";
+import { BugIcon, ChevronRightIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
@@ -40,7 +40,8 @@ function Scope({ added, openBugs }: FeatureRow["scope"]) {
   return <>{parts.flatMap((p, i) => (i ? [" · ", p] : [p]))}</>;
 }
 
-function Story({ story }: { story: StoryRow }) {
+/** A story or bug row on the shared grid; a bug shows the bug icon (STORY-13). */
+export function Story({ story }: { story: StoryRow }) {
   const { selected, paneId, open } = useCardSelection();
   const shown = selected === story.id;
   const agents = useContext(StoryAgentsContext);
@@ -51,6 +52,11 @@ function Story({ story }: { story: StoryRow }) {
       <div className={shown ? "prow shown" : "prow"} role="row" data-card={story.id}>
         <span aria-hidden="true" />
         <span role="cell" className="pn">
+          {story.type === "bug" && (
+            <span className="row-bug" role="img" aria-label={WORK_COPY.bug}>
+              <BugIcon />
+            </span>
+          )}
           <button
             type="button"
             className="row-open"

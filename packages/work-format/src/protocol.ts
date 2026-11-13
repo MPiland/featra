@@ -6,6 +6,7 @@
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
 import type { AbandonWarning } from "./abandon-copy.ts";
 import type { ApprovalChoice } from "./approvals.ts";
+import type { BugPlacements } from "./bug-copy.ts";
 import type { Answers } from "./questions.ts";
 import type { ChecksPatch, ChecksView } from "./checks-types.ts";
 import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
@@ -127,6 +128,16 @@ export interface ServerMethods {
    * checks run in CI for the project or the story isn't in review. The result reaches the card through `card.view`.
    */
   "story.rerunChecks": { params: { dir: string; id: string }; result: null };
+  /** Where a bug believed to come from `cause` (or null) would go (STORY-13): the proposal and every place it can go. */
+  "bug.propose": { params: { dir: string; cause: string | null }; result: BugPlacements };
+  /**
+   * Files a bug where the user placed it (STORY-13): a new bug card under a feature in progress or on the project bug
+   * list, or a task on a story being worked. Refused when that place can't take it now. `id` is the card it changed.
+   */
+  "bug.file": {
+    params: { dir: string; title: string; description: string; cause: string | null; placement: string };
+    result: { kind: "card" | "task"; id: string };
+  };
   /**
    * Pushes a story's branch and opens its PR against the feature branch through the user's `gh` (STORY-11), or adopts
    * the open PR from that branch. Refused in local mode, outside review, or when the story has a PR; a push or `gh`
@@ -181,7 +192,7 @@ export interface ServerMethods {
    * reason the agent is sent. Refused when the request isn't waiting.
    */
   "chat.approve": {
-    params: { id: string; tool: string; choice: ApprovalChoice; reason?: string };
+    params: { id: string; tool: string; choice: ApprovalChoice; reason?: string; option?: string };
     result: null;
   };
   /**

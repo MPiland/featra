@@ -26,13 +26,17 @@ export interface McpAttach {
   release: (chat: string) => void;
 }
 
-/** A request the app asks the user for an agent: the row it shows as, and the story it is about. */
-export interface AppApproval {
-  id: string;
-  name: string;
-  input: Record<string, unknown>;
-  story: string;
-}
+/**
+ * A request the app asks the user for an agent: the row it shows as, and what it is about: the `story` to merge, or
+ * the `subject` of anything else, such as the bug reported (STORY-13). Either keeps it open past the turn that asked.
+ */
+export type AppApproval = { id: string; name: string; input: Record<string, unknown> } & (
+  | { story: string; subject?: never }
+  | { subject: string; story?: never }
+);
+
+/** How an app request with choices ended: the input the user allowed, or that they denied it, or it was cancelled. */
+export type ChoiceAnswer = Record<string, unknown> | "denied" | "cancelled";
 
 export interface ChatManager {
   /**
@@ -59,6 +63,12 @@ export interface ChatManager {
    * chat's agent ends first.
    */
   askApproval: (id: string, request: AppApproval) => Promise<boolean>;
+  /**
+   * As `askApproval`, for a request that offers `choices` (STORY-13's `report_bug`): the input the user allowed, with
+   * the `option` they picked when they picked one; "denied" when they deny it; "cancelled" when the chat's agent ends
+   * first, so the user never answered.
+   */
+  askChoice: (id: string, request: AppApproval) => Promise<ChoiceAnswer>;
   /** Puts a notice in the Dev Lead's chat `id`, as story sessions' notices are (STORY-12: how a merge it asked for went). */
   notify: (id: string, notice: Notice) => void;
   /** Takes a story session that is queued and has never started out of the queue, and forgets it. False if it isn't one. */

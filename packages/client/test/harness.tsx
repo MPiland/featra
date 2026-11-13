@@ -21,6 +21,7 @@ import {
 } from "../src/bridge.ts";
 import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
 import type { Card } from "@featra/work-format";
+import { fakeBugServer } from "./bug-server.ts";
 import { fakeCardServer } from "./card-server.ts";
 import { fakeChatServer } from "./chat-server.ts";
 import type { HostOptions } from "./harness-options.ts";
@@ -183,6 +184,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
         return host.copyResult ?? { ok: true };
       },
       refreshPrs: () => void calls.push("refreshPrs"),
+      ...fakeBugServer(calls, host),
       ...cards.bridge,
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.

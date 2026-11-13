@@ -30,6 +30,7 @@ import type { CardReport } from "./card-report.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import type { DraftWriter } from "./draft-writer.ts";
 import type { FeatureStart } from "./feature-start.ts";
+import type { BugRequest } from "./bug-request.ts";
 import type { MergeRequest } from "./merge-request.ts";
 import type { StoryMessage } from "./story-message.ts";
 import type { StorySpawn } from "./story-spawn.ts";
@@ -72,6 +73,8 @@ export interface AgentBridgeDeps {
   checkSettings?: Pick<CheckSettings, "propose">;
   /** Asks the user to merge a story for the Dev Lead (STORY-12). Without it `story.requestMerge` is refused. */
   merges?: MergeRequest;
+  /** Asks the user to place a bug the Dev Lead reports (STORY-13). Without it `bug.report` is refused. */
+  bugs?: BugRequest;
   newToken?: () => string;
 }
 
@@ -106,6 +109,7 @@ export function createAgentBridge({
   messages,
   checkSettings,
   merges,
+  bugs,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -121,7 +125,7 @@ export function createAgentBridge({
     return (await enabled(dir)) ? null : AGENT_MESSAGES.mcpOff;
   }
 
-  const leads = createLeadCalls({ mcpRefusal, messages, checkSettings, merges });
+  const leads = createLeadCalls({ mcpRefusal, messages, checkSettings, merges, bugs });
 
   /**
    * Why agents may not write to the project: the MCP is off, or its knowledge setting is read-only, which keeps agents
@@ -243,6 +247,8 @@ export function createAgentBridge({
           return leads.propose(info.dir, info.story, params);
         case "story.requestMerge":
           return leads.requestMerge(chat, info.dir, info.story, params);
+        case "bug.report":
+          return leads.reportBug(chat, info.dir, info.story, params);
         case "log.append":
           return appendLog(chat, info.dir, info.cwd ?? info.dir, info.session, params);
         default:

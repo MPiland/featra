@@ -67,3 +67,4 @@ What becomes easier or harder, and what we must now do.
 | [0033](0033-proven-from-ci-test-reports.md)               | Proven from CI's test reports                                         | proposed |
 | [0034](0034-merging-a-story-into-its-feature.md)          | Merging a story into its feature                                      | proposed |
 | [0035](0035-abandoning-a-story.md)                        | Abandoning a story                                                    | proposed |
+| [0036](0036-filing-and-placing-bugs.md)                   | Filing and placing bugs                                               | proposed |

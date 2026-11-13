@@ -25,6 +25,7 @@ import { createAbandonGit, type RemoteCopy } from "./abandon-git.ts";
 import { ApiError } from "./api-error.ts";
 import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
+import { locationKey } from "./collect.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import { githubRemote } from "./github-detect.ts";
@@ -148,16 +149,14 @@ export function createStoryAbandon(deps: StoryAbandonDeps) {
     const there = scan.collected.copies.find(
       (c) => c.card?.id === id && sameLocation(c.location, { kind: "feature", branch: feature }),
     );
-    const old = await git.commitOf(top, `refs/heads/${feature}`);
-    if (!old) throw new ApiError(ABANDON_MESSAGES.noFeature(id));
     const drop = there && there.path !== owned.path ? [there.path] : [];
     const message = abandonCommitMessage(id, keep);
-    const made = await git.mergeCommit(top, { parents: [old], path: owned.path, text, message, drop });
-    if ("conflicts" in made) throw new ApiError(ABANDON_MESSAGES.featureBusy(feature));
-    const trees = (await git.git(top, ["rev-parse", `${made.commit}^{tree}`, `${old}^{tree}`])).stdout.split(/\r?\n/);
-    if (trees[0] !== trees[1] && !(await git.publish(top, feature, made.commit, old))) {
-      throw new ApiError(ABANDON_MESSAGES.featureBusy(feature));
-    }
+    // Only onto the commit this scan read, so nothing committed there meanwhile is overwritten.
+    const parent = scan.collected.heads.get(locationKey({ kind: "feature", branch: feature })) ?? null;
+    const done = await git.commitCardOn(top, feature, { path: owned.path, text, message, drop }, { parent });
+    if (done === "missing") throw new ApiError(ABANDON_MESSAGES.noFeature(id));
+    if (done === "busy") throw new ApiError(ABANDON_MESSAGES.featureBusy(feature));
+    if (done === "moved") throw new ApiError(ABANDON_MESSAGES.featureMoved(feature));
     return aheadNote(dir, top, feature);
   }
 

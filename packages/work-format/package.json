@@ -28,7 +28,8 @@
     "./questions": "./src/questions.ts",
     "./tool-summary": "./src/tool-summary.ts",
     "./merge-copy": "./src/merge-copy.ts",
-    "./abandon-copy": "./src/abandon-copy.ts"
+    "./abandon-copy": "./src/abandon-copy.ts",
+    "./bug-copy": "./src/bug-copy.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"
