@@ -129,6 +129,12 @@ export function createApi({
     if (!p) throw new ApiError("Expected { dir }.");
     return allow(p.dir);
   };
+  /** A card's folder, an open project, and its id. */
+  const card = (params: unknown): [dir: string, id: string] => {
+    const p = cardParams(params);
+    if (!p) throw new ApiError("Expected { dir, id }.");
+    return [allow(p.dir), p.id];
+  };
   const copy = (params: unknown) => {
     const p = copyParams(params);
     if (!p) throw new ApiError("Expected { dir, key }.");
@@ -207,34 +213,17 @@ export function createApi({
         return drafts.sendBack(allow(p.dir), p.id, p.reason);
       }
       case "draft.approve":
-      case "draft.reject": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        const dir = allow(p.dir);
-        return method === "draft.approve" ? review.approve(dir, p.id) : review.reject(dir, p.id);
-      }
-      case "feature.start": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        return starts.start(allow(p.dir), p.id, starter(null));
-      }
-      case "story.start": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        return spawns.start(allow(p.dir), p.id);
-      }
+      case "draft.reject":
+        return method === "draft.approve" ? review.approve(...card(params)) : review.reject(...card(params));
+      case "feature.start":
+        return starts.start(...card(params), starter(null));
+      case "story.start":
+        return spawns.start(...card(params));
       case "story.stop":
-      case "story.resume": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        const dir = allow(p.dir);
-        return method === "story.stop" ? stops.stop(dir, p.id) : stops.resume(dir, p.id);
-      }
-      case "story.accept": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        return acceptance.accept(allow(p.dir), p.id);
-      }
+      case "story.resume":
+        return method === "story.stop" ? stops.stop(...card(params)) : stops.resume(...card(params));
+      case "story.accept":
+        return acceptance.accept(...card(params));
       case "story.merge":
       case "story.abandonCheck":
       case "story.abandon":
@@ -242,16 +231,10 @@ export function createApi({
       case "bug.propose":
       case "bug.file":
         return bugApi(method, params);
-      case "story.rerunChecks": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        return checks.rerun(allow(p.dir), p.id);
-      }
-      case "story.createPr": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        return prs.createPr(allow(p.dir), p.id);
-      }
+      case "story.rerunChecks":
+        return checks.rerun(...card(params));
+      case "story.createPr":
+        return prs.createPr(...card(params));
       case "prs.refresh":
         prs.focus();
         return null;

@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   BUG_COPY,
+  parseCard,
   CHAT_MESSAGES,
   REPORT_BUG_MESSAGES,
   REPORT_BUG_TOOL,
@@ -47,7 +48,8 @@ describe("report_bug (AC1, AC3)", { timeout: 60_000 }, () => {
     expect(asked).toMatchObject({ ok: true, result: { asked: true } });
     await w.until(() => approvals(lead.events()).length === 1);
     const [card] = approvals(lead.events());
-    expect(card).toMatchObject({ name: REPORT_BUG_TOOL, story: bugSubject("Spawn hangs") });
+    expect(card).toMatchObject({ name: REPORT_BUG_TOOL, subject: bugSubject("Spawn hangs") });
+    expect(card).not.toHaveProperty("story");
     const input = card!.input as BugPlacements & { title: string; cause: string };
     expect(input).toMatchObject({ title: "Spawn hangs", cause: "STORY-6", proposed: "feature:FEAT-2" });
     expect(input.choices.map((c) => c.key)).toEqual(["feature:FEAT-2", "project"]);
@@ -85,6 +87,35 @@ describe("report_bug (AC1, AC3)", { timeout: 60_000 }, () => {
     });
     await w.until(() => heard(`${bugSubject("Odd place")} declined`));
     expect(bugsOnMain()).toEqual(before);
+  });
+
+  it("files nothing when the proposed feature is Done by Create, and tells the Dev Lead why (review 3)", async () => {
+    // A world of its own: FEAT-2 goes Done here, which the other tests rely on not happening.
+    const own = await storyWorld();
+    try {
+      const lead = await own.devLead();
+      await lead.agent.ask("bug.report", { title: "Late bug", cause: "STORY-6" });
+      await own.until(() => approvals(lead.events()).length === 1);
+      const [card] = approvals(lead.events());
+      expect(card!.input).toMatchObject({ proposed: "feature:FEAT-2" });
+      const branch = "feature/2-delegation";
+      const path = ".featra/cards/FEAT-2-card.md";
+      const feature = parseCard(own.repo.git(own.dir, "show", `${branch}:${path}`));
+      await own.repo.commitOn(branch, (tree) => own.repo.write(tree, { ...feature, status: "done" }), "FEAT-2 done");
+      const tips = own.repo.git(own.dir, "for-each-ref", "--format=%(objectname)", "refs/heads");
+      // Create, keeping the proposal.
+      expect(await own.window.ask("chat.approve", { id: lead.id, tool: card!.id, choice: "allow" })).toMatchObject({
+        ok: true,
+      });
+      const why = REPORT_BUG_MESSAGES.placeGone("feature:FEAT-2");
+      await own.until(() =>
+        own.claude.runs.some((r) => r.heard.some((h) => h.includes(`${bugSubject("Late bug")} not filed: ${why}`))),
+      );
+      expect(own.repo.git(own.dir, "for-each-ref", "--format=%(objectname)", "refs/heads")).toBe(tips);
+      expect(own.repo.git(own.dir, "status", "--porcelain")).toBe("");
+    } finally {
+      await own.close();
+    }
   });
 
   it("refuses a report without a title, or with a cause that isn't a card", async () => {

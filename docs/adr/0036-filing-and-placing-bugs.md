@@ -17,15 +17,23 @@ feature branch that isn't checked out. Nothing about filing needs GitHub.
   list (`bugPlacements`). The user keeps the proposal or picks another choice, then Creates or Cancels. Nothing is
   written before Create. At Create the server reads the cards again and refuses a place that is no longer offered
   (`placementRefusal`), so a feature that went Done meanwhile is never written to.
+- **A story still being worked is one its worktree owns** (`takesTask`, by `ownerOf`). A story merged into its
+  feature, or owned by a feature branch with no worktree, takes no task: it is offered, and proposed, the bug under
+  its feature. `routeProblem`, `bugPlacements` and `placementRefusal` take the scanned state for this.
 - **Places as keys.** A place is `project`, `feature:FEAT-N` or `task:STORY-N`. The client and the server share these
   keys, and the server is the only one that turns a key into a write.
 - **The Dev Lead's `report_bug`** works like `request_merge` (ADR 0034). It takes a title, a description and an
   optional suspected cause. The server proposes a place and puts an approval card in the Dev Lead's chat and the Inbox.
   The call answers at once. A notice tells the Dev Lead the outcome: filed (and where), declined, or not filed (and
-  why). Story sessions are refused. They tell the Dev Lead instead.
+  why). A chat that ends before the user answers is "not filed: the request was cancelled". Story sessions are
+  refused. They tell the Dev Lead instead.
+- **An app request has a subject.** The approval's `subject` (`Bug "title"`) says what it is about when it isn't a
+  story; like `story`, it keeps the request open past the turn. It is its own field, so nothing reads a bug as a
+  story id.
 - **The place travels on the approval.** `chat.approve` takes an optional `option` with Allow. The approval desk
-  accepts it only when it is one of the `choices` in the request's input, and refuses anything else (`badOption`) so
-  the card stays waiting. Other tools ignore it.
+  accepts it only on a request the app asks itself (`app: true`), and only when it is one of the `choices` in the
+  request's input. It refuses anything else (`badOption`), including any option on an agent's own tool, so the card
+  stays waiting.
 - **New bug in Work** asks `bug.propose` again whenever the suspected cause changes. It then calls `bug.file` with the
   chosen key. It is the user's click (`by: user`). The Dev Lead's bugs are `by: session:<lead>`.
 - **What is written.**
@@ -40,6 +48,11 @@ feature branch that isn't checked out. Nothing about filing needs GitHub.
     taken allocates again.
   - Where it isn't, the card is committed on the owner's branch with plumbing (`BUG-N: bug filed`, `STORY-N: bug task
     added`), with the same helper Abandon uses (`commitCardOn`, extracted from STORY-58). No checkout is touched.
+  - The scan records each copy's commit. `commitCardOn` takes it as the expected parent and refuses when the branch
+    tip differs (`moved`: "The branch X changed while the bug was being filed. Try again."), so an edit made since the
+    scan is never lost. For a new card it also refuses when the parent's tree has the path or the ID (`taken`), and
+    the server allocates again. Abandon uses the same guard.
+  - A task on a story whose owning copy has no copy of the card is refused with `readOnlyReason`, as a card edit is.
 - **The project bug list.** The Work list carries `bugs`: bugs with no feature, in order. It is left out when there
   are none. Work shows it after the epics, as "Project bugs", and bug rows have a bug icon wherever they are.
 
@@ -47,6 +60,7 @@ feature branch that isn't checked out. Nothing about filing needs GitHub.
 
 - A bug filed on a feature branch that isn't checked out is a local commit there, until the user pushes or merges.
 - A project bug is uncommitted on main, as any card edit there would be.
+- A branch that moves while a bug is filed refuses it; the user or the Dev Lead tries again.
 - The approval desk understands one more field. A request that carries `choices` can take a choice. Other requests
   can't.
 - A Done feature's bugs are always project bugs. Work shows them apart from the feature, and the feature's progress

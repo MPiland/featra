@@ -27,6 +27,7 @@ export const ABANDON_MESSAGES = {
   noFeature: (id: string) => `${id} has no feature branch to keep its card on.`,
   /** The feature branch couldn't take the card: nothing was removed. */
   featureBusy: (branch: string) => `${branch} has local changes to the card. Commit or stash them, then abandon again.`,
+  featureMoved: (branch: string) => `${branch} changed while the story was being abandoned. Abandon again.`,
   failed: "Couldn't abandon",
 } as const;
 

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { cardFileName, idFromFileName, newCard, nextId, routeProblem, slugify, validateCards } from "../src/index.ts";
+import {
+  cardFileName,
+  idFromFileName,
+  newCard,
+  nextId,
+  routeProblem,
+  slugify,
+  validateCards,
+  type BranchState,
+} from "../src/index.ts";
 import { at, config, feature, moves, story } from "./fixtures.ts";
 
 describe("routeProblem", () => {
@@ -11,6 +20,11 @@ describe("routeProblem", () => {
     moves(story("STORY-3", "FEAT-0"), [1, "Done"]),
     newCard({ id: "EPIC-1", type: "epic", title: "E", status: "active" }, "user", at(0)),
   ];
+  // FEAT-1 is started; STORY-1 is still in its worktree.
+  const state: BranchState = {
+    features: { "FEAT-1": { branch: "feature/1-f", merged: false } },
+    worktrees: { "STORY-1": { branch: "story/1-s", path: "/wt/story-1", merged: false } },
+  };
 
   it.each([
     ["a story still being worked → task on it", "STORY-1", { kind: "task", card: "STORY-1" }],
@@ -25,11 +39,25 @@ describe("routeProblem", () => {
     ["an epic → project bug", "EPIC-1", { kind: "project-bug" }],
     ["unknown card → project bug", "STORY-404", { kind: "project-bug" }],
   ])("%s", (_, cause, expected) => {
-    expect(routeProblem(cause, cards, config)).toEqual(expected);
+    expect(routeProblem(cause, cards, config, state)).toEqual(expected);
   });
 
   it("no known cause → project bug", () => {
-    expect(routeProblem(null, cards, config)).toEqual({ kind: "project-bug" });
+    expect(routeProblem(null, cards, config, state)).toEqual({ kind: "project-bug" });
+  });
+
+  // Ruling 7: "still being worked" means the story's card is still owned by its worktree.
+  it.each([
+    [
+      "merged into its feature (the feature branch owns it)",
+      { "STORY-1": { ...state.worktrees["STORY-1"]!, merged: true } },
+    ],
+    ["with no worktree", {}],
+  ])("a story in progress %s → bug under its feature, not a task", (_, worktrees) => {
+    expect(routeProblem("STORY-1", cards, config, { ...state, worktrees })).toEqual({
+      kind: "feature-bug",
+      feature: "FEAT-1",
+    });
   });
 });
 

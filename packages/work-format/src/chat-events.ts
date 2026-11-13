@@ -46,8 +46,9 @@ export type ChatEvent =
    * A tool call needs the user's approval (STORY-45): the chat waits until it is answered. `forChat` is false when
    * Allow for this chat isn't offered (the agent says the call may only be allowed once, or there is no rule for it),
    * so only Allow and Deny are. `covers` says what Allow for this chat would cover, when it is offered. `story` is set
-   * on the copy the Dev Lead's chat shows of a story session's approval (STORY-9): the story it is for. `subagent` is
-   * set when a subagent the session spawned asks (STORY-55): its label.
+   * on the copy the Dev Lead's chat shows of a story session's approval (STORY-9): the story it is for; `subject` on an
+   * app request about something else (STORY-13's report_bug: the bug). Either keeps it open past the turn. `subagent`
+   * is set when a subagent the session spawned asks (STORY-55): its label.
    */
   | {
       type: "approval";
@@ -57,6 +58,7 @@ export type ChatEvent =
       forChat: boolean;
       covers?: string;
       story?: string;
+      subject?: string;
       subagent?: string;
     }
   /** The call may run: the user allowed it, or an Allow for this chat already covers it (`scope: "chat"`). */
@@ -154,6 +156,7 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
             forChat: raw.forChat === true,
             ...(raw.forChat === true && nonEmpty(raw.covers) ? { covers: raw.covers } : {}),
             ...(nonEmpty(raw.story) ? { story: raw.story } : {}),
+            ...(nonEmpty(raw.subject) ? { subject: raw.subject } : {}),
             ...(nonEmpty(raw.subagent) ? { subagent: raw.subagent } : {}),
           }
         : null;

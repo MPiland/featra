@@ -11,39 +11,55 @@ function causes(list: WorkList): { id: string; label: string }[] {
   return [...features, ...storyRows(list)].map((c) => ({ id: c.id, label: `${c.id} ${c.title}` }));
 }
 
+/** The server's answer to one ask for the places: the places, or why there are none. */
+type Answer = { key: string; placements?: BugPlacements; error?: string };
+
 /**
  * New bug in Work (STORY-13): a title, a description and an optional suspected cause, then where it goes. Featra
- * proposes the place from the cause, and asks again when the cause changes; the user can pick another. Nothing is
- * written until Create.
+ * proposes the place from the cause, and asks again when the cause changes or the server refused the place; the user
+ * can pick another. Nothing is written until Create. Create and Cancel return focus to New bug.
  */
 export function NewBug({ bugs, dir, list }: { bugs: BugBridge; dir: string; list: WorkList }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [cause, setCause] = useState("");
-  const [placements, setPlacements] = useState<BugPlacements | null>(null);
-  const [placement, setPlacement] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /** Why Create was refused. */
+  const [fileError, setFileError] = useState<string | null>(null);
+  /** Counts the server's refusals, so the places are asked for again after one. */
+  const [refused, setRefused] = useState(0);
+  /**
+   * Each ask for the places has its own key, and its answer and the user's pick hold only for it: a new ask starts with
+   * no earlier places, error or pick.
+   */
+  const asking = open ? JSON.stringify([dir, cause, refused]) : null;
+  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [picked, setPicked] = useState<{ key: string; value: string } | null>(null);
+  const current = answer !== null && answer.key === asking ? answer : null;
+  const placements = current?.placements ?? null;
+  const proposeError = current?.error ?? null;
+  const placement = picked !== null && picked.key === asking ? picked.value : (placements?.proposed ?? "");
   const [notice, setNotice] = useState<string | null>(null);
   const titleField = useRef<HTMLInputElement>(null);
+  const newBugButton = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
   const ids = { title: useId(), description: useId(), cause: useId() };
 
   useEffect(() => {
-    if (!open) return undefined;
-    let live = true;
+    if (asking === null) return undefined;
+    // A later ask supersedes this one: its answer is dropped, so it can't replace the later one's.
+    const superseded = new AbortController();
     void bugs.proposeBug(dir, cause || null).then((r) => {
-      if (!live) return;
-      if (!r.ok) return setError(r.error);
-      setPlacements(r.placements);
-      setPlacement(r.placements.proposed);
+      if (superseded.signal.aborted) return;
+      setAnswer(r.ok ? { key: asking, placements: r.placements } : { key: asking, error: r.error });
     });
-    return () => {
-      live = false;
-    };
-  }, [bugs, dir, cause, open]);
+    return () => superseded.abort();
+  }, [bugs, dir, cause, asking]);
   useEffect(() => {
     if (open) titleField.current?.focus();
+    else if (wasOpen.current) newBugButton.current?.focus();
+    wasOpen.current = open;
   }, [open]);
 
   const reset = () => {
@@ -51,17 +67,22 @@ export function NewBug({ bugs, dir, list }: { bugs: BugBridge; dir: string; list
     setTitle("");
     setDescription("");
     setCause("");
-    setPlacements(null);
-    setError(null);
+    setAnswer(null);
+    setPicked(null);
+    setFileError(null);
   };
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !placement || busy) return;
     setBusy(true);
-    setError(null);
+    setFileError(null);
     const r = await bugs.fileBug(dir, { title, description, cause: cause || null }, placement);
     setBusy(false);
-    if (!r.ok) return setError(r.error);
+    if (!r.ok) {
+      setFileError(r.error);
+      // The place may be gone: ask again, so the user picks from what is offered now.
+      return setRefused((n) => n + 1);
+    }
     reset();
     setNotice(r.kind === "card" ? BUG_COPY.filedCard(r.id) : BUG_COPY.filedTask(r.id));
   };
@@ -70,6 +91,7 @@ export function NewBug({ bugs, dir, list }: { bugs: BugBridge; dir: string; list
     return (
       <div className="new-bug-bar">
         <button
+          ref={newBugButton}
           type="button"
           className="btn"
           onClick={() => {
@@ -120,7 +142,10 @@ export function NewBug({ bugs, dir, list }: { bugs: BugBridge; dir: string; list
           className="text-field"
           value={cause}
           disabled={busy}
-          onChange={(e) => setCause(e.target.value)}
+          onChange={(e) => {
+            setFileError(null);
+            setCause(e.target.value);
+          }}
         >
           <option value="">{BUG_COPY.noCause}</option>
           {causes(list).map((c) => (
@@ -131,7 +156,12 @@ export function NewBug({ bugs, dir, list }: { bugs: BugBridge; dir: string; list
         </select>
       </div>
       {placements && (
-        <PlacementSelect placements={placements} value={placement} onChange={setPlacement} disabled={busy} />
+        <PlacementSelect
+          placements={placements}
+          value={placement}
+          onChange={(value) => asking !== null && setPicked({ key: asking, value })}
+          disabled={busy}
+        />
       )}
       <div className="chat-approval-actions">
         <button type="submit" className="btn primary" disabled={busy || !title.trim() || !placements}>
@@ -141,9 +171,9 @@ export function NewBug({ bugs, dir, list }: { bugs: BugBridge; dir: string; list
           {BUG_COPY.cancel}
         </button>
       </div>
-      {error && (
+      {(fileError ?? proposeError) && (
         <p className="work-error" role="alert">
-          {error}
+          {fileError ?? proposeError}
         </p>
       )}
     </form>

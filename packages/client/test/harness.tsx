@@ -1,7 +1,6 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SETUP_ITEM_IDS } from "@featra/work-format/setup-plan";
-import { BUG_COPY } from "@featra/work-format/bug-copy";
 import { App } from "../src/App.tsx";
 import { act } from "react";
 import {
@@ -22,6 +21,7 @@ import {
 } from "../src/bridge.ts";
 import { EMPTY_WORK_LIST, type WorkList } from "@featra/work-format/work-list";
 import type { Card } from "@featra/work-format";
+import { fakeBugServer } from "./bug-server.ts";
 import { fakeCardServer } from "./card-server.ts";
 import { fakeChatServer } from "./chat-server.ts";
 import type { HostOptions } from "./harness-options.ts";
@@ -184,18 +184,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
         return host.copyResult ?? { ok: true };
       },
       refreshPrs: () => void calls.push("refreshPrs"),
-      proposeBug: async (dir, cause) => {
-        calls.push(`proposeBug:${dir}:${cause ?? ""}`);
-        const placements = host.bugPlacements?.[cause ?? ""] ?? {
-          proposed: "project",
-          choices: [{ key: "project", label: BUG_COPY.project }],
-        };
-        return { ok: true, placements };
-      },
-      fileBug: async (dir, report, placement) => {
-        calls.push(`fileBug:${dir}:${JSON.stringify(report)}:${placement}`);
-        return host.filedBug ?? { ok: true, kind: "card", id: "BUG-1" };
-      },
+      ...fakeBugServer(calls, host),
       ...cards.bridge,
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.

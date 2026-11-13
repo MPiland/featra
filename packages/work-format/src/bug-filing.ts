@@ -1,7 +1,8 @@
 /**
  * Filing a bug (STORY-13, ADR 0036): where it can go, what Featra proposes, and what it makes. `routeProblem` is the
  * one source of the proposal; the user confirms it or picks another place before anything is written. A bug card
- * under a feature in progress is added scope (origin `bug`); a task goes on a story still being worked; anything else
+ * under a feature in progress is added scope (origin `bug`); a task goes on a story still being worked (in an active
+ * stage, its card still owned by its worktree; `state` says which are); anything else
  * goes on the project bug list. Nothing here reopens or reparents a Done feature: it is never offered, and a place
  * that stopped being offered is refused at create time.
  */
@@ -11,6 +12,7 @@ import { recorded } from "./card-edit.ts";
 import { newCard } from "./card.ts";
 import { routeProblem, takesBug, takesTask, type ProblemRoute } from "./bugs.ts";
 import { parseId } from "./ids.ts";
+import type { BranchState } from "./ownership.ts";
 import type { Card, ProjectConfig } from "./types.ts";
 import { isRecord } from "./utils/guards.ts";
 
@@ -24,6 +26,8 @@ export const REPORT_BUG_MESSAGES = {
   badPlacement: "That isn't a place this bug can go.",
   placeGone: (key: PlacementKey) => `${key.replace(/^\w+:/, "")} can't take this bug now. Pick another place.`,
   asked: "Asked the user where to file the bug. A notice tells you where it went, or that they cancelled it.",
+  /** The notice's reason when the Dev Lead's chat ended before the user answered. */
+  cancelled: "the request was cancelled",
 } as const;
 
 /** The key for `route`, as the confirm and the server share it. */
@@ -45,25 +49,35 @@ export function routeOf(key: unknown): ProblemRoute | null {
 }
 
 /** Every place a bug can go now: a bug under each feature in progress, a task on each story being worked, the list. */
-function choices(cards: readonly Card[], config: ProjectConfig): PlacementChoice[] {
+function choices(cards: readonly Card[], config: ProjectConfig, state: BranchState): PlacementChoice[] {
   const features = cards
     .filter(takesBug)
     .map((c) => ({ key: `feature:${c.id}`, label: BUG_COPY.feature(c.id, c.title) }));
   const tasks = cards
-    .filter((c) => takesTask(c, config))
+    .filter((c) => takesTask(c, config, state))
     .map((c) => ({ key: `task:${c.id}`, label: BUG_COPY.task(c.id, c.title) }));
   return [...features, ...tasks, { key: "project", label: BUG_COPY.project }];
 }
 
 /** What the confirm shows for a bug believed to come from `cause`: `routeProblem`'s proposal and every choice. */
-export function bugPlacements(cause: string | null, cards: readonly Card[], config: ProjectConfig): BugPlacements {
-  return { proposed: placementKey(routeProblem(cause, cards, config)), choices: choices(cards, config) };
+export function bugPlacements(
+  cause: string | null,
+  cards: readonly Card[],
+  config: ProjectConfig,
+  state: BranchState,
+): BugPlacements {
+  return { proposed: placementKey(routeProblem(cause, cards, config, state)), choices: choices(cards, config, state) };
 }
 
 /** Why the bug can't go to `key` now (it names no place, or one no longer offered, such as a feature now Done); null if it can. */
-export function placementRefusal(key: unknown, cards: readonly Card[], config: ProjectConfig): string | null {
+export function placementRefusal(
+  key: unknown,
+  cards: readonly Card[],
+  config: ProjectConfig,
+  state: BranchState,
+): string | null {
   if (routeOf(key) === null) return REPORT_BUG_MESSAGES.badPlacement;
-  return choices(cards, config).some((c) => c.key === key) ? null : REPORT_BUG_MESSAGES.placeGone(String(key));
+  return choices(cards, config, state).some((c) => c.key === key) ? null : REPORT_BUG_MESSAGES.placeGone(String(key));
 }
 
 /** A bug report from the Dev Lead's tool or New bug, checked; the cause only as an id, which the server looks up. */

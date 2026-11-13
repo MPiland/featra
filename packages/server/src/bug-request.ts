@@ -4,7 +4,14 @@
  * keeps the proposal or picks another place, then Creates or Cancels. The call answers once the user is asked; where
  * the bug went (or that it was cancelled, or couldn't be filed and why) reaches the Dev Lead as a notice.
  */
-import { REPORT_BUG_TOOL, routeOf, spawner, type BugReport, type Notice } from "@featra/work-format";
+import {
+  REPORT_BUG_MESSAGES,
+  REPORT_BUG_TOOL,
+  routeOf,
+  spawner,
+  type BugReport,
+  type Notice,
+} from "@featra/work-format";
 import type { BugFiling } from "./bug-filing.ts";
 import type { ChatManager } from "./chat-manager.ts";
 
@@ -31,12 +38,14 @@ export function createBugRequest({ chats, bugs, log }: BugRequestDeps) {
   /** The user's answer, then the bug filed where they placed it, told to the Dev Lead as a notice. */
   async function decide(dir: string, report: BugReport, input: Record<string, unknown>, lead: string) {
     const story = bugSubject(report.title);
-    const ask = { id: `bug-${++asks}-${Date.now()}`, name: REPORT_BUG_TOOL, input, story };
+    const ask = { id: `bug-${++asks}-${Date.now()}`, name: REPORT_BUG_TOOL, input, subject: story };
     let notice: Notice;
     try {
       const allowed = await chats.askChoice(lead, ask);
-      if (allowed === null) {
+      if (allowed === "denied") {
         notice = { story, outcome: "declined", summary: "" };
+      } else if (allowed === "cancelled") {
+        notice = { story, outcome: "not filed", summary: REPORT_BUG_MESSAGES.cancelled };
       } else {
         const placement = typeof allowed.option === "string" ? allowed.option : String(input.proposed);
         const filed = await bugs.file(dir, report, placement, spawner(lead));

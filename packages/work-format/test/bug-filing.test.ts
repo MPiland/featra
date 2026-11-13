@@ -22,22 +22,31 @@ import {
   routeProblem,
   scopeSummary,
   serializeCard,
+  type BranchState,
   type Card,
   type OwnedCard,
 } from "../src/index.ts";
 import { at, config, feature, moves, story } from "./fixtures.ts";
 
-// FEAT-1 is in progress (STORY-1 went active at minute 1), FEAT-0 is Done, FEAT-2 is approved and not started.
+// FEAT-1 is in progress (STORY-1 went active at minute 1, in its worktree), FEAT-0 is Done, FEAT-2 is approved and
+// not started.
 const cards: Card[] = [
   newCard({ id: "EPIC-1", type: "epic", title: "E", status: "active" }, "user", at(0)),
   feature("FEAT-1", "active"),
   feature("FEAT-0", "done"),
   feature("FEAT-2", "approved"),
-  moves(story("STORY-1", "FEAT-1"), [1, "In Progress"]),
-  moves(story("STORY-2", "FEAT-1"), [1, "In Progress"], [2, "Done"]),
+  { ...moves(story("STORY-1", "FEAT-1"), [1, "In Progress"]), order: 2 },
+  { ...moves(story("STORY-2", "FEAT-1"), [1, "In Progress"], [2, "Done"]), order: 5 },
   moves(story("STORY-3", "FEAT-0"), [1, "In Progress"], [2, "Done"]),
   story("STORY-4", "FEAT-2"),
 ];
+const state: BranchState = {
+  features: { "FEAT-1": { branch: "feature/1-feat-1", merged: false } },
+  worktrees: {
+    "STORY-1": { branch: "story/1-story-1", path: "/wt/story-1", merged: false },
+    "STORY-2": { branch: "story/2-story-2", path: "/wt/story-2", merged: true },
+  },
+};
 const report = (cause: string | null = null) => ({
   title: "Saves twice",
   description: "Pressing Save writes two copies.",
@@ -47,7 +56,7 @@ const ctx = (id = "BUG-1") => ({ cards, config, id, by: "user", at: at(10) });
 
 describe("bugPlacements", () => {
   it("offers a bug under each feature in progress, a task on each story being worked, then the project list", () => {
-    expect(bugPlacements(null, cards, config).choices).toEqual([
+    expect(bugPlacements(null, cards, config, state).choices).toEqual([
       { key: "feature:FEAT-1", label: BUG_COPY.feature("FEAT-1", "FEAT-1") },
       { key: "task:STORY-1", label: BUG_COPY.task("STORY-1", "STORY-1") },
       { key: "project", label: BUG_COPY.project },
@@ -63,27 +72,46 @@ describe("bugPlacements", () => {
     ["a story not started", "STORY-4"],
     ["no known cause", null],
   ])("proposes what routeProblem routes for %s", (_, cause) => {
-    const { proposed, choices } = bugPlacements(cause, cards, config);
-    expect(routeOf(proposed)).toEqual(routeProblem(cause, cards, config));
+    const { proposed, choices } = bugPlacements(cause, cards, config, state);
+    expect(routeOf(proposed)).toEqual(routeProblem(cause, cards, config, state));
     expect(choices.map((c) => c.key)).toContain(proposed);
+  });
+});
+
+describe("a story still being worked is one still in its worktree (ruling 7)", () => {
+  const merged: BranchState = {
+    ...state,
+    worktrees: { "STORY-1": { ...state.worktrees["STORY-1"]!, merged: true } },
+  };
+
+  it("offers no task on a story merged into its feature, and proposes the bug under the feature", () => {
+    const placements = bugPlacements("STORY-1", cards, config, merged);
+    expect(placements.proposed).toBe("feature:FEAT-1");
+    expect(placements.choices.map((c) => c.key)).toEqual(["feature:FEAT-1", "project"]);
+  });
+
+  it("refuses a task on it asked for by key", () => {
+    expect(placementRefusal("task:STORY-1", cards, config, merged)).toBe(REPORT_BUG_MESSAGES.placeGone("task:STORY-1"));
   });
 });
 
 describe("Done stays Done", () => {
   it("never offers a Done feature, nor a task on a Done story", () => {
-    const keys = bugPlacements("STORY-3", cards, config).choices.map((c) => c.key);
+    const keys = bugPlacements("STORY-3", cards, config, state).choices.map((c) => c.key);
     expect(keys).not.toContain("feature:FEAT-0");
     expect(keys).not.toContain("task:STORY-3");
-    expect(bugPlacements("FEAT-0", cards, config).proposed).toBe("project");
+    expect(bugPlacements("FEAT-0", cards, config, state).proposed).toBe("project");
   });
 
   it("refuses a Done feature or a finished story asked for by key", () => {
-    expect(placementRefusal("feature:FEAT-0", cards, config)).toBe(REPORT_BUG_MESSAGES.placeGone("feature:FEAT-0"));
-    expect(placementRefusal("task:STORY-2", cards, config)).toBe(REPORT_BUG_MESSAGES.placeGone("task:STORY-2"));
+    expect(placementRefusal("feature:FEAT-0", cards, config, state)).toBe(
+      REPORT_BUG_MESSAGES.placeGone("feature:FEAT-0"),
+    );
+    expect(placementRefusal("task:STORY-2", cards, config, state)).toBe(REPORT_BUG_MESSAGES.placeGone("task:STORY-2"));
   });
 
   it("files a bug blamed on a Done feature on the project list, and leaves the feature as it was", () => {
-    const filed = fileBug(report("FEAT-0"), bugPlacements("FEAT-0", cards, config).proposed, ctx());
+    const filed = fileBug(report("FEAT-0"), bugPlacements("FEAT-0", cards, config, state).proposed, ctx());
     expect(filed.card.parent).toBeNull();
     expect(filed.card.id).toBe("BUG-1");
     const done = cards.find((c) => c.id === "FEAT-0");
@@ -94,15 +122,17 @@ describe("Done stays Done", () => {
 
 describe("placementRefusal", () => {
   it.each(["feature:FEAT-1", "task:STORY-1", "project"])("takes %s", (key) => {
-    expect(placementRefusal(key, cards, config)).toBeNull();
+    expect(placementRefusal(key, cards, config, state)).toBeNull();
   });
 
   it.each(["", "elsewhere", "feature:", "feature:FEAT-1:x", "task:nope", 7, null])("refuses %j", (key) => {
-    expect(placementRefusal(key, cards, config)).toBe(REPORT_BUG_MESSAGES.badPlacement);
+    expect(placementRefusal(key, cards, config, state)).toBe(REPORT_BUG_MESSAGES.badPlacement);
   });
 
   it("refuses a feature not started", () => {
-    expect(placementRefusal("feature:FEAT-2", cards, config)).toBe(REPORT_BUG_MESSAGES.placeGone("feature:FEAT-2"));
+    expect(placementRefusal("feature:FEAT-2", cards, config, state)).toBe(
+      REPORT_BUG_MESSAGES.placeGone("feature:FEAT-2"),
+    );
   });
 });
 
@@ -119,7 +149,7 @@ describe("fileBug", () => {
       parent: "FEAT-1",
       origin: "bug",
     });
-    expect(bug.order).toBe(Math.max(...cards.filter((c) => c.parent === "FEAT-1").map((c) => c.order)) + 1);
+    expect(bug.order).toBe(6);
     expect(bug.description).toBe(
       `Pressing Save writes two copies.\n\n${causeLine({ id: "STORY-2", title: "STORY-2" })}`,
     );
@@ -196,7 +226,7 @@ describe("parseBugReport", () => {
 });
 
 describe("the placement crossing to the client", () => {
-  const placements = bugPlacements("STORY-1", cards, config);
+  const placements = bugPlacements("STORY-1", cards, config, state);
 
   it("reads placements back whole, and refuses a proposal that isn't a choice", () => {
     expect(normalizeBugPlacements(JSON.parse(JSON.stringify(placements)))).toEqual(placements);

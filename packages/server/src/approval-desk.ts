@@ -148,6 +148,7 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         ...(covers ? { covers } : {}),
         ...(request.subagent ? { subagent: request.subagent } : {}),
         ...(request.story ? { story: request.story } : {}),
+        ...(request.subject ? { subject: request.subject } : {}),
       };
       return hold<ToolDecision>(chat, id, signal, opening, (settle) => ({ kind: "tool", request, offer, settle }));
     },
@@ -171,8 +172,10 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
       const entry = waiting.get(chat)?.get(tool);
       if (entry?.kind !== "tool") throw new ChatError(CHAT_MESSAGES.noRequest);
       const { id, name } = entry.request;
-      // An app approval with choices (STORY-13) takes the one the user picked, with Allow, and only one it offers.
-      if (option !== undefined && (choice !== "allow" || !offered(entry.request.input, option))) {
+      // An app approval with choices (STORY-13) takes the one the user picked, with Allow, and only one it offers. An
+      // agent's own tool never takes one, whatever its input holds.
+      const app = entry.request.app === true;
+      if (option !== undefined && (!app || choice !== "allow" || !offered(entry.request.input, option))) {
         throw new ChatError(CHAT_MESSAGES.badOption);
       }
       const input = option === undefined ? entry.request.input : { ...entry.request.input, option };

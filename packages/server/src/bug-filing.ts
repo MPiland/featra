@@ -19,6 +19,7 @@ import {
   nextId,
   ownerOf,
   placementRefusal,
+  readOnlyReason,
   REPORT_BUG_MESSAGES,
   serializeCard,
   toIso,
@@ -38,7 +39,8 @@ import type { Scan } from "./work-scan.ts";
 export const BUG_MESSAGES = {
   notProject: "This folder isn't a Featra project in git.",
   noBranch: (branch: string) => `The branch ${branch} is gone, so the bug can't go there.`,
-  busy: (branch: string) => `The branch ${branch} changed or has changes in the way. Try again.`,
+  busy: (branch: string) => `The branch ${branch} has changes in the way. Try again.`,
+  moved: (branch: string) => `The branch ${branch} changed while the bug was being filed. Try again.`,
   collide: "Can't file the bug: its ID keeps colliding with cards on disk.",
 } as const;
 
@@ -100,15 +102,19 @@ export function createBugFiling({ scan: scanDir, now, lane = createCardLane(), g
       );
     }
     const branch = owner.kind === "main" ? scan.collected.git.baseBranch : owner.branch;
-    const done = await git.commitCardOn(scan.collected.paths.top, branch, { path, text, message });
+    // Only onto the commit this scan read, so a card changed or an ID taken meanwhile is never overwritten.
+    const parent = scan.collected.heads.get(locationKey(owner)) ?? null;
+    const guard = created === null ? { parent } : { parent, create: created };
+    const done = await git.commitCardOn(scan.collected.paths.top, branch, { path, text, message }, guard);
     if (done === "missing") throw new ApiError(BUG_MESSAGES.noBranch(branch));
     if (done === "busy") throw new ApiError(BUG_MESSAGES.busy(branch));
-    return true;
+    if (done === "moved") throw new ApiError(BUG_MESSAGES.moved(branch));
+    return done !== "taken";
   }
 
   async function run(dir: string, report: BugReport, placement: PlacementKey, by: string): Promise<FiledResult> {
     const { scan, cards, config } = await read(dir, report.cause);
-    const refusal = placementRefusal(placement, cards, config);
+    const refusal = placementRefusal(placement, cards, config, scan.collected.state);
     if (refusal !== null) throw new ApiError(refusal);
     // Every copy's IDs, so a bug never takes an ID a card on another branch has.
     const ids = scan.collected.copies.flatMap((c) => (c.card ? [c.card.id] : []));
@@ -121,6 +127,9 @@ export function createBugFiling({ scan: scanDir, now, lane = createCardLane(), g
       if (filed.kind === "task") {
         const found = ownedIn(scan, card.id);
         if (!found) throw new ApiError(REPORT_BUG_MESSAGES.placeGone(placement));
+        // As a card edit: only to the owner's own copy, never one shown from elsewhere.
+        const noCopy = readOnlyReason(found.owned, true, config.baseBranch);
+        if (noCopy !== null) throw new ApiError(noCopy);
         await put(scan, found.owned.owner, found.owned.path, text, null, message);
       } else {
         const owner = ownerOf(card, scan.collected.state);
@@ -138,8 +147,8 @@ export function createBugFiling({ scan: scanDir, now, lane = createCardLane(), g
   return {
     /** Where a bug believed to come from `cause` would go, and every place it can go. */
     propose: async (dir: string, cause: string | null): Promise<BugPlacements> => {
-      const { cards, config } = await read(dir, cause);
-      return bugPlacements(cause, cards, config);
+      const { scan, cards, config } = await read(dir, cause);
+      return bugPlacements(cause, cards, config, scan.collected.state);
     },
     /** Files `report` at `placement`, as `by` (the user, or the Dev Lead's session); what it made. */
     file: (dir: string, report: BugReport, placement: PlacementKey, by: string) =>

@@ -1956,3 +1956,37 @@ before its fix.
   `{ text, done: false }`.
 - **Changed existing assertions:** mcp `stdio.test.ts` and desktop `mcp-bundle.test.ts` list the tools, and `report_bug` is appended to their expected
   list.
+
+### STORY-13 Dev Lead review rulings, applied (PR #46)
+
+1. **Stale scan.** The scan keeps each copy's commit (`Collected.heads`). `commitCardOn` takes a guard
+   `{ parent, create? }`: a tip other than `parent` is `moved`, and a new card whose path or ID the parent's tree has
+   is `taken` (the server allocates again). Abandon passes the same parent. Deviation: the outcome is `moved`, with
+   its own message ("The branch X changed while the bug was being filed. Try again." / `featureMoved`), not `busy`,
+   since nothing is busy.
+2. **Real-repo tests** (bug-filing-review.test.ts): a story its feature branch owns with no worktree; a project bug
+   by plumbing when main isn't checked out; a bug written in the folder that has the feature out; a taken ID on a
+   branch and on disk.
+3. **Feature Done by Create:** report_bug already said "not filed: <placeGone>"; a test now proves it. No product
+   change.
+4. **New bug:** each ask for places has its own key, and its answer and the user's pick hold only for it, so no
+   earlier error, places or pick carry over. A refusal asks again and keeps why. `reset()` clears the pick. The
+   "after Cancel" test also passes on the old code (every proposal set the place), so it guards the reset only.
+5. **E2E:** file-bug.spec.ts changes Place it before Create in New bug, and adds the Dev Lead's report_bug: the fake
+   agent calls the real MCP tool ("report_bug" turn), the user changes the place, Creates, and the notice is checked.
+6. **`option` only on app requests** (`ToolRequest.app`); an agent's own tool is refused `badOption`.
+7. **Being worked = owned by its worktree.** `takesTask` and `routeProblem` take the state; ADR 0036 updated.
+8. **Cancelled:** `askChoice` answers `"cancelled"` when the desk forgets the chat; report_bug's notice is "not
+   filed: the request was cancelled". request_merge is unchanged. Note: today a chat is forgotten only as its project
+   closes, which also marks it closed, so the notice is dropped then; the test proves it at the bug-request level.
+9. **`subject`** on app requests, carried through chat events, the chat list and the reducer; report_bug uses it.
+10. **No copy:** the task path refuses with `readOnlyReason`.
+11. The order test asserts a literal (6).
+12. Create and Cancel return focus to New bug.
+13. api.ts (a `card(params)` helper) and test/harness.tsx (bug fakes in test/bug-server.ts) are under 300 lines.
+
+**Changed existing assertions:** bugs-ids-validate.test.ts and bug-filing.test.ts call `routeProblem` and the
+placement rules with the state (ruling 7), and the order test's expectation is the literal 6 (ruling 11);
+report-bug.test.ts expects `subject: Bug "..."` and no `story` on the approval (ruling 9).
+
+**Roadmap, not now:** Work filter chips; a cancelled outcome for request_merge.

@@ -6,7 +6,7 @@
  * here forces, rebases or runs `git commit`.
  */
 import { setTimeout as sleep } from "node:timers/promises";
-import { MERGE_MESSAGES } from "@featra/work-format";
+import { CARDS_DIR, idFromFileName, MERGE_MESSAGES } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
 import { BUSY_RETRY, commitWithCard, type Must } from "./card-commit.ts";
 import { failed, runGit, type GitOptions } from "./git-run.ts";
@@ -24,6 +24,14 @@ export interface MergeCommitInput {
   message: string;
   /** Other files of the card to delete: its old names, when it was renamed. */
   drop?: readonly string[];
+}
+
+/** What a card write by plumbing expects of its branch (STORY-13 review). */
+export interface CardWriteGuard {
+  /** The commit the caller's scan read the branch at; the write is "busy" when the branch is anywhere else. */
+  parent: string | null;
+  /** A new card's ID: the write is "taken" when the branch already has a card file with that ID. */
+  create?: string;
 }
 
 export interface RemovedStory {
@@ -139,15 +147,25 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
    * checkout is touched unless it has the branch, which then fast-forwards (STORY-58's feature-branch write, shared with
    * STORY-13's bug filing). "same" when the branch has the card so already, and nothing is committed; "missing" when
    * there is no such branch; "busy", with nothing changed, when the branch can't take it (local changes in the way, or
-   * it moved meanwhile).
+   * it moved meanwhile); "moved" when it isn't at `guard.parent`, the commit the caller read it at; "taken" when
+   * `guard.create` names a card ID the branch already has.
    */
   async function commitCardOn(
     top: string,
     branch: string,
     input: Omit<MergeCommitInput, "parents">,
-  ): Promise<"made" | "same" | "missing" | "busy"> {
+    guard: CardWriteGuard,
+  ): Promise<"made" | "same" | "missing" | "busy" | "moved" | "taken"> {
     const old = await commitOf(top, `refs/heads/${branch}`);
     if (!old) return "missing";
+    if (old !== guard.parent) return "moved";
+    if (guard.create !== undefined) {
+      const listed = await git(top, ["ls-tree", "--name-only", old, `${CARDS_DIR}/`]);
+      const names = listed.stdout.split(/\r?\n/).filter(Boolean);
+      if (names.some((n) => n === input.path || idFromFileName(n.slice(CARDS_DIR.length + 1)) === guard.create)) {
+        return "taken";
+      }
+    }
     const made = await mergeCommit(top, { ...input, parents: [old] });
     if ("conflicts" in made) return "busy";
     const trees = (await git(top, ["rev-parse", `${made.commit}^{tree}`, `${old}^{tree}`])).stdout.split(/\r?\n/);

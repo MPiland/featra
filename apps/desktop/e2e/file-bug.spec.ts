@@ -2,14 +2,15 @@ import { expect, test, type ElectronApplication } from "@playwright/test";
 import { parseCard } from "@featra/work-format";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
-import { draftInNewChat } from "./draft-chat.ts";
+import { composer, draftInNewChat } from "./draft-chat.ts";
 import { cardFile, git, project } from "./draft-project.ts";
 
 /**
  * STORY-13: filing bugs from Work. The real app, its real local server and real git; only the platform and the agent
  * are faked (agent.ts). FEAT-1 is Done and FEAT-2 is started on its own branch. A bug blamed on FEAT-2 is proposed
  * under it and committed on its branch, which isn't checked out; one blamed on FEAT-1 goes on the project bug list in
- * main's checkout, and FEAT-1 stays Done. No GitHub is involved.
+ * main's checkout, and FEAT-1 stays Done. A place the user picks over the proposal is where the bug goes, from New bug
+ * and from the Dev Lead's report_bug (the fake Dev Lead calls the real MCP tool). No GitHub is involved.
  */
 test("New bug proposes where it goes, the user confirms, and it is filed there with the bug icon", async () => {
   const userData = await tempUserData();
@@ -72,6 +73,34 @@ test("New bug proposes where it goes, the user confirms, and it is filed there w
     });
     expect(parseCard(await cardFile(repo.dir, "BUG-2"))).toMatchObject({ parent: null, origin: "bug" });
     expect(await cardFile(repo.dir, "FEAT-1")).toBe(before);
+
+    // Review 5: the user picks another place before Create; the bug goes there, not where it was proposed.
+    const feature = git(repo.dir, "rev-parse", "feature/2-shaping");
+    await work.getByRole("button", { name: "New bug" }).click();
+    await form.getByRole("textbox", { name: "Title" }).fill("Slow open");
+    await form.getByRole("combobox", { name: "Suspected cause" }).selectOption({ label: "FEAT-2 Shaping" });
+    await expect(place()).toHaveValue("feature:FEAT-2");
+    await place().selectOption("project");
+    await form.getByRole("button", { name: "Create" }).click();
+    await expect(work.getByRole("status")).toHaveText("Filed BUG-3.");
+    expect(parseCard(await cardFile(repo.dir, "BUG-3"))).toMatchObject({ title: "Slow open", parent: null });
+    expect(git(repo.dir, "rev-parse", "feature/2-shaping")).toBe(feature);
+
+    // The Dev Lead's report_bug: the request card in its chat proposes the place, the user changes it and Creates, and
+    // a notice tells the Dev Lead where it went.
+    await page.getByRole("region", { name: "Chats" }).locator(".chat-row").first().click();
+    await expect(composer(page)).toBeEditable();
+    await composer(page).fill("report_bug");
+    await page.getByRole("button", { name: "Send", exact: true }).click();
+    const ask = page.getByRole("group", { name: 'File the bug "Flaky save"?' });
+    const askPlace = ask.getByRole("combobox", { name: "Place it" });
+    await expect(askPlace).toHaveValue("feature:FEAT-2");
+    await askPlace.selectOption("project");
+    await ask.getByRole("button", { name: "Create" }).click();
+    const log = page.getByRole("log", { name: "Chat" });
+    await expect(log).toContainText('Bug "Flaky save" filed: BUG-4 on the project bug list.');
+    expect(parseCard(await cardFile(repo.dir, "BUG-4"))).toMatchObject({ title: "Flaky save", parent: null });
+    expect(git(repo.dir, "rev-parse", "feature/2-shaping")).toBe(feature);
     await app.close();
   } finally {
     await running?.close().catch(() => {});
