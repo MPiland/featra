@@ -2,7 +2,7 @@
 id: STORY-13
 type: story
 title: File and place bugs
-status: Acceptance
+status: Done
 parent: FEAT-6
 order: 7
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-13T13:19:03Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-13T13:19:03Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
