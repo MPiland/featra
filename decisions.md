@@ -1990,3 +1990,13 @@ placement rules with the state (ruling 7), and the order test's expectation is t
 report-bug.test.ts expects `subject: Bug "..."` and no `story` on the approval (ruling 9).
 
 **Roadmap, not now:** Work filter chips; a cancelled outcome for request_merge.
+
+## 2026-11-12 — STORY-13 review rulings (dev-lead)
+
+- Build choices confirmed: placement keys (`project`, `feature:FEAT-N`, `task:STORY-N`), `routeProblem` as the only source of the proposal, `commitCardOn` shared with Abandon, and ADR 0036.
+- A plumbing write checks the branch tip it scanned. When the branch has moved, the result is "moved" (not "busy") and the user is asked to try again. A new card is refused when its path or ID is already in the parent's tree. Accepted the developer's "moved" naming.
+- A story still being worked means its card is owned by its worktree. A story already merged into its feature is not offered a task; the bug goes under the feature.
+- `option` on an approval is accepted only on app requests, never on an agent's own tool. Approvals have a `subject` instead of overloading `story`.
+- report_bug says "not filed: the request was cancelled" when the Dev Lead's chat ends before the user answers. Today the notice can't reach a closed chat; noted on the roadmap.
+- Approved expectation changes: tool lists gain `report_bug`; routing tests pass the story's state; the order test asserts a literal; report-bug expects `subject`.
+- Roadmap: Work filter chips for the project bug list; a cancelled outcome for request_merge; delivering notices to a chat that ended.

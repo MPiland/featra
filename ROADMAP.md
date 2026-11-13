@@ -82,6 +82,10 @@ epics in `.featra/cards/`.
 
 - Abandoning a story in a worktree that has no feature: decide where its card goes and test that path.
 
+- Work filter chips apply to the project bug list.
+- request_merge reports "cancelled" when the asking chat ends before the user answers.
+- Notices about a request reach the Dev Lead even after its chat has ended.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".
