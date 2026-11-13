@@ -2,7 +2,7 @@
 id: STORY-14
 type: story
 title: Accept a feature and merge it to main
-status: In Review
+status: Acceptance
 parent: FEAT-6
 order: 8
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-14
+  - at: 2026-11-13T06:48:24Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

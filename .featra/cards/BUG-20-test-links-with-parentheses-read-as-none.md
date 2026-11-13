@@ -2,7 +2,7 @@
 id: BUG-20
 type: bug
 title: Test links with parentheses in test names read as none
-status: In Review
+status: Acceptance
 parent: FEAT-6
 order: 9
 origin: bug
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-14
+  - at: 2026-11-13T06:48:25Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

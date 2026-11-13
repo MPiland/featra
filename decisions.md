@@ -2080,3 +2080,14 @@ merge would overwrite on main (an unrelated local change no longer blocks); expe
 an accepted feature with no facts yet expects "Checking…" instead of no reason; the client's Merge label takes the base.
 
 **Roadmap, not now:** a local-mode merge to main made with the git CLI making the feature Done.
+
+## 2026-11-13 — STORY-14 review rulings (dev-lead)
+
+- Build choices and ADR 0037 confirmed, as amended by the review.
+- Merge to main merges only the commit whose checks passed. When the feature branch, local main or the PR head moved after the checks, it is refused with `moved`. The auto-push happens while reading, before the checks are judged, never between the checks and the merge.
+- Settling a merge done outside Featra happens once. A PR merged at a head other than the local tip is never settled; the card says why.
+- Main's checkout blocks a merge only when the merge would overwrite one of its uncommitted files. Featra's own uncommitted card edits on main are normal and don't block. The reason shows before the button is on.
+- Withdrawn: refusing a manual `active → done` on a feature. Until a git CLI merge in local mode makes the feature Done, manual Done is the user's way to close it. `evidence.test.ts:133` is unchanged.
+- BUG-20 (test links with parentheses read as none) is fixed in this PR with a regression test; 17 of 17 AC links on STORY-12, 13, 14 and 58 now resolve.
+- Approved changes to this PR's own test expectations: `base: "main"` on feature-end objects, "Checking…" before the first read, the base name in the Merge label, and the "leaves main alone" test using an overlapping file.
+- Roadmap: a local-mode git CLI merge to main makes the feature Done.
