@@ -12,6 +12,11 @@ const read = () => JSON.parse(fs.readFileSync(statePath, "utf8"));
 const write = (state) => fs.writeFileSync(statePath, JSON.stringify(state, null, 2));
 const args = process.argv.slice(2);
 const input = args.includes("--input") ? fs.readFileSync(0, "utf8") : "";
+// A slow start (BUG-21): `gh pr view` is late to begin, as a process spawned under load is.
+const slowStart = JSON.parse(fs.readFileSync(statePath, "utf8")).viewStartDelayMs;
+if (slowStart && args[0] === "pr" && args[1] === "view") {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, slowStart);
+}
 fs.appendFileSync(`${statePath}.calls`, `${JSON.stringify({ args, input })}\n`);
 
 const out = (value) => process.stdout.write(`${JSON.stringify(value)}\n`);

@@ -44,6 +44,8 @@ export interface FakeGhState {
   whileCreating?: { file: string; text: string };
   /** How long `gh pr view` takes to answer. */
   viewDelayMs?: number;
+  /** How long `gh pr view` takes to start, before the call is recorded (BUG-21). */
+  viewStartDelayMs?: number;
   /** The repo's workflow runs (STORY-57). */
   runs?: FakeRun[];
   /** When set, downloading an artifact fails with this message. */
