@@ -42,19 +42,30 @@ export interface CardTree {
   /** The new commit's parents: one, or two for a merge commit. */
   parents: readonly string[];
   path: string;
-  text: string;
+  /** The card's text; null deletes it (STORY-58: an abandoned story's card discarded). */
+  text: string | null;
   message: string;
+  /** Other files of the card to delete: its old names, when it was renamed. */
+  drop?: readonly string[];
 }
 
-/** A commit of `tree` with the one card `path` replaced by `text`, on `parents`. Not on any branch. */
-export async function commitWithCard(must: Must, top: string, { tree, parents, path, text, message }: CardTree) {
+/** A commit of `tree` with the one card `path` replaced by `text` (or deleted), on `parents`. Not on any branch. */
+export async function commitWithCard(
+  must: Must,
+  top: string,
+  { tree, parents, path, text, message, drop = [] }: CardTree,
+) {
   const gitDir = (await must(top, ["rev-parse", "--absolute-git-dir"])).stdout.trim();
   const index = join(gitDir, `featra-card-${process.pid}-${Date.now()}.index`);
   const env = { GIT_INDEX_FILE: index };
   try {
-    const blob = (await must(top, ["hash-object", "-w", "--no-filters", "--stdin"], { input: text })).stdout.trim();
     await must(top, ["read-tree", tree], { env });
-    await must(top, ["update-index", "--add", "--cacheinfo", `100644,${blob},${path}`], { env });
+    const gone = [...drop, ...(text === null ? [path] : [])].filter((p, i, all) => all.indexOf(p) === i);
+    if (gone.length > 0) await must(top, ["update-index", "--force-remove", "--", ...gone], { env });
+    if (text !== null) {
+      const blob = (await must(top, ["hash-object", "-w", "--no-filters", "--stdin"], { input: text })).stdout.trim();
+      await must(top, ["update-index", "--add", "--cacheinfo", `100644,${blob},${path}`], { env });
+    }
     const written = (await must(top, ["write-tree"], { env })).stdout.trim();
     const args = ["commit-tree", written, ...parents.flatMap((p) => ["-p", p]), "-m", message];
     return (await must(top, args)).stdout.trim();

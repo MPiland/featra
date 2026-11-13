@@ -36,7 +36,7 @@ import { createMergeGit } from "./merge-git.ts";
 import { createMergeSettle, featureBranchOf, type MergeResult } from "./merge-settle.ts";
 import { ciRead } from "./pr-ci.ts";
 import { sendThenRecord } from "./send-then-record.ts";
-import { keyOf } from "./story-prs-seen.ts";
+import { createStoryEnding, type StoryEnding } from "./story-ending.ts";
 import type { Scan } from "./work-scan.ts";
 
 export interface StoryMergeDeps extends GithubPrDeps {
@@ -54,6 +54,8 @@ export interface StoryMergeDeps extends GithubPrDeps {
   write?: (file: string, text: string) => Promise<void>;
   /** The platform's git, which a test may stand in for. */
   gitRun?: typeof runGit;
+  /** The stories being merged or abandoned, which the server shares with Abandon (STORY-58). */
+  ending?: StoryEnding;
 }
 
 /** How an attempt ended: merged into `into` (through `remote` on GitHub), or stopped on the conflicting `files`. */
@@ -76,7 +78,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
   const lane = deps.lane ?? createCardLane();
   const git = createMergeGit(deps.gitCommand, deps.gitRun);
   const { settle } = createMergeSettle({ scan: scanDir, now, lane, chats, git, write });
-  const merging = new Set<string>();
+  const ending = deps.ending ?? createStoryEnding();
 
   async function ready(dir: string, id: string): Promise<Ready> {
     const scan = await scanDir(dir);
@@ -182,17 +184,8 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     throw new ApiError(MERGE_MESSAGES.conflict(id, files, stage));
   }
 
-  /** Runs `work` for story `id` unless a merge of it already runs. */
-  async function once<T>(dir: string, id: string, work: () => Promise<T>): Promise<T> {
-    const key = keyOf(dir, id);
-    if (merging.has(key)) throw new ApiError(MERGE_MESSAGES.merging(id));
-    merging.add(key);
-    try {
-      return await work();
-    } finally {
-      merging.delete(key);
-    }
-  }
+  /** Runs `work` for story `id` unless a merge or an abandon of it already runs. */
+  const once = <T>(dir: string, id: string, work: () => Promise<T>): Promise<T> => ending.hold(dir, id, "merge", work);
 
   /** Merges story `id` into its feature: on GitHub when it is usable here, else with git. */
   const merge = (dir: string, id: string): Promise<MergeResult> =>
@@ -205,8 +198,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
 
   /** Story `id`'s PR was merged on GitHub outside Featra: it settles as a merge Featra made does. */
   async function merged(dir: string, id: string): Promise<void> {
-    const key = keyOf(dir, id);
-    if (merging.has(key)) return;
+    if (ending.endingOf(dir, id) !== null) return;
     const scan = await scanDir(dir);
     const into = featureBranchOf(scan, ownedIn(scan, id)?.owned.card);
     const remote = await githubRemote(dir, deps.gitCommand);
@@ -219,10 +211,10 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     }
   }
 
-  /** Whether story `id` is merging now: its session takes no message or Resume meanwhile. */
-  const isMerging = (dir: string, id: string) => merging.has(keyOf(dir, id));
+  /** Why story `id`'s session takes no message, Send back or Resume now: it is merging or being abandoned. */
+  const busy = (dir: string, id: string) => ending.busy(dir, id);
 
-  return { merge, merged, isMerging };
+  return { merge, merged, busy };
 }
 
 export type StoryMerge = ReturnType<typeof createStoryMerge>;

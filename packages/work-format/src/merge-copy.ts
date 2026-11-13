@@ -3,6 +3,15 @@
  * sentence case, and the same words in the card pane, the Work row and the Dev Lead's request card.
  */
 
+/** The longest list of files a sentence names before it says how many more there are. */
+const LISTED = 5;
+
+/** `files` as one short list: the first few, then how many more. Shared by the merge's and the abandon's wording. */
+export function fileList(files: readonly string[]): string {
+  const shown = files.slice(0, LISTED).join(", ");
+  return files.length > LISTED ? `${shown} and ${files.length - LISTED} more` : shown;
+}
+
 /** The approval the Dev Lead's `request_merge` puts in its chat: the tool row's name. */
 export const REQUEST_MERGE_TOOL = "request_merge";
 

@@ -1832,3 +1832,81 @@ ADR 0033 (proposed) records the design. Choices to confirm:
   remains say so.
 - The two changed item-14 test expectations are stricter, not weaker. Approved.
 - Other build choices confirmed.
+
+## 2026-11-12 — STORY-58 build choices (story agent, for the Dev Lead to confirm)
+
+- **Where and what.** Abandon is in the story's card pane only, not its Work row or session. It applies to stories only;
+  a bug is refused ("isn't a story"). Any story that isn't merged or done can be abandoned, New to Acceptance, stopped
+  or not. A Cancelled story is offered it only while its worktree is still there. The rule is `abandonRefusal` in
+  work-format, used by the server and the card view (`abandonable`).
+- **Two calls, one token.** `story.abandonCheck` returns the warning; `story.abandon` carries its token (a digest of the
+  files, unpushed commits, tip, remote copies and PR). The story is read again after its turn stops and once more in
+  the card lane; any difference refuses with `changed` and nothing done.
+- **The Cancelled event is by `user`**, not `system`: it is the user's click. (Flag: the Dev Lead's note didn't say.)
+- **Stop, then re-check, then retire.** A running or queued turn is stopped (`chats.stop`), not retired, before the
+  re-check, so a stale token refuses without ending the session. The session is retired only after the re-check
+  passes. The chat stays as its transcript.
+- **One gate for merge and abandon.** `createStoryEnding` replaces Merge's own `isMerging`. Messages, Send back, Resume
+  and chat sends take a generic `busy(dir, id)` and refuse with the ending's own sentence. A second Abandon is refused
+  as "already being abandoned"; a Merge meanwhile as "being abandoned".
+- **PR close failure stops everything before the card.** The session is already retired by then (documented in ADR
+  0035); the worktree, branches and card are untouched, and the user can try again.
+- **Branches with git, not gh.** The local branch goes with `update-ref -d` at the tip read. Remote copies go with
+  `push --force-with-lease=<tip> --delete`, only where the remote tip is the local tip or behind it. A remote with
+  commits that aren't here stays and is said. An unreachable remote is said with Merge's note.
+- **Worktree story: the card change is committed on the feature branch** with Merge's plumbing (one parent; the
+  feature's older copy at a different path is dropped), message `STORY-N: abandoned, kept as Cancelled` or `… card
+  discarded`, and published to the local branch only. The worktree's own copy is written too, in case the worktree
+  stays. A feature branch that can't take it refuses with nothing removed.
+- **No-worktree story:** the owner copy is edited (or deleted) where it is checked out, uncommitted, like a card edit.
+- **Ghost cards (ADR 0035).** A card deleted at its owner was shown again from main's older copy. The scanner now asks
+  git, for a card whose owner has no copy, whether the owner deleted it (HEAD has it, or the owner's history had it),
+  and leaves it out with no problem. This changes owner resolution, so it is in the ADR.
+- **The index entry** goes with the next scan, which replaces all owner rows.
+- **Shared confirm UI.** Draft Reject's inline alertdialog is now `ConfirmAsk` (focus on Cancel, Escape, focus trap),
+  used by both.
+- **Discard closes the pane;** Keep leaves it open, showing what stayed (`remains`) as a status line.
+
+## 2026-11-12 — STORY-58 review fixes
+
+The Dev Lead's rulings on the review of 974c646, fixed in a new commit. Each bug has a regression test that failed
+before its fix.
+
+- **Loss set.** The warning now lists every commit that goes with the branch: those not on the feature branch and on no
+  remote branch but the story's own (`--exclude=*/<branch> --remotes`). A branch pushed with no PR is no longer a plain
+  question. The copy says "N commits only on this branch:" rather than "not pushed", since pushed ones are listed too.
+  The AC1 server test now expects the PR's pushed commit beside the unpushed one (2, was 1): the ruling changes what is
+  lost, not the assertion's strength.
+- **Order** (overrules build choice 5): stop the turn, re-check, close the PR, then in the card lane re-check, retire,
+  write the card, remove. A PR that can't be closed or a `changed` refusal leaves the session alive; the PR-close test
+  now also asserts `m.retired` is empty.
+- **Feature-owned stories** are abandonable when the feature branch isn't checked out: the card is changed on it with
+  plumbing, and the writable requirement is dropped for a feature-branch owner (`abandonRefusal`, card view, pane).
+- **Edits to a hidden card stay visible.** The scanner still leaves a card its owner deleted out of the list, but an
+  uncommitted working-tree edit to an older copy is reported as stale. The owner-copies test that asserted `stale: []`
+  for an edited copy encoded the wrong behaviour; it now expects the stale copy (Dev Lead approved), and a new test
+  keeps unedited older copies silent.
+- **Ahead note.** After the card commit, Abandon adds Merge's "<feature> is N commits ahead of GitHub; push it." when
+  the feature branch is ahead of its GitHub copy. The two GitHub tests that expected no such note now expect it.
+- **One remote delete.** `merge-git.deleteRemote` takes a `safe(tip)` predicate; Merge passes `mergedInto`, Abandon
+  "still at the tip the warning read". STORY-12's tests pass unchanged.
+- **api.ts** is under 300 lines: Merge and Abandon's handlers moved to `api-story-end.ts`.
+- **Copy:** "PR #1 closes".
+- **An abandon tried again** (after the worktree stayed) makes no commit when the feature branch's tree is unchanged.
+- **ADR 0035** says the token covers file names, not later edits to a listed file, and states the new order, the loss
+  set, the feature-owner path, the shared remote delete and that edits to a hidden card are still reported.
+- **Disagreement, item 11 (`epicProgress`).** Not a bug: feature cards use the lowercase container statuses
+  (`draft`, `approved`, `active`, `done`, `cancelled`; `CONTAINER_STATUSES`, enforced by validate), and only stories
+  and bugs use `Cancelled`. So `c.status !== "cancelled"` is right, and "Cancelled" would never match a feature. The
+  existing `rollup.test.ts` "counts done features, excluding cancelled" already proves cancelled features are left out
+  of epic bars; no change made.
+
+## 2026-11-12 — STORY-58 review rulings (dev-lead)
+
+- The abandon warning lists commits that are only on the story's branch. A commit counts as safe when it is on the feature branch or on any remote branch other than the story's own.
+- Order of steps: stop the turn, re-check, close the PR, then in the card lane re-check, retire, write the card and remove. A failed PR close leaves the session running.
+- A New story owned by a feature branch that isn't checked out can be abandoned. The card is changed on that branch with git plumbing.
+- Approved expectation change: in the owner-copies test, `stale` is no longer `[]`. An uncommitted edit to an older copy of a card its owner deleted is reported as stale, as ADR 0002 requires. Unedited older copies stay silent.
+- Abandon adds Merge's "N commits ahead of GitHub; push it." note. Both use one `deleteRemote`, which takes a `safe(tip)` check.
+- Retracted ruling (item 11): `epicProgress` comparing with lowercase `"cancelled"` is correct. Feature statuses are the lowercase container statuses, and rollup.test.ts already proves cancelled features are left out.
+- Roadmap: abandoning a story in a worktree that has no feature.

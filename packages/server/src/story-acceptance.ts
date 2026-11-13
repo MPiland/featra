@@ -9,7 +9,6 @@ import {
   acceptanceRefusal,
   acceptedStory,
   ACCEPT_MESSAGES,
-  MERGE_MESSAGES,
   SEND_BACK_MAX,
   sendBackMessage,
   sentBackStory,
@@ -33,8 +32,8 @@ export interface StoryAcceptanceDeps {
   chats: Pick<ChatManager, "storySession" | "open" | "send">;
   /** How a card reaches disk. Default: atomically. */
   write?: (file: string, text: string) => Promise<void>;
-  /** Whether the story is merging (STORY-12): its session is about to end, so nothing is sent back to it. */
-  merging?: (dir: string, id: string) => boolean;
+  /** Why the story takes no Send back now (STORY-12, STORY-58): it is merging or being abandoned, so its session is about to end. Null when it does. */
+  busy?: (dir: string, id: string) => string | null;
 }
 
 export function createStoryAcceptance({
@@ -43,7 +42,7 @@ export function createStoryAcceptance({
   lane = createCardLane(),
   chats,
   write = writeAtomic,
-  merging = () => false,
+  busy = () => null,
 }: StoryAcceptanceDeps) {
   /** The story as its owner has it now, where to write it, and why Accept and Send back can't be used on it. */
   async function fresh(dir: string, id: string) {
@@ -88,7 +87,8 @@ export function createStoryAcceptance({
         open: async () => chats.open(session()),
         send: async () => {
           await fresh(dir, id);
-          if (merging(dir, id)) throw new ApiError(MERGE_MESSAGES.busy(id));
+          const ending = busy(dir, id);
+          if (ending !== null) throw new ApiError(ending);
           chats.send(session(), sendBackMessage(id, reason));
         },
         record: async () => {

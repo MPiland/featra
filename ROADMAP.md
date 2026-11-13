@@ -80,6 +80,8 @@ epics in `.featra/cards/`.
 - **CI test reports: re-run detection.** A re-run that finishes within one poll interval is missed; compare the run's
   attempt or `updatedAt` instead of watching for pending. From STORY-57.
 
+- Abandoning a story in a worktree that has no feature: decide where its card goes and test that path.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".

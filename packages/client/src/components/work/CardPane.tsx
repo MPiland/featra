@@ -10,6 +10,7 @@ import { StoryChecks } from "./StoryChecks.tsx";
 import { StoryPr } from "./StoryPr.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
 import { MergeStory } from "./MergeStory.tsx";
+import { AbandonStory } from "./AbandonStory.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
@@ -161,13 +162,23 @@ export function CardPane({
               />
             </div>
           )}
-          {view.type === "story" && !readOnly && (
+          {view.type === "story" && (!readOnly || view.abandonable === true) && (
             <div className="draft-actions">
               <MergeStory
                 key={`merge-${id}`}
                 id={id}
                 mergeable={view.mergeable === true}
                 merge={(story) => work.mergeStory(dir, story)}
+              />
+              <AbandonStory
+                key={`abandon-${id}`}
+                id={id}
+                abandonable={view.abandonable === true}
+                actions={{
+                  check: (story) => work.abandonCheck(dir, story),
+                  abandon: (story, keep, token) => work.abandonStory(dir, story, keep, token),
+                }}
+                onDiscarded={onClose}
               />
             </div>
           )}

@@ -10,6 +10,7 @@ import {
   type CardUpdateResult,
   type CardView,
 } from "@featra/work-format/card-view";
+import { normalizeAbandonWarning, type AbandonWarning } from "@featra/work-format/abandon-copy";
 import { errorMessage, isRecord } from "@featra/work-format/guards";
 import type { PrChecks, PrState } from "@featra/work-format/prs";
 import type { ServerClient } from "./server-client.ts";
@@ -52,10 +53,30 @@ export interface CardBridge {
   createPr: (dir: string, id: string) => Promise<ReviewResult>;
   /** Merges a Verified story into its feature branch with a merge commit (STORY-12). */
   mergeStory: (dir: string, id: string) => Promise<MergeResult>;
+  /** What abandoning a story would lose, which the user confirms (STORY-58); or why it can't be abandoned. */
+  abandonCheck: (dir: string, id: string) => Promise<AbandonCheck>;
+  /** Abandons a story as confirmed with the warning's `token`: its card kept as Cancelled (`keep`), or deleted. */
+  abandonStory: (dir: string, id: string, keep: boolean, token: string) => Promise<MergeResult>;
 }
 
-/** That a merge went, with what it left behind (a worktree or branch that couldn't be removed); or why not. */
+/**
+ * That a merge (or an abandon, STORY-58) went, with what it left behind (a worktree or branch that couldn't be
+ * removed); or why not.
+ */
 export type MergeResult = { ok: true; remains: string[] } | { ok: false; error: string };
+
+/** What abandoning a story would lose; or why it can't be abandoned. */
+export type AbandonCheck = { ok: true; warning: AbandonWarning } | { ok: false; error: string };
+
+/** A merge's or an abandon's answer as the bridge gives it. */
+const ended = (call: Promise<unknown>): Promise<MergeResult> =>
+  call.then(
+    (r): MergeResult => ({
+      ok: true,
+      remains: isRecord(r) && Array.isArray(r.remains) ? r.remains.filter((x) => typeof x === "string") : [],
+    }),
+    (err: unknown): MergeResult => ({ ok: false, error: errorMessage(err) }),
+  );
 
 /** The chat the story's agent runs in, and whether it waits for a free slot; or why it didn't start. */
 export type StartStoryResult = { ok: true; chat: string; queued: boolean } | { ok: false; error: string };
@@ -198,14 +219,18 @@ export function serverCards(server: ServerClient): CardBridge {
     stopStory: (dir, id) => review(server.call("story.stop", { dir, id })),
     resumeStory: (dir, id) => review(server.call("story.resume", { dir, id })),
     createPr: (dir, id) => review(server.call("story.createPr", { dir, id })),
-    mergeStory: (dir, id) =>
-      server.call("story.merge", { dir, id }).then(
-        (r): MergeResult => ({
-          ok: true,
-          remains: isRecord(r) && Array.isArray(r.remains) ? r.remains.filter((x) => typeof x === "string") : [],
-        }),
-        (err: unknown): MergeResult => ({ ok: false, error: errorMessage(err) }),
+    mergeStory: (dir, id) => ended(server.call("story.merge", { dir, id })),
+    abandonCheck: (dir, id) =>
+      server.call("story.abandonCheck", { dir, id }).then(
+        (r): AbandonCheck => {
+          const warning = normalizeAbandonWarning(r);
+          return warning
+            ? { ok: true, warning }
+            : { ok: false, error: errorMessage(new Error("Featra gave an unexpected answer.")) };
+        },
+        (err: unknown): AbandonCheck => ({ ok: false, error: errorMessage(err) }),
       ),
+    abandonStory: (dir, id, keep, token) => ended(server.call("story.abandon", { dir, id, keep, token })),
   };
 }
 
@@ -226,6 +251,8 @@ export function noCards(error: string): CardBridge {
     startStory: async () => ({ ok: false, error }),
     rerunChecks: async () => ({ ok: false, error }),
     mergeStory: async () => ({ ok: false, error }),
+    abandonCheck: async () => ({ ok: false, error }),
+    abandonStory: async () => ({ ok: false, error }),
     stopStory: async () => ({ ok: false, error }),
     resumeStory: async () => ({ ok: false, error }),
     createPr: async () => ({ ok: false, error }),

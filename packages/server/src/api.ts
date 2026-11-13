@@ -20,6 +20,7 @@ import type { AllowedProjects } from "./allowed-projects.ts";
 import type { AgentBridge } from "./agent-bridge.ts";
 import { ApiError } from "./api-error.ts";
 import { createChatApi } from "./api-chat.ts";
+import { createStoryEndApi } from "./api-story-end.ts";
 import { cardViewIn, type CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
@@ -29,6 +30,7 @@ import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
 import type { StoryAcceptance } from "./story-acceptance.ts";
 import type { StoryMerge } from "./story-merge.ts";
+import type { StoryAbandon } from "./story-abandon.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import type { StoryChecks } from "./story-checks.ts";
 import type { StoryPrs } from "./story-prs.ts";
@@ -55,7 +57,11 @@ export interface ApiDeps {
   stops: StoryStop;
   acceptance: StoryAcceptance;
   /** Merges stories into their features (STORY-12). Without it `story.merge` is refused. */
-  merges?: Pick<StoryMerge, "merge" | "isMerging">;
+  merges?: Pick<StoryMerge, "merge">;
+  /** Abandons stories (STORY-58). Without it `story.abandonCheck` and `story.abandon` are refused. */
+  abandons?: Pick<StoryAbandon, "check" | "abandon">;
+  /** Why a story's session takes no message from the user now: it is merging or being abandoned. */
+  busy?: (dir: string, id: string) => string | null;
   checks: StoryChecks;
   checkSettings: CheckSettings;
   prs: Pick<StoryPrs, "prState" | "decorate" | "createPr" | "focus">;
@@ -99,6 +105,8 @@ export function createApi({
   stops,
   acceptance,
   merges,
+  abandons,
+  busy,
   checks,
   checkSettings,
   prs,
@@ -122,7 +130,8 @@ export function createApi({
     allow(p.dir);
     return p;
   };
-  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, merging: merges?.isMerging });
+  const storyEnd = createStoryEndApi({ merges, abandons, allow });
+  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
     switch (method) {
@@ -220,12 +229,10 @@ export function createApi({
         if (!p) throw new ApiError("Expected { dir, id }.");
         return acceptance.accept(allow(p.dir), p.id);
       }
-      case "story.merge": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        if (!merges) throw new ApiError("Merging isn't available.");
-        return merges.merge(allow(p.dir), p.id);
-      }
+      case "story.merge":
+      case "story.abandonCheck":
+      case "story.abandon":
+        return storyEnd(method, params);
       case "story.rerunChecks": {
         const p = cardParams(params);
         if (!p) throw new ApiError("Expected { dir, id }.");

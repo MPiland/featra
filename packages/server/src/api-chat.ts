@@ -11,7 +11,6 @@ import {
   chatStartParams,
   chatUndoParams,
   inboxParams,
-  MERGE_MESSAGES,
   type Inbox,
   type ServerMethod,
   type ServerMethods,
@@ -36,11 +35,11 @@ export interface ChatApiDeps {
   allow: (dir: string) => string;
   /** The open project a request's `{ dir }` names. */
   project: (params: unknown) => string;
-  /** Whether a story is merging (STORY-12): its session is about to end, so the user's message isn't sent. */
-  merging?: (dir: string, id: string) => boolean;
+  /** Why the story takes no message from the user now (STORY-12, STORY-58): it is merging or being abandoned, so its session is about to end. Null when it does. */
+  busy?: (dir: string, id: string) => string | null;
 }
 
-export function createChatApi({ chats, roles, allowed, agents, allow, project, merging = () => false }: ChatApiDeps) {
+export function createChatApi({ chats, roles, allowed, agents, allow, project, busy = () => null }: ChatApiDeps) {
   /** A chat in an open project, by the `{ id }` its method was sent. */
   const chat = (params: unknown): string => {
     const p = chatParams(params);
@@ -89,7 +88,8 @@ export function createChatApi({ chats, roles, allowed, agents, allow, project, m
         const chatId = chat(params);
         await chats.open(chatId);
         const story = chats.info(chatId)?.storyId;
-        if (story && merging(chats.dirOf(chatId) ?? "", story)) throw new ApiError(MERGE_MESSAGES.busy(story));
+        const ending = story ? busy(chats.dirOf(chatId) ?? "", story) : null;
+        if (ending !== null) throw new ApiError(ending);
         chats.send(chatId, p.text);
         return null;
       }

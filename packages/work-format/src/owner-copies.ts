@@ -78,7 +78,19 @@ function ownerOfCopies(copies: readonly Parsed[], state: BranchState): OwnerLoca
   return fallback ? ownerOf(fallback.card, state) : { kind: "main" };
 }
 
-export function resolveCopies(copies: readonly CardCopy[], state: BranchState): Resolution {
+/** Cards shown from a copy that isn't their owner's: the owner has none. */
+export const orphans = (resolution: Resolution): OwnedCard[] =>
+  resolution.cards.filter((c) => !sameLocation(c.owner, c.shownFrom));
+
+/**
+ * `gone` holds the cards deleted at their owner (STORY-58: an abandoned story's card discarded): older copies elsewhere
+ * don't bring them back, so they aren't shown at all. An uncommitted edit to one of those copies is still stale.
+ */
+export function resolveCopies(
+  copies: readonly CardCopy[],
+  state: BranchState,
+  gone: ReadonlySet<string> = new Set(),
+): Resolution {
   const problems: string[] = [];
   const byId = new Map<string, Parsed[]>();
   const ordered = copies.toSorted((a, b) => rank(a.location) - rank(b.location) || a.path.localeCompare(b.path));
@@ -104,6 +116,12 @@ export function resolveCopies(copies: readonly CardCopy[], state: BranchState): 
   const stale: StaleCopy[] = [];
   for (const [id, group] of byId) {
     const owner = ownerOfCopies(group, state);
+    if (gone.has(id)) {
+      // Not shown, but an uncommitted edit to it elsewhere is still flagged, never dropped silently.
+      for (const c of group)
+        if (c.workingTree && c.edited) stale.push({ cardId: id, location: c.location, path: c.path, owner });
+      continue;
+    }
     const own = group.find((c) => sameLocation(c.location, owner));
     const shown = own ?? group[0];
     if (!shown) continue;

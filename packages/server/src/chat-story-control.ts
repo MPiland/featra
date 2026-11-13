@@ -81,7 +81,7 @@ export function storyControl({
       try {
         await stop(id);
       } catch (err) {
-        log(`A merged story's session couldn't be stopped: ${errorMessage(err)}`);
+        log(`A story's session couldn't be stopped as it ended: ${errorMessage(err)}`);
       }
       // Its agent goes, so nothing holds the worktree; the chat stays, and opens as its transcript.
       end(c);

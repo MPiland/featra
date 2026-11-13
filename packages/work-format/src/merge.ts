@@ -14,15 +14,7 @@ import type { OwnedCard } from "./owner-copies.ts";
 import { resumedStory } from "./story-stop.ts";
 import type { Card, ProjectConfig } from "./types.ts";
 import { isRecord } from "./utils/guards.ts";
-
-/** The longest list of files a refusal names before it says how many more there are. */
-const LISTED = 5;
-
-/** `files` as one short list: the first few, then how many more. */
-export function fileList(files: readonly string[]): string {
-  const shown = files.slice(0, LISTED).join(", ");
-  return files.length > LISTED ? `${shown} and ${files.length - LISTED} more` : shown;
-}
+import { fileList } from "./merge-copy.ts";
 
 export const MERGE_MESSAGES = {
   gone: "That card is gone.",

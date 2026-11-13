@@ -34,6 +34,8 @@ export interface FakeGhState {
   next: number;
   /** When set, merging a PR fails with this message, as a branch rule would make it (STORY-12). */
   mergeFails?: string;
+  /** When set, closing a PR fails with this message (STORY-58). */
+  closeFails?: string;
   /** When set, opening a PR fails with this message. */
   createFails?: string;
   /** The bare repository that stands in for GitHub's copy: a PR's head commit is its branch's tip there. */
