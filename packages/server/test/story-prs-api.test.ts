@@ -108,16 +108,23 @@ describe("Create PR and the PR chip's data (AC2, AC3, AC4)", { timeout: 60_000 }
     );
     await gh.change((s) => {
       s.prs.push({ number: 14, url: "https://github.com/acme/app/pull/14", head: STORY_BRANCH, state: "OPEN" });
+      // A read that is slow to start: other timers, such as the feature's, are set before it is made (BUG-21).
+      s.viewStartDelayMs = 1500;
     });
     await ask("work.watch", { dir: repo.main });
     const reads = async () => (await gh.calls()).filter((c) => c.args[0] === "pr" && c.args[1] === "view").length;
-    await until(() => clock.timersSet() > 0, 10_000);
+    // Both pollers have read once and wait for their next read: the story PRs' and the features'. Any timer alone may be
+    // the features', set before the story's first read is made (BUG-21).
+    const settled = () => story()?.prStatus?.state === "open" && clock.timersSet() === 2;
+    await until(settled, 10_000);
     const before = await reads();
+    // The first read, when watching starts, is counted before the refresh (BUG-21).
+    expect(before).toBe(1);
     expect(await ask("prs.refresh", {})).toBeNull();
     clock.advance(1_000);
     await expect.poll(reads, { timeout: 10_000 }).toBe(before + 1);
-    // The read has finished once the next one is scheduled; the interval counts from there.
-    await until(() => clock.timersSet() > 0, 10_000);
+    // The reads have finished once both next ones are scheduled; the interval counts from there.
+    await until(() => clock.timersSet() === 2, 10_000);
     clock.advance(2 * MINUTE);
     await expect.poll(reads, { timeout: 10_000 }).toBe(before + 2);
   });
