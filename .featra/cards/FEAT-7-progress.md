@@ -17,7 +17,7 @@ history:
 
 ## Description
 
-Counts, scope baseline, burn-up and a pile-up board.
+Progress without asking the Dev Lead: stage breakdowns on the count bars, a scope baseline set when the feature goes in progress, a feature progress pane with a burn-up (no forecast), and a read-only stage board in Work.
 
 ## Depends on
 

@@ -24,14 +24,15 @@ history:
 
 ## Description
 
-Feature counts and added scope.
+As a builder, I read a feature's and an epic's progress at a glance and see what was added after the feature started.
+Counts, stage-split bars, epic bars and "+N added" already ship; this story fills the gaps.
 
 ## Acceptance criteria
 
-- [ ] Feature rows show 'N of M stories done' (or tasks, per setting) next to one continuous bar split by stage category; never a percentage
-- [ ] Hovering the bar shows the breakdown, e.g. '1 done · 1 needs your Accept · 2 in progress · 1 not started'
-- [ ] Each epic header shows 'N of M features done' with the same kind of bar
-- [ ] The scope baseline is set when the first story goes In Progress; later items show as '+N added since start' with origin
+- [ ] Hovering or focusing a feature's bar shows its breakdown by stage, for example "1 done · 1 needs your Accept · 2 in progress · 1 not started"; an epic's bar does the same by feature status
+- [ ] A feature's scope baseline is set when the feature goes in progress (Start feature), not at approval; stories added between approval and start are planned scope
+- [ ] A feature approved before this change keeps working: its baseline is the moment it went in progress, read from its history
+- [ ] Items added after the baseline show their origin in the feature row's "+N added" breakdown: added stories and bugs counted apart
 
 ## Tasks
 

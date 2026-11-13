@@ -2091,3 +2091,20 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - BUG-20 (test links with parentheses read as none) is fixed in this PR with a regression test; 17 of 17 AC links on STORY-12, 13, 14 and 58 now resolve.
 - Approved changes to this PR's own test expectations: `base: "main"` on feature-end objects, "Checking…" before the first read, the base name in the Merge label, and the "leaves main alone" test using an overlapping file.
 - Roadmap: a local-mode git CLI merge to main makes the feature Done.
+
+## 2026-11-13 — FEAT-7 shaping (user and dev-lead)
+
+- **STORY-15 is trimmed to its gaps.** Counts, stage-split bars, epic bars and "+N added" already ship. What is left is
+  the stage breakdown on hover or focus, and showing the origin of added items.
+- **The scope baseline moves to the moment the feature goes in progress** (Start feature), replacing approval
+  (STORY-51). The burn-up starts at the same moment, so the chart and "+N added" always agree. Stories added between
+  approval and start are planned scope.
+- **The burn-up lives in the feature progress pane.** It counts what the progress setting counts (stories or tasks),
+  one point per day plus now. Bugs count as added scope. No forecast.
+- **The feature progress pane** opens from the feature's chat and from its row in Work, so features without a chat have
+  it too.
+- **The stage board** is a List and Board toggle in Work. Every stage is a column, New through Done, for all features or
+  one. Cards are compact: ID, title, feature tag, PR chip, and a mark when the story waits on the user. No dragging.
+- **BUG-21** (PR refresh test counted reads before the first one) is fixed on main in PR #49; the test waits for both PR
+  pollers to settle.
+- **Order:** STORY-15, STORY-24, STORY-16 (it needs the pane), STORY-17.

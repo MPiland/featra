@@ -4,7 +4,7 @@ type: story
 title: Read-only stage board
 status: New
 parent: FEAT-7
-order: 3
+order: 4
 origin: planned
 role: developer
 agent: claude
@@ -24,12 +24,15 @@ history:
 
 ## Description
 
-Read-only stage board.
+As a builder, I switch Work to a board of stage columns to spot where stories pile up.
 
 ## Acceptance criteria
 
-- [ ] A toggle shows in-flight stories as stage columns, for all features or one
-- [ ] Cards cannot be dragged; stages change only through agents, merges or the side panel
+- [ ] A List and Board toggle in Work's header switches to the board; the choice is remembered per project
+- [ ] The board has one column per stage, New through Done, in the project's stage order, each with its count
+- [ ] A filter shows all features' stories or one feature's
+- [ ] A story card shows its ID and title, a feature tag when all features are shown, its PR chip and a mark when it waits on the user; clicking it opens its card pane
+- [ ] Cards cannot be dragged; stages change only through agents, merges and the card pane
 
 ## Tasks
 
