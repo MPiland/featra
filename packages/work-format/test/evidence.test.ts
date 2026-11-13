@@ -25,6 +25,7 @@ describe("evidenceState", () => {
       provenAcs: [],
       proven: false,
       accepted: false,
+      checkedHead: null,
     });
   });
 

@@ -33,6 +33,11 @@ export interface Collected {
   state: BranchState;
   /** The working-tree folder of each checked-out location, by `copyKey(location, "")`. */
   roots: Map<string, string>;
+  /**
+   * The commit each location's cards were read from, by `locationKey`: a checkout's HEAD, or a branch's tip. A write by
+   * plumbing expects its branch still there (STORY-13 review), so a scan gone stale can't overwrite what it didn't see.
+   */
+  heads: Map<string, string | null>;
   /** What HEAD has for each working-tree copy, by `copyKey(location, path)`; null when HEAD has no such file. */
   headTexts: Map<string, string | null>;
   problems: string[];
@@ -76,9 +81,10 @@ export interface CollectDeps {
 }
 
 /** One location to read: from disk with what its HEAD has, or the card files of a commit. */
-type Source =
-  | { location: OwnerLocation; tree: WorktreeInfo; inHead: Map<string, string> }
-  | { location: OwnerLocation; files: { path: string; text: string }[] };
+type Source = { location: OwnerLocation; rev: string | null } & (
+  | { tree: WorktreeInfo; inHead: Map<string, string> }
+  | { files: { path: string; text: string }[] }
+);
 
 /**
  * What git told one scan. A rescan for a card edit alone reuses it and runs no git (ADR 0016); a change to refs,
@@ -102,13 +108,13 @@ async function readGit(paths: RepoPaths, baseBranch: string, { git, index }: Col
   const plan: { location: OwnerLocation; tree?: WorktreeInfo; rev: string | null }[] = [];
   const treeOf = (branch: string) => trees.find((t) => t.branch === branch);
   const base = treeOf(baseBranch);
+  const baseTip = branches.find((b) => b.name === baseBranch);
   if (base) plan.push({ location: { kind: "main" }, tree: base, rev: base.head });
-  else if (branches.some((b) => b.name === baseBranch))
-    plan.push({ location: { kind: "main" }, rev: `refs/heads/${baseBranch}` });
+  else if (baseTip) plan.push({ location: { kind: "main" }, rev: baseTip.head });
   for (const b of branches) {
     if (!featureIdOfBranch(b.name)) continue;
     const tree = treeOf(b.name);
-    plan.push({ location: { kind: "feature", branch: b.name }, tree, rev: tree ? tree.head : `refs/heads/${b.name}` });
+    plan.push({ location: { kind: "feature", branch: b.name }, tree, rev: tree ? tree.head : b.head });
   }
   for (const t of trees) {
     if (!t.branch || t.branch === baseBranch || featureIdOfBranch(t.branch)) continue;
@@ -119,7 +125,9 @@ async function readGit(paths: RepoPaths, baseBranch: string, { git, index }: Col
   const committed = await git.committedCards(top, revs, (shas, load) => idx.blobs(shas, load));
   const sources = plan.map(({ location, tree, rev }): Source => {
     const files = (rev && committed.get(rev)) || [];
-    return tree ? { location, tree, inHead: new Map(files.map((f) => [f.path, f.text])) } : { location, files };
+    return tree
+      ? { location, rev, tree, inHead: new Map(files.map((f) => [f.path, f.text])) }
+      : { location, rev, files };
   });
   return { paths, baseBranch, detected: false, trees, branches, sources };
 }
@@ -180,6 +188,7 @@ export async function collect(dir: string, deps: CollectDeps, reuse?: GitState):
     ),
   );
   const copies = read.flat();
+  const heads = new Map(git.sources.map((s) => [locationKey(s.location), s.rev]));
 
   const cardBranches = new Map<string, string[]>();
   for (const c of copies) {
@@ -192,5 +201,5 @@ export async function collect(dir: string, deps: CollectDeps, reuse?: GitState):
     branches: git.branches,
     cardBranches,
   });
-  return { paths, config, copies, state, roots, headTexts, problems, git };
+  return { paths, config, copies, state, roots, heads, headTexts, problems, git };
 }

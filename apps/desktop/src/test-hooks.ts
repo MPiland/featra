@@ -10,6 +10,8 @@ export const e2e = process.env.FEATRA_E2E === "1";
 export interface TestHooks {
   notices: string[];
   shownInFolder: string[];
+  /** Links Featra asked the OS browser to open (a story's PR). */
+  openedExternal: string[];
   /** Folders the next folder dialogs return, in order; an empty queue is a cancelled dialog. */
   folderPicks: string[];
   /** Titles of the folder dialogs Featra opened. */
@@ -32,6 +34,7 @@ export interface ShownNotification {
 export const testHooks: TestHooks = {
   notices: [],
   shownInFolder: [],
+  openedExternal: [],
   folderPicks: [],
   folderDialogs: [],
   notifications: [],

@@ -1,5 +1,18 @@
 import { stageCategory } from "./config.ts";
+import { ownerOf, type BranchState } from "./ownership.ts";
 import type { Card, ProjectConfig } from "./types.ts";
+
+/**
+ * Whether `card` is a story or bug still being worked, so a problem it caused is a task on it: in an active stage, and
+ * its card still owned by its worktree. Once merged into its feature (owned by the feature branch) it isn't (ADR 0036).
+ */
+export const takesTask = (card: Card, config: ProjectConfig, state: BranchState): boolean =>
+  (card.type === "story" || card.type === "bug") &&
+  stageCategory(card.status, config) === "active" &&
+  ownerOf(card, state).kind === "worktree";
+
+/** Whether `card` is a feature in progress, so a problem it caused is a bug card under it. A Done one never is. */
+export const takesBug = (card: Card): boolean => card.type === "feature" && card.status === "active";
 
 export type ProblemRoute =
   /** The cause is a story (or bug) still being worked: add a task to it. */
@@ -11,15 +24,20 @@ export type ProblemRoute =
 
 /**
  * Decides where a newly found problem goes. `causedBy` is the card believed to have caused it
- * (a story, bug or feature), or null when unknown.
+ * (a story, bug or feature), or null when unknown. `state` says which stories are still in their worktrees.
  */
-export function routeProblem(causedBy: string | null, cards: readonly Card[], config: ProjectConfig): ProblemRoute {
+export function routeProblem(
+  causedBy: string | null,
+  cards: readonly Card[],
+  config: ProjectConfig,
+  state: BranchState,
+): ProblemRoute {
   const cause = causedBy ? cards.find((c) => c.id === causedBy) : undefined;
   if (!cause) return { kind: "project-bug" };
 
   let featureId: string | null;
   if (cause.type === "story" || cause.type === "bug") {
-    if (stageCategory(cause.status, config) === "active") return { kind: "task", card: cause.id };
+    if (takesTask(cause, config, state)) return { kind: "task", card: cause.id };
     featureId = cause.parent;
   } else if (cause.type === "feature") {
     featureId = cause.id;
@@ -27,6 +45,6 @@ export function routeProblem(causedBy: string | null, cards: readonly Card[], co
     return { kind: "project-bug" };
   }
 
-  const feature = featureId ? cards.find((c) => c.id === featureId && c.type === "feature") : undefined;
-  return feature?.status === "active" ? { kind: "feature-bug", feature: feature.id } : { kind: "project-bug" };
+  const feature = featureId ? cards.find((c) => c.id === featureId) : undefined;
+  return feature && takesBug(feature) ? { kind: "feature-bug", feature: feature.id } : { kind: "project-bug" };
 }

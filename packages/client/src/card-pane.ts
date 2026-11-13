@@ -10,7 +10,9 @@ import {
   type CardUpdateResult,
   type CardView,
 } from "@featra/work-format/card-view";
+import { normalizeAbandonWarning, type AbandonWarning } from "@featra/work-format/abandon-copy";
 import { errorMessage, isRecord } from "@featra/work-format/guards";
+import type { PrChecks, PrState } from "@featra/work-format/prs";
 import type { ServerClient } from "./server-client.ts";
 
 export type { CardEdit, CardUpdateResult, CardView };
@@ -37,11 +39,52 @@ export interface CardBridge {
   start: (dir: string, id: string) => Promise<ReviewResult>;
   /** Starts a story's agent in its own worktree; it is queued when the project is at its limit of story agents (STORY-9). */
   startStory: (dir: string, id: string) => Promise<StartStoryResult>;
+  /** Accepts a story waiting in Acceptance: Accepted in its history, and Done when its evidence allows (STORY-23). */
+  acceptStory: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Sends a story in Acceptance back to its session with the reason, optionally as a new criterion (STORY-23). */
+  sendBackStory: (dir: string, id: string, reason: string, addCriterion: boolean) => Promise<SendBackResult>;
+  /** Runs the story's checks again on this computer, whatever the last run said (STORY-56). */
+  rerunChecks: (dir: string, id: string) => Promise<ReviewResult>;
   /** Stops the story's running turn and marks it Stopped; its stage and worktree stay (STORY-53). */
   stopStory: (dir: string, id: string) => Promise<ReviewResult>;
   /** Goes on in the stopped story's session, and clears Stopped (STORY-53). */
   resumeStory: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Pushes the story's branch and opens its PR through the user's gh (STORY-11). */
+  createPr: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Merges a Verified story into its feature branch with a merge commit (STORY-12). */
+  mergeStory: (dir: string, id: string) => Promise<MergeResult>;
+  /** What abandoning a story would lose, which the user confirms (STORY-58); or why it can't be abandoned. */
+  abandonCheck: (dir: string, id: string) => Promise<AbandonCheck>;
+  /** Abandons a story as confirmed with the warning's `token`: its card kept as Cancelled (`keep`), or deleted. */
+  abandonStory: (dir: string, id: string, keep: boolean, token: string) => Promise<MergeResult>;
+  /** Accepts a feature whose stories and bugs are all Done or Cancelled; its PR opens first when that is on (STORY-14). */
+  acceptFeature: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Pushes an accepted feature's branch and opens its PR to main (STORY-14). */
+  createFeaturePr: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Runs an accepted feature's checks on this computer again (STORY-14). */
+  rerunFeatureChecks: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Merges an accepted feature to main with a merge commit (STORY-14). */
+  mergeFeature: (dir: string, id: string) => Promise<MergeResult>;
 }
+
+/**
+ * That a merge (or an abandon, STORY-58) went, with what it left behind (a worktree or branch that couldn't be
+ * removed); or why not.
+ */
+export type MergeResult = { ok: true; remains: string[] } | { ok: false; error: string };
+
+/** What abandoning a story would lose; or why it can't be abandoned. */
+export type AbandonCheck = { ok: true; warning: AbandonWarning } | { ok: false; error: string };
+
+/** A merge's or an abandon's answer as the bridge gives it. */
+const ended = (call: Promise<unknown>): Promise<MergeResult> =>
+  call.then(
+    (r): MergeResult => ({
+      ok: true,
+      remains: isRecord(r) && Array.isArray(r.remains) ? r.remains.filter((x) => typeof x === "string") : [],
+    }),
+    (err: unknown): MergeResult => ({ ok: false, error: errorMessage(err) }),
+  );
 
 /** The chat the story's agent runs in, and whether it waits for a free slot; or why it didn't start. */
 export type StartStoryResult = { ok: true; chat: string; queued: boolean } | { ok: false; error: string };
@@ -51,6 +94,15 @@ export type ReviewResult = { ok: true } | { ok: false; error: string };
 
 /** Why a send-back didn't go, or that it did; `recorded` is false when the chat has it but history doesn't. */
 export type SendBackResult = { ok: true; recorded: boolean } | { ok: false; error: string };
+
+/** What Accept and Send back call: the story's id. */
+export interface AcceptActions {
+  accept: (id: string) => Promise<ReviewResult>;
+  sendBack: (id: string, reason: string, addCriterion: boolean) => Promise<SendBackResult>;
+}
+
+const sent = (r: unknown): SendBackResult => ({ ok: true, recorded: !(isRecord(r) && r.recorded === false) });
+const refused = (err: unknown): SendBackResult => ({ ok: false, error: errorMessage(err) });
 
 export const CARD_COPY = {
   close: "Close card",
@@ -75,6 +127,10 @@ export const CARD_COPY = {
   sendBackHint: "What should change?",
   sendBackSend: "Send",
   sendBackCancel: "Cancel",
+  sendBackCriterion: "Add as acceptance criterion",
+  accept: "Accept",
+  acceptOf: (id: string) => `Accept ${id}`,
+  sendBackOf: (id: string) => `Send back ${id}`,
   sendBackGone: "Its chat is gone.",
   sendBackUnrecorded: "Sent. Couldn't record it in history.",
   approve: "Approve",
@@ -90,8 +146,37 @@ export const CARD_COPY = {
   none: "None",
   evidence: "Evidence",
   marks: { reported: "Reported", verified: "Verified", proven: "Proven", accepted: "Accepted" },
-  proof: { passed: "Test passed", linked: "No result yet", none: "No test yet" } satisfies Record<AcProof, string>,
+  proof: {
+    passed: "Test passed",
+    failed: "Test failed",
+    missing: "Not in the report",
+    linked: "No result yet",
+    none: "No test yet",
+  } satisfies Record<AcProof, string>,
+  checks: {
+    title: "Checks",
+    running: "Checks running…",
+    passed: "Checks passed",
+    failed: "Checks failed",
+    none: "No checks run yet",
+    rerun: "Re-run",
+    output: "Failing output",
+  },
   count: (done: number, total: number, what: string) => `${done} of ${total} ${what}`,
+} as const;
+
+/** A story's PR on its card and its Work row (STORY-11). */
+export const PR_COPY = {
+  create: "Create PR",
+  opening: "Opening PR…",
+  state: { open: "Open", draft: "Draft", merged: "Merged", closed: "Closed" } satisfies Record<PrState, string>,
+  checks: {
+    passing: "Checks passing",
+    failing: "Checks failing",
+    pending: "Checks running",
+  } satisfies Record<Exclude<PrChecks, "none">, string>,
+  mark: { passing: "✓", failing: "✗", pending: "…" } satisfies Record<Exclude<PrChecks, "none">, string>,
+  report: "Test report",
 } as const;
 
 const review = (call: Promise<unknown>): Promise<ReviewResult> =>
@@ -123,11 +208,10 @@ export function serverCards(server: ServerClient): CardBridge {
         error: errorMessage(err),
         view: null,
       })),
-    sendBack: (dir, id, reason) =>
-      server.call("draft.sendBack", { dir, id, reason }).then(
-        (r): SendBackResult => ({ ok: true, recorded: !(isRecord(r) && r.recorded === false) }),
-        (err: unknown): SendBackResult => ({ ok: false, error: errorMessage(err) }),
-      ),
+    sendBack: (dir, id, reason) => server.call("draft.sendBack", { dir, id, reason }).then(sent, refused),
+    acceptStory: (dir, id) => review(server.call("story.accept", { dir, id })),
+    sendBackStory: (dir, id, reason, addCriterion) =>
+      server.call("story.sendBack", { dir, id, reason, addCriterion }).then(sent, refused),
     approve: (dir, id) => review(server.call("draft.approve", { dir, id })),
     reject: (dir, id) => review(server.call("draft.reject", { dir, id })),
     start: (dir, id) => review(server.call("feature.start", { dir, id })),
@@ -139,8 +223,26 @@ export function serverCards(server: ServerClient): CardBridge {
             : { ok: false, error: errorMessage(new Error("Featra gave an unexpected answer.")) },
         (err: unknown): StartStoryResult => ({ ok: false, error: errorMessage(err) }),
       ),
+    rerunChecks: (dir, id) => review(server.call("story.rerunChecks", { dir, id })),
     stopStory: (dir, id) => review(server.call("story.stop", { dir, id })),
     resumeStory: (dir, id) => review(server.call("story.resume", { dir, id })),
+    createPr: (dir, id) => review(server.call("story.createPr", { dir, id })),
+    mergeStory: (dir, id) => ended(server.call("story.merge", { dir, id })),
+    abandonCheck: (dir, id) =>
+      server.call("story.abandonCheck", { dir, id }).then(
+        (r): AbandonCheck => {
+          const warning = normalizeAbandonWarning(r);
+          return warning
+            ? { ok: true, warning }
+            : { ok: false, error: errorMessage(new Error("Featra gave an unexpected answer.")) };
+        },
+        (err: unknown): AbandonCheck => ({ ok: false, error: errorMessage(err) }),
+      ),
+    abandonStory: (dir, id, keep, token) => ended(server.call("story.abandon", { dir, id, keep, token })),
+    acceptFeature: (dir, id) => review(server.call("feature.accept", { dir, id })),
+    createFeaturePr: (dir, id) => review(server.call("feature.createPr", { dir, id })),
+    rerunFeatureChecks: (dir, id) => review(server.call("feature.rerunChecks", { dir, id })),
+    mergeFeature: (dir, id) => ended(server.call("feature.merge", { dir, id })),
   };
 }
 
@@ -153,11 +255,22 @@ export function noCards(error: string): CardBridge {
     },
     updateCard: async () => ({ ok: false, error, view: null }),
     sendBack: async () => ({ ok: false, error }),
+    acceptStory: async () => ({ ok: false, error }),
+    sendBackStory: async () => ({ ok: false, error }),
     approve: async () => ({ ok: false, error }),
     reject: async () => ({ ok: false, error }),
     start: async () => ({ ok: false, error }),
     startStory: async () => ({ ok: false, error }),
+    rerunChecks: async () => ({ ok: false, error }),
+    mergeStory: async () => ({ ok: false, error }),
+    abandonCheck: async () => ({ ok: false, error }),
+    abandonStory: async () => ({ ok: false, error }),
     stopStory: async () => ({ ok: false, error }),
     resumeStory: async () => ({ ok: false, error }),
+    createPr: async () => ({ ok: false, error }),
+    acceptFeature: async () => ({ ok: false, error }),
+    createFeaturePr: async () => ({ ok: false, error }),
+    rerunFeatureChecks: async () => ({ ok: false, error }),
+    mergeFeature: async () => ({ ok: false, error }),
   };
 }

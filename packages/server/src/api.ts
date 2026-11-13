@@ -6,6 +6,8 @@ import {
   dirParams,
   roleEditParams,
   sendBackParams,
+  storySendBackParams,
+  checksSetParams,
   setupParams,
   starter,
   unwatchParams,
@@ -18,6 +20,10 @@ import type { AllowedProjects } from "./allowed-projects.ts";
 import type { AgentBridge } from "./agent-bridge.ts";
 import { ApiError } from "./api-error.ts";
 import { createChatApi } from "./api-chat.ts";
+import { createBugApi } from "./api-bugs.ts";
+import { createStoryEndApi } from "./api-story-end.ts";
+import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
+import type { BugFiling } from "./bug-filing.ts";
 import { cardViewIn, type CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
@@ -25,6 +31,12 @@ import type { DraftActions } from "./draft-actions.ts";
 import type { DraftReview } from "./draft-review.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
+import type { StoryAcceptance } from "./story-acceptance.ts";
+import type { StoryMerge } from "./story-merge.ts";
+import type { StoryAbandon } from "./story-abandon.ts";
+import type { CheckSettings } from "./check-settings.ts";
+import type { StoryChecks } from "./story-checks.ts";
+import type { StoryPrs } from "./story-prs.ts";
 import type { StoryStop } from "./story-stop.ts";
 import type { Git } from "./git.ts";
 import type { RoleRegistry } from "./role-registry.ts";
@@ -46,6 +58,20 @@ export interface ApiDeps {
   starts: FeatureStart;
   spawns: StorySpawn;
   stops: StoryStop;
+  acceptance: StoryAcceptance;
+  /** Merges stories into their features (STORY-12). Without it `story.merge` is refused. */
+  merges?: Pick<StoryMerge, "merge">;
+  /** Abandons stories (STORY-58). Without it `story.abandonCheck` and `story.abandon` are refused. */
+  abandons?: Pick<StoryAbandon, "check" | "abandon">;
+  /** Accepts and merges features (STORY-14). Without it the `feature.*` ending methods are refused. */
+  features?: FeatureApiDeps["features"];
+  /** Files bugs from Work's New bug (STORY-13). Without it `bug.propose` and `bug.file` are refused. */
+  bugs?: Pick<BugFiling, "propose" | "file">;
+  /** Why a story's session takes no message from the user now: it is merging or being abandoned. */
+  busy?: (dir: string, id: string) => string | null;
+  checks: StoryChecks;
+  checkSettings: CheckSettings;
+  prs: Pick<StoryPrs, "prState" | "decorate" | "createPr" | "focus">;
   chats: ChatManager;
   roles: RoleRegistry;
   roleWatches: RoleWatches;
@@ -84,6 +110,15 @@ export function createApi({
   starts,
   spawns,
   stops,
+  acceptance,
+  merges,
+  abandons,
+  features,
+  bugs,
+  busy,
+  checks,
+  checkSettings,
+  prs,
   chats,
   roles,
   roleWatches,
@@ -98,13 +133,22 @@ export function createApi({
     if (!p) throw new ApiError("Expected { dir }.");
     return allow(p.dir);
   };
+  /** A card's folder, an open project, and its id. */
+  const card = (params: unknown): [dir: string, id: string] => {
+    const p = cardParams(params);
+    if (!p) throw new ApiError("Expected { dir, id }.");
+    return [allow(p.dir), p.id];
+  };
   const copy = (params: unknown) => {
     const p = copyParams(params);
     if (!p) throw new ApiError("Expected { dir, key }.");
     allow(p.dir);
     return p;
   };
-  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project });
+  const storyEnd = createStoryEndApi({ merges, abandons, allow });
+  const bugApi = createBugApi({ bugs, allow });
+  const featureApi = createFeatureApi({ features, card });
+  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
     switch (method) {
@@ -123,12 +167,17 @@ export function createApi({
       }
       case "work.watch": {
         const dir = project(params);
-        const { list, stop } = await watches.watch(dir, (next) => {
-          // A project closed since: say nothing more about it.
-          if (allowed.has(dir)) connection.push("work.list", id, next);
-        });
+        // The rows carry each story's PR state as last read (STORY-11), which a new read changes without a file event.
+        const { value, stop } = await watches.observe(
+          dir,
+          (_scan, list) => prs.decorate(dir, list),
+          (next) => {
+            // A project closed since: say nothing more about it.
+            if (allowed.has(dir)) connection.push("work.list", id, next);
+          },
+        );
         connection.keep(id, stop);
-        return list;
+        return value;
       }
       case "work.unwatch": {
         const p = unwatchParams(params);
@@ -150,7 +199,14 @@ export function createApi({
         const dir = allow(p.dir);
         const { value, stop } = await watches.observe(
           dir,
-          (scan) => cardViewIn(scan, p.id),
+          (scan) =>
+            cardViewIn(
+              scan,
+              p.id,
+              checks.checksFor(dir, p.id) ?? features?.checksFor(dir, p.id),
+              prs.prState(dir, p.id) ?? features?.prState(dir, p.id),
+              features?.mergeState(dir, p.id),
+            ),
           (next) => {
             if (allowed.has(dir)) connection.push("card.view", id, next);
           },
@@ -169,28 +225,48 @@ export function createApi({
         return drafts.sendBack(allow(p.dir), p.id, p.reason);
       }
       case "draft.approve":
-      case "draft.reject": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        const dir = allow(p.dir);
-        return method === "draft.approve" ? review.approve(dir, p.id) : review.reject(dir, p.id);
-      }
-      case "feature.start": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        return starts.start(allow(p.dir), p.id, starter(null));
-      }
-      case "story.start": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        return spawns.start(allow(p.dir), p.id);
-      }
+      case "draft.reject":
+        return method === "draft.approve" ? review.approve(...card(params)) : review.reject(...card(params));
+      case "feature.start":
+        return starts.start(...card(params), starter(null));
+      case "story.start":
+        return spawns.start(...card(params));
       case "story.stop":
-      case "story.resume": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        const dir = allow(p.dir);
-        return method === "story.stop" ? stops.stop(dir, p.id) : stops.resume(dir, p.id);
+      case "story.resume":
+        return method === "story.stop" ? stops.stop(...card(params)) : stops.resume(...card(params));
+      case "story.accept":
+        return acceptance.accept(...card(params));
+      case "story.merge":
+      case "story.abandonCheck":
+      case "story.abandon":
+        return storyEnd(method, params);
+      case "bug.propose":
+      case "bug.file":
+        return bugApi(method, params);
+      case "feature.accept":
+      case "feature.createPr":
+      case "feature.rerunChecks":
+      case "feature.merge":
+        return featureApi(method, params);
+      case "story.rerunChecks":
+        return checks.rerun(...card(params));
+      case "story.createPr":
+        return prs.createPr(...card(params));
+      case "prs.refresh":
+        prs.focus();
+        features?.focus();
+        return null;
+      case "checks.load":
+        return checkSettings.load(project(params));
+      case "checks.set": {
+        const p = checksSetParams(params);
+        if (!p) throw new ApiError("Expected { dir, patch }.");
+        return checkSettings.set(allow(p.dir), p.patch);
+      }
+      case "story.sendBack": {
+        const p = storySendBackParams(params);
+        if (!p) throw new ApiError("Expected { dir, id, reason }.");
+        return acceptance.sendBack(allow(p.dir), p.id, p.reason, p.addCriterion);
       }
       case "roles.watch": {
         const dir = project(params);

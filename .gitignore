@@ -9,3 +9,6 @@ test-results/
 playwright-report/
 spikes/**/transcript-*.json
 .impeccable/hook.cache.json
+
+# The JUnit report CI uploads (STORY-57)
+test-report/

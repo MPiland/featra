@@ -6,6 +6,12 @@ import { CloseIcon } from "../icons.tsx";
 import { DraftReview } from "./DraftReview.tsx";
 import { SendBack } from "./SendBack.tsx";
 import { StartFeature } from "./StartFeature.tsx";
+import { StoryChecks } from "./StoryChecks.tsx";
+import { StoryPr } from "./StoryPr.tsx";
+import { AcceptStory } from "./AcceptStory.tsx";
+import { MergeStory } from "./MergeStory.tsx";
+import { AbandonStory } from "./AbandonStory.tsx";
+import { FeatureEnd } from "./FeatureEnd.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
@@ -87,6 +93,8 @@ export function CardPane({
   if (!view) body = <p className="meta">{card.loading ? CARD_COPY.loading : CARD_COPY.gone}</p>;
   else {
     const readOnly = view.readOnly !== null;
+    // A feature's end acts on its branch wherever it is: its checks and PR aren't edits to its card.
+    const feature = view.type === "feature";
     const status = view.statusOptions.find((o) => o.value === view.status)?.label ?? view.status;
     body = (
       <>
@@ -145,6 +153,48 @@ export function CardPane({
               <StoryAgent id={id} />
             </div>
           )}
+          {view.awaiting && !readOnly && (
+            <div className="draft-actions">
+              <AcceptStory
+                key={`accept-${id}`}
+                id={id}
+                actions={{
+                  accept: (story) => work.acceptStory(dir, story),
+                  sendBack: (story, reason, addCriterion) => work.sendBackStory(dir, story, reason, addCriterion),
+                }}
+              />
+            </div>
+          )}
+          {view.type === "story" && (!readOnly || view.abandonable === true) && (
+            <div className="draft-actions">
+              <MergeStory
+                key={`merge-${id}`}
+                id={id}
+                mergeable={view.mergeable === true}
+                merge={(story) => work.mergeStory(dir, story)}
+              />
+              <AbandonStory
+                key={`abandon-${id}`}
+                id={id}
+                abandonable={view.abandonable === true}
+                actions={{
+                  check: (story) => work.abandonCheck(dir, story),
+                  abandon: (story, keep, token) => work.abandonStory(dir, story, keep, token),
+                }}
+                onDiscarded={onClose}
+              />
+            </div>
+          )}
+          {view.type === "feature" && (
+            <div className="draft-actions">
+              <FeatureEnd
+                key={`end-${id}`}
+                id={id}
+                end={view.featureEnd}
+                actions={{ accept: () => work.acceptFeature(dir, id), merge: () => work.mergeFeature(dir, id) }}
+              />
+            </div>
+          )}
           {view.startable && (
             <div className="draft-actions">
               <StartFeature
@@ -168,13 +218,17 @@ export function CardPane({
           placeholder={CARD_COPY.storyEmpty}
         />
         {onOpen && <StoriesSection stories={view.stories} onOpen={onOpen} />}
+        {view.checks && (
+          <StoryChecks
+            checks={view.checks}
+            readOnly={readOnly && !feature}
+            onRerun={() => (feature ? work.rerunFeatureChecks(dir, id) : work.rerunChecks(dir, id))}
+          />
+        )}
         <AcSection view={view} save={save} />
         <TaskSection view={view} save={save} />
         <TextSection view={view} save={save} field="notes" title={CARD_COPY.notes} placeholder={CARD_COPY.notesEmpty} />
-        <section className="card-sec" aria-label={CARD_COPY.pr}>
-          <h3 className="sh">{CARD_COPY.pr}</h3>
-          <p>{view.pr ?? <span className="meta">{CARD_COPY.none}</span>}</p>
-        </section>
+        <StoryPr view={view} onCreate={() => (feature ? work.createFeaturePr(dir, id) : work.createPr(dir, id))} />
       </>
     );
   }

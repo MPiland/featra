@@ -9,6 +9,7 @@ import {
   CHAT_MESSAGES,
   chatRule,
   denyMessage,
+  isRecord,
   validAnswers,
   type Answers,
   type ApprovalAnswer,
@@ -50,6 +51,10 @@ function offerFor(request: ToolRequest, own: ChatRule | null): Offer | null {
   if (request.suggested) return { suggested: request.suggested };
   return own ? { own } : null;
 }
+
+/** Whether `option` is one of the `choices` (each `{ key }`) the request's input offers (STORY-13). */
+const offered = (input: Record<string, unknown>, option: string): boolean =>
+  Array.isArray(input.choices) && input.choices.some((c: unknown) => isRecord(c) && c.key === option);
 
 /** Ends a request with `decision`, telling the chat `event` (none when the chat itself ended). */
 type Settle<D> = (decision: D | Refusal, event: ChatEvent | null) => void;
@@ -142,6 +147,8 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         forChat: covers !== null,
         ...(covers ? { covers } : {}),
         ...(request.subagent ? { subagent: request.subagent } : {}),
+        ...(request.story ? { story: request.story } : {}),
+        ...(request.subject ? { subject: request.subject } : {}),
       };
       return hold<ToolDecision>(chat, id, signal, opening, (settle) => ({ kind: "tool", request, offer, settle }));
     },
@@ -161,10 +168,17 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         settle,
       }));
     },
-    answer(chat, tool, { choice, reason }) {
+    answer(chat, tool, { choice, reason, option }) {
       const entry = waiting.get(chat)?.get(tool);
       if (entry?.kind !== "tool") throw new ChatError(CHAT_MESSAGES.noRequest);
-      const { id, name, input } = entry.request;
+      const { id, name } = entry.request;
+      // An app approval with choices (STORY-13) takes the one the user picked, with Allow, and only one it offers. An
+      // agent's own tool never takes one, whatever its input holds.
+      const app = entry.request.app === true;
+      if (option !== undefined && (!app || choice !== "allow" || !offered(entry.request.input, option))) {
+        throw new ChatError(CHAT_MESSAGES.badOption);
+      }
+      const input = option === undefined ? entry.request.input : { ...entry.request.input, option };
       if (choice === "deny") {
         const event: ChatEvent = { type: "tool-denied", id, name, input, ...(reason ? { reason } : {}) };
         return entry.settle({ allow: false, message: denyMessage(reason) }, event);

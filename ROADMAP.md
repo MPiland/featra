@@ -8,6 +8,11 @@ epics in `.featra/cards/`.
 
 ## M2 and later
 
+- **Run end-to-end tests linked to criteria.** A per-path template (for example Playwright with a JUnit reporter) so
+  e2e refs can prove criteria; STORY-56 shows "No command runs this test" for them.
+- **Structured test links on cards.** Replace the free-text `(test: path::name)` link, which breaks on `)` or `;` in a
+  test name.
+- **Re-run checks for commits made while Featra was closed.** STORY-56 takes a baseline at startup.
 - **Guided GitHub setup.** Help builders who don't have GitHub install `gh`, sign in and create the repo. Until then,
   FEAT-6 says in one line what's missing and works in local mode.
 - **Clean up subagent worktrees.** The SDK does not report a subagent's worktree (STORY-55); when it does, Archive removes
@@ -66,6 +71,22 @@ epics in `.featra/cards/`.
 - **Test hygiene:** a shared `startChat(page, role)` e2e helper. The picker-then-composer sequence is hand-rolled in
   about 11 specs (chat, chat-log, composer, draft, inbox, review-draft, chat-approvals, chat-questions, chat-list,
   chat-restore, roles), so a fix like BUG-17's has to be made in each.
+
+- **PR chip: required versus optional checks.** The chip reports every check while Verified uses only required checks,
+  so a Verified story can show "Checks failing" from an optional check. Show which checks are required. From STORY-11.
+
+- **CI test reports: download limits.** Only the XML read is size-limited; downloads have no total size or time limit
+  and run one after another, which can hold up the PR poll. From STORY-57.
+- **CI test reports: re-run detection.** A re-run that finishes within one poll interval is missed; compare the run's
+  attempt or `updatedAt` instead of watching for pending. From STORY-57.
+
+- Abandoning a story in a worktree that has no feature: decide where its card goes and test that path.
+
+- Work filter chips apply to the project bug list.
+- request_merge reports "cancelled" when the asking chat ends before the user answers.
+- Notices about a request reach the Dev Lead even after its chat has ended.
+
+- A feature merged to main with git outside Featra in local mode becomes Done.
 
 ## Before public release
 

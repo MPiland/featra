@@ -11,6 +11,7 @@ import {
   normalizeUiState,
   normalizeWindowState,
   serverChats,
+  serverChecks,
   serverInbox,
   serverRoles,
   serverSetup,
@@ -70,6 +71,7 @@ const bridge: FeatraBridge = {
   work: serverWork(server),
   chats: serverChats(server),
   roles: serverRoles(server),
+  checks: serverChecks(server),
   inbox: serverInbox(server),
   notifications: {
     asked: (item) => ipcRenderer.send(IPC.notificationsAsked, item),
@@ -88,6 +90,7 @@ const bridge: FeatraBridge = {
     reload: () => ipcRenderer.send(IPC.appReload),
     toggleDevTools: () => ipcRenderer.send(IPC.appToggleDevTools),
     showLogs: () => ipcRenderer.send(IPC.appShowLogs),
+    openExternal: (url: string) => ipcRenderer.send(IPC.appOpenExternal, url),
     clearCacheAndRestart: () => ipcRenderer.send(IPC.appClearCacheAndRestart),
     resetAppData: () => ipcRenderer.send(IPC.appResetAppData),
     quit: () => ipcRenderer.send(IPC.appQuit),

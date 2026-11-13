@@ -169,7 +169,9 @@ export function fakeChatServer(calls: string[], host: ChatHost = {}) {
     },
     // The answer is recorded; what the server then tells the chat, the test emits as the agent would go on.
     approve: async (id, tool, answer: ApprovalAnswer) => {
-      calls.push(`chat.approve:${id}:${tool}:${answer.choice}${answer.reason ? `:${answer.reason}` : ""}`);
+      calls.push(
+        `chat.approve:${id}:${tool}:${answer.choice}${answer.reason ? `:${answer.reason}` : ""}${answer.option ? `:${answer.option}` : ""}`,
+      );
       return host.approveError ?? null;
     },
     answer: async (id, tool, answers) => {

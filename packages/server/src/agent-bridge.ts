@@ -11,7 +11,6 @@ import {
   assertNever,
   parseDraft,
   parseLogInput,
-  parseMessageInput,
   parseReportInput,
   parseSpawnInput,
   parseStartInput,
@@ -22,12 +21,17 @@ import {
   type AgentMethods,
   type KnowledgePermission,
 } from "@featra/work-format";
+import { createLeadCalls } from "./agent-lead.ts";
+import { AGENT_MESSAGES } from "./agent-messages.ts";
 import { ApiError } from "./api-error.ts";
 import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { CardReport } from "./card-report.ts";
+import type { CheckSettings } from "./check-settings.ts";
 import type { DraftWriter } from "./draft-writer.ts";
 import type { FeatureStart } from "./feature-start.ts";
+import type { BugRequest } from "./bug-request.ts";
+import type { MergeRequest } from "./merge-request.ts";
 import type { StoryMessage } from "./story-message.ts";
 import type { StorySpawn } from "./story-spawn.ts";
 import type { LogWriter } from "./log-writer.ts";
@@ -37,24 +41,7 @@ import { sameSecret } from "./secret.ts";
 /** The name agents see: their tools are `mcp__featra__<tool>` (Claude). */
 export const MCP_NAME = "featra";
 
-/** What an agent is told when logging is off. */
-export const AGENT_MESSAGES = {
-  mcpOff: "Featra MCP is off for this project.",
-  readOnly: "Logging is off: this project's knowledge setting is read-only.",
-  draftReadOnly: "Drafting is off: this project's knowledge setting is read-only.",
-  noDrafts: "Drafting cards isn't available.",
-  startReadOnly: "Starting is off: this project's knowledge setting is read-only.",
-  noStart: "Starting a feature isn't available.",
-  spawnReadOnly: "Starting a story is off: this project's knowledge setting is read-only.",
-  noSpawn: "Starting a story isn't available.",
-  updateReadOnly: "Updating cards is off: this project's knowledge setting is read-only.",
-  noUpdate: "Updating cards isn't available.",
-  noMessage: "Messaging a story isn't available.",
-  /** A story session reports to its Dev Lead and is steered by it; it does not message sessions. */
-  sessionMessage: "A story session can't message other story sessions. Ask the Dev Lead.",
-  /** A story session is a worker: only the Dev Lead's chat puts agents on stories. */
-  sessionSpawn: "A story session can't start other story sessions. Ask the Dev Lead.",
-} as const;
+export { AGENT_MESSAGES } from "./agent-messages.ts";
 
 type ChatInfo = NonNullable<ReturnType<Pick<ChatManager, "info">["info"]>>;
 
@@ -82,6 +69,12 @@ export interface AgentBridgeDeps {
   reports?: CardReport;
   /** Sends the Dev Lead's messages to story sessions (STORY-54). Without it `session.message` is refused. */
   messages?: StoryMessage;
+  /** Keeps the Dev Lead's check-command proposals for the user to confirm (STORY-56). Without it `checks.propose` is refused. */
+  checkSettings?: Pick<CheckSettings, "propose">;
+  /** Asks the user to merge a story for the Dev Lead (STORY-12). Without it `story.requestMerge` is refused. */
+  merges?: MergeRequest;
+  /** Asks the user to place a bug the Dev Lead reports (STORY-13). Without it `bug.report` is refused. */
+  bugs?: BugRequest;
   newToken?: () => string;
 }
 
@@ -114,6 +107,9 @@ export function createAgentBridge({
   spawns,
   reports,
   messages,
+  checkSettings,
+  merges,
+  bugs,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -128,6 +124,8 @@ export function createAgentBridge({
   async function mcpRefusal(dir: string): Promise<string | null> {
     return (await enabled(dir)) ? null : AGENT_MESSAGES.mcpOff;
   }
+
+  const leads = createLeadCalls({ mcpRefusal, messages, checkSettings, merges, bugs });
 
   /**
    * Why agents may not write to the project: the MCP is off, or its knowledge setting is read-only, which keeps agents
@@ -193,18 +191,6 @@ export function createAgentBridge({
     return reports.report(info.dir, { chat, story: info.storyId ?? null }, info.session, input.value, info.cwd);
   }
 
-  async function message(chat: string, dir: string, story: boolean | undefined, params: unknown) {
-    if (story) throw new ApiError(AGENT_MESSAGES.sessionMessage);
-    // A message writes no card or knowledge file, so only the MCP's off switch applies (the read-only setting
-    // withholds the whole MCP at `attach` anyway).
-    const off = await mcpRefusal(dir);
-    if (off !== null) throw new ApiError(off);
-    if (!messages) throw new ApiError(AGENT_MESSAGES.noMessage);
-    const input = parseMessageInput(params);
-    if (!input.ok) throw new ApiError(input.error);
-    return messages.send(dir, input.value, chat);
-  }
-
   return {
     setPort: (next) => {
       port = next;
@@ -256,7 +242,13 @@ export function createAgentBridge({
         case "card.update":
           return update(chat, info, params);
         case "session.message":
-          return message(chat, info.dir, info.story, params);
+          return leads.message(chat, info.dir, info.story, params);
+        case "checks.propose":
+          return leads.propose(info.dir, info.story, params);
+        case "story.requestMerge":
+          return leads.requestMerge(chat, info.dir, info.story, params);
+        case "bug.report":
+          return leads.reportBug(chat, info.dir, info.story, params);
         case "log.append":
           return appendLog(chat, info.dir, info.cwd ?? info.dir, info.session, params);
         default:

@@ -39,6 +39,15 @@ export interface ToolRequest {
   suggested?: SuggestedRule;
   /** The label of the subagent the call is from, when the session's own subagent asks (STORY-55). */
   subagent?: string;
+  /**
+   * The story a request is about when the app asks it for the agent (STORY-12's request_merge): it outlives the turn
+   * that asked, as a story session's request shown in its Dev Lead's chat does.
+   */
+  story?: string;
+  /** What an app request that isn't about a story is about (STORY-13's report_bug: the bug); it outlives the turn too. */
+  subject?: string;
+  /** Set on a request the app asks itself (request_merge, report_bug): only these take a chosen `option` (STORY-13). */
+  app?: boolean;
 }
 
 /** A request the agent is told no to. `interrupt` tells it to stop its turn rather than try another step (Stop, the chat ending). */

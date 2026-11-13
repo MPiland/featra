@@ -21,10 +21,12 @@ import { SettingsView } from "./components/settings/SettingsView.tsx";
 import { Sidebar } from "./components/Sidebar.tsx";
 import { TitleBar } from "./components/TitleBar.tsx";
 import { useProjects } from "./components/useProjects.tsx";
+import { usePrFocus } from "./components/usePrFocus.ts";
 import { useProjectSetup } from "./components/useProjectSetup.tsx";
 import { useShortcuts } from "./components/useShortcuts.tsx";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
+import { ExternalLinkContext } from "./components/work/PrChip.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import { canGoBack, canGoForward, currentView, entryChat, entryView, initialNav, leaveChats } from "./navigation.ts";
 import { useAppNav } from "./use-app-nav.ts";
@@ -187,12 +189,14 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
 
   useShortcuts(bridge.platform, actions);
 
+  usePrFocus(bridge.work);
+
   useEffect(() => {
     document.title = `Featra · ${title}`;
   }, [title]);
 
   return (
-    <>
+    <ExternalLinkContext.Provider value={bridge.app.openExternal}>
       <div className="shell" inert={dialog !== null || projectDialog !== null}>
         <TitleBar
           bridge={bridge}
@@ -289,6 +293,6 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
         onClose={() => setDialog(null)}
         onReset={() => bridge.app.resetAppData()}
       />
-    </>
+    </ExternalLinkContext.Provider>
   );
 }

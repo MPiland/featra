@@ -1,0 +1,52 @@
+/* Filing a bug (STORY-13): New bug's form in Work, the field rows it shares with the Dev Lead's request card. */
+.new-bug-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.new-bug-bar p {
+  margin: 0;
+}
+
+.new-bug {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 560px;
+  padding: 12px;
+  border: 1px solid var(--menu-line);
+  border-radius: 8px;
+}
+
+.bug-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 8px 0;
+}
+
+.new-bug .bug-field {
+  margin: 0;
+}
+
+.bug-field label {
+  color: var(--tx2);
+  font-size: 12px;
+}
+
+.bug-field textarea.text-field {
+  height: auto;
+  padding: 8px 12px;
+  resize: vertical;
+}
+
+.bug-description {
+  white-space: pre-wrap;
+}
+
+.row-bug {
+  display: inline-flex;
+  margin-right: 6px;
+  color: var(--bad);
+}

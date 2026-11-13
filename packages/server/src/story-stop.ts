@@ -36,6 +36,8 @@ export interface StoryStopDeps {
   chats: Pick<ChatManager, "storySession" | "list" | "stop" | "resume" | "dropQueued">;
   /** How long Stop waits for the provider to end the turn before it answers; the turn ends on its own after that. */
   interruptMs?: number;
+  /** Why the story takes no Resume now (STORY-12, STORY-58): it is merging or being abandoned, so its session is about to end. Null when it does. */
+  busy?: (dir: string, id: string) => string | null;
 }
 
 /** `work` settled, or `ms` passed. A failure of `work` before then is thrown; one after is left unheard. */
@@ -58,6 +60,7 @@ export function createStoryStop({
   lane = createCardLane(),
   chats,
   interruptMs = 10_000,
+  busy = () => null,
 }: StoryStopDeps) {
   const cardOf = async (dir: string, id: string) => storyCardIn(await scanDir(dir), id);
 
@@ -107,6 +110,8 @@ export function createStoryStop({
       const chat = chats.storySession(dir, id);
       const refusal = resumeRefusal(card, tone, turnOf(dir, chat));
       if (refusal !== null) throw new ApiError(refusal);
+      const ending = busy(dir, id);
+      if (ending !== null) throw new ApiError(ending);
       if (chat === null) throw new ApiError(CHAT_MESSAGES.noSession);
       const stopped = card !== undefined && stoppedIn(card, tone);
       // The session's own checks come first; then the mark is cleared; then the turn is sent.

@@ -3,6 +3,7 @@
  * remote control) gets the fallback below. The UI never talks to Electron any other way.
  */
 import { isRecord } from "@featra/work-format/guards";
+import { httpsLink } from "@featra/work-format/prs";
 import {
   DEFAULT_APP_SETTINGS,
   normalizeAppSettings,
@@ -15,6 +16,7 @@ import {
   type WorkSettings,
 } from "./settings.ts";
 import { noChats, type ChatBridge } from "./chats.ts";
+import { noChecks, type ChecksBridge } from "./checks-bridge.ts";
 import { noInbox, noNotifications, type InboxBridge, type NotificationsBridge } from "./inbox.ts";
 import { noRoles, type RolesBridge } from "./roles-bridge.ts";
 import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
@@ -23,9 +25,11 @@ import { noWork, type WorkBridge } from "./work-list.ts";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 import { normalizePaneWidth } from "./pane-width.ts";
 import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
+import { DEFAULT_WINDOW_STATE, type WindowState } from "./window-state.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
 export * from "./chats.ts";
+export * from "./checks-bridge.ts";
 export * from "./inbox.ts";
 export * from "./project-setup.ts";
 export * from "./projects.ts";
@@ -33,6 +37,7 @@ export * from "./roles-bridge.ts";
 export * from "./server-client.ts";
 export * from "./settings.ts";
 export * from "./work-list.ts";
+export * from "./window-state.ts";
 
 /** Window chrome state that survives a restart. The theme is an app setting (Settings > Appearance), not chrome. */
 export interface UiState {
@@ -57,36 +62,6 @@ export function normalizeUiState(raw: unknown): UiState {
 /** Text-editing commands; the host runs them on whatever field has focus. */
 export type EditCommand = "undo" | "redo" | "cut" | "copy" | "paste" | "delete" | "selectAll";
 export const EDIT_COMMANDS: readonly EditCommand[] = ["undo", "redo", "cut", "copy", "paste", "delete", "selectAll"];
-
-/** Whether the window is maximized or full screen, as the OS has it. Main reports every change, whoever made it. */
-export interface WindowState {
-  maximized: boolean;
-  fullScreen: boolean;
-}
-
-export const DEFAULT_WINDOW_STATE: WindowState = { maximized: false, fullScreen: false };
-
-export function normalizeWindowState(raw: unknown): WindowState {
-  const r = isRecord(raw) ? raw : {};
-  return { maximized: r.maximized === true, fullScreen: r.fullScreen === true };
-}
-
-/**
- * What the title bar's maximize button does. In full screen it leaves full screen, which puts the window back to
- * the size and maximized state it had before; un-maximizing a full-screen window instead shrinks it and the OS
- * snaps it back (BUG-1).
- */
-export function sizeButtonAction(state: WindowState): "leaveFullScreen" | "unmaximize" | "maximize" {
-  if (state.fullScreen) return "leaveFullScreen";
-  return state.maximized ? "unmaximize" : "maximize";
-}
-
-/** The maximize button's label (and tooltip) and icon for the window's state, in the platform's words. */
-export function sizeButtonFor(state: WindowState, platform: string): { label: string; icon: "maximize" | "restore" } {
-  if (state.fullScreen) return { label: "Exit Full Screen", icon: "restore" };
-  if (state.maximized) return { label: platform === "win32" ? "Restore Down" : "Restore", icon: "restore" };
-  return { label: "Maximize", icon: "maximize" };
-}
 
 export interface AppInfo {
   name: string;
@@ -147,6 +122,8 @@ export interface FeatraBridge {
   readonly chats: ChatBridge;
   /** The project's roles and their edits, from the local server (STORY-6). */
   readonly roles: RolesBridge;
+  /** Where checks run and the check commands, from the local server (STORY-56). */
+  readonly checks: ChecksBridge;
   /** The requests waiting on the user past the Inbox wait, from the local server (STORY-7). */
   readonly inbox: InboxBridge;
   /** Desktop notifications for the requests that arrive (STORY-7); the host decides when to show one. */
@@ -158,6 +135,8 @@ export interface FeatraBridge {
     toggleDevTools: () => void;
     /** Shows the main process's log file in the OS file manager. */
     showLogs: () => void;
+    /** Opens an https link (a story's PR) in the OS browser; anything else is ignored. */
+    openExternal: (url: string) => void;
     /** Clears Chromium's HTTP cache, then restarts the app. */
     clearCacheAndRestart: () => void;
     /** Deletes stored state (window chrome, app state, web storage, cache), then restarts. Logs are kept. */
@@ -183,6 +162,7 @@ export const IPC = {
   appReload: "app:reload",
   appToggleDevTools: "app:toggle-devtools",
   appShowLogs: "app:show-logs",
+  appOpenExternal: "app:open-external",
   appClearCacheAndRestart: "app:clear-cache-and-restart",
   appResetAppData: "app:reset-app-data",
   appQuit: "app:quit",
@@ -270,6 +250,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
     work: noWork(NO_FOLDERS),
     chats: noChats(NO_FOLDERS),
     roles: noRoles(NO_FOLDERS),
+    checks: noChecks(NO_FOLDERS),
     inbox: noInbox(),
     notifications: noNotifications(),
     edit: (command) => {
@@ -280,6 +261,10 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
       reload: () => window.location.reload(),
       toggleDevTools() {},
       showLogs() {},
+      openExternal: (url) => {
+        const link = httpsLink(url);
+        if (link) window.open(link, "_blank", "noopener,noreferrer");
+      },
       clearCacheAndRestart() {},
       resetAppData() {},
       quit() {},

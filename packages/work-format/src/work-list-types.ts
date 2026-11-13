@@ -3,6 +3,7 @@
  * the owner copies (ADR 0003). Types and the client-side check only, so the client can import it without the card
  * parser.
  */
+import { normalizePrStatus, type PrStatus } from "./prs-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /** How a status reads at a glance: the colour of its dot and its slice of a bar. */
@@ -40,6 +41,8 @@ export interface StoryRow {
   criteria: Count;
   tasks: Count;
   pr: string | null;
+  /** The PR's state and checks as last read (STORY-11); left out before the first read. */
+  prStatus?: PrStatus;
   /** Who works on it (STORY-9): the card's agent and model, and the chat that is its latest session. Null until started. */
   agent: string | null;
   model: string | null;
@@ -48,6 +51,12 @@ export interface StoryRow {
   reported?: true;
   /** The user stopped its agent (STORY-53): the row shows Stopped and offers Resume. */
   stopped: boolean;
+  /** Waiting in Acceptance for the user (STORY-23): the row, the card and the session offer Accept and Send back. */
+  awaiting: boolean;
+  /** Verified and still in its own worktree (STORY-12): the row, the card and the session offer Merge. */
+  mergeable: boolean;
+  /** Merged into its feature (STORY-12): its session is history, with no Stop or Resume. */
+  merged: boolean;
 }
 
 export interface FeatureRow {
@@ -60,6 +69,11 @@ export interface FeatureRow {
   draftedBy?: string;
   /** A draft an agent made, waiting on the user: the row shows a Review badge. Left out otherwise. */
   review?: true;
+  /**
+   * A feature in progress that Accept applies to, or that is accepted (STORY-14): the row opens its card, where Accept
+   * and Merge to main are. Left out otherwise.
+   */
+  ending?: true;
   tone: Tone;
   filters: WorkFilter[];
   progress: ProgressCount;
@@ -95,6 +109,8 @@ export interface WorkList {
   epics: EpicRow[];
   stale: StaleRow[];
   problems: string[];
+  /** The project bug list (STORY-13): bugs under no feature, which no feature row holds. Left out when there are none. */
+  bugs?: StoryRow[];
 }
 
 export const EMPTY_WORK_LIST: WorkList = { epics: [], stale: [], problems: [] };
@@ -113,6 +129,11 @@ const progress = (raw: unknown): ProgressCount => ({ ...count(raw), label: text(
 const tone = (v: unknown): Tone => (isOneOf(TONES, v) ? v : "idle");
 const bar = (raw: unknown) => list(raw, (s): Segment => ({ tone: tone(s.tone), count: num(s.count) }));
 
+const prStatusOf = (raw: unknown): { prStatus?: PrStatus } => {
+  const prStatus = normalizePrStatus(raw);
+  return prStatus ? { prStatus } : {};
+};
+
 const story = (r: Record<string, unknown>): StoryRow => ({
   id: text(r.id),
   type: r.type === "bug" ? "bug" : "story",
@@ -123,11 +144,15 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   criteria: count(r.criteria),
   tasks: count(r.tasks),
   pr: textOrNull(r.pr),
+  ...prStatusOf(r.prStatus),
   agent: textOrNull(r.agent),
   model: textOrNull(r.model),
   session: textOrNull(r.session),
   ...(r.reported === true ? { reported: true as const } : {}),
   stopped: r.stopped === true,
+  awaiting: r.awaiting === true,
+  mergeable: r.mergeable === true,
+  merged: r.merged === true,
 });
 
 const feature = (r: Record<string, unknown>): FeatureRow => {
@@ -138,6 +163,7 @@ const feature = (r: Record<string, unknown>): FeatureRow => {
     status: textOrNull(r.status),
     draftedBy: typeof r.draftedBy === "string" ? r.draftedBy : undefined,
     review: r.review === true ? true : undefined,
+    ...(r.ending === true ? { ending: true as const } : {}),
     tone: tone(r.tone),
     filters: Array.isArray(r.filters) ? r.filters.filter((f): f is WorkFilter => isOneOf(WORK_FILTERS, f)) : [],
     progress: progress(r.progress),
@@ -166,9 +192,11 @@ const staleRow = (r: Record<string, unknown>): StaleRow => ({
 
 export function normalizeWorkList(raw: unknown): WorkList {
   const r = isRecord(raw) ? raw : {};
+  const bugs = list(r.bugs, story);
   return {
     epics: list(r.epics, epic),
     stale: list(r.stale, staleRow),
     problems: Array.isArray(r.problems) ? r.problems.filter((p): p is string => typeof p === "string") : [],
+    ...(bugs.length ? { bugs } : {}),
   };
 }

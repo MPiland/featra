@@ -11,12 +11,14 @@ import {
   normalizeWorkList,
   type EpicRow,
   type FeatureRow,
+  type StoryRow,
   type WorkFilter,
   type WorkList,
 } from "@featra/work-format/work-list";
 import { CONTAINER_STATUS_LABELS } from "@featra/work-format/card-view";
 import { noCards, serverCards, type CardBridge } from "./card-pane.ts";
 import type { ServerClient } from "./server-client.ts";
+import { noBugs, serverBugs, type BugBridge } from "./bugs.ts";
 
 export type { CopyActionResult, WorkList };
 
@@ -27,13 +29,15 @@ export interface WorkUpdate {
 }
 
 /** The list, the stale-copy actions, and the card pane's card (ADR 0017). */
-export interface WorkBridge extends CardBridge {
+export interface WorkBridge extends CardBridge, BugBridge {
   /** Calls back with the project's list now and on every change; returns the stop. */
   watch: (dir: string, listener: (update: WorkUpdate) => void) => () => void;
   /** Writes a stale copy's edit to the owner's card, then puts the copy back as git has it. */
   applyCopy: (dir: string, key: string) => Promise<CopyActionResult>;
   /** Puts a stale copy back as git has it. */
   discardCopy: (dir: string, key: string) => Promise<CopyActionResult>;
+  /** Asks the server to read every open PR again soon: the window regained focus (STORY-11). */
+  refreshPrs: () => void;
 }
 
 export type ListFilter = "all" | WorkFilter;
@@ -83,12 +87,19 @@ export const WORK_COPY = {
   openSessionOf: (id: string) => `Open the session of ${id}`,
   none: "—",
   epic: "epic",
+  bug: "Bug",
   showStories: (title: string) => `Show stories of ${title}`,
 } as const;
 
 /** How a feature's status reads in the list. */
 export const featureStatusLabel = (status: string | null) =>
   status === null ? WORK_COPY.none : (CONTAINER_STATUS_LABELS[status] ?? status);
+
+/** Every story and bug row in `list`: under features, and on the project bug list (STORY-13). */
+export const storyRows = (list: WorkList): StoryRow[] => [
+  ...list.epics.flatMap((e) => e.features).flatMap((f) => f.stories),
+  ...(list.bugs ?? []),
+];
 
 /** How many features each chip shows. A feature can count under more than one. */
 export function filterCounts(epics: readonly EpicRow[]): Record<ListFilter, number> {
@@ -119,6 +130,7 @@ const copyError = (err: unknown): CopyActionResult => ({ ok: false, error: error
 export function serverWork(server: ServerClient): WorkBridge {
   return {
     ...serverCards(server),
+    ...serverBugs(server),
     watch(dir, listener) {
       let last = EMPTY_WORK_LIST;
       return server.watch(
@@ -135,6 +147,7 @@ export function serverWork(server: ServerClient): WorkBridge {
     },
     applyCopy: (dir, key) => server.call("work.applyCopy", { dir, key }).then(normalizeCopyActionResult, copyError),
     discardCopy: (dir, key) => server.call("work.discardCopy", { dir, key }).then(normalizeCopyActionResult, copyError),
+    refreshPrs: () => void server.call("prs.refresh", {}).catch(() => {}),
   };
 }
 
@@ -142,11 +155,13 @@ export function serverWork(server: ServerClient): WorkBridge {
 export function noWork(error: string): WorkBridge {
   return {
     ...noCards(error),
+    ...noBugs(error),
     watch(_dir, listener) {
       listener({ list: EMPTY_WORK_LIST, error });
       return () => {};
     },
     applyCopy: async () => ({ ok: false, error }),
     discardCopy: async () => ({ ok: false, error }),
+    refreshPrs() {},
   };
 }

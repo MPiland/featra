@@ -21,7 +21,7 @@ export interface ToolResult {
 
 /** Where a tool row's approval stands: waiting on the user, or allowed (by the user, or by an earlier Allow for this chat). */
 export type ToolApproval =
-  | { status: "pending"; forChat: boolean; covers?: string; story?: string; subagent?: string }
+  | { status: "pending"; forChat: boolean; covers?: string; story?: string; subject?: string; subagent?: string }
   | { status: "allowed"; scope: AllowScope };
 
 /** Where a question stands: waiting on the user, or answered with what they chose. */
@@ -148,8 +148,8 @@ const endTools = (state: ChatState, stopped: boolean): ChatState => ({
   ...state,
   items: state.items.map((item) => {
     if (item.kind !== "tool" || item.result !== null || item.denied) return item;
-    // A story session's request shown here belongs to the session's turn, not this one.
-    if (item.approval?.status === "pending" && item.approval.story) return item;
+    // A story session's request shown here belongs to the session's turn, not this one; an app request outlives it too.
+    if (item.approval?.status === "pending" && (item.approval.story || item.approval.subject)) return item;
     const open = unasked(item);
     return stopped ? { ...item, ...open, stopped: true } : { ...item, ...open, cancelled: !item.stopped };
   }),
@@ -176,6 +176,7 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
           forChat: event.forChat,
           ...(event.covers ? { covers: event.covers } : {}),
           ...(event.story ? { story: event.story } : {}),
+          ...(event.subject ? { subject: event.subject } : {}),
           ...(event.subagent ? { subagent: event.subagent } : {}),
         },
       }));

@@ -1,5 +1,9 @@
 // The local server's card side, as a fake: cards held in memory, edited with work-format's own rules.
 import {
+  abandonedStory,
+  abandonRefusal,
+  acceptanceRefusal,
+  acceptedStory,
   applyCardEdit,
   notStartableReason,
   notSpawnableReason,
@@ -10,26 +14,70 @@ import {
   buildWorkList,
   DEFAULT_CONFIG,
   draftStories,
+  type FeatureMergeState,
+  isMerged,
   isStopped,
   MAIN,
+  mergedStory,
+  mergeRefusal,
   planApproval,
   resumedStory,
   resumeRefusal,
+  sentBackStory,
   stageTone,
   stopRefusal,
   stoppedStory,
   type StoryTurn,
   type Card,
+  type CardChecks,
+  withPrStatus,
+  type CardPr,
   type CardView,
   type OwnedCard,
+  type OwnerLocation,
   type WorkList,
 } from "@featra/work-format";
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
+import { featureEndFakes, type FeatureActions } from "./card-server-features.ts";
+
+/** The card actions a test can set the server's answer to; each left out, the fake does what the server does. */
+export type ReviewAnswers = Partial<
+  Pick<
+    CardBridge,
+    | "approve"
+    | "reject"
+    | "start"
+    | "startStory"
+    | "stopStory"
+    | "resumeStory"
+    | "acceptStory"
+    | "sendBackStory"
+    | "rerunChecks"
+    | "createPr"
+    | "mergeStory"
+    | "abandonCheck"
+    | "abandonStory"
+    | FeatureActions
+  >
+>;
 
 /** The time the fake server stamps on a card edit. */
 export const EDIT_AT = "2026-11-05T12:00:00Z";
 
-const owned = (card: Card): OwnedCard => ({ card, owner: MAIN, shownFrom: MAIN, path: `.featra/cards/${card.id}.md` });
+/**
+ * Where a card lives, as the server resolves it (ADR 0002): a started story in its worktree until it merges, then on
+ * its feature branch (STORY-12); everything else on main. Every location is checked out here.
+ */
+function ownerOf(card: Card): OwnerLocation {
+  if (!card.branch) return MAIN;
+  if (isMerged(card)) return { kind: "feature", branch: featureBranch(card) };
+  return { kind: "worktree", branch: card.branch, path: `/worktrees/${card.id}` };
+}
+const featureBranch = (story: Card) => `feature/${story.parent ?? ""}`;
+const owned = (card: Card): OwnedCard => {
+  const owner = ownerOf(card);
+  return { card, owner, shownFrom: owner, path: `.featra/cards/${card.id}.md` };
+};
 const replace = (cards: Card[], card: Card) => cards.map((c) => (c.id === card.id ? card : c));
 
 /**
@@ -43,7 +91,7 @@ export function fakeCardServer(
   /** What the server answers to Send back. */
   sendBack: CardBridge["sendBack"] = async () => ({ ok: true, recorded: true }),
   /** What the server answers to Approve and Reject; left out, the fake does what the server does to the cards. */
-  review: Partial<Pick<CardBridge, "approve" | "reject" | "start" | "startStory" | "stopStory" | "resumeStory">> = {},
+  review: ReviewAnswers = {},
   /** The chat the server starts for a story, and whether it waits for a slot: what a Start makes besides the card change. */
   storySession: (dir: string, story: Card, feature: Card) => { chat: string; queued: boolean } = () => ({
     chat: "story-chat",
@@ -54,17 +102,34 @@ export function fakeCardServer(
     turn: () => ({ running: false, queued: false, stalled: false }),
     drop: () => {},
   },
+  /** What the server's checks say about a story's card: absent when CI runs them. */
+  checksOf: (dir: string, id: string) => CardChecks | undefined = () => undefined,
+  /** What the server knows of a story's PR (STORY-11): on its card, and its state on the story's Work row. */
+  prOf: (dir: string, id: string) => CardPr | undefined = () => undefined,
+  /** Whether the server finds an accepted feature can merge to main now, and why not (STORY-14). */
+  mergeOf: (dir: string, id: string) => FeatureMergeState | undefined = () => undefined,
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
   const viewOf = (dir: string, id: string): CardView | null => {
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
-    return card ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }) : null;
+    return card
+      ? buildCardView(
+          owned(card),
+          true,
+          { config: DEFAULT_CONFIG, cards },
+          checksOf(dir, id),
+          prOf(dir, id),
+          mergeOf(dir, id),
+        )
+      : null;
   };
   const listOf = (dir: string): WorkList | null => {
     const cards = cardSets.get(dir);
-    return cards ? buildWorkList({ cards: cards.map(owned), stale: [], problems: [] }, DEFAULT_CONFIG) : null;
+    if (!cards) return null;
+    const list = buildWorkList({ cards: cards.map(owned), stale: [], problems: [] }, DEFAULT_CONFIG);
+    return withPrStatus(list, (id) => prOf(dir, id)?.status ?? undefined);
   };
   /** The server sees the folder's cards change: it pushes the list and each watched card. */
   const changed = (dir: string, card: Card) => {
@@ -199,6 +264,68 @@ export function fakeCardServer(
       // Only a Stopped story has a mark to clear; an idle session that ended without finishing just goes on.
       if (isStopped(card)) changed(dir, resumedStory(card, "user", EDIT_AT));
       return { ok: true };
+    },
+    // Accept and Send back are the server's to prove (the lane, the session): the fake records the call and applies
+    // work-format's rules to the card, as the server does.
+    acceptStory: async (dir, id) => {
+      calls.push(`acceptStory:${dir}:${id}`);
+      if (review.acceptStory) return review.acceptStory(dir, id);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = acceptanceRefusal(card, id, DEFAULT_CONFIG);
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      changed(dir, acceptedStory(card, DEFAULT_CONFIG, "user", EDIT_AT));
+      return { ok: true };
+    },
+    sendBackStory: async (dir, id, reason, addCriterion) => {
+      calls.push(`sendBackStory:${dir}:${id}:${reason}:${addCriterion}`);
+      if (review.sendBackStory) return review.sendBackStory(dir, id, reason, addCriterion);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = acceptanceRefusal(card, id, DEFAULT_CONFIG);
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      changed(dir, sentBackStory(card, DEFAULT_CONFIG, reason, addCriterion, "user", EDIT_AT));
+      return { ok: true, recorded: true };
+    },
+    // Re-run is the server's to prove (the run, the lane): the fake records the call.
+    rerunChecks: async (dir, id) => {
+      calls.push(`rerunChecks:${dir}:${id}`);
+      return review.rerunChecks ? review.rerunChecks(dir, id) : { ok: true };
+    },
+    // Create PR is the server's to prove (git, gh, the lane): the fake records the call.
+    createPr: async (dir, id) => {
+      calls.push(`createPr:${dir}:${id}`);
+      return review.createPr ? review.createPr(dir, id) : { ok: true };
+    },
+    // Merging is the server's to prove (git, gh, the worktree): the fake refuses with work-format's rule, as the server
+    // does for a card main owns, unless the test sets the answer.
+    mergeStory: async (dir, id) => {
+      calls.push(`mergeStory:${dir}:${id}`);
+      if (review.mergeStory) return review.mergeStory(dir, id);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = mergeRefusal(card && owned(card), id, DEFAULT_CONFIG, true);
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      changed(dir, mergedStory(card, featureBranch(card), "system", EDIT_AT));
+      return { ok: true, remains: [] };
+    },
+    ...featureEndFakes({ cardsIn: (dir) => cardSets.get(dir) ?? [], changed, calls, review, at: EDIT_AT }),
+    // Abandoning is the server's to prove (the session, git, gh): the fake refuses with work-format's rule and, unless
+    // a test sets the answer, warns of nothing but the card, then keeps it as Cancelled or deletes it.
+    abandonCheck: async (dir, id) => {
+      calls.push(`abandonCheck:${dir}:${id}`);
+      if (review.abandonCheck) return review.abandonCheck(dir, id);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = abandonRefusal(card && owned(card), id, DEFAULT_CONFIG, true);
+      if (why !== null) return { ok: false, error: why };
+      return { ok: true, warning: { files: [], unpushed: [], pr: null, branch: null, remotes: [], token: "t" } };
+    },
+    abandonStory: async (dir, id, keep, token) => {
+      calls.push(`abandonStory:${dir}:${id}:${keep}:${token}`);
+      if (review.abandonStory) return review.abandonStory(dir, id, keep, token);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = abandonRefusal(card && owned(card), id, DEFAULT_CONFIG, true);
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      if (keep) changed(dir, abandonedStory(card, "user", EDIT_AT));
+      else removed(dir, [id]);
+      return { ok: true, remains: [] };
     },
     reject: async (dir, id) => {
       calls.push(`reject:${dir}:${id}`);

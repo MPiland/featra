@@ -2,11 +2,17 @@
  * The card pane's shapes (ADR 0017): a card as the pane shows it, and the one-field edits the pane sends. Types and
  * the checks for data that crosses the socket only, so the client can import it without the card parser.
  */
+import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
+import { normalizeCardPr, type CardPr } from "./prs-types.ts";
+import { normalizeFeatureEnd, type CardFeatureEnd } from "./feature-end-copy.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
-/** What is known about an AC's proof: its linked test passed, a test is linked but hasn't passed, or none is. */
-export type AcProof = "passed" | "linked" | "none";
-const AC_PROOFS: readonly AcProof[] = ["passed", "linked", "none"];
+/**
+ * What is known about an AC's proof: its linked test passed or failed, CI's report doesn't have it (STORY-57), a test
+ * is linked but hasn't run, or none is.
+ */
+export type AcProof = "passed" | "failed" | "missing" | "linked" | "none";
+const AC_PROOFS: readonly AcProof[] = ["passed", "failed", "missing", "linked", "none"];
 
 export interface CardViewAc {
   text: string;
@@ -66,8 +72,22 @@ export interface CardView {
   draftChat?: string;
   /** With `draftChat`: every story under the draft, Cancelled ones too. Reject deletes all of them (STORY-51). */
   draftStories?: number;
+  /** A story's checks on this computer (STORY-56): running, the last result and its output; absent when CI runs them. */
+  checks?: CardChecks;
+  /** A story's PR (STORY-11): its state and checks, and Create PR; absent when GitHub isn't usable for the project. */
+  prState?: CardPr;
+  /** True on a story waiting in Acceptance, which Accept and Send back apply to (STORY-23); absent otherwise. */
+  awaiting?: true;
   /** True on an approved feature, which Start can give its branch (STORY-52); absent otherwise. */
   startable?: true;
+  /** True on a Verified story in its own worktree, which Merge can merge into its feature (STORY-12); absent otherwise. */
+  mergeable?: true;
+  /** True on a story that isn't merged or done, which Abandon can end (STORY-58); absent otherwise. */
+  abandonable?: true;
+  /** A feature in progress: its Accept and Merge to main (STORY-14); absent otherwise. */
+  featureEnd?: CardFeatureEnd;
+  /** True on a story merged into its feature (STORY-12); absent otherwise. */
+  merged?: true;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -140,7 +160,30 @@ export function sendBackParams(params: unknown): { dir: string; id: string; reas
   return p && isRecord(params) && typeof params.reason === "string" ? { ...p, reason: params.reason } : null;
 }
 
+/** The `{ dir, id, reason, addCriterion }` params of `story.sendBack`, or null. An empty reason is the method's to refuse. */
+export function storySendBackParams(
+  params: unknown,
+): { dir: string; id: string; reason: string; addCriterion: boolean } | null {
+  const p = sendBackParams(params);
+  return p && isRecord(params) ? { ...p, addCriterion: params.addCriterion === true } : null;
+}
+
 const option = (r: Record<string, unknown>): CardOption => ({ value: textOrNull(r.value), label: text(r.label) });
+
+const checksOf = (raw: unknown): { checks?: CardChecks } => {
+  const checks = normalizeCardChecks(raw);
+  return checks ? { checks } : {};
+};
+
+const featureEndOf = (raw: unknown): { featureEnd?: CardFeatureEnd } => {
+  const featureEnd = normalizeFeatureEnd(raw);
+  return featureEnd ? { featureEnd } : {};
+};
+
+const prOf = (raw: unknown): { prState?: CardPr } => {
+  const prState = normalizeCardPr(raw);
+  return prState ? { prState } : {};
+};
 
 /** A view from the socket, read defensively; null when there is no card. */
 export function normalizeCardView(raw: unknown): CardView | null {
@@ -175,7 +218,14 @@ export function normalizeCardView(raw: unknown): CardView | null {
     readOnly: textOrNull(raw.readOnly),
     ...(typeof raw.draftChat === "string" && raw.draftChat ? { draftChat: raw.draftChat } : {}),
     ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
+    ...checksOf(raw.checks),
+    ...prOf(raw.prState),
+    ...featureEndOf(raw.featureEnd),
+    ...(raw.awaiting === true ? { awaiting: true as const } : {}),
     ...(raw.startable === true ? { startable: true as const } : {}),
+    ...(raw.mergeable === true ? { mergeable: true as const } : {}),
+    ...(raw.abandonable === true ? { abandonable: true as const } : {}),
+    ...(raw.merged === true ? { merged: true as const } : {}),
   };
 }
 

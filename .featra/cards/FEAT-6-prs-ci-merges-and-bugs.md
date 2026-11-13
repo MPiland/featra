@@ -2,7 +2,7 @@
 id: FEAT-6
 type: feature
 title: PRs, CI, merges and bugs
-status: approved
+status: done
 parent: EPIC-1
 order: 8
 origin: planned
@@ -12,6 +12,21 @@ history:
     field: status
     from: null
     to: approved
+    by: user
+  - at: 2026-11-12T13:27:00Z
+    field: status
+    from: approved
+    to: active
+    by: dev-lead
+  - at: 2026-11-13T14:24:13Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-13T14:24:13Z
+    field: status
+    from: active
+    to: done
     by: user
 ---
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { canResume } from "@featra/work-format";
-import type { WorkBridge } from "../../work-list.ts";
+import { storyRows, type WorkBridge } from "../../work-list.ts";
 import { useWorkList } from "../work/useWorkList.ts";
 import type { ChatViewProps } from "./ChatView.tsx";
 
@@ -18,15 +18,16 @@ export function useStoryTurn(work: WorkBridge, { chats, chat, dir }: Pick<ChatVi
       setSummary({ queued: mine?.queued === true, stalled: mine?.stalled === true });
     });
   }, [chats, dir, chat.id, story]);
-  const row = useWorkList(work, story === null ? null : dir)
-    ?.list.epics.flatMap((e) => e.features)
-    .flatMap((f) => f.stories)
-    .find((s) => s.id === story);
+  const update = useWorkList(work, story === null ? null : dir);
+  const row = update ? storyRows(update.list).find((s) => s.id === story) : undefined;
   if (story === null) return undefined;
   const stopped = row?.stopped === true;
   return {
     stopped,
-    resumable: row !== undefined && canResume(stopped, summary.stalled, row.tone),
+    // A merged story's session is history: nothing resumes it (STORY-12).
+    resumable: row !== undefined && !row.merged && canResume(stopped, summary.stalled, row.tone),
     queued: summary.queued,
+    awaiting: row?.awaiting === true,
+    mergeable: row?.mergeable === true,
   };
 }

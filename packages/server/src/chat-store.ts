@@ -3,6 +3,7 @@
  * A restored chat's transcript is read back from its provider's own session, through the adapter.
  */
 import {
+  CHAT_MESSAGES,
   errorMessage,
   normalizeSavedChats,
   type ChatEvent,
@@ -77,6 +78,13 @@ export async function savedHistory(
   } catch (err) {
     return { events: [{ type: "problem", problem: { type: "failed", message: errorMessage(err) } }], gone: false };
   }
+}
+
+/** Why a restored chat can't go on: its session is gone, or its provider or role isn't there; null when it can. */
+export function loadRefusal(gone: boolean, adapter: ProviderAdapter | undefined, role: unknown): string | null {
+  if (gone) return CHAT_MESSAGES.gone;
+  if (!adapter) return CHAT_MESSAGES.noProvider;
+  return role ? null : CHAT_MESSAGES.unknownRole;
 }
 
 /** The history carries no window: the last one the chat reported stands in for it. */

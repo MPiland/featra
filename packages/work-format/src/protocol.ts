@@ -4,8 +4,11 @@
  * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
  */
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
+import type { AbandonWarning } from "./abandon-copy.ts";
 import type { ApprovalChoice } from "./approvals.ts";
+import type { BugPlacements } from "./bug-copy.ts";
 import type { Answers } from "./questions.ts";
+import type { ChecksPatch, ChecksView } from "./checks-types.ts";
 import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
@@ -14,6 +17,7 @@ import type { Role } from "./roles.ts";
 import type { RoleEdit, RoleEditResult, RoleList } from "./role-edit.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
+import { isId } from "./protocol-frames.ts";
 import type { WorkList } from "./work-list-types.ts";
 
 /** Only loopback, always: the server must not be reachable from another machine (docs/architecture.md). */
@@ -93,6 +97,83 @@ export interface ServerMethods {
    * session goes on and Stopped is cleared. Refused when its provider can't resume.
    */
   "story.resume": { params: { dir: string; id: string }; result: null };
+  /**
+   * Accepts a story waiting in Acceptance (STORY-23): records Accepted in its history, by the user, and moves it to Done
+   * when its evidence allows. Refused when the story isn't waiting in Acceptance or is already accepted.
+   */
+  "story.accept": { params: { dir: string; id: string }; result: null };
+  /**
+   * Merges a Verified story into its feature branch with a merge commit (STORY-12): through its PR when the project uses
+   * GitHub, else in git. Afterwards its session stops, and its worktree and branches go. Refused with why when it can't
+   * merge; a conflict merges nothing, returns the story to In Progress and is refused with the files. `remains` says
+   * what was left behind (a worktree or branch that couldn't be removed); empty when it all went.
+   */
+  "story.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
+  /**
+   * What abandoning a story would lose (STORY-58): its uncommitted files, commits no remote has, the open PR it closes,
+   * and the branch it removes. Refused with why when it can't be abandoned.
+   */
+  "story.abandonCheck": { params: { dir: string; id: string }; result: AbandonWarning };
+  /**
+   * Abandons a story the user confirmed (STORY-58): its session stops, its PR closes, and its worktree and its local and
+   * remote branches go; its card is kept as Cancelled (`keep`) or deleted. Refused when the story no longer matches the
+   * warning's `token`. `remains` says what was left behind; empty when it all went.
+   */
+  "story.abandon": {
+    params: { dir: string; id: string; keep: boolean; token: string };
+    result: { remains: string[] };
+  };
+  /**
+   * Runs a story's checks on this computer again now (STORY-56): the check command and the linked tests. Refused when
+   * checks run in CI for the project or the story isn't in review. The result reaches the card through `card.view`.
+   */
+  "story.rerunChecks": { params: { dir: string; id: string }; result: null };
+  /**
+   * Accepts a feature in progress once every story and bug under it is Done or Cancelled (STORY-14): with "Open feature
+   * PRs automatically" on and GitHub usable, its branch is pushed and its PR to the base opened first. The user's only.
+   */
+  "feature.accept": { params: { dir: string; id: string }; result: null };
+  /** Pushes an accepted feature's branch and opens (or adopts) its PR to the base (STORY-14). Refused in local mode. */
+  "feature.createPr": { params: { dir: string; id: string }; result: null };
+  /** Runs an accepted feature's checks on this computer again, at the commit its branch is at (STORY-14). */
+  "feature.rerunChecks": { params: { dir: string; id: string }; result: null };
+  /**
+   * Merges an accepted feature into the base with a merge commit (STORY-14): through its PR when the project uses
+   * GitHub, else in git. Refused with why while something stops it. The feature is then Done and the base owns its
+   * cards; `remains` says what was left to do.
+   */
+  "feature.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
+  /** Where a bug believed to come from `cause` (or null) would go (STORY-13): the proposal and every place it can go. */
+  "bug.propose": { params: { dir: string; cause: string | null }; result: BugPlacements };
+  /**
+   * Files a bug where the user placed it (STORY-13): a new bug card under a feature in progress or on the project bug
+   * list, or a task on a story being worked. Refused when that place can't take it now. `id` is the card it changed.
+   */
+  "bug.file": {
+    params: { dir: string; title: string; description: string; cause: string | null; placement: string };
+    result: { kind: "card" | "task"; id: string };
+  };
+  /**
+   * Pushes a story's branch and opens its PR against the feature branch through the user's `gh` (STORY-11), or adopts
+   * the open PR from that branch. Refused in local mode, outside review, or when the story has a PR; a push or `gh`
+   * failure is refused with its reason, which the card also shows.
+   */
+  "story.createPr": { params: { dir: string; id: string }; result: null };
+  /** The window regained focus: every open project reads its open PRs again soon (STORY-11). */
+  "prs.refresh": { params: Record<string, never>; result: null };
+  /** Project settings' Checks section: where checks run, the commands, and the proposals waiting for the user (STORY-56). */
+  "checks.load": { params: { dir: string }; result: ChecksView };
+  /** Changes the Checks settings in the project's config (`null` clears one); answers with the section as it is after. */
+  "checks.set": { params: { dir: string; patch: ChecksPatch }; result: ChecksView };
+  /**
+   * Sends a story in Acceptance back to its session with the user's reason, as the user's message (STORY-23): logged in
+   * history, the story In Progress again, and with `addCriterion` the reason a new acceptance criterion. Refused
+   * without a reason, when the story isn't waiting in Acceptance, or when its session is gone.
+   */
+  "story.sendBack": {
+    params: { dir: string; id: string; reason: string; addCriterion: boolean };
+    result: { recorded: boolean };
+  };
   /** Rejects a draft feature: deletes its card files. Refused when git tracks any of them. */
   "draft.reject": { params: { dir: string; id: string }; result: { removed: number } };
   /** The roles a chat in this project can start from (ADR 0018). */
@@ -126,7 +207,7 @@ export interface ServerMethods {
    * reason the agent is sent. Refused when the request isn't waiting.
    */
   "chat.approve": {
-    params: { id: string; tool: string; choice: ApprovalChoice; reason?: string };
+    params: { id: string; tool: string; choice: ApprovalChoice; reason?: string; option?: string };
     result: null;
   };
   /**
@@ -175,105 +256,6 @@ export interface ServerPushes {
   "inbox.asked": InboxItem;
 }
 
-export type PushEvent = keyof ServerPushes;
-const PUSH_EVENTS: readonly PushEvent[] = [
-  "work.list",
-  "card.view",
-  "chat.event",
-  "chat.list",
-  "roles.list",
-  "inbox.list",
-  "inbox.asked",
-];
-
-/**
- * A pushed frame: `{ event, watch, data }`. It never has an `id`, so neither end can take it for an answer, and a
- * client that doesn't know the event ignores it.
- */
-export interface ServerPush {
-  event: PushEvent;
-  watch: number;
-  data: unknown;
-}
-
-export type ServerMethod = keyof ServerMethods;
-export const SERVER_METHODS: readonly ServerMethod[] = [
-  "project.setupStatus",
-  "project.gitInit",
-  "project.init",
-  "project.setupPlan",
-  "project.setup",
-  "work.watch",
-  "work.unwatch",
-  "work.applyCopy",
-  "work.discardCopy",
-  "card.watch",
-  "card.update",
-  "draft.sendBack",
-  "draft.approve",
-  "feature.start",
-  "story.start",
-  "story.stop",
-  "story.resume",
-  "draft.reject",
-  "chat.roles",
-  "roles.watch",
-  "roles.edit",
-  "chat.start",
-  "chat.watch",
-  "chat.controls",
-  "chat.configure",
-  "chat.send",
-  "chat.stop",
-  "chat.archive",
-  "chat.approve",
-  "chat.answer",
-  "chat.undoLog",
-  "chat.list",
-  "inbox.watch",
-  "inbox.asked",
-];
-
-export interface ServerRequest {
-  id: number;
-  method: ServerMethod;
-  params: unknown;
-}
-
-export type ServerResponse = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
-
-const json = (text: string): unknown => {
-  try {
-    return JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-};
-
-const isId = (id: unknown): id is number => typeof id === "number" && Number.isSafeInteger(id);
-
-/** A request frame, or why it can't be answered (`id` is null when even that can't be read). */
-export function parseRequest(text: string): ServerRequest | { id: number | null; error: string } {
-  const raw = json(text);
-  if (!isRecord(raw) || !isId(raw.id)) return { id: null, error: "Malformed request." };
-  if (!isOneOf(SERVER_METHODS, raw.method)) return { id: raw.id, error: "Unknown method." };
-  return { id: raw.id, method: raw.method, params: raw.params };
-}
-
-export function parseResponse(text: string): ServerResponse | null {
-  const raw = json(text);
-  if (!isRecord(raw) || !isId(raw.id)) return null;
-  if (raw.ok === true) return { id: raw.id, ok: true, result: raw.result };
-  return { id: raw.id, ok: false, error: typeof raw.error === "string" && raw.error ? raw.error : "Request failed." };
-}
-
-/** A pushed frame, or null for anything else (an answer has an `id`; a push never does). */
-export function parsePush(text: string): ServerPush | null {
-  const raw = json(text);
-  if (!isRecord(raw) || "id" in raw || !isOneOf(PUSH_EVENTS, raw.event) || !isId(raw.watch)) return null;
-  return { event: raw.event, watch: raw.watch, data: raw.data };
-}
-
 /** The `{ dir }` params every project method takes, or null. */
 export function dirParams(params: unknown): { dir: string } | null {
   return isRecord(params) && typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
@@ -300,3 +282,16 @@ export function normalizeInitResult(raw: unknown): InitResult {
 export function unwatchParams(params: unknown): { watch: number } | null {
   return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
 }
+
+// The framing lives in protocol-frames.ts; it is part of this module's surface.
+export {
+  parsePush,
+  parseRequest,
+  parseResponse,
+  SERVER_METHODS,
+  type PushEvent,
+  type ServerMethod,
+  type ServerPush,
+  type ServerRequest,
+  type ServerResponse,
+} from "./protocol-frames.ts";

@@ -25,6 +25,8 @@ export interface WorktreeInfo {
 
 export interface BranchInfo {
   name: string;
+  /** The commit the branch is at. */
+  head: string;
   /** Whether the tip is in the base branch (`git for-each-ref --merged`). */
   inBase: boolean;
 }
@@ -58,6 +60,11 @@ export interface RepoGit {
   committedCards: (top: string, revs: readonly string[], cache: BlobCache) => Promise<Map<string, CommittedFile[]>>;
   /** Puts `path` back as HEAD has it in the working tree at `root`, or removes it when HEAD has none. */
   restore: (root: string, path: string, inHead: boolean) => Promise<void>;
+  /**
+   * Whether `rev` or a commit before it had a card file of `id` (STORY-58). A card its owner lacks but once had was
+   * deleted there. False when `rev` doesn't resolve.
+   */
+  hadCard: (top: string, rev: string, id: string) => Promise<boolean>;
 }
 
 const NO_COMMIT = /^0+$/;
@@ -103,13 +110,17 @@ export function createRepoGit(command = "git"): RepoGit {
     async branches(top, base) {
       // Side by side: each git start adds to every scan, about 200 ms apiece on Windows under load (BUG-5).
       const [listed, merged] = await Promise.all([
-        ok(top, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]),
+        ok(top, ["for-each-ref", "--format=%(objectname) %(refname:short)", "refs/heads"]),
         run(top, ["for-each-ref", `--merged=refs/heads/${base}`, "--format=%(refname:short)", "refs/heads"]),
       ]);
-      const all = listed.split("\n");
+      const all = listed.split("\n").filter(Boolean);
       // No base branch yet (no commits): nothing is in it.
       const inBase = new Set(merged.code === 0 ? merged.stdout.split("\n") : []);
-      return all.filter(Boolean).map((name) => ({ name, inBase: inBase.has(name) }));
+      return all.map((line) => {
+        const [head = "", ...rest] = line.split(" ");
+        const name = rest.join(" ");
+        return { name, head, inBase: inBase.has(name) };
+      });
     },
     async defaultBranch(top) {
       const listed = await run(top, ["for-each-ref", "--format=%(refname:short)", "refs/heads"]);
@@ -151,6 +162,11 @@ export function createRepoGit(command = "git"): RepoGit {
       } finally {
         await batch.close();
       }
+    },
+    async hadCard(top, rev, id) {
+      const files = [`:(glob)${CARDS_DIR}/${id}.md`, `:(glob)${CARDS_DIR}/${id}-*.md`];
+      const r = await run(top, ["log", "-1", "--format=%H", rev, "--", ...files]);
+      return r.code === 0 && r.stdout.trim() !== "";
     },
     async restore(root, path, inHead) {
       if (inHead) {

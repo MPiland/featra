@@ -5,6 +5,8 @@ import type { ProjectSettings, SettingsSnapshot, WorkSettingKey, WorkSettings } 
 import { SETUP_PAGE_COPY } from "../../setup-page.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
 import { PageHeader } from "./PageHeader.tsx";
+import { ProjectChecks } from "./ProjectChecks.tsx";
+import { ProjectPrs } from "./ProjectPrs.tsx";
 import { ProjectWorkGroups } from "./ProjectWorkGroups.tsx";
 
 export interface ProjectPageProps {
@@ -92,6 +94,8 @@ export function ProjectPage({ bridge, snapshot, projects, title, onSetUp }: Proj
         disabled={!project || project.error !== null}
         onSet={(key, value) => void (value === null ? reset(key) : set(key, value))}
       />
+      <ProjectChecks checks={bridge.checks} dir={dir} />
+      <ProjectPrs checks={bridge.checks} dir={dir} />
     </div>
   );
 }

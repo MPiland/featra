@@ -31,6 +31,15 @@ export function recordEvidence(card: Card, to: string, by: string, at: string): 
   return change(card, "evidence", null, to, by, at);
 }
 
+/** Records the story's PR (STORY-11): its URL, by `system`. A no-op when it is the same one. */
+export function setPr(card: Card, to: string, by: string, at: string): Card {
+  if (card.pr === to) return card;
+  return { ...change(card, "pr", card.pr, to, by, at), pr: to };
+}
+
+/** Whether the card's history records the story's merge into its feature branch (STORY-12). */
+export const isMerged = (card: Pick<Card, "history">): boolean => card.history.some((e) => e.field === "merged");
+
 /** Records the user's Accept (or its withdrawal). */
 export function recordAcceptance(card: Card, accepted: boolean, by: string, at: string): Card {
   return change(card, "accepted", null, accepted ? "accepted" : "withdrawn", by, at);
@@ -41,11 +50,19 @@ export function recordSentBack(card: Card, reason: string, by: string, at: strin
   return change(card, "sent-back", null, reason.trim(), by, at);
 }
 
-/** What the drafting chat is told when its draft is sent back: short, and naming the feature it refers to. */
 /** The longest reason a send-back takes, in characters. */
 export const SEND_BACK_MAX = 2000;
 
-export const sendBackMessage = (feature: string, reason: string): string => `Sent back ${feature}: ${reason.trim()}`;
+/** What a send-back refuses with, for a draft and for a story alike (STORY-50, STORY-23). */
+export const SEND_BACK_REFUSALS = {
+  noReason: "Say why you're sending it back.",
+  tooLong: `Keep it under ${SEND_BACK_MAX.toLocaleString("en-US")} characters.`,
+  gone: "That card is gone.",
+  readOnly: "Can't edit it here.",
+} as const;
+
+/** What the chat is told when a draft feature or a story is sent back: short, and naming the card it refers to. */
+export const sendBackMessage = (card: string, reason: string): string => `Sent back ${card}: ${reason.trim()}`;
 
 const ms = (iso: string) => Date.parse(iso);
 

@@ -7,6 +7,9 @@ import { ComposerControls } from "./ComposerControls.tsx";
 import { ContextMeter } from "./ContextMeter.tsx";
 import { useChatControls } from "./use-chat-controls.ts";
 import { Transcript } from "./Transcript.tsx";
+import type { AcceptActions } from "../../card-pane.ts";
+import { AcceptStory } from "../work/AcceptStory.tsx";
+import { MergeStory, type MergeAction } from "../work/MergeStory.tsx";
 import { StoryStop, type StopActions, type StopState } from "../work/StoryStop.tsx";
 
 /** The chat the user opened: its id and the role it started from. */
@@ -29,7 +32,16 @@ export interface ChatViewProps {
   /** What the header offers beside the chat's settings (STORY-49: Review draft). */
   headerExtra?: ReactNode;
   /** A story session's Stop and Resume, and whether its story is Stopped (STORY-53). */
-  story?: Omit<StopState, "active"> & { queued: boolean; actions: StopActions };
+  story?: Omit<StopState, "active"> & {
+    queued: boolean;
+    actions: StopActions;
+    /** The story waits in Acceptance: Accept and Send back are offered at the end of the chat (STORY-23). */
+    awaiting: boolean;
+    acceptance: AcceptActions;
+    /** The story is Verified and can merge: Merge is offered beside Accept (STORY-12). */
+    mergeable: boolean;
+    merge: MergeAction;
+  };
 }
 
 /** One chat: the role it runs as, its transcript, and the composer. A chat whose history is gone offers a new one. */
@@ -104,6 +116,12 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
           onUndoLog: (entry) => chats.undoLog(chat.id, entry),
         }}
       />
+      {chat.story && story && (
+        <div className="chat-accept">
+          {story.awaiting && <AcceptStory id={chat.story} actions={story.acceptance} />}
+          <MergeStory id={chat.story} mergeable={story.mergeable} merge={story.merge} />
+        </div>
+      )}
       {readOnly && (
         <p className="chat-note" role="note">
           {chat.subagent ? CHAT_COPY.watchingSubagent : CHAT_COPY.watching}

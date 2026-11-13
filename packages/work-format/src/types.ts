@@ -19,7 +19,9 @@ export type HistoryField =
   | "sent-back"
   | "stopped"
   | "queued"
-  | "report";
+  | "report"
+  | "pr"
+  | "merged";
 export const HISTORY_FIELDS: readonly HistoryField[] = [
   "status",
   "parent",
@@ -30,6 +32,8 @@ export const HISTORY_FIELDS: readonly HistoryField[] = [
   "report",
   "stopped",
   "queued",
+  "pr",
+  "merged",
 ];
 
 /** Append-only record of a change, written at the card's owner (ADR 0002). */
@@ -109,4 +113,23 @@ export interface ProjectConfig {
   knowledge: KnowledgePermission;
   /** The most story sessions that run at once (STORY-9); the rest wait, Queued. */
   maxStoryAgents: number;
+  /** Where checks run (STORY-56); null until the user chooses, when the default applies (`defaultChecksWhere`). */
+  checksWhere: "ci" | "local" | null;
+  /** The command that runs the project's checks on this computer; null until the user confirms one. */
+  checkCommand: string | null;
+  /** The template that runs one linked test, with `{file}`, `{name}` and `{namePattern}`; null until confirmed. */
+  linkedTestCommand: string | null;
+  /** Whether a story's PR is opened when it moves to review (STORY-11); off, the card offers Create PR. */
+  openStoryPrs: boolean;
+  /** Whether an accepted feature's PR to main is opened (STORY-14); off, the feature offers Create PR. */
+  openFeaturePrs: boolean;
+  /** How often open PRs are read again, in minutes (STORY-11). */
+  prRefreshMinutes: number;
+  /**
+   * The workflow artifact CI uploads its JUnit report in (STORY-57), a name or a pattern such as `test-report-*`. Null
+   * until set, and Proven from CI is off until then.
+   */
+  testReportArtifact: string | null;
+  /** The report files inside the artifact, a glob; null reads every `.xml` file in it. */
+  testReportFiles: string | null;
 }

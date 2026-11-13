@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import type { FeatureRow, StoryRow, Tone } from "@featra/work-format/work-list";
 import { featureStatusLabel, WORK_COPY } from "../../work-list.ts";
-import { ChevronRightIcon } from "../icons.tsx";
+import { BugIcon, ChevronRightIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
-import { StoryAgent } from "./story-agents.tsx";
+import { MERGE_COPY } from "@featra/work-format/merge-copy";
+import { AcceptStory } from "./AcceptStory.tsx";
+import { MergeStory } from "./MergeStory.tsx";
+import { PrChip } from "./PrChip.tsx";
+import { StoryAgent, StoryAgentsContext } from "./story-agents.tsx";
 
 const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
 
@@ -36,34 +40,55 @@ function Scope({ added, openBugs }: FeatureRow["scope"]) {
   return <>{parts.flatMap((p, i) => (i ? [" · ", p] : [p]))}</>;
 }
 
-function Story({ story }: { story: StoryRow }) {
+/** A story or bug row on the shared grid; a bug shows the bug icon (STORY-13). */
+export function Story({ story }: { story: StoryRow }) {
   const { selected, paneId, open } = useCardSelection();
   const shown = selected === story.id;
+  const agents = useContext(StoryAgentsContext);
+  // Send back's form opens below the row, across its width, not in the name cell.
+  const [below, setBelow] = useState<HTMLElement | null>(null);
   return (
-    <div className={shown ? "prow shown" : "prow"} role="row" data-card={story.id}>
-      <span aria-hidden="true" />
-      <span role="cell" className="pn">
-        <button
-          type="button"
-          className="row-open"
-          aria-expanded={shown}
-          aria-controls={shown ? paneId : undefined}
-          onClick={() => open(story.id)}
-        >
-          {story.title}
-        </button>
-        {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
-        <StaleMark id={story.id} />
-        <StoryAgent id={story.id} />
-        {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
-      </span>
-      <span role="cell">
-        <Status tone={story.tone} label={story.stage} />
-      </span>
-      <span role="cell">{ticks(story.criteria)}</span>
-      <span role="cell">{ticks(story.tasks)}</span>
-      <span role="cell">{story.pr ?? <span className="meta">{WORK_COPY.none}</span>}</span>
-    </div>
+    <>
+      <div className={shown ? "prow shown" : "prow"} role="row" data-card={story.id}>
+        <span aria-hidden="true" />
+        <span role="cell" className="pn">
+          {story.type === "bug" && (
+            <span className="row-bug" role="img" aria-label={WORK_COPY.bug}>
+              <BugIcon />
+            </span>
+          )}
+          <button
+            type="button"
+            className="row-open"
+            aria-expanded={shown}
+            aria-controls={shown ? paneId : undefined}
+            onClick={() => open(story.id)}
+          >
+            {story.title}
+          </button>
+          {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
+          <StaleMark id={story.id} />
+          <StoryAgent id={story.id} />
+          {story.awaiting && <AcceptStory id={story.id} actions={agents.acceptance} into={below} />}
+          <MergeStory id={story.id} mergeable={story.mergeable} merge={agents.merge} />
+          {story.merged && <span className="meta"> · {MERGE_COPY.merged}</span>}
+          {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
+        </span>
+        <span role="cell">
+          <Status tone={story.tone} label={story.stage} />
+        </span>
+        <span role="cell">{ticks(story.criteria)}</span>
+        <span role="cell">{ticks(story.tasks)}</span>
+        <span role="cell">
+          {story.pr ? (
+            <PrChip url={story.pr} status={story.prStatus} compact />
+          ) : (
+            <span className="meta">{WORK_COPY.none}</span>
+          )}
+        </span>
+      </div>
+      <div role="none" ref={setBelow} className="prow-below" />
+    </>
   );
 }
 
@@ -97,8 +122,9 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               {WORK_COPY.reviewDraft}
             </button>
           )}
-          {feature.status === "approved" && feature.id && (
-            // An approved feature has no story to open it from: this opens its card, where Start is (STORY-52).
+          {(feature.status === "approved" || feature.ending) && feature.id && (
+            // A feature has no story to open it from: this opens its card, where Start is (STORY-52), or Accept and
+            // Merge to main once its end applies (STORY-14).
             <button
               type="button"
               className="review-draft"

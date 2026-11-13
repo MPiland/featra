@@ -19,6 +19,8 @@ export interface Ask {
   reason: AskReason;
   /** The story session whose request this is, when it is a copy shown in its Dev Lead's chat (STORY-9). */
   story?: string;
+  /** What an app request is about (STORY-13); like `story`, it keeps the request open past its turn. */
+  subject?: string;
 }
 
 /**
@@ -140,12 +142,14 @@ const isAnswer = (
 export function nextAsks(asks: readonly Ask[], event: ChatEvent): readonly Ask[] {
   if (event.type === "approval" || event.type === "question") {
     const story = event.type === "approval" && event.story ? { story: event.story } : {};
-    return asks.some((a) => a.id === event.id) ? asks : [...asks, { id: event.id, reason: event.type, ...story }];
+    const subject = event.type === "approval" && event.subject ? { subject: event.subject } : {};
+    const ask = { id: event.id, reason: event.type, ...story, ...subject };
+    return asks.some((a) => a.id === event.id) ? asks : [...asks, ask];
   }
   // An answer closes its request.
   if (isAnswer(event)) return asks.some((a) => a.id === event.id) ? asks.filter((a) => a.id !== event.id) : asks;
   if (event.type === "user" || event.type === "turn-end") {
-    const kept = asks.filter((a) => a.story !== undefined);
+    const kept = asks.filter((a) => a.story !== undefined || a.subject !== undefined);
     return kept.length === asks.length ? asks : kept;
   }
   return asks;

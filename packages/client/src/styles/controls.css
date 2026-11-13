@@ -247,3 +247,8 @@
   outline: 2px solid var(--acc);
   outline-offset: 2px;
 }
+
+/* A short number, such as the PR refresh interval in minutes. */
+.text-field.number-field {
+  width: 88px;
+}

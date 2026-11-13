@@ -11,7 +11,10 @@
 @import "./work.css";
 @import "./work-story.css";
 @import "./work-stale.css";
+@import "./bugs.css";
 @import "./card-pane.css";
+@import "./card-proof.css";
+@import "./card-review.css";
 @import "./chat.css";
 @import "./chat-list.css";
 @import "./chat-story.css";

@@ -1561,3 +1561,533 @@ Reason for all of them: AC1 adds Settings › Project › Roles.
   main goes to the Dev Lead to merge main in, never rebase.
 - **Order:** STORY-23 Accept or send back first (no GitHub needed), then STORY-11, STORY-56, STORY-57, STORY-12,
   STORY-58, STORY-13, STORY-14. FEAT-6 stays one feature of eight stories.
+
+## 2026-11-12 — STORY-23 build choices (story agent, for the Dev Lead to confirm)
+
+- **Stories only; the acceptance stage is found by position, not by name** (Dev Lead ruling): the last stage before the first done one (`stageCeiling`), so a project may rename its stages. Send back returns to the first stage in the `active` category. Bugs show neither button until a ruling widens it. `awaitingAcceptance` is the one rule, computed on the server for the Work row and the card view; the row shows it only where the owner's copy can be edited, as the card pane does.
+- **Accept on an unverified story records Accepted and stays in Acceptance.** Why: nothing writes Verified yet. `settleDone` is the pure rule that moves an accepted, Verified story to Done (via `checkTransition`); later Verified writes call it, by `system`.
+- **Send back is message first, then recorded, with one retry.** Why: as the FEAT-4 draft Send back; a failed write returns `recorded: false` rather than an error, since the agent already has the reason. Draft and story Send back share `sendThenRecord` (server) and `SEND_BACK_REFUSALS` (work-format).
+- **A missing session refuses Send back.** Why: a reason nobody receives would be lost, so there is no silent fallback.
+- **Send back clears a Stopped mark.** Why: the user is directing the session again.
+- **The reason added as a criterion is collapsed to one line**, unchecked, with a `content` history event. The history keeps the reason as written.
+- **No confirmation on Accept or Send back.** Why: both are visible in history; a Send back asks for a reason already.
+- **Send back's form opens below the Work row**, across its width, not in the name cell.
+- **Button labels include the story id** ("Accept STORY-5") so each is unique in the Work list.
+
+## 2026-11-12 — STORY-23 review rulings (dev-lead)
+
+- Build choices confirmed, except matching the acceptance stage by name: it is matched by position (`stageCeiling`), and
+  Send back returns to the first `active` stage, so renamed stages keep working.
+- Story and draft Send back share `sendThenRecord` and one set of refusal messages; the Work row respects read-only like
+  the card pane; the Send back form opens below the Work row.
+
+## 2026-11-12 — STORY-56 build choices (story agent, for the Dev Lead to confirm)
+
+- **A linked test command template, proposed with the check command** (your design note): `linkedTestCommand`, run once per test file. `{file}`, `{name}`, `{namePattern}` and `{report}` are each one quoted argument; `{namePattern}` is the file's linked names, escaped and joined by `|`. Same Checks section, same confirm.
+- **Proof is a JUnit report, not an exit code** (review ruling, ADR 0004). `{report}` is a temp path; a criterion is Proven only if the report has a passed test whose full name equals the linked name. A name matching nothing, a name that is only part of another test's name, a skipped test and a run without a report prove nothing. A template without `{report}` says "Can't prove linked tests without a report". The parser is in work-format for STORY-57. The vitest proposal is `pnpm exec vitest run {file} -t {namePattern} --reporter=junit --outputFile={report}`; jest is not proposed because it can't write a report to a chosen path.
+- **No command runs this test:** a ref under an `e2e`, `playwright` or `cypress` folder gets that note and its criterion stays unchanged, never failed. An e2e template is a roadmap item.
+- **A command changed through git does not run unconfirmed.** The app data folder keeps the last confirmed `checkCommand` and `linkedTestCommand` (`check-confirmed.json`); a different value in `config.yaml` shows "Changed in the project's config" with Confirm. Saving in Project settings confirms. A story can still make itself Verified by editing its own test script (same as CI); ADR 0031 says so.
+- **Proposals are kept in the app's data folder, not in the project.** Why: a proposal is not a decision, and the committed config must hold only what the user confirmed. "Use this" fills the field; only Save writes `.featra/config.yaml`. A saved field drops its proposals.
+- **Checks apply to a story in the review stage or in Acceptance, not In Progress** (found by position, like acceptance). Why: a half-built story would fail on every commit.
+- **Triggers:** the move into review, a change of the worktree's HEAD, and Re-run. At startup the current HEAD is recorded and nothing runs. Evidence is written only on a change, so history does not grow with every run.
+- **Queue, not cancel** (my call). A request during a run sets one pending flag; the stale result is discarded and the run starts again. At most 2 runs go at once across the app. Why: a cancelled run may have been the commit's only result, and a result for old code would mislead.
+- **Linked tests run after the check command, whatever it said.** An AC is Proven only if every ref is in the report as passed; a missing file counts as a failure; an AC with a ref nothing can run is left unchanged. A run that throws ends with running off and a note; a story's checks are dropped when it leaves review. With no template set the card says so and the criteria stay as they are.
+- **Quoting is per platform.** POSIX single quotes. Windows double quotes, refusing `"`, `%`, `^`, `!` and line breaks rather than guessing at cmd.exe. The confirmed check command is run as typed.
+- **Where checks run** defaults from `github-detect.ts` (remote, workflows, `gh repo view --json visibility`, fixed argv). Unknown (no `gh`, signed out, failing) counts as not public and says "Couldn't tell if it's public on GitHub, so checks run on this computer."
+- **The server watches every allowed project's worktrees** for HEAD changes, permanently: a few more file watchers.
+- **`writeProjectValue` in the desktop settings store now delegates to the server's `config-writer`**, so the Checks section and the Workflow page share one writer.
+- **A failing linked test shows as "Test failed" on its criterion**, a new proof state beside passed, linked and none.
+
+## 2026-11-12 — STORY-56 review rulings (dev-lead)
+
+- Proven never comes from an exit code: linked tests write a JUnit report through `{report}`, and a criterion is Proven
+  only when the report has a passed test whose full name equals the linked name. The JUnit parser lives in work-format for
+  STORY-57 to reuse.
+- Refs no template covers (end-to-end folders) get "No command runs this test" and are never counted as failed.
+- A check command changed through git does not run until the user confirms it.
+- Other build choices confirmed, with the unknown-visibility copy "Couldn't tell if it's public on GitHub, so checks run
+  on this computer."
+
+## 2026-11-12 — STORY-11 build choices (story agent, for the Dev Lead to confirm)
+
+- **GitHub usable** means a GitHub remote, a `gh` that runs (`gh --version`), and `gh auth status --hostname github.com`
+  exiting 0. Only its exit code is read; nothing it prints is kept. The answer is cached for 60 seconds per project.
+  Local mode says the first thing missing in one line in Project settings' new Pull requests section.
+- **The two settings live in `.featra/config.yaml`**: `openStoryPrs` (default true) and `prRefreshMinutes` (whole
+  minutes, 1 to 60, default 2). They go through the Checks bridge (`checks.load` and `checks.set`), the same writer.
+- **A PR opens only on a move into review after Featra starts.** Stories already in review at startup are left alone and
+  offered Create PR. Why: opening PRs for every old story on first launch would surprise.
+- **Base is the feature branch** (`features[parent].branch`), else the repo's base branch. The feature branch is pushed
+  only when the remote lacks it. The story branch is pushed with `-u`; nothing is ever forced, and a rejected push shows
+  git's reason on the card.
+- **An open PR from the story's branch is adopted** (`gh pr list --head --base`, in the project's own repository, not a
+  fork's), so a PR the user opened by hand isn't duplicated. A new PR is created with `gh api repos/{owner}/{repo}/pulls --method POST --input -`, its title and body as
+  JSON on stdin, so card text never reaches a command line (ADR 0031's rule). Title `STORY-n: title`; body the user
+  story, the criteria as a checklist, and "Opened by Featra for STORY-n."
+- **The PR is recorded on the owner copy by `system`**, with a `pr` history event, through the card lane.
+- **Create PR** shows when GitHub is usable, the story is in review in its worktree with no PR, and nothing is opening;
+  also after a failure, with the failure as a note. It is offered whatever the automatic setting, so a failed or skipped
+  open can be retried.
+- **The repo's required checks count** (`gh pr checks --required`, Dev Lead ruling), or every reported check when the
+  repo requires none. Failure beats pending; skipped passes; pending or none changes nothing. Passing writes Verified,
+  failing removes it, only when `checksWhere` is CI, through the same `recordEvidence` the local checks use.
+- **One poller per project.** It reads at start, then every N minutes. Window focus asks the server (`prs.refresh`),
+  which settles a burst of focus changes for 1 second and reads once. Reads never overlap. Merged or closed PRs and the
+  PRs of done or cancelled stories aren't read again. Polling stops when the project closes; local mode reads nothing.
+- **The chip** is the PR number as a link (full URL in its title), the PR's state, and its checks: words on the card, a
+  mark with an accessible name on the Work row. The link opens in the OS browser through a new `app.openExternal`, which
+  takes only https links. A PR recorded before GitHub was usable still shows its number, without state.
+- **Tests fake `gh` with a script** (`packages/server/test/fake-gh.cjs`) given to the server as `ghCommand`, and the
+  remote is a bare repository whose path contains `github.com`, so detection passes and pushes stay on disk. The
+  Playwright journey puts the same fake `gh` first on the PATH. The Work list's fixture PR is now a URL, as cards record
+  it, so the existing tests' `#15` is the chip's label.
+
+## 2026-11-12 — STORY-11 review fixes
+
+The Dev Lead's review of 0194bbe, fixed in this story:
+
+- **Verified follows the commit.** `headRefOid` is read with the PR. When it isn't the story branch's tip, Verified is
+  removed and never granted; a head that moved since the last read removes Verified until its own checks pass. A story
+  with a PR has its branch pushed again (never forced) on every move into review, after removing Verified given for an
+  older commit.
+- **Required checks** (`gh pr checks --required --json bucket,name`), else every reported check. The chip still shows
+  every check.
+- **Older `pr` values** (`12`, `#12`) show as `#12` text with no link.
+- **Windows quoting**: any argument with a character outside `[\w./:{}@+-]` is quoted; commas and `=` were not.
+- **Recording the PR** leaves a `pr` someone set meanwhile alone.
+- **Adopting** needs the same base and the project's own repository.
+- **Pushes** go to the remote GitHub was detected on (`origin` first), not always `origin`.
+- **A closed project** forgets its PR reads and notes, and a read that finishes after it closed records no evidence.
+- `App.tsx` and `bridge.ts` are under 300 lines (`usePrFocus`, `window-state.ts`).
+
+## 2026-11-12 — STORY-11 review rulings (dev-lead)
+
+- CI Verified is tied to the PR's head commit: a head that differs from the story branch's tip removes Verified and never
+  grants it, and every move into review pushes the story branch again (never forced) once it has a PR.
+- Verified comes from the repo's required checks (`gh pr checks --required`); only a repo with no required checks falls
+  back to all reported checks. A failed or cancelled check removes Verified; skipped counts as passed; running checks
+  change nothing.
+- Pushing an existing PR's branch on review happens even with "Open story PRs automatically" off: the setting governs
+  opening PRs, and keeping an open PR current is part of having one.
+- "The worktree's HEAD" means the story branch's tip, so it also works when the owner copy isn't a worktree.
+- The chip shows all checks while evidence uses required checks only; accepted for now, with a roadmap item to show the
+  difference.
+- Older `pr` values (`12`, `#12`) show as `#N` text with no link.
+- All other build choices confirmed.
+
+## 2026-11-12 — STORY-57 build choices (story agent, for the Dev Lead to confirm)
+
+ADR 0033 (proposed) records the design. Choices to confirm:
+
+- **Setting.** Two keys in `.featra/config.yaml`, edited in Project settings > Checks: `testReportArtifact` (an
+  artifact name or a `gh run download -p` pattern, so `test-report-*` merges per-OS reports) and `testReportFiles` (a
+  path or glob inside the artifact, every `.xml` when empty). Off until the artifact is set. Both are checked against a
+  safe character set; files can't use `..`, `.` or empty segments.
+- **When it reads.** Only when checks run in CI and the story is in review. Once per PR head, when the PR's checks
+  finish (passing or failing) and every workflow run of that head has completed. Checks going back to running on the
+  same head (a re-run) mean one more read once they finish. No read on the other polls, and never for a head that isn't
+  the story branch's tip. A failed `gh` call is tried again at the next poll.
+- **Fetching.** `gh run list --commit <sha> --json databaseId,status --limit 20`, then
+  `gh run download <id> -p <artifact> -D <temp>/<id>` per run, with fixed arguments through the shared `gh` runner. A run
+  without the artifact adds nothing ("no valid artifacts found" is not an error). The XML read is bounded to 32 MB in
+  total; files over the bound are skipped with a note. The temp folder is always removed.
+- **Refs to report names.** The linked file must be the report's `classname` (equal, or one path ends with the other,
+  which covers package-relative classnames), then the exact full name as for local runs. A link without a name needs
+  every test of that file to have passed. E2E refs count when the report has them. Playwright's JUnit uses `›`; such a
+  link must use the report's own name (noted in the ADR).
+- **Merge rule.** Failed anywhere fails; passed somewhere and failed nowhere passes; skipped everywhere is missing.
+- **Evidence.** `proven:<n>`/`unproven:<n>` by `system` through `recordEvidence`, only on change. Criteria without a
+  linked test are left alone. With no report for a head, every linked criterion is recorded unproven (missing), with a
+  note on the card.
+- **Head moves.** Proven given for an older head is not removed when the head moves; the new head's report decides,
+  once read. This differs from Verified, which is removed as soon as the head is stale. To confirm.
+- **Card.** A new proof state `missing` ("Not in the report", warning color) next to "Test failed". The PR section lists
+  each reason (for example `AC 2: "open saves" failed.`) and the note, under "Test report". Kept in memory with the
+  PR's state, not written to the card.
+- **Our CI.** The Gate step sets `FEATRA_JUNIT=test-report/unit.xml`; `vitest.config.ts` then adds the `junit` reporter
+  (keeping `default`, plus `github-actions` on GitHub, so the log is unchanged). A new step uploads `test-report/` as
+  `test-report-unit` on success or failure. Nothing else in the gate changed. This repo's config does not set
+  `testReportArtifact` yet; turning it on for Featra itself is the Dev Lead's call.
+
+## 2026-11-12 — STORY-57 review fixes
+
+- A shorter (package-relative) classname proves a link only when nothing else could be meant; otherwise the test is
+  missing, as ambiguous. Reports are merged per resolved file, so one file under two runners' paths is one.
+- Proven goes as soon as the PR's head moves or the branch is past it, like Verified; the new head's report proves again.
+- Only queued or in-progress runs hold the read back; only completed runs are downloaded.
+- Playwright's `›` reads like `>` in links and reports.
+- The artifact and files settings refuse a leading `-`.
+- No-report note: "CI uploaded no test report matching Project settings."
+- Featra's own config sets `testReportArtifact: test-report-unit`.
+- vitest's junit `classnameTemplate` exists, but `{filepath}` writes the absolute path; the default classname is already
+  the path from the repository's root, so `vitest.config.ts` keeps it.
+
+## 2026-11-12 — STORY-57 review rulings (dev-lead)
+
+- Proven from CI drops as soon as the PR head moves or is stale, like Verified; the new head's report proves again.
+- A report path that only matches a link by a shorter suffix counts only when it is unambiguous; otherwise the criterion
+  is missing with the reason that the report can't tell the files apart.
+- Only `queued` and `in_progress` runs hold the read back.
+- Report names and links share one normalizer, so Playwright's `›` and vitest's `>` read the same.
+- Our CI keeps vitest's default JUnit classname (the path from the repository root); `{filepath}` would be absolute and
+  machine-specific. Confirmed.
+- Approved changed expectation: `card.test.ts` "uses the default config" now expects Featra's own config to equal the
+  default plus `testReportArtifact: test-report-unit`, because this repo now proves its criteria from CI (ruling 8).
+  Still an exact match.
+- Other build choices confirmed. Download limits and re-run detection go to the roadmap.
+
+## 2026-11-12 — STORY-12 build choices (story agent, for the Dev Lead to confirm)
+
+- **When Merge is offered.** A story can merge when all of these hold:
+  - it is Verified;
+  - it is in review up to Acceptance, or already Done;
+  - its owner copy is its live worktree, checked out;
+  - it isn't merged yet.
+
+  Accept is not needed. The rule is `mergeRefusal` in work-format, which both the server and the Work list and card pane
+  use.
+
+- **GitHub mode needs a PR.** Whenever GitHub is usable (`githubUse`), Merge goes through the story's PR. A story with no
+  PR is refused ("Open its PR first."). It does not fall back to a local merge.
+- **Local merge with plumbing.** The local merge commit is made with `merge-tree --write-tree` and `commit-tree`. Its
+  parents are the feature tip, then the story tip, and the merged card is written into the tree. The feature branch then
+  moves by `merge --ff-only` where it is checked out, or by `update-ref` with the old value where it isn't. Local
+  changes in the feature checkout, or a branch that moved meanwhile, refuse with nothing changed. The lane is held only
+  for the local merge, not across `gh`.
+- **Head checks.**
+  - **GitHub:** the PR head must equal the local story tip. With `checksWhere: local`, the local checks must also have
+    settled on that tip.
+  - **Local:** `settledHead` (story-checks) must equal the tip. It is null while a run is in flight, and before any run
+    it is the head Featra saw on start.
+- **Dirty and working refusals.** Every uncommitted or untracked path in the worktree refuses, except the story's own
+  card. A session that is running or queued refuses.
+- **Conflicts.**
+  - On GitHub, `gh pr view --json mergeable` reporting CONFLICTING, or `gh pr merge` saying it can't be cleanly created,
+    is a conflict. The files then come from `merge-tree` of the fetched feature branch, and are empty if it can't tell.
+  - The story goes to the first active stage by `system` (`conflictedStory`), which also clears a Stopped mark.
+  - If sending to the session fails, the move is still recorded, and the failure is logged.
+- **After a GitHub merge.**
+  - The merged card is committed on the local feature branch. It goes on top of GitHub's merge commit (fast-forward when
+    the local branch is behind), or as a two-parent commit if the local branch moved on. It is not pushed.
+  - If that commit can't be made, nothing is removed, and the user is told to pull and merge again.
+  - The remote branch is deleted with `git push --delete`.
+- **Outside merges.** The PR poller re-reads a merged PR while its story still has a worktree and isn't merged, Done
+  stories included, and settles it through the same `settle`.
+- **The `story.merge` result.** It returns `{ remains }`: the notes for what couldn't be removed, shown in place of the
+  button.
+- **`request_merge` notice outcomes.** "merge declined" has an empty summary. "merged" has `<feature branch>.` plus
+  whatever remains. "not merged" carries the refusal or conflict sentence. A second ask while one waits is refused.
+- **The session after a merge.** `retire` stops a running turn and ends the agent. The chat stays and opens as its
+  transcript. Resume is not offered for a merged story.
+- **The client fake.** The client tests' fake card server now owns a started story in its worktree, and a merged one on
+  its feature branch, as the server does. This keeps the real `mergeRefusal` meaningful there.
+- **Open: no known head after a restart.** In local mode Featra doesn't know which commit the checks settled on after a
+  restart, so Merge is refused as stale until they run again. A Done story can't re-run its checks today. This is a
+  roadmap candidate. Resolved by the review fixes below: the card records the checked commit.
+
+## 2026-11-12 — STORY-12 review fixes
+
+- **The checked commit is on the card.** A passing or failing run records `checked:<commit>` in the card's evidence
+  history when the commit it checked changes. `settledHead` is the checks' own memory, else the card's commit; never the
+  head seen on start. After a restart Merge works on that commit, a Done story included, and refuses any other.
+- **CI mode reads CI again at Merge.** Besides the PR head equalling the tip, the PR's checks for that head must pass,
+  read through `ciRead` when Merge is clicked.
+- **No turn mid-merge, and a second look after it.** `message_session` and Resume refuse while the story merges. After
+  the session is retired, settle checks the worktree again; anything uncommitted besides the card keeps the worktree and
+  its branch, and is said. This is what protects a PR merged on GitHub outside Featra.
+- **The card waits for the feature branch.** After a GitHub merge the worktree's card is written as merged only once the
+  feature branch has the card commit, so "Pull it, then merge again" and the poller's retry both work.
+- **Smaller fixes.**
+  - Only "cannot be cleanly created" or "merge conflict" from `gh pr merge` is a conflict; anything else is an error.
+  - A conflict with no files found is an error, not a stage move.
+  - git older than 2.38 refuses with "Merging needs git 2.38 or later."
+  - A local merge deletes the story's branch from each remote that has it, or lists it when the remote can't be reached.
+  - Worktree removal retries briefly while Windows holds a file (card-commit's retry).
+  - The remains say how far the local feature branch is ahead of GitHub.
+  - `featureBranchOf` is the one feature-branch lookup.
+  - chat-manager.ts is under 300 lines (`chat-approvals.ts`).
+
+## 2026-11-12 — STORY-12 review fixes, round 2
+
+- **A remote branch is deleted only when merged.** A local merge deletes the story's remote branch only when its tip
+  (from `ls-remote`) is in the feature branch's history, with `--force-with-lease` at that tip. Otherwise it stays and
+  the remains say it has commits that aren't merged.
+- **Every send to a merging story is refused.** A message typed in the story's chat (`chat.send`) and Send back refuse
+  with the busy sentence while it merges, as `message_session` and Resume already did.
+- **A verdict with no known commit clears the old one.** It records a bare `checked:`, so Merge after a restart needs a
+  new run. ADR 0004 lists `checked:<commit>`; ADR 0034 says the stored commit has the same trust as `verified`.
+- **The ahead note is said only when counted.** A failed `rev-list --count` leaves the note out instead of guessing.
+- Tested: GitHub saying it conflicts while git finds no files is an error and moves nothing.
+
+## 2026-11-12 — STORY-12 review rulings (dev-lead)
+
+- Nothing is lost by a merge: settle re-checks the worktree after the session is retired and keeps it, with a note,
+  when anything but the card is uncommitted; messages, Send back and Resume are refused while the story merges.
+- Merge needs Verified for the current tip: local mode uses the commit the checks recorded (`checked:<commit>`, stored on
+  the card so it survives a restart); CI mode re-reads CI for the PR head.
+- A conflict on GitHub with no conflicting files found is an error and the story stays put.
+- A remote story branch is deleted only when its commit is in the feature branch, with a lease; otherwise it stays and
+  the user is told.
+- After a GitHub merge the local feature branch is ahead of GitHub by the merged card until the user pushes; the
+  remains say so.
+- The two changed item-14 test expectations are stricter, not weaker. Approved.
+- Other build choices confirmed.
+
+## 2026-11-12 — STORY-58 build choices (story agent, for the Dev Lead to confirm)
+
+- **Where and what.** Abandon is in the story's card pane only, not its Work row or session. It applies to stories only;
+  a bug is refused ("isn't a story"). Any story that isn't merged or done can be abandoned, New to Acceptance, stopped
+  or not. A Cancelled story is offered it only while its worktree is still there. The rule is `abandonRefusal` in
+  work-format, used by the server and the card view (`abandonable`).
+- **Two calls, one token.** `story.abandonCheck` returns the warning; `story.abandon` carries its token (a digest of the
+  files, unpushed commits, tip, remote copies and PR). The story is read again after its turn stops and once more in
+  the card lane; any difference refuses with `changed` and nothing done.
+- **The Cancelled event is by `user`**, not `system`: it is the user's click. (Flag: the Dev Lead's note didn't say.)
+- **Stop, then re-check, then retire.** A running or queued turn is stopped (`chats.stop`), not retired, before the
+  re-check, so a stale token refuses without ending the session. The session is retired only after the re-check
+  passes. The chat stays as its transcript.
+- **One gate for merge and abandon.** `createStoryEnding` replaces Merge's own `isMerging`. Messages, Send back, Resume
+  and chat sends take a generic `busy(dir, id)` and refuse with the ending's own sentence. A second Abandon is refused
+  as "already being abandoned"; a Merge meanwhile as "being abandoned".
+- **PR close failure stops everything before the card.** The session is already retired by then (documented in ADR
+  0035); the worktree, branches and card are untouched, and the user can try again.
+- **Branches with git, not gh.** The local branch goes with `update-ref -d` at the tip read. Remote copies go with
+  `push --force-with-lease=<tip> --delete`, only where the remote tip is the local tip or behind it. A remote with
+  commits that aren't here stays and is said. An unreachable remote is said with Merge's note.
+- **Worktree story: the card change is committed on the feature branch** with Merge's plumbing (one parent; the
+  feature's older copy at a different path is dropped), message `STORY-N: abandoned, kept as Cancelled` or `… card
+  discarded`, and published to the local branch only. The worktree's own copy is written too, in case the worktree
+  stays. A feature branch that can't take it refuses with nothing removed.
+- **No-worktree story:** the owner copy is edited (or deleted) where it is checked out, uncommitted, like a card edit.
+- **Ghost cards (ADR 0035).** A card deleted at its owner was shown again from main's older copy. The scanner now asks
+  git, for a card whose owner has no copy, whether the owner deleted it (HEAD has it, or the owner's history had it),
+  and leaves it out with no problem. This changes owner resolution, so it is in the ADR.
+- **The index entry** goes with the next scan, which replaces all owner rows.
+- **Shared confirm UI.** Draft Reject's inline alertdialog is now `ConfirmAsk` (focus on Cancel, Escape, focus trap),
+  used by both.
+- **Discard closes the pane;** Keep leaves it open, showing what stayed (`remains`) as a status line.
+
+## 2026-11-12 — STORY-58 review fixes
+
+The Dev Lead's rulings on the review of 974c646, fixed in a new commit. Each bug has a regression test that failed
+before its fix.
+
+- **Loss set.** The warning now lists every commit that goes with the branch: those not on the feature branch and on no
+  remote branch but the story's own (`--exclude=*/<branch> --remotes`). A branch pushed with no PR is no longer a plain
+  question. The copy says "N commits only on this branch:" rather than "not pushed", since pushed ones are listed too.
+  The AC1 server test now expects the PR's pushed commit beside the unpushed one (2, was 1): the ruling changes what is
+  lost, not the assertion's strength.
+- **Order** (overrules build choice 5): stop the turn, re-check, close the PR, then in the card lane re-check, retire,
+  write the card, remove. A PR that can't be closed or a `changed` refusal leaves the session alive; the PR-close test
+  now also asserts `m.retired` is empty.
+- **Feature-owned stories** are abandonable when the feature branch isn't checked out: the card is changed on it with
+  plumbing, and the writable requirement is dropped for a feature-branch owner (`abandonRefusal`, card view, pane).
+- **Edits to a hidden card stay visible.** The scanner still leaves a card its owner deleted out of the list, but an
+  uncommitted working-tree edit to an older copy is reported as stale. The owner-copies test that asserted `stale: []`
+  for an edited copy encoded the wrong behaviour; it now expects the stale copy (Dev Lead approved), and a new test
+  keeps unedited older copies silent.
+- **Ahead note.** After the card commit, Abandon adds Merge's "<feature> is N commits ahead of GitHub; push it." when
+  the feature branch is ahead of its GitHub copy. The two GitHub tests that expected no such note now expect it.
+- **One remote delete.** `merge-git.deleteRemote` takes a `safe(tip)` predicate; Merge passes `mergedInto`, Abandon
+  "still at the tip the warning read". STORY-12's tests pass unchanged.
+- **api.ts** is under 300 lines: Merge and Abandon's handlers moved to `api-story-end.ts`.
+- **Copy:** "PR #1 closes".
+- **An abandon tried again** (after the worktree stayed) makes no commit when the feature branch's tree is unchanged.
+- **ADR 0035** says the token covers file names, not later edits to a listed file, and states the new order, the loss
+  set, the feature-owner path, the shared remote delete and that edits to a hidden card are still reported.
+- **Disagreement, item 11 (`epicProgress`).** Not a bug: feature cards use the lowercase container statuses
+  (`draft`, `approved`, `active`, `done`, `cancelled`; `CONTAINER_STATUSES`, enforced by validate), and only stories
+  and bugs use `Cancelled`. So `c.status !== "cancelled"` is right, and "Cancelled" would never match a feature. The
+  existing `rollup.test.ts` "counts done features, excluding cancelled" already proves cancelled features are left out
+  of epic bars; no change made.
+
+## 2026-11-12 — STORY-58 review rulings (dev-lead)
+
+- The abandon warning lists commits that are only on the story's branch. A commit counts as safe when it is on the feature branch or on any remote branch other than the story's own.
+- Order of steps: stop the turn, re-check, close the PR, then in the card lane re-check, retire, write the card and remove. A failed PR close leaves the session running.
+- A New story owned by a feature branch that isn't checked out can be abandoned. The card is changed on that branch with git plumbing.
+- Approved expectation change: in the owner-copies test, `stale` is no longer `[]`. An uncommitted edit to an older copy of a card its owner deleted is reported as stale, as ADR 0002 requires. Unedited older copies stay silent.
+- Abandon adds Merge's "N commits ahead of GitHub; push it." note. Both use one `deleteRemote`, which takes a `safe(tip)` check.
+- Retracted ruling (item 11): `epicProgress` comparing with lowercase `"cancelled"` is correct. Feature statuses are the lowercase container statuses, and rollup.test.ts already proves cancelled features are left out.
+- Roadmap: abandoning a story in a worktree that has no feature.
+
+## 2026-11-12 — STORY-13 build choices (story agent, for the Dev Lead to confirm)
+
+- **Places are keys:** `project`, `feature:FEAT-N` and `task:STORY-N`. `bugPlacements` offers, in order:
+  - a bug under each feature whose status is active;
+  - a task on each story or bug in an active stage;
+  - the project list.
+
+  `routeProblem` picks the proposal. `takesBug` and `takesTask` are now exported from bugs.ts, and both use them.
+  ADR 0036.
+
+- **Done stays Done by construction.** A Done feature or a finished story is never a choice. `bug.file` checks the
+  place again at Create, so a feature that went Done in the meantime is refused (`placeGone`) and never written to.
+- **The changed place rides on the approval.** `chat.approve` has a new optional `option`, kept only with Allow. The
+  desk refuses an option that isn't one of the `choices` in the request's input (`badOption`) and keeps the card
+  waiting.
+- **report_bug has request_merge's shape.** It answers once the user is asked. Its notice says one of:
+  - "filed: BUG-N under FEAT-X.", "filed: BUG-N on the project bug list." or "filed: a task on STORY-N.";
+  - "declined";
+  - "not filed:" and why.
+
+  Its approval's `story` is `Bug "title"`, which keeps the card past the Dev Lead's turn, as a merge request's does.
+  Story sessions are refused with "Tell the Dev Lead what you found."
+
+- **Who files.** New bug is `by: user`. The Dev Lead's bugs are `by: session:<lead>` (`spawner`).
+- **Where it's written.**
+  - Owner checked out: the file is written there, uncommitted. A new card uses `createExclusive` and reallocates its
+    ID on a name clash.
+  - Owner not checked out (a started feature's branch, or main when main isn't the checkout): one plumbing commit via
+    `commitCardOn`, with the message `BUG-N: bug filed` or `STORY-N: bug task added`. `commitCardOn` is extracted from
+    STORY-58's Abandon, which now uses it too.
+- **IDs** are allocated past every copy's IDs, so a bug on a feature branch and one on main never share a number.
+- **The task text** is `Fix bug: <title>`. It is logged as a `content` event on tasks, like a card pane edit.
+- **The bug card** starts at the first stage, with `origin: bug`. Its description is the user's text, then
+  "Suspected cause: ID title". No new frontmatter field.
+- **Work list shape.** `WorkList.bugs` holds bugs with no feature. It is optional and left out when empty, so existing
+  list assertions are unchanged. The no-feature row now holds only stories. Work shows "Project bugs" after the epics,
+  with "No project bugs" when the list is empty. Bug rows show a bug icon (role img, "Bug"), both under features and on
+  the list.
+- **New bug** is a button above the list. The form's cause select lists features, then story and bug rows in Work's
+  order. The placement is asked for again on every cause change.
+- **Bug found while building, with a regression test.** `fileBug` added a task with `test: null`, a field tasks don't
+  have, so the card in memory differed from the one written. The server test failed first. The task is now
+  `{ text, done: false }`.
+- **Changed existing assertions:** mcp `stdio.test.ts` and desktop `mcp-bundle.test.ts` list the tools, and `report_bug` is appended to their expected
+  list.
+
+### STORY-13 Dev Lead review rulings, applied (PR #46)
+
+1. **Stale scan.** The scan keeps each copy's commit (`Collected.heads`). `commitCardOn` takes a guard
+   `{ parent, create? }`: a tip other than `parent` is `moved`, and a new card whose path or ID the parent's tree has
+   is `taken` (the server allocates again). Abandon passes the same parent. Deviation: the outcome is `moved`, with
+   its own message ("The branch X changed while the bug was being filed. Try again." / `featureMoved`), not `busy`,
+   since nothing is busy.
+2. **Real-repo tests** (bug-filing-review.test.ts): a story its feature branch owns with no worktree; a project bug
+   by plumbing when main isn't checked out; a bug written in the folder that has the feature out; a taken ID on a
+   branch and on disk.
+3. **Feature Done by Create:** report_bug already said "not filed: <placeGone>"; a test now proves it. No product
+   change.
+4. **New bug:** each ask for places has its own key, and its answer and the user's pick hold only for it, so no
+   earlier error, places or pick carry over. A refusal asks again and keeps why. `reset()` clears the pick. The
+   "after Cancel" test also passes on the old code (every proposal set the place), so it guards the reset only.
+5. **E2E:** file-bug.spec.ts changes Place it before Create in New bug, and adds the Dev Lead's report_bug: the fake
+   agent calls the real MCP tool ("report_bug" turn), the user changes the place, Creates, and the notice is checked.
+6. **`option` only on app requests** (`ToolRequest.app`); an agent's own tool is refused `badOption`.
+7. **Being worked = owned by its worktree.** `takesTask` and `routeProblem` take the state; ADR 0036 updated.
+8. **Cancelled:** `askChoice` answers `"cancelled"` when the desk forgets the chat; report_bug's notice is "not
+   filed: the request was cancelled". request_merge is unchanged. Note: today a chat is forgotten only as its project
+   closes, which also marks it closed, so the notice is dropped then; the test proves it at the bug-request level.
+9. **`subject`** on app requests, carried through chat events, the chat list and the reducer; report_bug uses it.
+10. **No copy:** the task path refuses with `readOnlyReason`.
+11. The order test asserts a literal (6).
+12. Create and Cancel return focus to New bug.
+13. api.ts (a `card(params)` helper) and test/harness.tsx (bug fakes in test/bug-server.ts) are under 300 lines.
+
+**Changed existing assertions:** bugs-ids-validate.test.ts and bug-filing.test.ts call `routeProblem` and the
+placement rules with the state (ruling 7), and the order test's expectation is the literal 6 (ruling 11);
+report-bug.test.ts expects `subject: Bug "..."` and no `story` on the approval (ruling 9).
+
+**Roadmap, not now:** Work filter chips; a cancelled outcome for request_merge.
+
+## 2026-11-12 — STORY-13 review rulings (dev-lead)
+
+- Build choices confirmed: placement keys (`project`, `feature:FEAT-N`, `task:STORY-N`), `routeProblem` as the only source of the proposal, `commitCardOn` shared with Abandon, and ADR 0036.
+- A plumbing write checks the branch tip it scanned. When the branch has moved, the result is "moved" (not "busy") and the user is asked to try again. A new card is refused when its path or ID is already in the parent's tree. Accepted the developer's "moved" naming.
+- A story still being worked means its card is owned by its worktree. A story already merged into its feature is not offered a task; the bug goes under the feature.
+- `option` on an approval is accepted only on app requests, never on an agent's own tool. Approvals have a `subject` instead of overloading `story`.
+- report_bug says "not filed: the request was cancelled" when the Dev Lead's chat ends before the user answers. Today the notice can't reach a closed chat; noted on the roadmap.
+- Approved expectation changes: tool lists gain `report_bug`; routing tests pass the story's state; the order test asserts a literal; report-bug expects `subject`.
+- Roadmap: Work filter chips for the project bug list; a cancelled outcome for request_merge; delivering notices to a chat that ended.
+
+## 2026-11-12 — STORY-14 build choices (story agent, for the Dev Lead to confirm)
+
+ADR 0037 records the design. Choices made while building it:
+
+1. **Accept, then the PR, in one write.** With GitHub usable and `openFeaturePrs` on, Accept pushes the feature
+   branch and opens (or adopts) its PR first, then records `accepted` and the PR on the feature branch in one card
+   commit. If the PR can't open, Accept is still recorded and the card offers Create PR.
+2. **`openFeaturePrs`** is a project config key (default true) beside `openStoryPrs`, in Project settings' Pull
+   requests section as "Open feature PRs automatically".
+3. **Feature cards write `pr`.** `serializeCard` wrote `pr` only for stories and bugs, so a feature's PR was lost on
+   write. It is now written for a feature once it has one (regression test in work-format feature-end.test.ts, which
+   fails on the old code); features without a PR serialize as before.
+4. **Local checks run in a temporary detached worktree** at the feature branch's tip, removed after; the verdict is
+   kept in memory per commit, so a restart runs them again. CI checks are read from the feature's PR at that commit.
+5. **The facts Merge to main waits on are read fresh** on the PR interval, on focus, and when the feature branch or
+   main moves, only for accepted features. Precedence of the reason shown: conflicts, behind main, no PR, PR closed,
+   branch ahead on GitHub, then checks.
+6. **A feature branch that GitHub's copy is behind on is pushed** during that read (never forced), so the PR's head is
+   the local tip and CI runs on it. One with commits GitHub has and this computer doesn't blocks the merge.
+7. **Main moving on:** a notice with outcome `behind main` goes to the Dev Lead once per main commit, naming
+   conflicting files. The Dev Lead is the chat that drafted the feature, else the parent chat of a story session
+   under it. Featra never merges main in itself.
+8. **Local merge publishes main only when its checkout is clean** (`publish(..., clean=true)`); otherwise it refuses
+   with "main has local changes. Commit or stash them, then merge again." and main is untouched.
+9. **Done only by the merge,** by `system`, with `merged` and the PR in its history. After a GitHub merge the Done card
+   is a commit on local main on top of GitHub's merge commit, and how far main is ahead of GitHub is said.
+10. **Ownership moves to main by itself** once main has the branch's tip and the branch isn't checked out; nothing is
+    copied. A checkout of the feature branch keeps its cards there and the merge says so. Feature branches are kept.
+11. **Open on the feature row.** An active feature's card couldn't be opened from Work (Open was only on approved
+    features), so Accept was unreachable. The row now offers Open once the feature's end applies (Accept is open to it,
+    or it is accepted). start-feature.spec.ts's "no Open FEAT-2 on an active feature" still holds: that feature has
+    no stories done.
+12. **A Done feature isn't "merged"** on its card view: `merged: true` is for stories merged into their feature only.
+13. **Splits for the lint limits:** feature-end.ts (end, Accept, PR, merge), feature-facts.ts (the facts and the
+    notice), feature-merge.ts, feature-checks.ts, feature-pr.ts, feature-look.ts; the client's fake feature actions
+    are in test/card-server-features.ts.
+
+**Changed existing assertions:** none. Existing fakes gained the new parameters (card-server's `mergeOf`,
+checks-server's `openFeaturePrs`, ProjectChecks.test.tsx's view gains `openFeaturePrs`).
+
+**Roadmap, not now:** deleting merged feature branches; a Dev Lead for features with none found.
+
+### STORY-14 Dev Lead review rulings, applied (PR #47)
+
+1. **B1, judged commits.** Reading the facts returns `Judged { facts, tip, baseTip }`. Merge to main, in the card
+   lane, refuses `moved` when the feature branch or local main isn't at what was judged; on GitHub also when the PR's
+   head isn't the judged tip, and `gh pr merge --match-head-commit` gets the judged tip. The check no longer pushes;
+   the read pushes a branch GitHub is behind on before judging (`pushBehind`).
+2. **B2, outside merges once.** Settling is skipped when main's copy of the card is already Done and merged. A PR
+   merged at a head other than the local tip gets the PR fact `merged`, which blocks first with "Its PR merged without
+   this computer's latest commits." and is never settled. The settle notice adds "main is N commits ahead of GitHub; push it.".
+3. **Should-fix 2, main's checkout.** Build choice 8 (clean checkout) is replaced: the fact `baseBusy` is main's
+   uncommitted files that the merge changes, plus the card's path (feature-base.ts). It shows before the button is on
+   and is checked in the lane before the local publish and before `gh pr merge`. Featra's own card edits elsewhere
+   don't block. `publish` and `cardOnBranch` lost their `clean` parameter.
+4. **Should-fix 3, BUG-20.** Test links whose names have balanced parentheses read as none. Filed as BUG-20 under
+   FEAT-6 (origin bug), fixed in card.ts with a regression test that failed first. STORY-12, 13, 14 and 58 now resolve
+   17 of 17 acceptance-criterion links (0 before).
+5. **Should-fix 4.** The Dev Lead's notice is recorded as told only once `notify` succeeds.
+6. **Should-fix 5.** Tests for Accept retried after its PR opened and its card write failed, the checks' worktree
+   removed after a failed and a hung run, GitHub ahead blocking without a push, and the notice with no Dev Lead.
+7. **Nits.** `safeBranch` and a full refspec on the push; verdicts keyed by tip and check command; `active.delete` in
+   a finally; `git worktree prune` before each run; one refusal (`noBranch`) for a missing branch; Create PR in local
+   mode refuses with GitHub's `noRemote`; `aria-describedby` on the disabled Merge button; "Checking…" before the first
+   read; the configured base branch in "Merge to <base>"; the orphan JSDoc removed; the client fake-rule test unlinked
+   from AC5 (AC5 links the server tests).
+8. **Rulings recorded:** Open on the feature row is approved; the notice lists the first three files, then "and N
+   more"; dropping the notice with no Dev Lead is fine (finding one is on the roadmap).
+9. **Should-fix 1 withdrawn** (Dev Lead ruling). An accepted feature can still be set Done by hand through
+   `checkTransition`, and evidence.test.ts keeps expecting that. Until a local-mode merge made with the git CLI makes
+   the feature Done (roadmap), setting Done by hand is the only way to close a feature merged outside Featra.
+10. **Verdicts keyed by tip and command** have a test: a passed run at the same commit doesn't count once the check
+    command changes (it fails with the key on the tip alone).
+
+**Changed assertions in this PR's own tests:** feature-end-local's "leaves main alone" now puts an untracked file the
+merge would overwrite on main (an unrelated local change no longer blocks); expected feature ends gain `base: "main"`;
+an accepted feature with no facts yet expects "Checking…" instead of no reason; the client's Merge label takes the base.
+
+**Roadmap, not now:** a local-mode merge to main made with the git CLI making the feature Done.
+
+## 2026-11-13 — STORY-14 review rulings (dev-lead)
+
+- Build choices and ADR 0037 confirmed, as amended by the review.
+- Merge to main merges only the commit whose checks passed. When the feature branch, local main or the PR head moved after the checks, it is refused with `moved`. The auto-push happens while reading, before the checks are judged, never between the checks and the merge.
+- Settling a merge done outside Featra happens once. A PR merged at a head other than the local tip is never settled; the card says why.
+- Main's checkout blocks a merge only when the merge would overwrite one of its uncommitted files. Featra's own uncommitted card edits on main are normal and don't block. The reason shows before the button is on.
+- Withdrawn: refusing a manual `active → done` on a feature. Until a git CLI merge in local mode makes the feature Done, manual Done is the user's way to close it. `evidence.test.ts:133` is unchanged.
+- BUG-20 (test links with parentheses read as none) is fixed in this PR with a regression test; 17 of 17 AC links on STORY-12, 13, 14 and 58 now resolve.
+- Approved changes to this PR's own test expectations: `base: "main"` on feature-end objects, "Checking…" before the first read, the base name in the Merge label, and the "leaves main alone" test using an overlapping file.
+- Roadmap: a local-mode git CLI merge to main makes the feature Done.

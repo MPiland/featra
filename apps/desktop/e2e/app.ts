@@ -84,6 +84,7 @@ function traceUntilClosed(app: ElectronApplication): void {
 interface TestHooks {
   notices: string[];
   shownInFolder: string[];
+  openedExternal: string[];
   folderPicks: string[];
   folderDialogs: string[];
   notifications: { title: string; body: string; click: () => void }[];
@@ -129,6 +130,9 @@ export const notices = (app: ElectronApplication) => app.evaluate(() => (globalT
 /** Files Help > Troubleshooting > Show Logs asked the OS to show in File Explorer. */
 export const shownInFolder = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.shownInFolder);
+/** Links Featra asked the OS browser to open (a PR chip's link). */
+export const openedExternal = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as MainGlobal).featraTest.openedExternal);
 /** Queues the folders the next folder dialogs return (Playwright can't drive the OS picker); then they cancel. */
 export const queueFolderPicks = (app: ElectronApplication, ...dirs: string[]) =>
   app.evaluate((_e, picks) => {

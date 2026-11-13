@@ -4,6 +4,11 @@ import { createApi, type Api } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
 import { createCardReport } from "./card-report.ts";
 import { createCardLane } from "./card-lane.ts";
+import { createCheckSettings } from "./check-settings.ts";
+import { createStoryChecks } from "./story-checks.ts";
+import { createFeatureEnd } from "./feature-end.ts";
+import { createStoryPrs } from "./story-prs.ts";
+import { systemTimers, type Timers } from "./inbox.ts";
 import { createChatManager } from "./chat-manager.ts";
 import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts";
 import { locateClaude } from "./claude-locate.ts";
@@ -15,6 +20,13 @@ import { createDraftWriter } from "./draft-writer.ts";
 import { createFeatureStart } from "./feature-start.ts";
 import { createStoryMessage } from "./story-message.ts";
 import { createStorySpawn } from "./story-spawn.ts";
+import { createStoryAcceptance } from "./story-acceptance.ts";
+import { createStoryMerge } from "./story-merge.ts";
+import { createStoryAbandon } from "./story-abandon.ts";
+import { createStoryEnding } from "./story-ending.ts";
+import { createMergeRequest } from "./merge-request.ts";
+import { createBugFiling } from "./bug-filing.ts";
+import { createBugRequest } from "./bug-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
@@ -56,6 +68,12 @@ export interface ServiceOptions {
   logs?: LogWriterDeps;
   /** How long Stop waits for a provider to end the turn it interrupts; ten seconds by default. */
   interruptMs?: number;
+  /** The GitHub CLI to ask whether a repo is public; the one on the PATH by default (STORY-56). */
+  ghCommand?: string;
+  /** How long a check command may run before it is killed (STORY-56). */
+  checkTimeoutMs?: number;
+  /** The timers PR reads wait on (STORY-11); the real ones by default. */
+  prTimers?: Timers;
 }
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
@@ -74,6 +92,9 @@ export function createServices({
   mcpExecPath,
   logs,
   interruptMs,
+  ghCommand,
+  checkTimeoutMs,
+  prTimers = systemTimers(),
 }: ServiceOptions): {
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
@@ -85,7 +106,38 @@ export function createServices({
   const copies = createCopyActions({ git: repoGit, scan: watches.scan, now });
   // One lane for every card write: a draft that allocates IDs and a card edit never interleave (ADR 0002).
   const lane = createCardLane();
-  const cards = createCardActions({ scan: watches.scan, now, lane });
+  const cards = createCardActions({
+    scan: watches.scan,
+    now,
+    lane,
+    checks: (dir, id) => checks.checksFor(dir, id) ?? features.checksFor(dir, id),
+    prState: (dir, id) => prs.prState(dir, id) ?? features.prState(dir, id),
+    merge: (dir, id) => features.mergeState(dir, id),
+  });
+  const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand });
+  const checks = createStoryChecks({
+    scan: watches.scan,
+    observe: watches.observe,
+    allowed,
+    settings: checkSettings,
+    now,
+    lane,
+    log,
+    timeoutMs: checkTimeoutMs,
+  });
+  const prs = createStoryPrs({
+    scan: watches.scan,
+    observe: watches.observe,
+    allowed,
+    settings: checkSettings,
+    now,
+    timers: prTimers,
+    lane,
+    log,
+    gitCommand,
+    ghCommand,
+    onMerged: (dir, id) => merges.merged(dir, id),
+  });
   const roles = createRoleRegistry({
     fs: roleFs,
     readers: [createClaudeReader(roleFs), createCodexReader(roleFs)],
@@ -104,8 +156,57 @@ export function createServices({
   });
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
-  const stops = createStoryStop({ scan: watches.scan, now, lane, chats, ...(interruptMs ? { interruptMs } : {}) });
+  // A story that is merging or being abandoned takes no message, Send back or Resume: its session is about to end
+  // (STORY-12, STORY-58).
+  const ending = createStoryEnding();
+  const busy = ending.busy;
+  const stops = createStoryStop({
+    scan: watches.scan,
+    now,
+    lane,
+    chats,
+    busy,
+    ...(interruptMs ? { interruptMs } : {}),
+  });
+  const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats, busy });
+  const merges = createStoryMerge({
+    scan: watches.scan,
+    now,
+    lane,
+    log,
+    settings: checkSettings,
+    chats,
+    checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
+    gitCommand,
+    ghCommand,
+    ending,
+  });
+  const abandons = createStoryAbandon({
+    scan: watches.scan,
+    now,
+    lane,
+    settings: checkSettings,
+    chats,
+    gitCommand,
+    ghCommand,
+    ending,
+  });
+  const features = createFeatureEnd({
+    scan: watches.scan,
+    observe: watches.observe,
+    allowed,
+    settings: checkSettings,
+    chats,
+    now,
+    timers: prTimers,
+    lane,
+    log,
+    gitCommand,
+    ghCommand,
+    checkTimeoutMs,
+  });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
+  const bugs = createBugFiling({ scan: watches.scan, now, lane, gitCommand });
   const reports = createCardReport({
     scan: watches.scan,
     now,
@@ -125,7 +226,10 @@ export function createServices({
     starts,
     spawns,
     reports,
-    messages: createStoryMessage({ scan: watches.scan, chats }),
+    messages: createStoryMessage({ scan: watches.scan, chats, busy }),
+    checkSettings,
+    merges: createMergeRequest({ scan: watches.scan, chats, merge: merges.merge, log }),
+    bugs: createBugRequest({ chats, bugs, log }),
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
@@ -143,6 +247,15 @@ export function createServices({
     starts,
     spawns,
     stops,
+    acceptance,
+    merges,
+    abandons,
+    features,
+    bugs,
+    busy,
+    checks,
+    checkSettings,
+    prs,
     chats,
     roles,
     roleWatches,
@@ -153,6 +266,12 @@ export function createServices({
     agents,
     async close() {
       stopClosing();
+      checks.close();
+      prs.close();
+      features.close();
+      // A project watch still starting finishes against open watches, then stops itself.
+      await prs.idle();
+      await features.idle();
       chats.close();
       await chats.flush();
       watches.close();

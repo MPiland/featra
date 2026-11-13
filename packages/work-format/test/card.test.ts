@@ -128,6 +128,31 @@ describe("parseCard", () => {
     );
   });
 
+  it("reads a test link whose test names have parentheses in them (regression: BUG-20, the link read as none)", () => {
+    const ref = "a.test.ts::Accept (AC1) > offers it (once); b.test.ts::Merge (AC3, AC5)";
+    const acs = parseCard(
+      story.replace("## Acceptance criteria\n\n", `## Acceptance criteria\n\n- [x] Accept works (test: ${ref})\n`),
+    ).acs;
+    expect(acs[0]).toEqual({ done: true, text: "Accept works", test: ref });
+    const evidence = parseCard(
+      story.replace(
+        "## Acceptance criteria\n\n",
+        "## Acceptance criteria\n\n- [x] Shows (test: a.test.ts::Row (AC2)) (evidence: .featra/evidence/a.png)\n",
+      ),
+    ).acs;
+    expect(evidence[0]).toEqual({
+      done: true,
+      text: "Shows",
+      test: "a.test.ts::Row (AC2)",
+      evidence: ".featra/evidence/a.png",
+    });
+    // A criterion with parentheses of its own, and no link, keeps them.
+    const plain = parseCard(
+      story.replace("## Acceptance criteria\n\n", "## Acceptance criteria\n\n- [ ] Works (fast) offline\n"),
+    ).acs;
+    expect(plain[0]).toEqual({ done: false, text: "Works (fast) offline", test: null });
+  });
+
   it("accepts CRLF line endings", () => {
     expect(parseCard(story.replace(/\n/g, "\r\n")).acs).toHaveLength(2);
   });
@@ -213,7 +238,7 @@ describe("Featra's own backlog (real data)", () => {
     expect(validateCards(cards, config)).toEqual([]);
   });
 
-  it("uses the default config", () => {
-    expect(config).toEqual(DEFAULT_CONFIG);
+  it("uses the default config, reading CI's test report (STORY-57)", () => {
+    expect(config).toEqual({ ...DEFAULT_CONFIG, testReportArtifact: "test-report-unit" });
   });
 });
