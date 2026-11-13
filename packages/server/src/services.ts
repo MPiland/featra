@@ -21,6 +21,8 @@ import { createStoryMessage } from "./story-message.ts";
 import { createStorySpawn } from "./story-spawn.ts";
 import { createStoryAcceptance } from "./story-acceptance.ts";
 import { createStoryMerge } from "./story-merge.ts";
+import { createStoryAbandon } from "./story-abandon.ts";
+import { createStoryEnding } from "./story-ending.ts";
 import { createMergeRequest } from "./merge-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
@@ -150,17 +152,19 @@ export function createServices({
   });
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
-  // A story that is merging takes no message or Resume: its session is about to end (STORY-12).
-  const merging = (dir: string, id: string) => merges.isMerging(dir, id);
+  // A story that is merging or being abandoned takes no message, Send back or Resume: its session is about to end
+  // (STORY-12, STORY-58).
+  const ending = createStoryEnding();
+  const busy = ending.busy;
   const stops = createStoryStop({
     scan: watches.scan,
     now,
     lane,
     chats,
-    merging,
+    busy,
     ...(interruptMs ? { interruptMs } : {}),
   });
-  const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats, merging });
+  const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats, busy });
   const merges = createStoryMerge({
     scan: watches.scan,
     now,
@@ -171,6 +175,17 @@ export function createServices({
     checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
     gitCommand,
     ghCommand,
+    ending,
+  });
+  const abandons = createStoryAbandon({
+    scan: watches.scan,
+    now,
+    lane,
+    settings: checkSettings,
+    chats,
+    gitCommand,
+    ghCommand,
+    ending,
   });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
   const reports = createCardReport({
@@ -192,7 +207,7 @@ export function createServices({
     starts,
     spawns,
     reports,
-    messages: createStoryMessage({ scan: watches.scan, chats, merging }),
+    messages: createStoryMessage({ scan: watches.scan, chats, busy }),
     checkSettings,
     merges: createMergeRequest({ scan: watches.scan, chats, merge: merges.merge, log }),
   });
@@ -214,6 +229,8 @@ export function createServices({
     stops,
     acceptance,
     merges,
+    abandons,
+    busy,
     checks,
     checkSettings,
     prs,

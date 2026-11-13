@@ -58,6 +58,11 @@ export interface RepoGit {
   committedCards: (top: string, revs: readonly string[], cache: BlobCache) => Promise<Map<string, CommittedFile[]>>;
   /** Puts `path` back as HEAD has it in the working tree at `root`, or removes it when HEAD has none. */
   restore: (root: string, path: string, inHead: boolean) => Promise<void>;
+  /**
+   * Whether `rev` or a commit before it had a card file of `id` (STORY-58). A card its owner lacks but once had was
+   * deleted there. False when `rev` doesn't resolve.
+   */
+  hadCard: (top: string, rev: string, id: string) => Promise<boolean>;
 }
 
 const NO_COMMIT = /^0+$/;
@@ -151,6 +156,11 @@ export function createRepoGit(command = "git"): RepoGit {
       } finally {
         await batch.close();
       }
+    },
+    async hadCard(top, rev, id) {
+      const files = [`:(glob)${CARDS_DIR}/${id}.md`, `:(glob)${CARDS_DIR}/${id}-*.md`];
+      const r = await run(top, ["log", "-1", "--format=%H", rev, "--", ...files]);
+      return r.code === 0 && r.stdout.trim() !== "";
     },
     async restore(root, path, inHead) {
       if (inHead) {

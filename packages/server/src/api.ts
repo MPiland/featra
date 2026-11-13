@@ -1,4 +1,5 @@
 import {
+  abandonParams,
   assertNever,
   cardParams,
   cardUpdateParams,
@@ -29,6 +30,7 @@ import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
 import type { StoryAcceptance } from "./story-acceptance.ts";
 import type { StoryMerge } from "./story-merge.ts";
+import type { StoryAbandon } from "./story-abandon.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import type { StoryChecks } from "./story-checks.ts";
 import type { StoryPrs } from "./story-prs.ts";
@@ -55,7 +57,11 @@ export interface ApiDeps {
   stops: StoryStop;
   acceptance: StoryAcceptance;
   /** Merges stories into their features (STORY-12). Without it `story.merge` is refused. */
-  merges?: Pick<StoryMerge, "merge" | "isMerging">;
+  merges?: Pick<StoryMerge, "merge">;
+  /** Abandons stories (STORY-58). Without it `story.abandonCheck` and `story.abandon` are refused. */
+  abandons?: Pick<StoryAbandon, "check" | "abandon">;
+  /** Why a story's session takes no message from the user now: it is merging or being abandoned. */
+  busy?: (dir: string, id: string) => string | null;
   checks: StoryChecks;
   checkSettings: CheckSettings;
   prs: Pick<StoryPrs, "prState" | "decorate" | "createPr" | "focus">;
@@ -99,6 +105,8 @@ export function createApi({
   stops,
   acceptance,
   merges,
+  abandons,
+  busy,
   checks,
   checkSettings,
   prs,
@@ -122,7 +130,7 @@ export function createApi({
     allow(p.dir);
     return p;
   };
-  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, merging: merges?.isMerging });
+  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
     switch (method) {
@@ -225,6 +233,18 @@ export function createApi({
         if (!p) throw new ApiError("Expected { dir, id }.");
         if (!merges) throw new ApiError("Merging isn't available.");
         return merges.merge(allow(p.dir), p.id);
+      }
+      case "story.abandonCheck": {
+        const p = cardParams(params);
+        if (!p) throw new ApiError("Expected { dir, id }.");
+        if (!abandons) throw new ApiError("Abandoning isn't available.");
+        return abandons.check(allow(p.dir), p.id);
+      }
+      case "story.abandon": {
+        const p = abandonParams(params);
+        if (!p) throw new ApiError("Expected { dir, id, keep, token }.");
+        if (!abandons) throw new ApiError("Abandoning isn't available.");
+        return abandons.abandon(allow(p.dir), p.id, { keep: p.keep, token: p.token });
       }
       case "story.rerunChecks": {
         const p = cardParams(params);

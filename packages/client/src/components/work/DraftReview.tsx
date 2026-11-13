@@ -1,5 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CARD_COPY, type ReviewResult } from "../../card-pane.ts";
+import { ConfirmAsk } from "./ConfirmAsk.tsx";
 
 export interface DraftReviewProps {
   id: string;
@@ -21,39 +22,14 @@ export function DraftReview({ id, stories, onApprove, onReject, onRejected }: Dr
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const cancel = useRef<HTMLButtonElement>(null);
   const reject = useRef<HTMLButtonElement>(null);
   const back = useRef(false);
-  const dialog = useRef<HTMLDivElement>(null);
-  const question = useId();
 
   useEffect(() => {
-    if (asking) cancel.current?.focus();
-    else if (back.current) {
+    if (!asking && back.current) {
       back.current = false;
       reject.current?.focus();
     }
-  }, [asking]);
-
-  // While the question is open: Escape closes it wherever focus is, and focus can't leave it.
-  useEffect(() => {
-    if (!asking) return undefined;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.preventDefault();
-      e.stopPropagation();
-      back.current = true;
-      setAsking(false);
-    };
-    const onFocus = (e: FocusEvent) => {
-      if (e.target instanceof Node && !dialog.current?.contains(e.target)) cancel.current?.focus();
-    };
-    document.addEventListener("keydown", onKey, true);
-    document.addEventListener("focusin", onFocus);
-    return () => {
-      document.removeEventListener("keydown", onKey, true);
-      document.removeEventListener("focusin", onFocus);
-    };
   }, [asking]);
 
   const run = async (act: () => Promise<ReviewResult>, done?: () => void) => {
@@ -100,32 +76,18 @@ export function DraftReview({ id, stories, onApprove, onReject, onRejected }: Dr
         </div>
       )}
       {asking && (
-        // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-        <div
-          ref={dialog}
-          className="draft-ask"
-          role="alertdialog"
-          aria-label={CARD_COPY.reject}
-          aria-describedby={question}
-          onKeyDown={(e) => {
-            if (e.key !== "Tab") return;
-            const buttons = [...e.currentTarget.querySelectorAll("button")];
-            const edge = buttons[e.shiftKey ? 0 : buttons.length - 1];
-            if (e.target !== edge) return;
-            e.preventDefault();
-            buttons[e.shiftKey ? buttons.length - 1 : 0]?.focus();
-          }}
-        >
-          <p id={question}>{CARD_COPY.rejectAsk(id, stories)}</p>
-          <div className="send-back-actions">
+        <ConfirmAsk
+          label={CARD_COPY.reject}
+          cancel={CARD_COPY.rejectCancel}
+          onCancel={closeAsk}
+          actions={
             <button type="button" className="btn" aria-disabled={busy} onClick={() => void run(onReject, onRejected)}>
               {CARD_COPY.rejectConfirm}
             </button>
-            <button ref={cancel} type="button" className="btn" onClick={closeAsk}>
-              {CARD_COPY.rejectCancel}
-            </button>
-          </div>
-        </div>
+          }
+        >
+          <p>{CARD_COPY.rejectAsk(id, stories)}</p>
+        </ConfirmAsk>
       )}
       {error && (
         <p className="card-error" role="alert">

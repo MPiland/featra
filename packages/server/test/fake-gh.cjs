@@ -146,6 +146,15 @@ if (first === "--version") {
   remoteGit("update-ref", `refs/heads/${pr.base}`, commit, base);
   pr.state = "MERGED";
   write(state);
+} else if (first === "pr" && second === "close") {
+  // Closes the PR without merging it; its branch stays, as `gh pr close` without `--delete-branch` leaves it (STORY-58).
+  const pr = state.prs.find((p) => p.url === args[2]);
+  if (!pr) fail("GraphQL: Could not resolve to a PullRequest");
+  if (args.length !== 3) fail("fake gh: pr close takes the PR alone");
+  if (state.closeFails) fail(state.closeFails);
+  if (pr.state === "MERGED") fail(`X Pull request #${pr.number} can't be closed because it was already merged`);
+  pr.state = "CLOSED";
+  write(state);
 } else if (first === "pr" && second === "checks") {
   const pr = state.prs.find((p) => p.url === args[2]);
   if (!pr) fail("GraphQL: Could not resolve to a PullRequest");

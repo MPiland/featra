@@ -27,7 +27,8 @@
     "./approvals": "./src/approvals.ts",
     "./questions": "./src/questions.ts",
     "./tool-summary": "./src/tool-summary.ts",
-    "./merge-copy": "./src/merge-copy.ts"
+    "./merge-copy": "./src/merge-copy.ts",
+    "./abandon-copy": "./src/abandon-copy.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

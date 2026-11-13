@@ -38,3 +38,15 @@ export async function mergePr(
   const said = r.stderr || r.stdout;
   return CONFLICT.test(said) ? { conflict: true } : { error: because("Couldn't merge the PR", said) };
 }
+
+/**
+ * Closes the PR at `url` without merging it (STORY-58), with fixed args: its branch is deleted by Featra with git, as
+ * after a merge. Null once closed; else why not.
+ */
+export async function closePr(dir: string, url: string, deps: GithubPrDeps = {}): Promise<null | { error: string }> {
+  const safe = githubPrUrl(url);
+  if (!safe) return { error: "Couldn't close the PR." };
+  const r = await runGh(dir, ["pr", "close", safe], ghOptions(deps));
+  if (!r) return { error: "Couldn't close the PR." };
+  return r.code === 0 ? null : { error: because("Couldn't close the PR", r.stderr || r.stdout) };
+}

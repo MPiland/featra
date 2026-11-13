@@ -1832,3 +1832,37 @@ ADR 0033 (proposed) records the design. Choices to confirm:
   remains say so.
 - The two changed item-14 test expectations are stricter, not weaker. Approved.
 - Other build choices confirmed.
+
+## 2026-11-12 — STORY-58 build choices (story agent, for the Dev Lead to confirm)
+
+- **Where and what.** Abandon is in the story's card pane only, not its Work row or session. It applies to stories only;
+  a bug is refused ("isn't a story"). Any story that isn't merged or done can be abandoned, New to Acceptance, stopped
+  or not. A Cancelled story is offered it only while its worktree is still there. The rule is `abandonRefusal` in
+  work-format, used by the server and the card view (`abandonable`).
+- **Two calls, one token.** `story.abandonCheck` returns the warning; `story.abandon` carries its token (a digest of the
+  files, unpushed commits, tip, remote copies and PR). The story is read again after its turn stops and once more in
+  the card lane; any difference refuses with `changed` and nothing done.
+- **The Cancelled event is by `user`**, not `system`: it is the user's click. (Flag: the Dev Lead's note didn't say.)
+- **Stop, then re-check, then retire.** A running or queued turn is stopped (`chats.stop`), not retired, before the
+  re-check, so a stale token refuses without ending the session. The session is retired only after the re-check
+  passes. The chat stays as its transcript.
+- **One gate for merge and abandon.** `createStoryEnding` replaces Merge's own `isMerging`. Messages, Send back, Resume
+  and chat sends take a generic `busy(dir, id)` and refuse with the ending's own sentence. A second Abandon is refused
+  as "already being abandoned"; a Merge meanwhile as "being abandoned".
+- **PR close failure stops everything before the card.** The session is already retired by then (documented in ADR
+  0035); the worktree, branches and card are untouched, and the user can try again.
+- **Branches with git, not gh.** The local branch goes with `update-ref -d` at the tip read. Remote copies go with
+  `push --force-with-lease=<tip> --delete`, only where the remote tip is the local tip or behind it. A remote with
+  commits that aren't here stays and is said. An unreachable remote is said with Merge's note.
+- **Worktree story: the card change is committed on the feature branch** with Merge's plumbing (one parent; the
+  feature's older copy at a different path is dropped), message `STORY-N: abandoned, kept as Cancelled` or `… card
+  discarded`, and published to the local branch only. The worktree's own copy is written too, in case the worktree
+  stays. A feature branch that can't take it refuses with nothing removed.
+- **No-worktree story:** the owner copy is edited (or deleted) where it is checked out, uncommitted, like a card edit.
+- **Ghost cards (ADR 0035).** A card deleted at its owner was shown again from main's older copy. The scanner now asks
+  git, for a card whose owner has no copy, whether the owner deleted it (HEAD has it, or the owner's history had it),
+  and leaves it out with no problem. This changes owner resolution, so it is in the ADR.
+- **The index entry** goes with the next scan, which replaces all owner rows.
+- **Shared confirm UI.** Draft Reject's inline alertdialog is now `ConfirmAsk` (focus on Cancel, Escape, focus trap),
+  used by both.
+- **Discard closes the pane;** Keep leaves it open, showing what stayed (`remains`) as a status line.

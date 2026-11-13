@@ -81,6 +81,8 @@ export interface CardView {
   startable?: true;
   /** True on a Verified story in its own worktree, which Merge can merge into its feature (STORY-12); absent otherwise. */
   mergeable?: true;
+  /** True on a story that isn't merged or done, which Abandon can end (STORY-58); absent otherwise. */
+  abandonable?: true;
   /** True on a story merged into its feature (STORY-12); absent otherwise. */
   merged?: true;
   /** Why the card can't be edited here, or null when it can. */
@@ -213,6 +215,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(raw.awaiting === true ? { awaiting: true as const } : {}),
     ...(raw.startable === true ? { startable: true as const } : {}),
     ...(raw.mergeable === true ? { mergeable: true as const } : {}),
+    ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
   };
 }

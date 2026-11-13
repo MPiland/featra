@@ -27,12 +27,12 @@ describe("a turn that runs mid-merge (review fix)", { timeout: 60_000 }, () => {
   it("can't start: the Dev Lead's message and Resume are refused while the story merges", async () => {
     await local();
     await m.verified();
-    const messages = createStoryMessage({ scan: w.watches.scan, chats: m.chats, merging: m.merges.isMerging });
+    const messages = createStoryMessage({ scan: w.watches.scan, chats: m.chats, busy: m.merges.busy });
     const stops = createStoryStop({
       scan: w.watches.scan,
       now: w.clock.now,
       chats: { ...m.chats, stop: async () => {}, resume: async () => {}, dropQueued: () => false },
-      merging: m.merges.isMerging,
+      busy: m.merges.busy,
     });
     const refusals: string[] = [];
     const said = (err: unknown) => void refusals.push(err instanceof Error ? err.message : String(err));
@@ -56,13 +56,13 @@ describe("a turn that runs mid-merge (review fix)", { timeout: 60_000 }, () => {
       agents: {} as never,
       allow: (dir: string) => dir,
       project: () => w.repo.main,
-      merging: m.merges.isMerging,
+      busy: m.merges.busy,
     });
     const acceptance = createStoryAcceptance({
       scan: w.watches.scan,
       now: w.clock.now,
       chats: m.chats,
-      merging: m.merges.isMerging,
+      busy: m.merges.busy,
     });
     const refusals: string[] = [];
     const said = (err: unknown) => void refusals.push(err instanceof Error ? err.message : String(err));

@@ -4,6 +4,7 @@
  * `{ id, ok: false, error }`. Pure, so the server, the client and the tests share one copy.
  */
 import type { CardEdit, CardUpdateResult, CardView } from "./card-view-types.ts";
+import type { AbandonWarning } from "./abandon-copy.ts";
 import type { ApprovalChoice } from "./approvals.ts";
 import type { Answers } from "./questions.ts";
 import type { ChecksPatch, ChecksView } from "./checks-types.ts";
@@ -107,6 +108,20 @@ export interface ServerMethods {
    * what was left behind (a worktree or branch that couldn't be removed); empty when it all went.
    */
   "story.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
+  /**
+   * What abandoning a story would lose (STORY-58): its uncommitted files, commits no remote has, the open PR it closes,
+   * and the branch it removes. Refused with why when it can't be abandoned.
+   */
+  "story.abandonCheck": { params: { dir: string; id: string }; result: AbandonWarning };
+  /**
+   * Abandons a story the user confirmed (STORY-58): its session stops, its PR closes, and its worktree and its local and
+   * remote branches go; its card is kept as Cancelled (`keep`) or deleted. Refused when the story no longer matches the
+   * warning's `token`. `remains` says what was left behind; empty when it all went.
+   */
+  "story.abandon": {
+    params: { dir: string; id: string; keep: boolean; token: string };
+    result: { remains: string[] };
+  };
   /**
    * Runs a story's checks on this computer again now (STORY-56): the check command and the linked tests. Refused when
    * checks run in CI for the project or the story isn't in review. The result reaches the card through `card.view`.

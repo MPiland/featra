@@ -78,7 +78,19 @@ function ownerOfCopies(copies: readonly Parsed[], state: BranchState): OwnerLoca
   return fallback ? ownerOf(fallback.card, state) : { kind: "main" };
 }
 
-export function resolveCopies(copies: readonly CardCopy[], state: BranchState): Resolution {
+/** Cards shown from a copy that isn't their owner's: the owner has none. */
+export const orphans = (resolution: Resolution): OwnedCard[] =>
+  resolution.cards.filter((c) => !sameLocation(c.owner, c.shownFrom));
+
+/**
+ * `gone` holds the cards deleted at their owner (STORY-58: an abandoned story's card discarded): older copies elsewhere
+ * don't bring them back, so they aren't shown at all.
+ */
+export function resolveCopies(
+  copies: readonly CardCopy[],
+  state: BranchState,
+  gone: ReadonlySet<string> = new Set(),
+): Resolution {
   const problems: string[] = [];
   const byId = new Map<string, Parsed[]>();
   const ordered = copies.toSorted((a, b) => rank(a.location) - rank(b.location) || a.path.localeCompare(b.path));
@@ -103,6 +115,7 @@ export function resolveCopies(copies: readonly CardCopy[], state: BranchState): 
   const cards: OwnedCard[] = [];
   const stale: StaleCopy[] = [];
   for (const [id, group] of byId) {
+    if (gone.has(id)) continue;
     const owner = ownerOfCopies(group, state);
     const own = group.find((c) => sameLocation(c.location, owner));
     const shown = own ?? group[0];

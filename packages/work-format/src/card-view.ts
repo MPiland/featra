@@ -5,6 +5,7 @@
 import { awaitingAcceptance } from "./acceptance.ts";
 import { isMerged } from "./history.ts";
 import { mergeRefusal } from "./merge.ts";
+import { abandonRefusal } from "./abandon.ts";
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
 import type { CardChecks } from "./checks-types.ts";
@@ -87,6 +88,7 @@ export function buildCardView(
     ...(awaitingAcceptance(card, ctx.config) ? { awaiting: true as const } : {}),
     ...(notStartableReason(card, card.id) === null ? { startable: true as const } : {}),
     ...(mergeRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { mergeable: true as const } : {}),
+    ...(abandonRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { abandonable: true as const } : {}),
     ...(isMerged(card) ? { merged: true as const } : {}),
     ...(draftChat === null
       ? {}

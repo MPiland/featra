@@ -19,8 +19,11 @@ export interface MergeCommitInput {
   /** The branch it lands on, first; the commit merged into it, second. One parent makes a plain card commit on it. */
   parents: readonly string[];
   path: string;
-  text: string;
+  /** The card's text; null deletes it (STORY-58). */
+  text: string | null;
   message: string;
+  /** Other files of the card to delete: its old names, when it was renamed. */
+  drop?: readonly string[];
 }
 
 export interface RemovedStory {
@@ -228,7 +231,9 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
     mergeTree,
     mergeCommit,
     publish,
+    removeFolder,
     removeStory,
+    remoteTip,
     deleteRemote,
     deleteFromRemotes,
     fetchTip,
