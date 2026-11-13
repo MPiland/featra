@@ -12,8 +12,11 @@ import {
   buildWorkList,
   DEFAULT_CONFIG,
   draftStories,
+  isMerged,
   isStopped,
   MAIN,
+  mergedStory,
+  mergeRefusal,
   planApproval,
   resumedStory,
   resumeRefusal,
@@ -28,6 +31,7 @@ import {
   type CardPr,
   type CardView,
   type OwnedCard,
+  type OwnerLocation,
   type WorkList,
 } from "@featra/work-format";
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
@@ -46,13 +50,27 @@ export type ReviewAnswers = Partial<
     | "sendBackStory"
     | "rerunChecks"
     | "createPr"
+    | "mergeStory"
   >
 >;
 
 /** The time the fake server stamps on a card edit. */
 export const EDIT_AT = "2026-11-05T12:00:00Z";
 
-const owned = (card: Card): OwnedCard => ({ card, owner: MAIN, shownFrom: MAIN, path: `.featra/cards/${card.id}.md` });
+/**
+ * Where a card lives, as the server resolves it (ADR 0002): a started story in its worktree until it merges, then on
+ * its feature branch (STORY-12); everything else on main. Every location is checked out here.
+ */
+function ownerOf(card: Card): OwnerLocation {
+  if (!card.branch) return MAIN;
+  if (isMerged(card)) return { kind: "feature", branch: featureBranch(card) };
+  return { kind: "worktree", branch: card.branch, path: `/worktrees/${card.id}` };
+}
+const featureBranch = (story: Card) => `feature/${story.parent ?? ""}`;
+const owned = (card: Card): OwnedCard => {
+  const owner = ownerOf(card);
+  return { card, owner, shownFrom: owner, path: `.featra/cards/${card.id}.md` };
+};
 const replace = (cards: Card[], card: Card) => cards.map((c) => (c.id === card.id ? card : c));
 
 /**
@@ -260,6 +278,17 @@ export function fakeCardServer(
     createPr: async (dir, id) => {
       calls.push(`createPr:${dir}:${id}`);
       return review.createPr ? review.createPr(dir, id) : { ok: true };
+    },
+    // Merging is the server's to prove (git, gh, the worktree): the fake refuses with work-format's rule, as the server
+    // does for a card main owns, unless the test sets the answer.
+    mergeStory: async (dir, id) => {
+      calls.push(`mergeStory:${dir}:${id}`);
+      if (review.mergeStory) return review.mergeStory(dir, id);
+      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
+      const why = mergeRefusal(card && owned(card), id, DEFAULT_CONFIG, true);
+      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
+      changed(dir, mergedStory(card, featureBranch(card), "system", EDIT_AT));
+      return { ok: true, remains: [] };
     },
     reject: async (dir, id) => {
       calls.push(`reject:${dir}:${id}`);

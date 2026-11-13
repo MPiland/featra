@@ -11,12 +11,10 @@ import {
   checksApply,
   checksWhere,
   GITHUB_COPY,
+  isMerged,
   prContent,
   prIsOpen,
-  serializeCard,
-  setPr,
   stageCategory,
-  toIso,
   type CardPr,
   withPrStatus,
   type PrStatus,
@@ -24,7 +22,7 @@ import {
 } from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { ApiError } from "./api-error.ts";
-import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
+import { ownedIn } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { createCiProven } from "./ci-proven.ts";
 import type { CiReportDeps } from "./ci-report.ts";
@@ -36,6 +34,7 @@ import type { Timers } from "./inbox.ts";
 import { ciRead, headIsStale, UNVERIFY } from "./pr-ci.ts";
 import { createPrPoller } from "./pr-poller.ts";
 import { watchProjects } from "./project-watch.ts";
+import { recordPr } from "./story-pr-record.ts";
 import { baseOf, keyOf, seenOf, type ProjectSeen } from "./story-prs-seen.ts";
 import type { Scan } from "./work-scan.ts";
 import type { WorkWatches } from "./work-watch.ts";
@@ -50,6 +49,8 @@ export interface StoryPrsDeps extends CiReportDeps {
   lane?: CardLane;
   log: (message: string) => void;
   focusMs?: number;
+  /** A story's PR was read as merged while its worktree still has it: the merge settles (STORY-12, story-merge.ts). */
+  onMerged?: (dir: string, id: string) => Promise<void>;
 }
 
 export const PR_REFUSALS = {
@@ -84,15 +85,6 @@ export function createStoryPrs(deps: StoryPrsDeps) {
     closed || !seen.has(dir) ? false : recordEvidence({ scan: scanDir, lane, now }, dir, id, outcome);
   const proven = createCiProven({ ...deps, record: evidence });
 
-  /** Records the PR on the owner copy, unless someone set another `pr` there meanwhile: theirs stands. */
-  const recordPr = (dir: string, id: string, url: string) =>
-    lane.exclusive(async () => {
-      const found = ownedIn(await scanDir(dir), id);
-      if (!found?.root || (found.owned.card.pr && found.owned.card.pr !== url)) return;
-      const next = setPr(found.owned.card, url, "system", toIso(now()));
-      if (next !== found.owned.card) await writeAtomic(fileIn(found.root, found.owned.path), serializeCard(next));
-    });
-
   /** Pushes and opens (or adopts) story `id`'s PR; null once it has one, else why not. */
   async function openNow(dir: string, id: string): Promise<string | null> {
     const scan = await scanDir(dir);
@@ -112,7 +104,7 @@ export function createStoryPrs(deps: StoryPrsDeps) {
       (await createPr(dir, { base, head: card.branch, ...prContent(card) }, deps));
     if (typeof pr === "string") return pr;
     read.set(keyOf(dir, id), { url: pr.url, status: pr.status, head: pr.head });
-    await recordPr(dir, id, pr.url);
+    await recordPr({ scan: scanDir, lane, now }, dir, id, pr.url);
     return null;
   }
 
@@ -164,7 +156,10 @@ export function createStoryPrs(deps: StoryPrsDeps) {
     return note;
   }
 
-  /** Reads `dir`'s open PRs of stories not yet done; their checks are the evidence when checks run in CI. */
+  /**
+   * Reads `dir`'s open PRs of stories not yet done; their checks are the evidence when checks run in CI. A PR merged
+   * while its story still has its worktree (a Done story too) settles that merge.
+   */
   async function refresh(dir: string) {
     if (!(await refreshUse(dir))) return;
     const scan = await scanDir(dir);
@@ -172,16 +167,21 @@ export function createStoryPrs(deps: StoryPrsDeps) {
     const { config } = scan.collected;
     const ci = checksWhere(config, await settings.github(dir)) === "ci";
     let changed = false;
-    for (const { card } of scan.resolution.cards) {
+    for (const { card, owner } of scan.resolution.cards) {
       const category = stageCategory(card.status, config);
-      if (card.type !== "story" || !card.pr || category === "done" || category === null) continue;
+      const unsettled = owner.kind === "worktree" && !isMerged(card);
+      if (card.type !== "story" || !card.pr || category === null || (category === "done" && !unsettled)) continue;
       const key = keyOf(dir, card.id);
       const last = read.get(key);
-      if (last?.url === card.pr && !prIsOpen(last.status)) continue;
+      if (last?.url === card.pr && !prIsOpen(last.status) && !(unsettled && last.status.state === "merged")) continue;
       const pr = await readPrAt(dir, card.pr, deps);
       if (!pr || closed || !seen.has(dir)) continue;
       changed ||= JSON.stringify(last?.status) !== JSON.stringify(pr.status) || last?.url !== card.pr;
       read.set(key, { url: card.pr, status: pr.status, head: pr.head });
+      if (pr.status.state === "merged" && unsettled) {
+        if (deps.onMerged) await deps.onMerged(dir, card.id);
+        continue;
+      }
       if (ci && checksApply(card, config)) {
         const outcome = await ciRead(dir, card, pr, last?.url === card.pr ? last.head : undefined, deps);
         await evidence(dir, card.id, outcome);

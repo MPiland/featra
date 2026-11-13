@@ -20,6 +20,8 @@ import { createFeatureStart } from "./feature-start.ts";
 import { createStoryMessage } from "./story-message.ts";
 import { createStorySpawn } from "./story-spawn.ts";
 import { createStoryAcceptance } from "./story-acceptance.ts";
+import { createStoryMerge } from "./story-merge.ts";
+import { createMergeRequest } from "./merge-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
@@ -128,6 +130,7 @@ export function createServices({
     log,
     gitCommand,
     ghCommand,
+    onMerged: (dir, id) => merges.merged(dir, id),
   });
   const roles = createRoleRegistry({
     fs: roleFs,
@@ -147,8 +150,28 @@ export function createServices({
   });
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
-  const stops = createStoryStop({ scan: watches.scan, now, lane, chats, ...(interruptMs ? { interruptMs } : {}) });
-  const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats });
+  // A story that is merging takes no message or Resume: its session is about to end (STORY-12).
+  const merging = (dir: string, id: string) => merges.isMerging(dir, id);
+  const stops = createStoryStop({
+    scan: watches.scan,
+    now,
+    lane,
+    chats,
+    merging,
+    ...(interruptMs ? { interruptMs } : {}),
+  });
+  const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats, merging });
+  const merges = createStoryMerge({
+    scan: watches.scan,
+    now,
+    lane,
+    log,
+    settings: checkSettings,
+    chats,
+    checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
+    gitCommand,
+    ghCommand,
+  });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
   const reports = createCardReport({
     scan: watches.scan,
@@ -169,8 +192,9 @@ export function createServices({
     starts,
     spawns,
     reports,
-    messages: createStoryMessage({ scan: watches.scan, chats }),
+    messages: createStoryMessage({ scan: watches.scan, chats, merging }),
     checkSettings,
+    merges: createMergeRequest({ scan: watches.scan, chats, merge: merges.merge, log }),
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
@@ -189,6 +213,7 @@ export function createServices({
     spawns,
     stops,
     acceptance,
+    merges,
     checks,
     checkSettings,
     prs,

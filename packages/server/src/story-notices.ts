@@ -44,6 +44,8 @@ export interface StoryNotices {
   removed: (c: Chat) => void;
   /** A story session that waited for a slot could not start. */
   failedStart: (c: Chat, reason: string) => void;
+  /** Puts `notice` in the Dev Lead's chat `id`, when it can still be told (STORY-12: how a merge it asked for went). */
+  tell: (id: string, notice: Notice) => void;
   /** A chat's agent ended: what it held, notices and questions, goes with it. */
   forget: (c: Chat) => void;
 }
@@ -167,6 +169,10 @@ export function createStoryNotices({ chats, open, send, askUser, log }: NoticeHo
       const story = c.summary.story;
       const lead = story ? leadOf(c) : null;
       if (story && lead) post(lead, { story: story.id, outcome: "failed", summary: oneLine(reason) });
+    },
+    tell(id, notice) {
+      const lead = chats.get(id);
+      if (lead && !lead.closed && lead.summary.story === undefined && lead.refusal === null) post(lead, notice);
     },
     forget(c) {
       asking.delete(c.id);

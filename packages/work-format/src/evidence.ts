@@ -6,12 +6,17 @@ import { isOneOf } from "./utils/guards.ts";
  * Evidence vocabulary written to `history[]` with field `evidence` (ADR 0004):
  * - `verified` / `unverified`: the PR's required CI checks passed / stopped passing (e.g. a new push)
  * - `proven:<n>` / `unproven:<n>`: AC number n (1-based) had its linked test pass / fail
+ * - `checked:<commit>`: the commit the latest verdict was for, recorded when it changes (STORY-12), so a merge after a
+ *   restart knows whether Verified is for the branch's current head; `checked:` alone when a verdict's commit wasn't
+ *   known, so an older commit never stands beside a newer verdict
  * Acceptance uses field `accepted` with `accepted` / `withdrawn`.
  */
 export const VERIFIED = "verified";
 export const UNVERIFIED = "unverified";
 export const provenEvent = (ac: number) => `proven:${ac}`;
 export const unprovenEvent = (ac: number) => `unproven:${ac}`;
+const CHECKED = "checked:";
+export const checkedEvent = (commit: string) => `${CHECKED}${commit}`;
 
 export interface EvidenceState {
   /** The latest status move or progress report was an agent session's: it is the agent's claim, not proof. */
@@ -24,16 +29,20 @@ export interface EvidenceState {
   proven: boolean;
   /** The user signed off. */
   accepted: boolean;
+  /** The commit the latest verdict was for; null when none was recorded. */
+  checkedHead: string | null;
 }
 
 export function evidenceState(card: Card): EvidenceState {
   let verified = false;
   let accepted = false;
+  let checkedHead: string | null = null;
   const proven = new Set<number>();
   for (const e of card.history) {
     if (e.field === "evidence") {
       if (e.to === VERIFIED) verified = true;
       else if (e.to === UNVERIFIED) verified = false;
+      else if (e.to?.startsWith(CHECKED)) checkedHead = e.to.slice(CHECKED.length) || null;
       else {
         const m = /^(proven|unproven):(\d+)$/.exec(e.to ?? "");
         if (m?.[1] === "proven") proven.add(Number(m[2]));
@@ -52,6 +61,7 @@ export function evidenceState(card: Card): EvidenceState {
     provenAcs,
     proven: card.acs.length > 0 && provenAcs.length === card.acs.length,
     accepted,
+    checkedHead,
   };
 }
 

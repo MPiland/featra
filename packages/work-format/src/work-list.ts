@@ -3,6 +3,8 @@
  * count comes from the rollups (ADR 0003) at the moment the list is built; nothing here is stored.
  */
 import { awaitingAcceptance } from "./acceptance.ts";
+import { isMerged } from "./history.ts";
+import { mergeRefusal } from "./merge.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { evidenceState } from "./evidence.ts";
@@ -81,6 +83,7 @@ function storyRow(
   added: ReadonlySet<string>,
   config: ProjectConfig,
   editable: ReadonlySet<string>,
+  mergeable: ReadonlySet<string>,
 ): StoryRow {
   const tone = stageTone(card.status, config);
   return {
@@ -99,6 +102,8 @@ function storyRow(
     ...(evidenceState(card).reported ? { reported: true as const } : {}),
     stopped: stoppedIn(card, tone),
     awaiting: editable.has(card.id) && awaitingAcceptance(card, config),
+    mergeable: mergeable.has(card.id),
+    merged: isMerged(card),
   };
 }
 
@@ -108,10 +113,11 @@ function featureRow(
   cards: readonly Card[],
   config: ProjectConfig,
   editable: ReadonlySet<string>,
+  mergeable: ReadonlySet<string>,
 ): FeatureRow {
   const scope = feature ? scopeSummary(feature.id, cards, config) : null;
   const added = new Set(scope?.added.map((a) => a.id));
-  const rows = stories.toSorted(byOrder).map((s) => storyRow(s, added, config, editable));
+  const rows = stories.toSorted(byOrder).map((s) => storyRow(s, added, config, editable, mergeable));
   const counted = feature ? itemsOf(feature.id, cards) : stories.filter((s) => s.status !== CANCELLED);
   const tones = counted.map((s) => stageTone(s.status, config));
   const done = tones.filter((t) => t === "done").length;
@@ -159,6 +165,9 @@ export function buildWorkList(
   canEdit: (owned: OwnedCard) => boolean = () => true,
 ): WorkList {
   const editable = new Set(resolution.cards.filter(canEdit).map((o) => o.card.id));
+  const mergeable = new Set(
+    resolution.cards.filter((o) => mergeRefusal(o, o.card.id, config, canEdit(o)) === null).map((o) => o.card.id),
+  );
   const cards = resolution.cards.map((c) => c.card);
   const epics = cards.filter((c) => c.type === "epic").toSorted(byOrder);
   const features = cards.filter((c) => c.type === "feature").toSorted(byOrder);
@@ -172,6 +181,7 @@ export function buildWorkList(
       cards,
       config,
       editable,
+      mergeable,
     );
 
   const rows: EpicRow[] = epics.map((e) => {
@@ -187,7 +197,7 @@ export function buildWorkList(
 
   const loose = features.filter((f) => !f.parent || !epicIds.has(f.parent)).map(rowOf);
   const orphans = items.filter((s) => !s.parent || !featureIds.has(s.parent));
-  if (orphans.length) loose.push(featureRow(null, orphans, cards, config, editable));
+  if (orphans.length) loose.push(featureRow(null, orphans, cards, config, editable, mergeable));
   if (loose.length) {
     const tones = loose.filter((f) => f.id !== null && f.status !== "cancelled").map((f) => f.tone);
     const done = tones.filter((t) => t === "done").length;

@@ -7,7 +7,7 @@
 import { settleDone } from "./acceptance.ts";
 import { stageCeiling } from "./card-report.ts";
 import { COMMAND_MAX, stageCategory } from "./config.ts";
-import { evidenceState, provenEvent, UNVERIFIED, unprovenEvent, VERIFIED } from "./evidence.ts";
+import { checkedEvent, evidenceState, provenEvent, UNVERIFIED, unprovenEvent, VERIFIED } from "./evidence.ts";
 import { recordEvidence } from "./history.ts";
 import type { ChecksWhere, GithubDetection } from "./checks-types.ts";
 import { isRecord } from "./utils/guards.ts";
@@ -66,6 +66,8 @@ export interface CheckOutcome {
   passed: boolean | null;
   /** AC number (1-based) and whether every test linked to it passed. */
   acs: readonly { ac: number; passed: boolean }[];
+  /** The commit the verdict is for (STORY-12): recorded as `checked:<commit>` when the check command ran on it. */
+  head?: string;
 }
 
 /**
@@ -76,6 +78,11 @@ export interface CheckOutcome {
 export function withCheckEvidence(card: Card, config: ProjectConfig, outcome: CheckOutcome, by: string, at: string) {
   const before = evidenceState(card);
   let next = card;
+  // The commit first, so the verdict stays the run's last word on the card.
+  // A verdict whose commit isn't known clears the one before: Verified is then for no known commit.
+  if (outcome.passed !== null && (outcome.head || null) !== before.checkedHead) {
+    next = recordEvidence(next, checkedEvent(outcome.head ?? ""), by, at);
+  }
   if (outcome.passed === true && !before.verified) next = recordEvidence(next, VERIFIED, by, at);
   if (outcome.passed === false && before.verified) next = recordEvidence(next, UNVERIFIED, by, at);
   for (const { ac, passed } of outcome.acs) {

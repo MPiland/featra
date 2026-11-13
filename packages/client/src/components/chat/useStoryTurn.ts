@@ -26,8 +26,10 @@ export function useStoryTurn(work: WorkBridge, { chats, chat, dir }: Pick<ChatVi
   const stopped = row?.stopped === true;
   return {
     stopped,
-    resumable: row !== undefined && canResume(stopped, summary.stalled, row.tone),
+    // A merged story's session is history: nothing resumes it (STORY-12).
+    resumable: row !== undefined && !row.merged && canResume(stopped, summary.stalled, row.tone),
     queued: summary.queued,
     awaiting: row?.awaiting === true,
+    mergeable: row?.mergeable === true,
   };
 }

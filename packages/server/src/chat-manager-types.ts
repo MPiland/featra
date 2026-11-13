@@ -8,6 +8,7 @@ import type {
   Inbox,
   InboxItem,
   ModeInfo,
+  Notice,
   ProviderInfo,
   SettingsChange,
   TitleBy,
@@ -25,6 +26,14 @@ export interface McpAttach {
   release: (chat: string) => void;
 }
 
+/** A request the app asks the user for an agent: the row it shows as, and the story it is about. */
+export interface AppApproval {
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+  story: string;
+}
+
 export interface ChatManager {
   /**
    * Starts a story's agent as a chat in its worktree (STORY-9, ADR 0025), now or Queued when the project is at its
@@ -39,6 +48,19 @@ export interface ChatManager {
    * nothing is running), then `before`, then the message is sent: a failing `before` sends nothing.
    */
   resume: (id: string, before?: () => Promise<void>) => Promise<void>;
+  /**
+   * Ends a merged story's session for good (STORY-12): a running turn is stopped and its agent ends, so nothing holds
+   * its worktree. The chat stays, and opens as its transcript.
+   */
+  retire: (id: string) => Promise<void>;
+  /**
+   * Asks the user, in chat `id` and the Inbox, to approve a step the app takes for the chat's agent (STORY-12's
+   * request_merge). It outlives the turn that asked. True when the user allows it; false when they deny it, or the
+   * chat's agent ends first.
+   */
+  askApproval: (id: string, request: AppApproval) => Promise<boolean>;
+  /** Puts a notice in the Dev Lead's chat `id`, as story sessions' notices are (STORY-12: how a merge it asked for went). */
+  notify: (id: string, notice: Notice) => void;
   /** Takes a story session that is queued and has never started out of the queue, and forgets it. False if it isn't one. */
   dropQueued: (id: string) => boolean;
   /** Whether a session for the story is waiting for a free slot. */

@@ -47,6 +47,28 @@ function tipOf(branch) {
   }
 }
 
+/** Runs git in the remote that stands in for GitHub, as GitHub's own bot. */
+function remoteGit(...gitArgs) {
+  const identity = ["-c", "user.name=GitHub", "-c", "user.email=noreply@github.com"];
+  try {
+    const said = execFileSync("git", ["--git-dir", state.remote, ...identity, ...gitArgs], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return { code: 0, out: String(said).trim() };
+  } catch (err) {
+    return { code: typeof err.status === "number" ? err.status : 128, out: String(err.stdout ?? "").trim() };
+  }
+}
+
+/** The tree merging the PR's head into its base makes, or null when it conflicts (STORY-12), as GitHub works it out. */
+function mergedTree(pr) {
+  const base = tipOf(pr.base);
+  const head = tipOf(pr.head);
+  if (!base || !head) return null;
+  const r = remoteGit("merge-tree", "--write-tree", base, head);
+  return r.code === 0 ? r.out.split(/\r?\n/)[0] : null;
+}
+
 /** The PR's checks: those of its head commit when they are kept per commit, else its own. */
 const checksOf = (pr) => (pr.checksAt ? (pr.checksAt[tipOf(pr.head) ?? ""] ?? []) : (pr.checks ?? []));
 
@@ -105,7 +127,25 @@ if (first === "--version") {
   if (state.viewDelayMs) sleep(state.viewDelayMs);
   const pr = state.prs.find((p) => p.url === args[2]);
   if (!pr) fail("GraphQL: Could not resolve to a PullRequest");
-  out(view(pr));
+  if ((flag("--json") ?? "").split(",").includes("mergeable")) {
+    out({ ...view(pr), mergeable: pr.state !== "OPEN" ? "UNKNOWN" : mergedTree(pr) ? "MERGEABLE" : "CONFLICTING" });
+  } else out(view(pr));
+} else if (first === "pr" && second === "merge") {
+  // A merge commit of the head into the base, in the remote, only at the head commit asked for (STORY-12).
+  const pr = state.prs.find((p) => p.url === args[2]);
+  if (!pr) fail("GraphQL: Could not resolve to a PullRequest");
+  if (!args.includes("--merge")) fail("fake gh: only merge commits");
+  if (state.mergeFails) fail(state.mergeFails);
+  if (pr.state !== "OPEN") fail(`Pull request #${pr.number} is not open`);
+  const head = tipOf(pr.head);
+  if (flag("--match-head-commit") !== head) fail("GraphQL: Head branch was modified. Review and try the merge again.");
+  const tree = mergedTree(pr);
+  if (!tree) fail(`X Pull request #${pr.number} is not mergeable: the merge commit cannot be cleanly created.`);
+  const base = tipOf(pr.base);
+  const commit = remoteGit("commit-tree", tree, "-p", base, "-p", head, "-m", `Merge pull request #${pr.number}`).out;
+  remoteGit("update-ref", `refs/heads/${pr.base}`, commit, base);
+  pr.state = "MERGED";
+  write(state);
 } else if (first === "pr" && second === "checks") {
   const pr = state.prs.find((p) => p.url === args[2]);
   if (!pr) fail("GraphQL: Could not resolve to a PullRequest");

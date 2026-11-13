@@ -8,6 +8,7 @@ import type { ProposeInput } from "./checks.ts";
 import type { DraftInput, DraftResult } from "./card-draft-input.ts";
 import type { LogFile, LogInput } from "./knowledge-log.ts";
 import type { ReportInput } from "./card-report.ts";
+import type { RequestMergeInput } from "./merge.ts";
 import type { MessageInput } from "./story-notice.ts";
 import type { SpawnInput } from "./story-start.ts";
 import { isRecord } from "./utils/guards.ts";
@@ -36,6 +37,8 @@ export interface AgentMethods {
   "session.message": { params: MessageInput; result: { story: string } };
   /** The Dev Lead proposes the project's check command and linked-test command for the user to confirm (STORY-56). */
   "checks.propose": { params: ProposeInput; result: { proposed: string[] } };
+  /** The Dev Lead asks the user to merge a story it started (STORY-12): a card in its chat and the Inbox. */
+  "story.requestMerge": { params: RequestMergeInput; result: { story: string } };
 }
 export type AgentMethod = keyof AgentMethods;
 export const AGENT_METHODS = [
@@ -46,6 +49,7 @@ export const AGENT_METHODS = [
   "card.update",
   "session.message",
   "checks.propose",
+  "story.requestMerge",
 ] as const satisfies readonly AgentMethod[];
 
 export interface AgentRequest {

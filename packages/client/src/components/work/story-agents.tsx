@@ -3,6 +3,7 @@ import { canResume, isStartable } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
 import type { AcceptActions, StartStoryResult } from "../../card-pane.ts";
 import { WORK_COPY } from "../../work-list.ts";
+import type { MergeAction } from "./MergeStory.tsx";
 import { StoryStop, type StopActions } from "./StoryStop.tsx";
 import { useAction } from "./useAction.ts";
 
@@ -23,6 +24,8 @@ export interface StoryAgents {
   stops: StopActions;
   /** Accept and Send back on a story waiting in Acceptance (STORY-23). */
   acceptance: AcceptActions;
+  /** Merge on a Verified story (STORY-12). */
+  merge: MergeAction;
 }
 
 const NONE: StoryAgents = {
@@ -35,6 +38,7 @@ const NONE: StoryAgents = {
   stalled: () => false,
   stops: { stop: async () => ({ ok: true }), resume: async () => ({ ok: true }) },
   acceptance: { accept: async () => ({ ok: true }), sendBack: async () => ({ ok: true, recorded: true }) },
+  merge: async () => ({ ok: true, remains: [] }),
 };
 
 export const StoryAgentsContext = createContext<StoryAgents>(NONE);
@@ -56,7 +60,8 @@ export function StoryAgent({ id }: { id: string }) {
       id={id}
       state={{
         stopped: story.stopped,
-        resumable: canResume(story.stopped, agents.stalled(id), story.tone),
+        // A merged story's session is history: nothing resumes it (STORY-12).
+        resumable: !story.merged && canResume(story.stopped, agents.stalled(id), story.tone),
         active: agents.running(id) || agents.queued(id),
       }}
       actions={agents.stops}

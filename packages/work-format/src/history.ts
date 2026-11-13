@@ -37,6 +37,9 @@ export function setPr(card: Card, to: string, by: string, at: string): Card {
   return { ...change(card, "pr", card.pr, to, by, at), pr: to };
 }
 
+/** Whether the card's history records the story's merge into its feature branch (STORY-12). */
+export const isMerged = (card: Pick<Card, "history">): boolean => card.history.some((e) => e.field === "merged");
+
 /** Records the user's Accept (or its withdrawal). */
 export function recordAcceptance(card: Card, accepted: boolean, by: string, at: string): Card {
   return change(card, "accepted", null, accepted ? "accepted" : "withdrawn", by, at);

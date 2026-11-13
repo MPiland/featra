@@ -50,7 +50,12 @@ export interface CardBridge {
   resumeStory: (dir: string, id: string) => Promise<ReviewResult>;
   /** Pushes the story's branch and opens its PR through the user's gh (STORY-11). */
   createPr: (dir: string, id: string) => Promise<ReviewResult>;
+  /** Merges a Verified story into its feature branch with a merge commit (STORY-12). */
+  mergeStory: (dir: string, id: string) => Promise<MergeResult>;
 }
+
+/** That a merge went, with what it left behind (a worktree or branch that couldn't be removed); or why not. */
+export type MergeResult = { ok: true; remains: string[] } | { ok: false; error: string };
 
 /** The chat the story's agent runs in, and whether it waits for a free slot; or why it didn't start. */
 export type StartStoryResult = { ok: true; chat: string; queued: boolean } | { ok: false; error: string };
@@ -193,6 +198,14 @@ export function serverCards(server: ServerClient): CardBridge {
     stopStory: (dir, id) => review(server.call("story.stop", { dir, id })),
     resumeStory: (dir, id) => review(server.call("story.resume", { dir, id })),
     createPr: (dir, id) => review(server.call("story.createPr", { dir, id })),
+    mergeStory: (dir, id) =>
+      server.call("story.merge", { dir, id }).then(
+        (r): MergeResult => ({
+          ok: true,
+          remains: isRecord(r) && Array.isArray(r.remains) ? r.remains.filter((x) => typeof x === "string") : [],
+        }),
+        (err: unknown): MergeResult => ({ ok: false, error: errorMessage(err) }),
+      ),
   };
 }
 
@@ -212,6 +225,7 @@ export function noCards(error: string): CardBridge {
     start: async () => ({ ok: false, error }),
     startStory: async () => ({ ok: false, error }),
     rerunChecks: async () => ({ ok: false, error }),
+    mergeStory: async () => ({ ok: false, error }),
     stopStory: async () => ({ ok: false, error }),
     resumeStory: async () => ({ ok: false, error }),
     createPr: async () => ({ ok: false, error }),

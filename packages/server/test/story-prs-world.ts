@@ -59,6 +59,8 @@ export interface PrWorld {
   settle: () => Promise<void>;
   /** The `gh` calls of one kind (`pr view`, `pr list`, `api`). */
   callsOf: (kind: string) => Promise<string[][]>;
+  /** What the poller calls when it reads a story's PR merged on GitHub (STORY-12); nothing until a test sets it. */
+  onMerged?: (dir: string, id: string) => Promise<void>;
 }
 
 export const storyCard = (status: string, extra: Partial<Card> = {}): Card => ({
@@ -124,6 +126,7 @@ export function prWorld(): PrWorld {
       now: w.clock.now,
       timers: w.clock.timers,
       log: () => {},
+      onMerged: async (dir, id) => w.onMerged?.(dir, id),
       ...deps,
     });
     await w.watches.watch(repo.main, () => {});

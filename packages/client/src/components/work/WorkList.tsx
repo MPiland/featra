@@ -76,6 +76,7 @@ export function WorkList(props: {
         accept: (id) => work.acceptStory(project.dir, id),
         sendBack: (id, reason, addCriterion) => work.sendBackStory(project.dir, id, reason, addCriterion),
       },
+      merge: (id) => work.mergeStory(project.dir, id),
       start: (id) => work.startStory(project.dir, id),
       open: onOpenChat,
     };

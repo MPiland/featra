@@ -20,6 +20,8 @@ export interface StoryControlHost {
   /** Claims the session's next turn, refused when one runs or is claimed (see chat-send.ts). */
   claim: (c: Chat) => () => void;
   listChanged: (dir: string) => void;
+  /** Ends the chat's agent, keeping the chat. */
+  end: (c: Chat) => void;
   log: (message: string) => void;
 }
 
@@ -32,8 +34,19 @@ export function storyControl({
   notices,
   claim,
   listChanged,
+  end,
   log,
-}: StoryControlHost): Pick<ChatManager, "resume" | "stop" | "dropQueued"> {
+}: StoryControlHost): Pick<ChatManager, "resume" | "stop" | "dropQueued" | "retire"> {
+  async function stop(id: string) {
+    const c = chat(id);
+    if (!c.running && !c.summary.queued) return;
+    // A turn still waiting for a slot just leaves the queue: it never started, so it has no end to record.
+    if (await stories.cancelTurn(c)) {
+      if (c.running) record(c, { type: "turn-end", outcome: "stopped" });
+      return;
+    }
+    if (c.running) await c.agent?.interrupt();
+  }
   return {
     async resume(id, before = async () => {}) {
       await open(id);
@@ -62,15 +75,17 @@ export function storyControl({
         release();
       }
     },
-    async stop(id) {
+    stop,
+    async retire(id) {
       const c = chat(id);
-      if (!c.running && !c.summary.queued) return;
-      // A turn still waiting for a slot just leaves the queue: it never started, so it has no end to record.
-      if (await stories.cancelTurn(c)) {
-        if (c.running) record(c, { type: "turn-end", outcome: "stopped" });
-        return;
+      try {
+        await stop(id);
+      } catch (err) {
+        log(`A merged story's session couldn't be stopped: ${errorMessage(err)}`);
       }
-      if (c.running) await c.agent?.interrupt();
+      // Its agent goes, so nothing holds the worktree; the chat stays, and opens as its transcript.
+      end(c);
+      listChanged(c.dir);
     },
     dropQueued(id) {
       const c = chat(id);

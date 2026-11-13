@@ -11,6 +11,7 @@ import {
   chatStartParams,
   chatUndoParams,
   inboxParams,
+  MERGE_MESSAGES,
   type Inbox,
   type ServerMethod,
   type ServerMethods,
@@ -35,9 +36,11 @@ export interface ChatApiDeps {
   allow: (dir: string) => string;
   /** The open project a request's `{ dir }` names. */
   project: (params: unknown) => string;
+  /** Whether a story is merging (STORY-12): its session is about to end, so the user's message isn't sent. */
+  merging?: (dir: string, id: string) => boolean;
 }
 
-export function createChatApi({ chats, roles, allowed, agents, allow, project }: ChatApiDeps) {
+export function createChatApi({ chats, roles, allowed, agents, allow, project, merging = () => false }: ChatApiDeps) {
   /** A chat in an open project, by the `{ id }` its method was sent. */
   const chat = (params: unknown): string => {
     const p = chatParams(params);
@@ -85,6 +88,8 @@ export function createChatApi({ chats, roles, allowed, agents, allow, project }:
         if (!p) throw new ApiError("Expected { id, text }.");
         const chatId = chat(params);
         await chats.open(chatId);
+        const story = chats.info(chatId)?.storyId;
+        if (story && merging(chats.dirOf(chatId) ?? "", story)) throw new ApiError(MERGE_MESSAGES.busy(story));
         chats.send(chatId, p.text);
         return null;
       }
