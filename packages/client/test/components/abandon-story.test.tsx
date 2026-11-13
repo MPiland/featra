@@ -56,7 +56,11 @@ describe("the warning (AC1)", () => {
     const risks = within(dialog)
       .getAllByRole("listitem")
       .map((li) => li.textContent);
-    expect(risks).toEqual(["1 uncommitted file: notes.txt", "1 commit not pushed: abc1234 Add a", "PR #12 is closed"]);
+    expect(risks).toEqual([
+      "1 uncommitted file: notes.txt",
+      "1 commit only on this branch: abc1234 Add a",
+      "PR #12 closes",
+    ]);
     expect(within(dialog).getByText(ABANDON_COPY.removes("featra/story-5-x", ["origin"]))).toBeTruthy();
     expect(document.activeElement).toBe(within(dialog).getByRole("button", { name: ABANDON_COPY.cancel }));
   });

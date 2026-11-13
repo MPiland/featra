@@ -2,11 +2,12 @@
  * Abandoning a story (STORY-58, ADR 0035): always the user's click. `check` warns what would be lost; `abandon` goes
  * ahead only while the story still matches that warning (its token).
  *
- * In order: the story's turn stops and the story is read again; then its session is retired (the chat stays, as its
- * transcript), its open PR is closed, and in the card lane the card is kept as Cancelled or deleted, committed on the
- * feature branch for a story in its own worktree (which owns it from then on), else written where its owner has it.
- * Only then do the worktree and the branches go. A failure before the card step leaves the story as it was (its session
- * retired, its PR closed); one after leaves notes of what stayed, and the card already says it was abandoned.
+ * In order (review ruling): the story's turn stops and the story is read again; its open PR is closed; then, in the card
+ * lane, the story is read once more, its session is retired (the chat stays, as its transcript), and the card is kept
+ * as Cancelled or deleted: committed on the feature branch for a story in its own worktree (which owns it from then on)
+ * or owned by that branch, else written where its owner has it. Only then do the worktree and the branches go. A
+ * failure before the card step leaves the story and its session as they were (its PR closed, if it got that far); one
+ * after leaves notes of what stayed, and the card already says it was abandoned.
  */
 import { createHash } from "node:crypto";
 import { rm } from "node:fs/promises";
@@ -26,11 +27,12 @@ import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { CheckSettings } from "./check-settings.ts";
+import { githubRemote } from "./github-detect.ts";
 import { closePr } from "./github-merge.ts";
 import { readPrAt, type GithubPrDeps } from "./github-prs.ts";
 import type { runGit } from "./git-run.ts";
 import { createMergeGit, REMOVE_NOTES } from "./merge-git.ts";
-import { featureBranchOf } from "./merge-settle.ts";
+import { featureBranchOf, SETTLE_NOTES } from "./merge-settle.ts";
 import { createStoryEnding, type StoryEnding } from "./story-ending.ts";
 import type { Scan } from "./work-scan.ts";
 
@@ -53,7 +55,8 @@ interface Look {
   /** The token of the git part alone, which closing the PR doesn't change. */
   local: string;
   scan: Scan;
-  root: string;
+  /** Where the owner copy is checked out; null for a feature branch that isn't. */
+  root: string | null;
   /** The story's branch, when it has one: its worktree's, else the one its card names. */
   branch: string | null;
   tip: string | null;
@@ -87,16 +90,16 @@ export function createStoryAbandon(deps: StoryAbandonDeps) {
     const config = scan?.collected.config;
     if (!scan || !config) throw new ApiError(ABANDON_MESSAGES.gone);
     const refusal = abandonRefusal(found?.owned, id, config, found?.root != null);
-    if (refusal !== null || !found?.root) throw new ApiError(refusal ?? ABANDON_MESSAGES.readOnly);
+    if (refusal !== null || !found) throw new ApiError(refusal ?? ABANDON_MESSAGES.gone);
     const { card, owner, path } = found.owned;
     const top = scan.collected.paths.top;
     const inWorktree = owner.kind === "worktree";
-    const feature = featureBranchOf(scan, card);
+    const feature = owner.kind === "feature" ? owner.branch : featureBranchOf(scan, card);
     if (inWorktree && !feature) throw new ApiError(ABANDON_MESSAGES.noFeature(id));
     const branch = inWorktree ? owner.branch : card.branch;
     const tip = branch ? await git.commitOf(top, `refs/heads/${branch}`) : null;
-    const files = inWorktree ? await git.uncommitted(found.root, path) : [];
-    const lost = tip ? await branches.unpushed(top, tip, feature) : { shas: [], commits: [] };
+    const files = inWorktree && found.root ? await git.uncommitted(found.root, path) : [];
+    const lost = tip && branch ? await branches.unpushed(top, tip, branch, feature) : { shas: [], commits: [] };
     const remote = branch ? await branches.remoteCopies(top, branch, tip) : { deletable: [], kept: [] };
     const pr = withPr ? await openPr(dir, id, card.pr) : null;
     const shown = branch !== null && (tip !== null || remote.deletable.length > 0 || inWorktree) ? branch : null;
@@ -121,11 +124,22 @@ export function createStoryAbandon(deps: StoryAbandonDeps) {
     return session;
   }
 
+  /** How far the feature branch is ahead of GitHub's copy, as STORY-12's note; null when it isn't, or can't tell. */
+  async function aheadNote(dir: string, top: string, feature: string): Promise<string | null> {
+    const remote = await githubRemote(dir, deps.gitCommand);
+    const there = remote ? await git.fetchTip(top, remote.name, feature) : null;
+    if (!there) return null;
+    const r = await git.git(top, ["rev-list", "--count", `${there}..refs/heads/${feature}`]);
+    const commits = Number(r.stdout.trim());
+    return r.code === 0 && commits > 0 ? SETTLE_NOTES.ahead(feature, commits) : null;
+  }
+
   /**
    * Keeps the card as Cancelled, or deletes it, on the feature branch, so a story in its own worktree leaves its card
-   * there. Throws, with nothing changed, when the branch can't take it.
+   * there; nothing when the branch has it so already (an abandon tried again). Throws, with nothing changed, when the
+   * branch can't take it. Says how far that leaves the branch ahead of GitHub.
    */
-  async function onFeature(l: Look, id: string, text: string | null, keep: boolean) {
+  async function onFeature(dir: string, l: Look, id: string, text: string | null, keep: boolean) {
     const { scan } = l;
     const feature = l.feature ?? "";
     const top = scan.collected.paths.top;
@@ -139,16 +153,19 @@ export function createStoryAbandon(deps: StoryAbandonDeps) {
     const drop = there && there.path !== owned.path ? [there.path] : [];
     const message = abandonCommitMessage(id, keep);
     const made = await git.mergeCommit(top, { parents: [old], path: owned.path, text, message, drop });
-    if ("conflicts" in made || !(await git.publish(top, feature, made.commit, old))) {
+    if ("conflicts" in made) throw new ApiError(ABANDON_MESSAGES.featureBusy(feature));
+    const trees = (await git.git(top, ["rev-parse", `${made.commit}^{tree}`, `${old}^{tree}`])).stdout.split(/\r?\n/);
+    if (trees[0] !== trees[1] && !(await git.publish(top, feature, made.commit, old))) {
       throw new ApiError(ABANDON_MESSAGES.featureBusy(feature));
     }
+    return aheadNote(dir, top, feature);
   }
 
   /** The story's worktree, then its local and remote branches, removed; what stayed, as notes. */
   async function removeBranches(l: Look, inWorktree: boolean): Promise<string[]> {
     const { branch } = l;
     const top = l.scan.collected.paths.top;
-    if (inWorktree && !(await git.removeFolder(top, l.root))) {
+    if (inWorktree && l.root && !(await git.removeFolder(top, l.root))) {
       return [REMOVE_NOTES.folder(l.root), ...(branch ? [REMOVE_NOTES.branch(branch)] : [])];
     }
     if (!branch) return [];
@@ -168,25 +185,32 @@ export function createStoryAbandon(deps: StoryAbandonDeps) {
       const session = await stopTurn(dir, id);
       const seen = await look(dir, id);
       if (seen.warning.token !== token) throw new ApiError(ABANDON_MESSAGES.changed(id));
-      if (session !== null) await chats.retire(session);
       if (seen.warning.pr !== null) {
         const closed = await closePr(dir, seen.warning.pr, deps);
         if (closed) throw new ApiError(closed.error);
       }
       return lane.exclusive(async () => {
-        // Read again in the lane, past the PR: its session is gone, so nothing new should be here.
+        // Read again in the lane, past the PR: its turn is stopped and no new one starts, so nothing new should be here.
         const l = await look(dir, id, false);
         if (l.local !== seen.local) throw new ApiError(ABANDON_MESSAGES.changed(id));
         const owned = ownedIn(l.scan, id)?.owned;
         if (!owned) throw new ApiError(ABANDON_MESSAGES.gone);
-        const inWorktree = owned.owner.kind === "worktree";
+        if (session !== null) await chats.retire(session);
+        const kind = owned.owner.kind;
         const text = keep ? serializeCard(abandonedStory(owned.card, "user", toIso(now()))) : null;
-        if (inWorktree) await onFeature(l, id, text, keep);
-        // The owner's copy says it too, so a worktree that stays reads as abandoned.
-        const file = fileIn(l.root, owned.path);
-        if (text === null) await rm(file, { force: true });
-        else await write(file, text);
-        const remains = await removeBranches(l, inWorktree);
+        const remains: string[] = [];
+        if (kind !== "main") {
+          const ahead = await onFeature(dir, l, id, text, keep);
+          if (ahead !== null) remains.push(ahead);
+        }
+        // The owner's copy says it too where it is checked out, so a worktree that stays reads as abandoned. A feature
+        // branch's copy is the commit just made.
+        if (kind !== "feature" && l.root) {
+          const file = fileIn(l.root, owned.path);
+          if (text === null) await rm(file, { force: true });
+          else await write(file, text);
+        }
+        remains.push(...(await removeBranches(l, kind === "worktree")));
         await scanDir(dir);
         return { remains };
       });

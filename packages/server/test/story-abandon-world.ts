@@ -2,13 +2,14 @@
  * The world of the abandon tests (STORY-58): the merge world (a real repository with FEAT-1's branch and STORY-1's
  * worktree, the real scanner, watches, settings and PR poller; GitHub as the fake `gh` over a bare remote), with the
  * real abandon module on it, sharing one ending gate. Only the platform is faked: GitHub, the clock, and the chat
- * manager, which records the turns it was asked to stop and the sessions it retired.
+ * manager, which records the turns it was asked to stop and the sessions it retired; git's runner where a test sets one.
  */
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { beforeEach } from "vitest";
 import { parseCard, type Card } from "@featra/work-format";
+import { runGit } from "../src/git-run.ts";
 import { createStoryAbandon, type StoryAbandon } from "../src/story-abandon.ts";
 import { createStoryEnding, type StoryEnding } from "../src/story-ending.ts";
 import type { Scan } from "../src/work-scan.ts";
@@ -72,6 +73,7 @@ export function abandonWorld(): AbandonWorld {
       },
       ending: a.ending,
       ghCommand: options.noGh ? "gh-that-is-not-installed" : w.gh.command,
+      gitRun: (...args) => (m.gitRun ?? runGit)(...args),
     });
   };
   a.check = (id = "STORY-1") => a.abandons.check(w.repo.main, id);

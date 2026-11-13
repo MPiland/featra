@@ -92,14 +92,16 @@ describe("which stories can be abandoned", () => {
     expect(abandonRefusal(owned(cancelled, TREE), "STORY-1", config, true)).toBeNull();
   });
 
-  it("refuses where its owner copy isn't checked out", () => {
-    expect(abandonRefusal(owned(working(), FEATURE), "STORY-1", config, false)).toBe(ABANDON_MESSAGES.readOnly);
+  it("refuses where its owner copy isn't checked out, unless a feature branch owns it (review ruling)", () => {
+    expect(abandonRefusal(owned(working(), MAIN), "STORY-1", config, false)).toBe(ABANDON_MESSAGES.readOnly);
+    expect(abandonRefusal(owned(working(), FEATURE), "STORY-1", config, false)).toBeNull();
   });
 
   it("is offered on the card pane exactly when it is allowed", () => {
     expect(view(working(), TREE)?.abandonable).toBe(true);
     expect(view(moves(working(), [2, "Done"]), TREE)?.abandonable).toBeUndefined();
-    expect(view(working(), FEATURE, false)?.abandonable).toBeUndefined();
+    expect(view(working(), MAIN, false)?.abandonable).toBeUndefined();
+    expect(view(working(), FEATURE, false)?.abandonable).toBe(true);
   });
 });
 
@@ -168,8 +170,8 @@ describe("the warning (AC1)", () => {
     const lines = warningLines(w);
     expect(lines.risks).toEqual([
       "7 uncommitted files: a.ts, b.ts, c.ts, d.ts, e.ts and 2 more",
-      "1 commit not pushed: abc1234 Add a",
-      "PR #12 is closed",
+      "1 commit only on this branch: abc1234 Add a",
+      "PR #12 closes",
     ]);
     expect(lines.removes).toBe("Its worktree and the branch claude/story-1-x are removed, here and on origin.");
   });

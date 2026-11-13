@@ -84,7 +84,7 @@ export const orphans = (resolution: Resolution): OwnedCard[] =>
 
 /**
  * `gone` holds the cards deleted at their owner (STORY-58: an abandoned story's card discarded): older copies elsewhere
- * don't bring them back, so they aren't shown at all.
+ * don't bring them back, so they aren't shown at all. An uncommitted edit to one of those copies is still stale.
  */
 export function resolveCopies(
   copies: readonly CardCopy[],
@@ -115,8 +115,13 @@ export function resolveCopies(
   const cards: OwnedCard[] = [];
   const stale: StaleCopy[] = [];
   for (const [id, group] of byId) {
-    if (gone.has(id)) continue;
     const owner = ownerOfCopies(group, state);
+    if (gone.has(id)) {
+      // Not shown, but an uncommitted edit to it elsewhere is still flagged, never dropped silently.
+      for (const c of group)
+        if (c.workingTree && c.edited) stale.push({ cardId: id, location: c.location, path: c.path, owner });
+      continue;
+    }
     const own = group.find((c) => sameLocation(c.location, owner));
     const shown = own ?? group[0];
     if (!shown) continue;

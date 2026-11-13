@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { ABANDON_MESSAGES, CANCELLED } from "@featra/work-format";
 import { ABANDON_NOTES } from "../src/abandon-git.ts";
 import { indexFile, openCardIndex } from "../src/card-index.ts";
+import { SETTLE_NOTES } from "../src/merge-settle.ts";
 import { abandonWorld, FEATURE_BRANCH, PR, SESSION, STORY_BRANCH } from "./story-abandon-world.ts";
 
 const a = abandonWorld();
@@ -27,7 +28,7 @@ async function featureRow() {
 }
 
 describe("the warning (AC1)", { timeout: 60_000 }, () => {
-  it("names uncommitted files, commits not pushed, the PR it closes, the branch and the remote", async () => {
+  it("names uncommitted files, commits only on this branch, the PR it closes, the branch and the remote", async () => {
     await a.start();
     await m.verified();
     await a.commitInTree("late.txt", "Late work");
@@ -39,8 +40,10 @@ describe("the warning (AC1)", { timeout: 60_000 }, () => {
       branch: STORY_BRANCH,
       remotes: ["origin"],
     });
-    expect(warning.unpushed).toHaveLength(1);
+    // The PR's commit is on GitHub only on the story's own branch, which goes with it (review fix), so it is listed too.
+    expect(warning.unpushed).toHaveLength(2);
     expect(warning.unpushed[0]).toMatch(/^[0-9a-f]{7,} Late work$/);
+    expect(warning.unpushed[1]).toMatch(/^[0-9a-f]{7,} work$/);
   });
 
   it("warns of nothing but the worktree and branch when nothing would be lost", async () => {
@@ -73,7 +76,8 @@ describe("abandoning with GitHub usable (AC2, AC3)", { timeout: 60_000 }, () => 
     await m.verified();
     expect((await featureRow())?.progress).toMatchObject({ total: 1 });
     const { token } = await a.check();
-    await expect(a.abandon(true, token)).resolves.toEqual({ remains: [] });
+    // The card's commit leaves the feature branch ahead of GitHub's copy, as Merge says (review fix).
+    await expect(a.abandon(true, token)).resolves.toEqual({ remains: [SETTLE_NOTES.ahead(FEATURE_BRANCH, 1)] });
 
     expect(await w.callsOf("pr close")).toEqual([["pr", "close", PR]]);
     expect((await w.gh.load()).prs[0]?.state).toBe("CLOSED");
@@ -113,6 +117,7 @@ describe("abandoning with GitHub usable (AC2, AC3)", { timeout: 60_000 }, () => 
     expect(w.remoteBranches()).toContain(STORY_BRANCH);
     expect(a.cardOn(FEATURE_BRANCH)?.status).toBe("Ready");
     expect((await w.read()).status).toBe("In Review");
+    expect(m.retired).toEqual([]);
   });
 
   it("leaves a remote branch with commits that aren't here, and says so", async () => {
@@ -123,7 +128,9 @@ describe("abandoning with GitHub usable (AC2, AC3)", { timeout: 60_000 }, () => 
     w.repo.git(w.tree, "reset", "-q", "--hard", "HEAD~1");
     const { token, remotes } = await a.check();
     expect(remotes).toEqual([]);
-    await expect(a.abandon(true, token)).resolves.toEqual({ remains: [ABANDON_NOTES.ahead(STORY_BRANCH)] });
+    await expect(a.abandon(true, token)).resolves.toEqual({
+      remains: [SETTLE_NOTES.ahead(FEATURE_BRANCH, 1), ABANDON_NOTES.ahead(STORY_BRANCH)],
+    });
     expect(a.treeExists()).toBe(false);
     expect(m.hasBranch(STORY_BRANCH)).toBe(false);
     expect(w.remoteBranches()).toContain(STORY_BRANCH);

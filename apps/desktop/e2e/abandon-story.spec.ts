@@ -75,7 +75,7 @@ test("Abandon a story: it warns, closes the PR, removes its worktree and branche
     const ask = page.getByRole("alertdialog", { name: "Abandon" });
     await expect(ask).toContainText(`Abandon ${id}?`);
     await expect(ask.getByRole("listitem").filter({ hasText: "notes.txt" })).toBeVisible();
-    await expect(ask.getByRole("listitem").filter({ hasText: "PR #1 is closed" })).toBeVisible();
+    await expect(ask.getByRole("listitem").filter({ hasText: "PR #1 closes" })).toBeVisible();
     await expect(ask).toContainText(`the branch ${branch} are removed, here and on origin.`);
 
     // AC2, AC3: kept as Cancelled; the PR closes, and the worktree and both branches go.

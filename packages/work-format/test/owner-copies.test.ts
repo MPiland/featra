@@ -69,11 +69,17 @@ describe("resolveCopies: one owner per card", () => {
     expect(orphans(r).map((c) => c.card.id)).toEqual(["STORY-1"]);
   });
 
-  it("leaves out a card its owner deleted, with no problem, however many older copies it left (STORY-58)", () => {
+  it("leaves out a card its owner deleted, however many older copies it left, but flags an edit to one (STORY-58)", () => {
     const copies = [copy(MAIN, s1), copy(OTHER_WT, s1, { edited: true, text: "changed" }), copy(FB, f1)];
     const r = resolveCopies(copies, active, new Set(["STORY-1"]));
     expect(r.cards.map((c) => c.card.id)).toEqual(["FEAT-1"]);
     expect(r.problems).toEqual([]);
+    // Review ruling: an uncommitted edit isn't dropped silently (ADR 0002's stale copies).
+    expect(r.stale).toEqual([{ cardId: "STORY-1", location: OTHER_WT, path: ".featra/cards/STORY-1-x.md", owner: WT }]);
+  });
+
+  it("flags nothing for a deleted card whose older copies are unedited (STORY-58)", () => {
+    const r = resolveCopies([copy(MAIN, s1), copy(FB, f1)], active, new Set(["STORY-1"]));
     expect(r.stale).toEqual([]);
   });
 

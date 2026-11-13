@@ -183,17 +183,30 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
   }
 
   /**
-   * Deletes `branch` on `remote` when everything on it is merged into `into`, and only at the commit read (a lease), so
-   * a push that lands meanwhile is never deleted. Null once gone (one already gone counts), else what to tell the user.
+   * Deletes `branch` on `remote` when `safe` allows its tip there (null; else why it stays), and only at that commit (a
+   * lease), so a push that lands meanwhile is never deleted. Null once gone (one already gone counts), else what to tell
+   * the user. Merge and Abandon both delete through this, each with its own `safe`.
    */
-  async function deleteRemote(top: string, remote: string, branch: string, into: string): Promise<string | null> {
+  async function deleteRemote(
+    top: string,
+    remote: string,
+    branch: string,
+    safe: (tip: string) => Promise<string | null>,
+  ): Promise<string | null> {
     const tip = await remoteTip(top, remote, branch);
     if (tip === null) return null;
     if (tip === undefined) return REMOVE_NOTES.remote(branch);
-    if (!(await isAncestor(top, tip, `refs/heads/${into}`))) return REMOVE_NOTES.unmerged(branch);
+    const why = await safe(tip);
+    if (why !== null) return why;
     const r = await git(top, ["push", `--force-with-lease=refs/heads/${branch}:${tip}`, remote, "--delete", branch]);
     return r.code === 0 ? null : REMOVE_NOTES.remote(branch);
   }
+
+  /** Merge's `safe`: everything on the remote branch is merged into `into`. */
+  const mergedInto =
+    (top: string, branch: string, into: string) =>
+    async (tip: string): Promise<string | null> =>
+      (await isAncestor(top, tip, `refs/heads/${into}`)) ? null : REMOVE_NOTES.unmerged(branch);
 
   /**
    * Deletes `branch` from every remote that has it, after a merge made without GitHub, as `deleteRemote` does. A
@@ -208,7 +221,7 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
         remains.add(REMOVE_NOTES.remote(branch));
       }
       if (!tip) continue;
-      const note = await deleteRemote(top, remote, branch, into);
+      const note = await deleteRemote(top, remote, branch, mergedInto(top, branch, into));
       if (note !== null) remains.add(note);
     }
     return [...remains];
@@ -235,6 +248,7 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
     removeStory,
     remoteTip,
     deleteRemote,
+    mergedInto,
     deleteFromRemotes,
     fetchTip,
   };

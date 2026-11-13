@@ -32,7 +32,7 @@ export const ABANDON_MESSAGES = {
 
 /**
  * Why story `id` can't be abandoned, or null when it can. `writable` says whether its owner copy is checked out, which
- * Abandon writes.
+ * Abandon writes; a feature branch's copy is committed on the branch instead, so it needn't be.
  */
 export function abandonRefusal(
   owned: OwnedCard | undefined,
@@ -46,7 +46,7 @@ export function abandonRefusal(
   if (isMerged(card)) return ABANDON_MESSAGES.merged(id);
   if (stageCategory(card.status, config) === "done") return ABANDON_MESSAGES.done(id);
   if (card.status === CANCELLED && owned.owner.kind !== "worktree") return ABANDON_MESSAGES.cancelled(id);
-  if (!writable) return ABANDON_MESSAGES.readOnly;
+  if (!writable && owned.owner.kind !== "feature") return ABANDON_MESSAGES.readOnly;
   return null;
 }
 

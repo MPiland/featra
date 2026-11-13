@@ -26,11 +26,12 @@ export const ABANDON_NOTES = {
 
 export function createAbandonGit(git: MergeGit) {
   /**
-   * The commits on the story's branch at `tip` that no remote-tracking branch and no `feature` branch has, newest first,
-   * as `<short commit> <subject>`, with the full commits in `shas`.
+   * The commits on the story's branch at `tip` that go with it, newest first, as `<short commit> <subject>`, with the
+   * full commits in `shas`: those in no `feature` branch and on no remote-tracking branch but the story's own, which is
+   * deleted with it (review fix).
    */
-  async function unpushed(top: string, tip: string, feature: string | null) {
-    const not = ["--not", "--remotes", ...(feature ? [`refs/heads/${feature}`] : [])];
+  async function unpushed(top: string, tip: string, branch: string, feature: string | null) {
+    const not = ["--not", `--exclude=*/${branch}`, "--remotes", ...(feature ? [`refs/heads/${feature}`] : [])];
     const out = (await git.must(top, ["log", "--format=%H %h %s", tip, ...not, "--"])).stdout;
     const lines = out.split(/\r?\n/).filter(Boolean);
     return {
@@ -69,13 +70,16 @@ export function createAbandonGit(git: MergeGit) {
     return r.code === 0 ? null : REMOVE_NOTES.branch(branch);
   }
 
-  /** Deletes `branch` on each remote of `copies`, only at the commit read there; a note for each that stays. */
+  /**
+   * Deletes `branch` on each remote of `copies` through the merge's `deleteRemote`, only while it is still at the commit
+   * the warning read there; a note for each that stays.
+   */
   async function deleteCopies(top: string, branch: string, copies: readonly RemoteCopy[]): Promise<string[]> {
     const remains = new Set<string>();
     for (const { remote, tip } of copies) {
-      const lease = `--force-with-lease=refs/heads/${branch}:${tip}`;
-      const r = await git.git(top, ["push", lease, remote, "--delete", branch]);
-      if (r.code !== 0) remains.add(REMOVE_NOTES.remote(branch));
+      const same = async (now: string) => (now === tip ? null : ABANDON_NOTES.ahead(branch));
+      const note = await git.deleteRemote(top, remote, branch, same);
+      if (note !== null) remains.add(note);
     }
     return [...remains];
   }

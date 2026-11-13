@@ -9,7 +9,10 @@ import { isRecord } from "./utils/guards.ts";
 export interface AbandonWarning {
   /** Uncommitted and untracked files in the story's worktree, its own card left out. */
   files: string[];
-  /** Commits on the story's branch that no remote and no feature branch has, as `<short commit> <subject>`. */
+  /**
+   * Commits on the story's branch that go with it: on no other remote branch and not in its feature branch, as
+   * `<short commit> <subject>`. A copy on the story's own remote branch is deleted with it, so it doesn't count.
+   */
   unpushed: string[];
   /** The open PR that Abandon closes, as its URL; null when there is none. */
   pr: string | null;
@@ -43,8 +46,8 @@ export const ABANDON_COPY = {
   files: (files: readonly string[]) =>
     `${plural(files.length, "uncommitted file", "uncommitted files")}: ${fileList(files)}`,
   unpushed: (commits: readonly string[]) =>
-    `${plural(commits.length, "commit", "commits")} not pushed: ${fileList(commits)}`,
-  pr: (url: string) => `PR ${prLabel(url)} is closed`,
+    `${plural(commits.length, "commit", "commits")} only on this branch: ${fileList(commits)}`,
+  pr: (url: string) => `PR ${prLabel(url)} closes`,
   /** What always goes: the worktree and the branch, here and on the remotes that have it. */
   removes: (branch: string, remotes: readonly string[]) =>
     remotes.length > 0

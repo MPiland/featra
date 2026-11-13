@@ -162,7 +162,7 @@ export function CardPane({
               />
             </div>
           )}
-          {view.type === "story" && !readOnly && (
+          {view.type === "story" && (!readOnly || view.abandonable === true) && (
             <div className="draft-actions">
               <MergeStory
                 key={`merge-${id}`}

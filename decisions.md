@@ -1866,3 +1866,37 @@ ADR 0033 (proposed) records the design. Choices to confirm:
 - **Shared confirm UI.** Draft Reject's inline alertdialog is now `ConfirmAsk` (focus on Cancel, Escape, focus trap),
   used by both.
 - **Discard closes the pane;** Keep leaves it open, showing what stayed (`remains`) as a status line.
+
+## 2026-11-12 — STORY-58 review fixes
+
+The Dev Lead's rulings on the review of 974c646, fixed in a new commit. Each bug has a regression test that failed
+before its fix.
+
+- **Loss set.** The warning now lists every commit that goes with the branch: those not on the feature branch and on no
+  remote branch but the story's own (`--exclude=*/<branch> --remotes`). A branch pushed with no PR is no longer a plain
+  question. The copy says "N commits only on this branch:" rather than "not pushed", since pushed ones are listed too.
+  The AC1 server test now expects the PR's pushed commit beside the unpushed one (2, was 1): the ruling changes what is
+  lost, not the assertion's strength.
+- **Order** (overrules build choice 5): stop the turn, re-check, close the PR, then in the card lane re-check, retire,
+  write the card, remove. A PR that can't be closed or a `changed` refusal leaves the session alive; the PR-close test
+  now also asserts `m.retired` is empty.
+- **Feature-owned stories** are abandonable when the feature branch isn't checked out: the card is changed on it with
+  plumbing, and the writable requirement is dropped for a feature-branch owner (`abandonRefusal`, card view, pane).
+- **Edits to a hidden card stay visible.** The scanner still leaves a card its owner deleted out of the list, but an
+  uncommitted working-tree edit to an older copy is reported as stale. The owner-copies test that asserted `stale: []`
+  for an edited copy encoded the wrong behaviour; it now expects the stale copy (Dev Lead approved), and a new test
+  keeps unedited older copies silent.
+- **Ahead note.** After the card commit, Abandon adds Merge's "<feature> is N commits ahead of GitHub; push it." when
+  the feature branch is ahead of its GitHub copy. The two GitHub tests that expected no such note now expect it.
+- **One remote delete.** `merge-git.deleteRemote` takes a `safe(tip)` predicate; Merge passes `mergedInto`, Abandon
+  "still at the tip the warning read". STORY-12's tests pass unchanged.
+- **api.ts** is under 300 lines: Merge and Abandon's handlers moved to `api-story-end.ts`.
+- **Copy:** "PR #1 closes".
+- **An abandon tried again** (after the worktree stayed) makes no commit when the feature branch's tree is unchanged.
+- **ADR 0035** says the token covers file names, not later edits to a listed file, and states the new order, the loss
+  set, the feature-owner path, the shared remote delete and that edits to a hidden card are still reported.
+- **Disagreement, item 11 (`epicProgress`).** Not a bug: feature cards use the lowercase container statuses
+  (`draft`, `approved`, `active`, `done`, `cancelled`; `CONTAINER_STATUSES`, enforced by validate), and only stories
+  and bugs use `Cancelled`. So `c.status !== "cancelled"` is right, and "Cancelled" would never match a feature. The
+  existing `rollup.test.ts` "counts done features, excluding cancelled" already proves cancelled features are left out
+  of epic bars; no change made.

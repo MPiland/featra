@@ -93,7 +93,7 @@ export function createMergeSettle({ scan: scanDir, now, lane, chats, git, write 
       const removed = await git.removeStory(top, found.root, path, owner.branch, into);
       remains.push(...removed.remains);
       if (removed.removed && remote) {
-        const note = await git.deleteRemote(top, remote.name, owner.branch, into);
+        const note = await git.deleteRemote(top, remote.name, owner.branch, git.mergedInto(top, owner.branch, into));
         if (note !== null) remains.push(note);
       } else if (removed.removed) {
         remains.push(...(await git.deleteFromRemotes(top, owner.branch, into)));
