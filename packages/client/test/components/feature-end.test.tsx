@@ -33,7 +33,7 @@ type App = ReturnType<typeof renderApp>;
 const feature = (app: App) => app.cardsIn(PROJECT.dir).find((c) => c.id === ID) as Card;
 const accept = (scope: HTMLElement) => within(scope).queryByRole("button", { name: FEATURE_END_COPY.acceptOf(ID) });
 const merge = (scope: HTMLElement) =>
-  within(scope).queryByRole<HTMLButtonElement>("button", { name: FEATURE_END_COPY.mergeOf(ID) });
+  within(scope).queryByRole<HTMLButtonElement>("button", { name: FEATURE_END_COPY.mergeOf(ID, "main") });
 
 /** The Work list with the feature's cards, and its card opened from its row. */
 async function openFeature(cards: Card[] = ready(), host: Host = {}) {
@@ -86,6 +86,16 @@ describe("AC3, AC4: Merge to main", () => {
     const button = await waitFor(() => merge(pane) as HTMLButtonElement);
     expect(button.disabled).toBe(true);
     expect(within(pane).getByText(FEATURE_END_MESSAGES.behind("main"))).toBeTruthy();
+    // The reason is the disabled button's description too (review nit).
+    const described = button.getAttribute("aria-describedby");
+    expect(described && document.getElementById(described)?.textContent).toBe(FEATURE_END_MESSAGES.behind("main"));
+  });
+
+  it("waits with a reason before the server's first read of it", async () => {
+    const { pane } = await openFeature(acceptedCards());
+    const button = await waitFor(() => merge(pane) as HTMLButtonElement);
+    expect(button.disabled).toBe(true);
+    expect(within(pane).getByText(FEATURE_END_MESSAGES.checking)).toBeTruthy();
   });
 
   it("merges with no confirmation once on, the feature is Done, and what stays to do is said (AC5)", async () => {

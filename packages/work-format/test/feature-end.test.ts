@@ -6,6 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   acceptedFeature,
   behindMessage,
+  FEATURE_END_COPY,
+  NAMED_FILES,
   buildCardView,
   buildWorkList,
   checksSetParams,
@@ -45,6 +47,7 @@ const facts = (over: Partial<FeatureMergeFacts> = {}): FeatureMergeFacts => ({
   conflicts: false,
   pr: null,
   remoteAhead: false,
+  baseBusy: false,
   checks: "passed",
   ...over,
 });
@@ -159,11 +162,17 @@ describe("Merge to main waits (AC3, AC4)", () => {
     expect(featureMergeBlock(facts({ pr: "none", checks: "failed" }))).toBe(m.noPr);
     expect(featureMergeBlock(facts({ pr: "closed" }))).toBe(m.prClosed);
     expect(featureMergeBlock(facts({ remoteAhead: true, checks: "failed" }))).toBe(m.remoteAhead("feature/1-ship"));
+    expect(featureMergeBlock(facts({ baseBusy: true, checks: "failed" }))).toBe(m.baseBusy("main"));
     expect(featureMergeBlock(facts({ checks: "failed" }))).toBe(m.failed);
     expect(featureMergeBlock(facts({ checks: "running" }))).toBe(m.running);
     expect(featureMergeBlock(facts({ checks: "pending" }))).toBe(m.pending);
     expect(featureMergeBlock(facts({ checks: "no-command" }))).toBe(m.noCommand);
     expect(mergeStateOf(facts({ checks: "pending" }))).toEqual({ mergeable: false, blocked: m.pending });
+  });
+
+  it("says first that its PR merged on GitHub without this computer's latest commits (review B2)", () => {
+    const all = facts({ pr: "merged", conflicts: true, behind: true, baseBusy: true, checks: "failed" });
+    expect(featureMergeBlock(all)).toBe(FEATURE_END_MESSAGES.prMergedBehind);
   });
 
   it("tells the Dev Lead to merge main in with a merge commit, never a rebase, naming conflicting files", () => {
@@ -172,6 +181,18 @@ describe("Merge to main waits (AC3, AC4)", () => {
       "main has moved on. Merge main into feature/1-ship with a merge commit, never a rebase, and commit it.",
     );
     expect(behindMessage("feature/1-ship", "main", ["a.ts", "b.ts"])).toBe(`${ask} These files conflict: a.ts, b.ts.`);
+  });
+
+  it("names the first few conflicting files, then how many more (review ruling)", () => {
+    const ask = behindMessage("feature/1-ship", "main", []);
+    const files = Array.from({ length: NAMED_FILES + 2 }, (_, i) => `f${i}.ts`);
+    expect(behindMessage("feature/1-ship", "main", files)).toBe(
+      `${ask} These files conflict: ${files.slice(0, NAMED_FILES).join(", ")} and 2 more.`,
+    );
+    const exactly = files.slice(0, NAMED_FILES);
+    expect(behindMessage("feature/1-ship", "main", exactly)).toBe(
+      `${ask} These files conflict: ${exactly.join(", ")}.`,
+    );
   });
 });
 
@@ -187,24 +208,32 @@ describe("the card pane's feature end (AC1, AC3)", () => {
       accepted: false,
       mergeable: false,
       blocked: null,
+      base: "main",
     });
     const ready = [feature(ID), done("STORY-1")];
     // The server's merge state is ignored until Accept: Merge to main is never on before it.
     const shown = view(ready[0]!, ready, { mergeable: true, blocked: null }).featureEnd;
-    expect(shown).toEqual({ acceptable: true, accepted: false, mergeable: false, blocked: null });
+    expect(shown).toEqual({ acceptable: true, accepted: false, mergeable: false, blocked: null, base: "main" });
   });
 
   it("shows Merge to main once accepted, on only when the server finds it can merge", () => {
     const card = accepted();
     const cards = [card, done("STORY-1")];
+    // Before the server's first read, it waits with a reason (review nit: "Checking…").
     expect(view(card, cards).featureEnd).toEqual({
       acceptable: false,
       accepted: true,
       mergeable: false,
-      blocked: null,
+      blocked: FEATURE_END_MESSAGES.checking,
+      base: "main",
     });
     const waiting = { mergeable: false, blocked: FEATURE_END_MESSAGES.pending };
-    expect(view(card, cards, waiting).featureEnd).toEqual({ acceptable: false, accepted: true, ...waiting });
+    expect(view(card, cards, waiting).featureEnd).toEqual({
+      acceptable: false,
+      accepted: true,
+      ...waiting,
+      base: "main",
+    });
     expect(view(card, cards, { mergeable: true, blocked: null }).featureEnd?.mergeable).toBe(true);
   });
 
@@ -216,7 +245,17 @@ describe("the card pane's feature end (AC1, AC3)", () => {
       accepted: true,
       mergeable: true,
       blocked: null,
+      base: "main",
     });
+  });
+
+  it("names the project's base branch, as configured (review nit)", () => {
+    const card = accepted();
+    const cards = [card, done("STORY-1")];
+    const trunk = buildCardView(owned(card), true, { config: { ...config, baseBranch: "trunk" }, cards });
+    expect(trunk.featureEnd?.base).toBe("trunk");
+    expect(FEATURE_END_COPY.merge("trunk")).toBe("Merge to trunk");
+    expect(FEATURE_END_COPY.mergeOf(ID, "trunk")).toBe(`Merge ${ID} to trunk`);
   });
 
   it("is absent on stories and on a feature that isn't in progress", () => {

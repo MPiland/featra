@@ -3,7 +3,8 @@
  * the commit the feature branch is at, in a temporary detached worktree that is removed afterwards. The user's
  * checkouts are never touched, and a branch nobody has checked out can be checked. The result is kept here, for that
  * commit only, and never written to the card: a card commit on the branch would move it past the commit it is for.
- * One run per feature at a time; a run for a commit the branch has moved past still finishes, and counts for nothing.
+ * One run per feature at a time; a run for a commit the branch has moved past, or for a check command since changed,
+ * still finishes, and counts for nothing. Worktrees a run left behind (the app quit mid-run) are pruned first.
  */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -23,9 +24,10 @@ export interface FeatureChecksDeps {
   changed: (dir: string) => void;
 }
 
-/** What a feature's checks are: the commit, and what the card shows. */
+/** What a feature's checks are: the commit and the project's check command they ran with, and what the card shows. */
 interface Kept {
   tip: string;
+  command: string | null;
   checks: CardChecks;
   noCommand: boolean;
 }
@@ -41,15 +43,18 @@ export function createFeatureChecks({ git, settings, now, log, timeoutMs, change
 
   /** Runs `command` at `tip` in a temporary detached worktree; its exit and output. */
   async function runAt(top: string, tip: string, command: string) {
+    await git.git(top, ["worktree", "prune"]);
     const folder = await mkdtemp(join(tmpdir(), "featra-feature-checks-"));
     try {
       const added = await git.git(top, ["worktree", "add", "--detach", "--quiet", folder, tip]);
       if (added.code !== 0) return { code: null, output: added.stderr, timedOut: false };
       const control = runCommand(command, folder, timeoutMs);
       active.add(control);
-      const result = await control.done;
-      active.delete(control);
-      return result;
+      try {
+        return await control.done;
+      } finally {
+        active.delete(control);
+      }
     } finally {
       await git.removeFolder(top, folder);
       await rm(folder, { recursive: true, force: true }).catch(() => {});
@@ -59,13 +64,15 @@ export function createFeatureChecks({ git, settings, now, log, timeoutMs, change
   async function execute(dir: string, id: string, top: string, tip: string, config: ProjectConfig) {
     const key = keyOf(dir, id);
     const command = (await settings.confirmed(dir, config)).command;
-    if (config.checkCommand === null || command === null) {
-      kept.set(key, { tip, checks: idle(CHECKS_COPY.noCommand), noCommand: true });
+    const ran = config.checkCommand;
+    if (ran === null || command === null) {
+      kept.set(key, { tip, command: ran, checks: idle(CHECKS_COPY.noCommand), noCommand: true });
       return changed(dir);
     }
     const before = kept.get(key)?.checks.last ?? null;
     kept.set(key, {
       tip,
+      command: ran,
       checks: { running: true, idle: null, last: before, failedAcs: [], note: null },
       noCommand: false,
     });
@@ -75,16 +82,18 @@ export function createFeatureChecks({ git, settings, now, log, timeoutMs, change
     const passed = result.code === 0;
     const output = passed ? "" : `${result.timedOut ? "Timed out.\n" : ""}${result.output}`;
     const last = { passed, command, at: toIso(now()), output };
-    kept.set(key, { tip, checks: { running: false, idle: null, last, failedAcs: [], note: null }, noCommand: false });
+    const checks = { running: false, idle: null, last, failedAcs: [], note: null };
+    kept.set(key, { tip, command: ran, checks, noCommand: false });
     changed(dir);
   }
 
-  /** Runs feature `id`'s checks at `tip`, unless they ran there or run now. `again` runs them whatever they said. */
+  /** Runs feature `id`'s checks at `tip`, unless they ran there with this command or run now. `again` runs them anyway. */
   function request(dir: string, id: string, top: string, tip: string, config: ProjectConfig, again = false) {
     const key = keyOf(dir, id);
     const running = runs.get(key);
     if (running) return running;
-    if (!again && kept.get(key)?.tip === tip) return Promise.resolve();
+    const k = kept.get(key);
+    if (!again && k?.tip === tip && k.command === config.checkCommand) return Promise.resolve();
     const run = execute(dir, id, top, tip, config)
       .catch((err: unknown) => {
         const why = err instanceof Error ? err.message : String(err);
@@ -92,7 +101,7 @@ export function createFeatureChecks({ git, settings, now, log, timeoutMs, change
         // A run that threw must not leave the card saying it is still running.
         const last = kept.get(key)?.checks.last ?? null;
         const checks = { running: false, idle: null, last, failedAcs: [], note: `Checks couldn't run: ${why}` };
-        kept.set(key, { tip: "", checks, noCommand: false });
+        kept.set(key, { tip: "", command: null, checks, noCommand: false });
         changed(dir);
       })
       .finally(() => runs.delete(key));
@@ -103,10 +112,10 @@ export function createFeatureChecks({ git, settings, now, log, timeoutMs, change
   return {
     request,
 
-    /** Where feature `id`'s checks stand for `tip`. */
-    verdict(dir: string, id: string, tip: string): FeatureChecks {
+    /** Where feature `id`'s checks stand for `tip`, with the project's check command `command`. */
+    verdict(dir: string, id: string, tip: string, command: string | null): FeatureChecks {
       const k = kept.get(keyOf(dir, id));
-      if (!k || k.tip !== tip) return "pending";
+      if (!k || k.tip !== tip || k.command !== command) return "pending";
       if (k.noCommand) return "no-command";
       if (k.checks.running) return "running";
       return k.checks.last?.passed ? "passed" : "failed";

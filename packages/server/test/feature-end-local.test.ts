@@ -44,7 +44,13 @@ function mergeMainIn() {
 describe("Accept on a feature (AC1)", { timeout: 60_000 }, () => {
   it("is refused while a story under it isn't finished, and isn't offered", async () => {
     await w.start({ story2: "In Progress" });
-    expect((await view())?.featureEnd).toEqual({ acceptable: false, accepted: false, mergeable: false, blocked: null });
+    expect((await view())?.featureEnd).toEqual({
+      acceptable: false,
+      accepted: false,
+      mergeable: false,
+      blocked: null,
+      base: "main",
+    });
     await expect(accept()).rejects.toThrow(FEATURE_END_MESSAGES.unfinished(ID, 1));
     expect(evidenceState(w.onFeature()).accepted).toBe(false);
   });
@@ -119,12 +125,15 @@ describe("Merge to main without GitHub (AC3, AC5)", { timeout: 60_000 }, () => {
     expect(w.onMain().status).toBe("active");
   });
 
-  it("leaves main alone when its checkout has local changes", async () => {
+  it("leaves main alone when its checkout has a local change the merge would overwrite", async () => {
     await w.start({ remote: false });
     await accept();
     await w.settle();
     const base = w.tip("main");
-    await writeFile(join(dir(), "draft.txt"), "unsaved\n");
+    // The merge brings feature.txt; main's checkout has its own, uncommitted (review Should-fix 2: the overlap).
+    await writeFile(join(dir(), "feature.txt"), "unsaved\n");
+    await w.poll();
+    expect(state()).toEqual({ mergeable: false, blocked: FEATURE_END_MESSAGES.baseBusy("main") });
     await expect(merge()).rejects.toThrow(FEATURE_END_MESSAGES.baseBusy("main"));
     expect(w.tip("main")).toBe(base);
   });

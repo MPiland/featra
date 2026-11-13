@@ -61,21 +61,28 @@ export interface FeatureMergeFacts {
   behind: boolean;
   /** Merging the feature into the base conflicts. */
   conflicts: boolean;
-  /** Its PR on GitHub: none yet, open, or closed; null in local mode. */
-  pr: "none" | "open" | "closed" | null;
+  /**
+   * Its PR on GitHub: none yet, open, closed, or merged there without the commit the local branch is at (one merged at
+   * that commit settles instead); null in local mode.
+   */
+  pr: "none" | "open" | "closed" | "merged" | null;
   /** The feature branch on GitHub has commits the local one doesn't. */
   remoteAhead: boolean;
+  /** The base's checkout has local changes the merge would overwrite, so it can't take the merge. */
+  baseBusy: boolean;
   checks: FeatureChecks;
 }
 
 /** Why Merge to main waits, or null when it can go. */
 export function featureMergeBlock(f: FeatureMergeFacts): string | null {
   const m = FEATURE_END_MESSAGES;
+  if (f.pr === "merged") return m.prMergedBehind;
   if (f.conflicts) return m.conflicts(f.base);
   if (f.behind) return m.behind(f.base);
   if (f.pr === "none") return m.noPr;
   if (f.pr === "closed") return m.prClosed;
   if (f.remoteAhead) return m.remoteAhead(f.branch);
+  if (f.baseBusy) return m.baseBusy(f.base);
   if (f.checks === "passed") return null;
   if (f.checks === "no-command") return m.noCommand;
   return f.checks === "running" ? m.running : f.checks === "failed" ? m.failed : m.pending;
@@ -94,13 +101,23 @@ export function featureEndOf(
   state: FeatureMergeState | undefined,
 ): CardFeatureEnd | undefined {
   if (card.type !== "feature" || card.status !== "active") return undefined;
+  const base = config.baseBranch;
   const acceptable = featureAcceptRefusal(card, card.id, cards, config) === null;
-  if (!evidenceState(card).accepted) return { acceptable, accepted: false, mergeable: false, blocked: null };
-  return { acceptable: false, accepted: true, mergeable: state?.mergeable === true, blocked: state?.blocked ?? null };
+  if (!evidenceState(card).accepted) return { acceptable, accepted: false, mergeable: false, blocked: null, base };
+  // Before the server's first read of it, Merge to main waits with a reason, never silently.
+  if (!state)
+    return { acceptable: false, accepted: true, mergeable: false, blocked: FEATURE_END_MESSAGES.checking, base };
+  return { acceptable: false, accepted: true, mergeable: state.mergeable, blocked: state.blocked, base };
 }
+
+/** How many conflicting files the Dev Lead's notice names before it says how many more there are. */
+export const NAMED_FILES = 3;
 
 /** What the Dev Lead is told when the base moved on, or conflicts: merge it in, never rebase. */
 export function behindMessage(branch: string, base: string, files: readonly string[]): string {
   const ask = `${base} has moved on. Merge ${base} into ${branch} with a merge commit, never a rebase, and commit it.`;
-  return files.length === 0 ? ask : `${ask} These files conflict: ${files.join(", ")}.`;
+  if (files.length === 0) return ask;
+  const more = files.length - NAMED_FILES;
+  const named = files.slice(0, NAMED_FILES).join(", ");
+  return `${ask} These files conflict: ${more > 0 ? `${named} and ${more} more` : named}.`;
 }

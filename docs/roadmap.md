@@ -14,6 +14,7 @@ Ideas outside M1 scope. The M1 backlog lives in `.featra/cards/`.
 - Importers for BMAD, spec-kit, OpenSpec and GSD.
 - Artifact folders.
 - SSH remote compute.
+- A feature merged to main with the git CLI in local mode becomes Done, as an outside merge on GitHub does.
 
 ## Before public release
 

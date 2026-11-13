@@ -14,6 +14,8 @@ export interface CardFeatureEnd {
   mergeable: boolean;
   /** Why Merge to main waits, once accepted; null when it doesn't. */
   blocked: string | null;
+  /** The branch it merges into: the project's base branch. */
+  base: string;
 }
 
 /** What the server knows of an accepted feature beyond its card: whether it can merge, and why not. */
@@ -29,14 +31,15 @@ export function normalizeFeatureEnd(raw: unknown): CardFeatureEnd | undefined {
     accepted: raw.accepted === true,
     mergeable: raw.mergeable === true,
     blocked: typeof raw.blocked === "string" && raw.blocked ? raw.blocked : null,
+    base: typeof raw.base === "string" && raw.base ? raw.base : "main",
   };
 }
 
 export const FEATURE_END_COPY = {
   accept: "Accept",
   acceptOf: (id: string) => `Accept ${id}`,
-  merge: "Merge to main",
-  mergeOf: (id: string) => `Merge ${id} to main`,
+  merge: (base: string) => `Merge to ${base}`,
+  mergeOf: (id: string, base: string) => `Merge ${id} to ${base}`,
   merging: "Merging…",
 } as const;
 
@@ -53,6 +56,8 @@ export const FEATURE_END_MESSAGES = {
   behind: (base: string) => `${base} has moved on. The Dev Lead is merging it in.`,
   conflicts: (base: string) => `It conflicts with ${base}. The Dev Lead is merging ${base} in.`,
   noPr: "Open its PR first.",
+  checking: "Checking…",
+  prMergedBehind: "Its PR merged without this computer's latest commits.",
   prClosed: "Its PR is closed.",
   remoteAhead: (branch: string) => `${branch} has commits on GitHub that this computer doesn't. Pull it.`,
   running: "Checks are running.",

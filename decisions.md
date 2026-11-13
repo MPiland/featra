@@ -2042,3 +2042,39 @@ ADR 0037 records the design. Choices made while building it:
 checks-server's `openFeaturePrs`, ProjectChecks.test.tsx's view gains `openFeaturePrs`).
 
 **Roadmap, not now:** deleting merged feature branches; a Dev Lead for features with none found.
+
+### STORY-14 Dev Lead review rulings, applied (PR #47)
+
+1. **B1, judged commits.** Reading the facts returns `Judged { facts, tip, baseTip }`. Merge to main, in the card
+   lane, refuses `moved` when the feature branch or local main isn't at what was judged; on GitHub also when the PR's
+   head isn't the judged tip, and `gh pr merge --match-head-commit` gets the judged tip. The check no longer pushes;
+   the read pushes a branch GitHub is behind on before judging (`pushBehind`).
+2. **B2, outside merges once.** Settling is skipped when main's copy of the card is already Done and merged. A PR
+   merged at a head other than the local tip gets the PR fact `merged`, which blocks first with "Its PR merged without
+   this computer's latest commits." and is never settled. The settle notice adds "main is N commits ahead of GitHub; push it.".
+3. **Should-fix 2, main's checkout.** Build choice 8 (clean checkout) is replaced: the fact `baseBusy` is main's
+   uncommitted files that the merge changes, plus the card's path (feature-base.ts). It shows before the button is on
+   and is checked in the lane before the local publish and before `gh pr merge`. Featra's own card edits elsewhere
+   don't block. `publish` and `cardOnBranch` lost their `clean` parameter.
+4. **Should-fix 3, BUG-20.** Test links whose names have balanced parentheses read as none. Filed as BUG-20 under
+   FEAT-6 (origin bug), fixed in card.ts with a regression test that failed first. STORY-12, 13, 14 and 58 now resolve
+   17 of 17 acceptance-criterion links (0 before).
+5. **Should-fix 4.** The Dev Lead's notice is recorded as told only once `notify` succeeds.
+6. **Should-fix 5.** Tests for Accept retried after its PR opened and its card write failed, the checks' worktree
+   removed after a failed and a hung run, GitHub ahead blocking without a push, and the notice with no Dev Lead.
+7. **Nits.** `safeBranch` and a full refspec on the push; verdicts keyed by tip and check command; `active.delete` in
+   a finally; `git worktree prune` before each run; one refusal (`noBranch`) for a missing branch; Create PR in local
+   mode refuses with GitHub's `noRemote`; `aria-describedby` on the disabled Merge button; "Checking…" before the first
+   read; the configured base branch in "Merge to <base>"; the orphan JSDoc removed; the client fake-rule test unlinked
+   from AC5 (AC5 links the server tests).
+8. **Rulings recorded:** Open on the feature row is approved; the notice lists the first three files, then "and N
+   more"; dropping the notice with no Dev Lead is fine (finding one is on the roadmap).
+9. **Should-fix 1 held.** Refusing active → done through `checkTransition` ("Merge it to main") contradicts an
+   existing assertion: evidence.test.ts expects `checkTransition(recordAcceptance(feature), "done", …)` to be ok. Per
+   the rule on assertions, it is not changed; reported to the Dev Lead for a ruling.
+
+**Changed assertions in this PR's own tests:** feature-end-local's "leaves main alone" now puts an untracked file the
+merge would overwrite on main (an unrelated local change no longer blocks); expected feature ends gain `base: "main"`;
+an accepted feature with no facts yet expects "Checking…" instead of no reason; the client's Merge label takes the base.
+
+**Roadmap, not now:** a local-mode merge to main made with the git CLI making the feature Done.

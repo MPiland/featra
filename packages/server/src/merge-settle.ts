@@ -49,8 +49,7 @@ export const cardMessage = (id: string, into: string) => `${id}: merged into ${i
 /**
  * Commits a merged card onto the local branch `into`, on top of `into` as GitHub has it now (which has the PR's merge
  * commit): a story's card on its feature branch (STORY-12), a feature's on main (STORY-14). How far ahead of GitHub that
- * leaves it (null when git couldn't count), else why not; nothing changes then. `clean` leaves a checkout of `into` with
- * local changes alone.
+ * leaves it (null when git couldn't count), else why not; nothing changes then.
  */
 export async function cardOnBranch(
   git: MergeGit,
@@ -58,7 +57,6 @@ export async function cardOnBranch(
   remote: string,
   into: string,
   card: { path: string; text: string; id: string },
-  clean = false,
 ): Promise<string | { ahead: number | null }> {
   const remoteTip = await git.fetchTip(top, remote, into);
   const local = await git.commitOf(top, `refs/heads/${into}`);
@@ -70,7 +68,7 @@ export async function cardOnBranch(
       : [local, remoteTip];
   const message = cardMessage(card.id, into);
   const made = await git.mergeCommit(top, { parents, path: card.path, text: card.text, message });
-  if ("conflicts" in made || !(await git.publish(top, into, made.commit, local, clean))) {
+  if ("conflicts" in made || !(await git.publish(top, into, made.commit, local))) {
     return SETTLE_NOTES.feature(into);
   }
   const ahead = await git.git(top, ["rev-list", "--count", `${remoteTip}..${made.commit}`]);

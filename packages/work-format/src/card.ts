@@ -208,9 +208,12 @@ function parseChecklist(content: string): ChecklistItem[] {
   return items;
 }
 
-/** An AC's trailing references: `(test: <ref>)`, then `(evidence: <path>)`, each optional. */
+/**
+ * An AC's trailing references: `(test: <ref>)`, then `(evidence: <path>)`, each optional. A ref may hold balanced
+ * parentheses, one deep, as test names do ("Accept (AC1) > ..."; BUG-20).
+ */
 function splitTestRef(item: ChecklistItem): AcceptanceCriterion {
-  const m = /^(.*?)(?:\s*\(test: ([^)]+)\))?(?:\s*\(evidence: ([^)]+)\))?\s*$/.exec(item.text);
+  const m = /^(.*?)(?:\s*\(test: ((?:[^()]|\([^()]*\))+)\))?(?:\s*\(evidence: ([^)]+)\))?\s*$/.exec(item.text);
   const [, text, test, evidence] = m ?? [];
   if (text === undefined || (!test && !evidence)) return { ...item, test: null };
   return { ...item, text, test: test?.trim() || null, ...(evidence?.trim() ? { evidence: evidence.trim() } : {}) };

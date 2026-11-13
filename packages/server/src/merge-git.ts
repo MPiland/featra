@@ -133,14 +133,12 @@ export function createMergeGit(gitCommand = "git", run = runGit) {
   /**
    * Moves `branch` from `old` to `commit`, which has `old` in its history. Where a checkout has the branch it fast-
    * forwards there, so its files follow; false, with nothing changed, when git refuses (local changes in the way) or
-   * the branch moved meanwhile. With `clean`, a checkout with any local change is left alone too (STORY-14: the user's
-   * checkout of main).
+   * the branch moved meanwhile.
    */
-  async function publish(top: string, branch: string, commit: string, old: string, clean = false): Promise<boolean> {
+  async function publish(top: string, branch: string, commit: string, old: string): Promise<boolean> {
     const checkout = await checkoutOf(top, branch);
     if (checkout === null) return (await git(top, ["update-ref", `refs/heads/${branch}`, commit, old])).code === 0;
     if ((await commitOf(checkout, "HEAD")) !== old) return false;
-    if (clean && (await uncommitted(checkout, "")).length > 0) return false;
     return (await git(checkout, ["merge", "--ff-only", "--no-stat", "--quiet", commit])).code === 0;
   }
 

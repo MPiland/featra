@@ -3,7 +3,8 @@
  * stories finished, the real scanner, watches, card lane, settings, feature end, checks, PRs and merge, and the
  * work-format rules. Only the platform is faked: GitHub (`fake-gh.cjs` over a bare remote whose path names
  * github.com), the clock and timers, the check command (a small Node script of the project that reads its verdict
- * from a file), and the chat manager, which records the notices it is asked to post.
+ * from a file), and the chat manager, which records the notices it is asked to post. `beforeLane` stands in for
+ * something else on the computer acting at a given moment: it runs once, as the next job enters the real card lane.
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -27,7 +28,8 @@ export const PR = "https://github.com/acme/app/pull/1";
 
 const CHECK = `const fs = require("fs");
 const verdict = fs.readFileSync("verdict.txt", "utf8").trim();
-if (verdict !== "pass") { console.log("boom: " + verdict); process.exit(1); }
+if (verdict === "hang") setInterval(() => {}, 1000);
+else if (verdict !== "pass") { console.log("boom: " + verdict); process.exit(1); }
 `;
 
 export interface FeatureStartOptions {
@@ -41,6 +43,10 @@ export interface FeatureStartOptions {
   checks?: "local" | "ci";
   /** STORY-2's status: Cancelled by default, which Accept counts as finished. */
   story2?: string;
+  /** How long a check run may take; 30 s by default. */
+  checkTimeoutMs?: number;
+  /** Whether a story session under FEAT-1 names its Dev Lead; true by default. */
+  lead?: boolean;
 }
 
 export interface FeatureWorld {
@@ -53,6 +59,10 @@ export interface FeatureWorld {
   allowed: AllowedProjects;
   features: FeatureEnd;
   notices: { chat: string; notice: Notice }[];
+  /** How many of the next notices fail to post. */
+  notifyFails: number;
+  /** Runs once, as the next job enters the card lane. */
+  beforeLane: (() => Promise<void>) | null;
   start: (options?: FeatureStartOptions) => Promise<void>;
   /** Waits for the scan, the reads and the check runs in flight. */
   settle: () => Promise<void>;
@@ -72,13 +82,30 @@ export interface FeatureWorld {
 
 export function featureWorld(): FeatureWorld {
   let scanner: ReturnType<typeof createScanner>;
+  let lead = true;
   const w = {} as FeatureWorld;
   const chats = {
     list: () =>
-      [{ id: "chat-1", story: { id: "STORY-1", parent: LEAD } }] as unknown as ReturnType<ChatManager["list"]>,
+      (lead ? [{ id: "chat-1", story: { id: "STORY-1", parent: LEAD } }] : []) as unknown as ReturnType<
+        ChatManager["list"]
+      >,
     notify: (chat: string, notice: Notice) => {
+      if (w.notifyFails > 0) {
+        w.notifyFails--;
+        throw new Error("The chat is busy.");
+      }
       w.notices.push({ chat, notice });
     },
+  };
+  const realLane = createCardLane();
+  const lane = {
+    exclusive: <T>(job: () => Promise<T>) =>
+      realLane.exclusive(async () => {
+        const before = w.beforeLane;
+        w.beforeLane = null;
+        await before?.();
+        return job();
+      }),
   };
 
   w.settle = async () => {
@@ -101,8 +128,10 @@ export function featureWorld(): FeatureWorld {
   w.callsOf = async (kind) =>
     (await w.gh.calls()).map((c) => c.args).filter((a) => a.slice(0, kind.split(" ").length).join(" ") === kind);
 
-  w.start = async ({ yaml = "", remote = true, gh = {}, checks = "local", story2 }: FeatureStartOptions = {}) => {
+  w.start = async (options: FeatureStartOptions = {}) => {
+    const { yaml = "", remote = true, gh = {}, checks = "local", story2 } = options;
     const { repo } = w;
+    lead = options.lead ?? true;
     const where = checks === "local" ? "checksWhere: local\ncheckCommand: node check.cjs\n" : "checksWhere: ci\n";
     await writeFile(join(repo.main, ".featra", "config.yaml"), `version: 1\n${where}${yaml}`);
     await writeFile(join(repo.main, "check.cjs"), CHECK);
@@ -131,10 +160,10 @@ export function featureWorld(): FeatureWorld {
       chats,
       now: w.clock.now,
       timers: w.clock.timers,
-      lane: createCardLane(),
+      lane,
       log: () => {},
       ghCommand: w.gh.command,
-      checkTimeoutMs: 30_000,
+      checkTimeoutMs: options.checkTimeoutMs ?? 30_000,
     });
     await w.watches.watch(repo.main, () => {});
     await w.settle();
@@ -142,6 +171,8 @@ export function featureWorld(): FeatureWorld {
 
   beforeEach(async () => {
     w.notices = [];
+    w.notifyFails = 0;
+    w.beforeLane = null;
     w.repo = await cardRepo();
     w.repo.git(w.repo.main, "config", "user.name", "Test");
     w.repo.git(w.repo.main, "config", "user.email", "test@example.invalid");

@@ -27,7 +27,13 @@ on while the feature waits, and only an agent working on the feature branch shou
   branch is at. Checks are CI on the PR, or the check command run here in a temporary detached worktree at that commit,
   whose verdict is kept in memory per commit. Merge to main is on only when nothing stops it; otherwise the reason
   shows beside it, in that order of precedence: conflicts, behind main, no PR, PR closed, branch ahead on GitHub, then
-  the checks. A feature branch that GitHub's copy is behind on is pushed, never forced.
+  the checks. A PR that merged without the commit the branch is at here comes first of all ("Its PR merged without
+  this computer's latest commits."), and a local change in main's checkout that the merge would overwrite comes just
+  before the checks. Until the first read the reason is "Checking…". A feature branch that GitHub's copy is behind on
+  is pushed, never forced, before the facts are judged, never between judging them and merging.
+- **The merge goes ahead only at the commits it was judged at.** Reading the facts returns the feature branch's tip
+  and main's tip it judged. Merge to main runs in the card lane and refuses ("The branch X changed…") if either moved
+  since; on GitHub it also refuses when the PR's head isn't that tip, and merges with `--match-head-commit` at it.
 - **Main moving on goes to the Dev Lead.** When main isn't in the feature branch's history, the Dev Lead leading the
   feature is sent a notice (outcome `behind main`) to merge main into the feature branch with a merge commit, never a
   rebase, naming any conflicting files. It is sent once per main commit. The Dev Lead is the chat that drafted the
@@ -36,12 +42,15 @@ on while the feature waits, and only an agent working on the feature branch shou
 - **A merge commit, never squash, rebase or force.** With GitHub usable the feature's PR is merged:
   `gh pr merge --merge --match-head-commit <tip>`, after reading the PR again (merged already, closed, a head that isn't
   the tip, or conflicting each refuse or settle). In local mode Featra makes the merge commit itself with `merge-tree`
-  and `commit-tree` (parents: main, then the feature branch), with the Done card in it, and publishes main only when its
-  checkout is clean; otherwise it refuses with one sentence and main is untouched.
+  and `commit-tree` (parents: main, then the feature branch), with the Done card in it, and publishes main with git's
+  own `merge --ff-only` safety. Main's checkout blocks the merge only with an uncommitted change to a file the merge
+  changes (or the feature's card); Featra's own uncommitted card edits elsewhere on main (ADR 0017) don't. That fact is
+  read before the button is on, and checked again before `gh pr merge`, so nothing is done when it would be refused.
 - **Done only by the merge.** The feature becomes Done by `system`, with `merged` (feature branch to main) and its PR in
   its history. After a GitHub merge the Done card is a commit on local main on top of GitHub's merge commit, and how far
   local main is ahead of GitHub is said. A PR merged on GitHub outside Featra is noticed by the same reads and settles
-  the same way.
+  the same way, once: a read whose main already has the card Done and merged commits nothing, and a PR merged at a head
+  other than the local tip isn't settled at all.
 - **Main owns the feature's cards.** Once main has the feature branch's tip and the branch isn't checked out, ownership
   resolves to main for the feature and all its cards; nothing is copied. A checkout of the feature branch keeps its
   cards there until it is switched away, and the merge says so. Feature branches are kept.
@@ -50,9 +59,11 @@ on while the feature waits, and only an agent working on the feature branch shou
 
 - The feature's end needs no new state on disk besides `accepted`, `merged` and `pr` in the card's history and
   frontmatter. Check verdicts are in memory, so a restart runs local checks again.
-- Every read of an accepted feature may fetch from GitHub and push its branch. Reads are limited to accepted features
+- Every read of an accepted feature may fetch from GitHub and push its branch (only when GitHub's copy is behind). Reads are limited to accepted features
   and share the PR interval.
 - A notice to the Dev Lead is dropped when no Dev Lead can be found for the feature (one drafted before STORY-8 with
   no story sessions); Merge to main still says why it waits.
-- A notice's summary is cut at 160 characters, so a long list of conflicting files is cut too; the Dev Lead finds the
-  full list when it merges.
+- A notice names the first three conflicting files, then "and N more"; the Dev Lead finds the full list when it
+  merges. A notice counts as sent only once it is posted, so a failed post is tried again on the next read.
+- Check verdicts are kept per commit and check command, and each run prunes stale worktrees first and removes its own
+  however it ends.

@@ -5,12 +5,14 @@
  * accepted features are read again on the PR interval, on focus, and when their branch or the base moves: whether
  * the base is in the feature's history, whether they conflict, its PR, and its checks at the commit its branch is at
  * (CI on the PR, or the check command here). When the base has moved on, the Dev Lead who leads the feature is told
- * once per base commit to merge it in, never rebase. A PR merged on GitHub outside Featra settles as Featra's own.
+ * once per base commit to merge it in, never rebase. A PR merged on GitHub outside Featra settles as Featra's own when
+ * it merged at the commit the branch is at here, and its Dev Lead is told what stays to do; else it waits, saying why.
  */
 import {
   acceptedFeature,
   featureAcceptRefusal,
   FEATURE_END_MESSAGES,
+  GITHUB_COPY,
   mergeStateOf,
   serializeCard,
   setPr,
@@ -87,6 +89,18 @@ function refusal(scan: Scan | null, id: string): string | null {
   return featureAcceptRefusal(ownedIn(scan, id)?.owned.card, id, cards, scan.collected.config);
 }
 
+/** Facts of a feature whose PR merged on GitHub without the commit its branch is at here: it waits, saying so. */
+const mergedBehind = (look: FeatureLook): FeatureMergeFacts => ({
+  base: look.base,
+  branch: look.branch,
+  behind: false,
+  conflicts: false,
+  pr: "merged",
+  remoteAhead: false,
+  baseBusy: false,
+  checks: "pending",
+});
+
 export function createFeatureEnd(deps: FeatureEndDeps) {
   const { scan: scanDir, observe, allowed, settings, now, timers, lane, log } = deps;
   const git = createMergeGit(deps.gitCommand, deps.gitRun);
@@ -114,8 +128,16 @@ export function createFeatureEnd(deps: FeatureEndDeps) {
     git,
     prs,
     github: async (dir) => (await settings.githubUse(dir)).usable,
-    check: async (dir, look) => mergeStateOf(await read.factsOf(dir, look, (await settings.githubUse(dir)).usable)),
+    check: async (dir, look) => read.factsOf(dir, look, (await settings.githubUse(dir)).usable),
   });
+
+  /** Settles feature `id`, whose PR merged on GitHub outside Featra; its Dev Lead is told what stays to do. */
+  async function settleOutside(dir: string, look: FeatureLook, url: string) {
+    const remains = await merges.merged(dir, look.card.id, url);
+    if (remains.length === 0) return;
+    for (const note of remains) log(`${look.card.id} merged on GitHub: ${note}`);
+    read.tell(dir, look, { outcome: "merged", summary: remains.join(" ") });
+  }
 
   /** Reads `dir`'s accepted features again; a PR merged outside Featra settles. */
   async function refresh(dir: string) {
@@ -136,12 +158,15 @@ export function createFeatureEnd(deps: FeatureEndDeps) {
       if (use && look.card.pr) {
         const pr = await prs.readNow(dir, id, look.card.pr);
         if (pr?.status.state === "merged") {
-          await merges.merged(dir, id, pr.url);
+          // Merged at another commit: settling would leave the branch's later commits out of the base, every time.
+          if (pr.head === look.tip) await settleOutside(dir, look, pr.url);
+          else facts.set(key, mergedBehind(look));
           changed = true;
           continue;
         }
       }
-      const next = await read.factsOf(dir, look, use);
+      if (use) await read.pushBehind(dir, look);
+      const next = (await read.factsOf(dir, look, use)).facts;
       changed ||= JSON.stringify(facts.get(key)) !== JSON.stringify(next);
       facts.set(key, next);
     }
@@ -215,7 +240,7 @@ export function createFeatureEnd(deps: FeatureEndDeps) {
     /** The card's Create PR for an accepted feature; refused in local mode or when it has one. */
     async createPr(dir: string, id: string): Promise<null> {
       const use = await settings.githubUse(dir);
-      if (!use.usable) throw new ApiError(use.missing ?? FEATURE_END_MESSAGES.notAccepted(id));
+      if (!use.usable) throw new ApiError(use.missing ?? GITHUB_COPY.noRemote);
       usable.set(dir, true);
       const look = await featureOf(dir, id);
       if (!acceptedFeature(look.card)) throw new ApiError(FEATURE_END_MESSAGES.notAccepted(id));
