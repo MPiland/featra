@@ -23,11 +23,11 @@ function Status({ tone, label }: { tone: Tone; label: string }) {
   );
 }
 
-function Scope({ added, openBugs }: FeatureRow["scope"]) {
+function Scope({ added, addedBreakdown, openBugs }: FeatureRow["scope"]) {
   const parts = [
     added > 0 && (
       <span key="added" className="scope-added">
-        {WORK_COPY.added(added)}
+        {addedBreakdown || WORK_COPY.added(added)}
       </span>
     ),
     openBugs > 0 && (
@@ -140,7 +140,12 @@ export function Feature({ feature }: { feature: FeatureRow }) {
           <Status tone={feature.tone} label={featureStatusLabel(feature.status)} />
         </span>
         <span role="cell">
-          <Progress label={feature.progress.label} segments={feature.bar} total={feature.progress.total} />
+          <Progress
+            label={feature.progress.label}
+            segments={feature.bar}
+            total={feature.progress.total}
+            breakdown={feature.breakdown}
+          />
         </span>
         <span role="cell">{ticks(feature.tasks)}</span>
         <span role="cell">

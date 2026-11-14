@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   applyCardEdit,
   approvalMessage,
-  baselineOf,
   DEFAULT_CONFIG,
+  LEGACY_BASELINE,
   newCard,
   originForNewItem,
   parseCard,
@@ -12,6 +12,7 @@ import {
   scopeSummary,
   serializeCard,
   setStatus,
+  startedFeature,
   type Card,
 } from "../src/index.ts";
 import { apply, input, story, T1, T2 } from "./draft-fixtures.ts";
@@ -46,11 +47,11 @@ describe("planApproval", () => {
     expect(plan.feature.extra["drafted-by"]).toBe("chat-1");
   });
 
-  it("records the baseline: when, and the live stories in order", () => {
+  it("records no scope baseline: that is set when the feature goes in progress (ADR 0038)", () => {
     const { plan } = approved();
-    const live = plan.keep.map((s) => s.id);
-    expect(live).toHaveLength(2);
-    expect(baselineOf(plan.feature)).toEqual({ at: AT, stories: live });
+    expect(plan.keep.map((s) => s.id)).toHaveLength(2);
+    expect(plan.feature.extra[LEGACY_BASELINE]).toBeUndefined();
+    expect(scopeBaseline(plan.feature.id, [plan.feature, ...plan.keep])).toBeNull();
   });
 
   it("keeps live stories exactly as they are (still New) and drops the cancelled ones", () => {
@@ -62,9 +63,9 @@ describe("planApproval", () => {
     expect(plan.keep.map((s) => s.id)).not.toContain(plan.drop[0]?.id);
   });
 
-  it("survives the card file: the baseline reads back after a write and a parse", () => {
+  it("survives the card file: the approved feature reads back after a write and a parse", () => {
     const { plan } = approved();
-    expect(baselineOf(parseCard(serializeCard(plan.feature)))).toEqual(baselineOf(plan.feature));
+    expect(parseCard(serializeCard(plan.feature))).toEqual(plan.feature);
   });
 
   it("refuses a feature that has left draft, naming where it is, and a card that isn't a draft", () => {
@@ -91,58 +92,100 @@ describe("planApproval", () => {
   });
 });
 
-describe("the scope baseline after approval", () => {
-  it("is the approval time, before any story starts; an item added after it is added scope", () => {
+const START = "2026-11-12T08:00:00Z";
+const later = (id: string, feature: string, at: string) =>
+  newCard({ id, type: "story", title: id, status: "New", parent: feature }, "user", at);
+/** The cards once `feature` is approved, with `more` cards. */
+const withFeature = (cards: Card[], feature: Card, ...more: Card[]) => [
+  ...cards.filter((c) => c.id !== feature.id),
+  feature,
+  ...more,
+];
+
+describe("AC2: the scope baseline is set when the feature goes in progress, not at approval (ADR 0038)", () => {
+  it("is null after approval: a story added before Start is planned scope", () => {
     const { cards, feature, plan } = approved();
-    const after = [...cards.filter((c) => c.id !== feature), plan.feature];
-    expect(scopeBaseline(feature, after, DEFAULT_CONFIG)).toBe(AT);
-    expect(originForNewItem(feature, "story", after, DEFAULT_CONFIG)).toBe("added");
-    expect(scopeSummary(feature, after, DEFAULT_CONFIG).added).toEqual([]);
+    const between = later("STORY-90", feature, "2026-11-11T00:00:00Z");
+    const after = withFeature(cards, plan.feature, between);
+    expect(scopeBaseline(feature, after)).toBeNull();
+    expect(originForNewItem(feature, "story", after)).toBe("planned");
+    expect(scopeSummary(feature, after, DEFAULT_CONFIG)).toMatchObject({ baseline: null, added: [] });
+  });
+
+  it("is the moment Start moves it to in progress; stories added between approval and Start stay planned", () => {
+    const { cards, feature, plan } = approved();
+    const between = later("STORY-90", feature, "2026-11-11T00:00:00Z");
+    const afterStart = later("STORY-91", feature, "2026-11-12T09:00:00Z");
+    const started = startedFeature(plan.feature, "user", START);
+    const all = withFeature(cards, started, between, afterStart);
+    expect(scopeBaseline(feature, all)).toBe(START);
+    expect(originForNewItem(feature, "story", all)).toBe("added");
+    const summary = scopeSummary(feature, all, DEFAULT_CONFIG);
+    expect(summary.baseline).toBe(START);
+    expect(summary.added.map((a) => a.id)).toEqual(["STORY-91"]);
+    expect(summary.addedBreakdown).toBe("+1 added: 1 story");
   });
 
   it("does not move when a story later starts", () => {
     const { feature, plan } = approved();
     const started = plan.keep.map((s, i) =>
-      i === 0 ? setStatus(s, "In Progress", "developer", "2026-11-11T00:00:00Z") : s,
+      i === 0 ? setStatus(s, "In Progress", "developer", "2026-11-13T00:00:00Z") : s,
     );
-    expect(scopeBaseline(feature, [plan.feature, ...started], DEFAULT_CONFIG)).toBe(AT);
+    expect(scopeBaseline(feature, [startedFeature(plan.feature, "user", START), ...started])).toBe(START);
   });
 
-  it("is the first start for a feature with none stored, and null before that", () => {
+  it("is null for a draft", () => {
     const { cards, feature } = draft();
-    expect(scopeBaseline(feature, cards, DEFAULT_CONFIG)).toBeNull();
+    expect(scopeBaseline(feature, cards)).toBeNull();
   });
 });
 
-const later = (id: string, feature: string, at: string) =>
-  newCard({ id, type: "story", title: id, status: "New", parent: feature }, "user", at);
+/** A feature as an approval before ADR 0038 wrote it: with the stored baseline of that time. */
+function legacyApproved() {
+  const { cards, feature, plan } = approved();
+  const stored = { at: AT, stories: plan.keep.map((s) => s.id) };
+  return {
+    cards,
+    feature,
+    plan,
+    legacy: { ...plan.feature, extra: { ...plan.feature.extra, [LEGACY_BASELINE]: stored } },
+  };
+}
 
-describe("added scope after approval reads the stored list, not the time (STORY-51 review)", () => {
-  it("a story added after approval is added scope, with its origin", () => {
-    const { cards, feature, plan } = approved();
+describe("AC3: a feature approved before this change keeps working", () => {
+  it("still parses, and keeps its stored baseline as it was", () => {
+    const { legacy } = legacyApproved();
+    const read = parseCard(serializeCard(legacy));
+    expect(read).toEqual(legacy);
+    expect(serializeCard(read)).toContain("baseline:");
+  });
+
+  it("has no baseline while it is approved, whatever it stored", () => {
+    const { cards, feature, legacy } = legacyApproved();
     const extra = later("STORY-90", feature, "2026-11-10T13:00:00Z");
-    const after = [...cards.filter((c) => c.id !== feature), plan.feature, extra];
-    expect(scopeSummary(feature, after, DEFAULT_CONFIG).added.map((a) => a.id)).toEqual(["STORY-90"]);
+    const all = withFeature(cards, legacy, extra);
+    expect(scopeBaseline(feature, all)).toBeNull();
+    expect(scopeSummary(feature, all, DEFAULT_CONFIG).added).toEqual([]);
   });
 
-  it("a story created in the same second as the approval, and not in the list, is added scope", () => {
-    const { cards, feature, plan } = approved();
-    const extra = later("STORY-91", feature, AT);
-    const after = [...cards.filter((c) => c.id !== feature), plan.feature, extra];
-    expect(scopeSummary(feature, after, DEFAULT_CONFIG).added.map((a) => a.id)).toEqual(["STORY-91"]);
+  it("reads its baseline from its history: the move to in progress, not the stored approval time or list", () => {
+    const { cards, feature, legacy } = legacyApproved();
+    // Added after approval and not in the stored list, but before Start: planned scope now.
+    const between = later("STORY-90", feature, "2026-11-10T13:00:00Z");
+    const afterStart = later("STORY-91", feature, "2026-11-12T09:00:00Z");
+    const started = parseCard(serializeCard(startedFeature(legacy, "user", START)));
+    const all = withFeature(cards, started, between, afterStart);
+    expect(scopeBaseline(feature, all)).toBe(START);
+    expect(scopeSummary(feature, all, DEFAULT_CONFIG).added.map((a) => a.id)).toEqual(["STORY-91"]);
   });
 
-  it("the stories in the stored list are never added scope, whatever their times", () => {
-    const { feature, plan } = approved();
-    expect(scopeSummary(feature, [plan.feature, ...plan.keep], DEFAULT_CONFIG).added).toEqual([]);
-  });
-
-  it("a feature with no stored baseline keeps the old computed result: the first start, and later joiners are added", () => {
-    const feature = newCard(
+  it("an old feature started by hand reads the same: the first start, and later joiners are added", () => {
+    const approvedOnly = newCard(
       { id: "FEAT-8", type: "feature", title: "Old", status: "approved", parent: null },
       "user",
       "2026-11-01T00:00:00Z",
     );
+    const feature = setStatus(approvedOnly, "active", "dev-lead", "2026-11-02T00:00:00Z");
     const first = setStatus(
       later("STORY-80", "FEAT-8", "2026-11-01T00:00:00Z"),
       "In Progress",
@@ -155,7 +198,14 @@ describe("added scope after approval reads the stored list, not the time (STORY-
     expect(summary.baseline).toBe("2026-11-02T00:00:00Z");
     expect(summary.added.map((a) => a.id)).toEqual(["STORY-81"]);
     expect(summary.addedLabel).toBe("+1 added since start");
-    expect(scopeSummary("FEAT-8", [feature, early], DEFAULT_CONFIG)).toMatchObject({ baseline: null, added: [] });
+    expect(scopeSummary("FEAT-8", [approvedOnly, early], DEFAULT_CONFIG)).toMatchObject({ baseline: null, added: [] });
+  });
+
+  it("a story that joins in the same instant as Start is planned scope", () => {
+    const { cards, feature, plan } = approved();
+    const same = later("STORY-92", feature, START);
+    const all = withFeature(cards, startedFeature(plan.feature, "user", START), same);
+    expect(scopeSummary(feature, all, DEFAULT_CONFIG).added).toEqual([]);
   });
 });
 

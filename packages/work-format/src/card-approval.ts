@@ -1,30 +1,18 @@
 /**
- * Approving a draft (STORY-51, ADR 0023): pure rules over cards. Approval moves the feature from draft to approved,
- * records its scope baseline (the stories live at that moment) and decides which draft stories are kept. A story
- * cancelled while the feature was a draft was never committed, so approval drops it instead of committing it.
+ * Approving a draft (STORY-51, ADR 0023): pure rules over cards. Approval moves the feature from draft to approved and
+ * decides which draft stories are kept. A story cancelled while the feature was a draft was never committed, so
+ * approval drops it instead of committing it. Approval sets no scope baseline: the baseline is the moment the feature
+ * goes in progress (ADR 0038), and stories added before then are planned scope.
  */
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { setStatus } from "./history.ts";
-import { isRecord } from "./utils/guards.ts";
 import { CANCELLED, type Card } from "./types.ts";
 
-/** The frontmatter key of a feature's scope baseline, set by approval. */
-export const BASELINE = "baseline";
-
-/** The scope a feature was approved with. */
-export interface Baseline {
-  /** When it was approved. */
-  at: string;
-  /** The stories live then, in order. */
-  stories: string[];
-}
-
-/** A feature's stored baseline, or null when it has none (not approved, or approved before baselines were stored). */
-export function baselineOf(feature: Pick<Card, "extra">): Baseline | null {
-  const raw = feature.extra[BASELINE];
-  if (!isRecord(raw) || typeof raw.at !== "string" || !Array.isArray(raw.stories)) return null;
-  return { at: raw.at, stories: raw.stories.filter((s): s is string => typeof s === "string") };
-}
+/**
+ * The frontmatter key approvals wrote a scope baseline under before ADR 0038 (`{ at, stories }`). Approval no longer
+ * writes it; a card that has it keeps it as an unknown key, and nothing reads it.
+ */
+export const LEGACY_BASELINE = "baseline";
 
 /** Why `card` can't be approved or rejected as a draft, or null when it can. One wording for both actions. */
 export function notDraftReason(card: Card | undefined, id: string): string | null {
@@ -44,7 +32,7 @@ export function draftStories(featureId: string, cards: readonly Card[]): Card[] 
 export type ApprovalPlan =
   | {
       ok: true;
-      /** The feature as approved: status, baseline and history. */
+      /** The feature as approved: status and history. */
       feature: Card;
       /** The stories that are live, written as they are: they stay where they were (New). */
       keep: Card[];
@@ -65,11 +53,9 @@ export function planApproval(id: string, cards: readonly Card[], at: string): Ap
   const stories = draftStories(id, cards);
   const keep = stories.filter((s) => s.status !== CANCELLED);
   if (!keep.length) return { ok: false, error: `${id} has no stories to approve.` };
-  const baseline: Baseline = { at, stories: keep.map((s) => s.id) };
-  const approved = setStatus(feature, "approved", "user", at);
   return {
     ok: true,
-    feature: { ...approved, extra: { ...approved.extra, [BASELINE]: baseline } },
+    feature: setStatus(feature, "approved", "user", at),
     keep,
     drop: stories.filter((s) => s.status === CANCELLED),
   };

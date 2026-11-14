@@ -6,7 +6,6 @@ import { awaitingAcceptance } from "./acceptance.ts";
 import { isMerged } from "./history.ts";
 import { mergeRefusal } from "./merge.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
-import { stageCategory } from "./config.ts";
 import { evidenceState } from "./evidence.ts";
 import { acceptedFeature, featureAcceptRefusal } from "./feature-end.ts";
 import { parseId } from "./ids.ts";
@@ -14,38 +13,19 @@ import { locationLabel, type OwnerLocation } from "./ownership.ts";
 import type { OwnedCard, Resolution } from "./owner-copies.ts";
 import { epicProgress, featureProgress, itemsOf, progressLabel, scopeSummary } from "./rollup.ts";
 import { stoppedIn } from "./story-stop.ts";
+import { featureTone, segments, stageBreakdown, stageTone, statusBreakdown } from "./work-tones.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
 import { assertNever } from "./utils/guards.ts";
 import type {
   EpicRow,
   FeatureRow,
   ProgressCount,
-  Segment,
   StaleRow,
   StoryRow,
   Tone,
   WorkFilter,
   WorkList,
 } from "./work-list-types.ts";
-
-/**
- * A story's tone. The first active stage is work in progress; any later active stage (In Review, Acceptance) waits
- * on a review.
- */
-export function stageTone(status: string, config: ProjectConfig): Tone {
-  if (status === CANCELLED) return "cancelled";
-  const category = stageCategory(status, config);
-  if (category === "done") return "done";
-  if (category !== "active") return "idle";
-  return config.stages.find((s) => s.category === "active")?.name === status ? "active" : "review";
-}
-
-export function featureTone(status: string): Tone {
-  if (status === "done") return "done";
-  if (status === "active") return "active";
-  if (status === "cancelled") return "cancelled";
-  return "idle";
-}
 
 /** Which filter chips a feature appears under, from its status and its stories' tones. */
 export function featureFilters(status: string | null, storyTones: readonly Tone[], review = false): WorkFilter[] {
@@ -59,12 +39,6 @@ export function featureFilters(status: string | null, storyTones: readonly Tone[
   const done = status === null ? tones.length > 0 && tones.every((t) => t === "done") : status === "done";
   if (done) out.push("done");
   return out;
-}
-
-const BAR_ORDER: readonly Tone[] = ["done", "review", "active", "idle"];
-
-function segments(tones: readonly Tone[]): Segment[] {
-  return BAR_ORDER.map((tone) => ({ tone, count: tones.filter((t) => t === tone).length })).filter((s) => s.count);
 }
 
 /** Cards in their `order`, then by ID number. */
@@ -144,8 +118,13 @@ function featureRow(
       ? labelled(featureProgress(feature.id, cards, config))
       : { done, total: tones.length, label: progressLabel(done, tones.length, "stories") },
     bar: segments(tones),
+    breakdown: stageBreakdown(counted, config),
     tasks,
-    scope: { added: scope?.added.length ?? 0, openBugs: scope?.bugs.open ?? openBugs },
+    scope: {
+      added: scope?.added.length ?? 0,
+      addedBreakdown: scope?.addedBreakdown ?? "",
+      openBugs: scope?.bugs.open ?? openBugs,
+    },
     stories: rows,
   };
 }
@@ -197,6 +176,7 @@ export function buildWorkList(
       title: e.title,
       progress: labelled(epicProgress(e.id, cards)),
       bar: segments(under.filter((f) => f.status !== "cancelled").map((f) => featureTone(f.status))),
+      breakdown: statusBreakdown(under),
       features: under.map(rowOf),
     };
   });
@@ -211,13 +191,15 @@ export function buildWorkList(
     .map((b) => storyRow(b, new Set(), config, editable, mergeable));
   if (orphans.length) loose.push(featureRow(null, orphans, cards, config, editable, mergeable));
   if (loose.length) {
-    const tones = loose.filter((f) => f.id !== null && f.status !== "cancelled").map((f) => f.tone);
+    const counted = loose.filter((f) => f.id !== null && f.status !== "cancelled");
+    const tones = counted.map((f) => f.tone);
     const done = tones.filter((t) => t === "done").length;
     rows.push({
       id: null,
       title: "",
       progress: { done, total: tones.length, label: progressLabel(done, tones.length, "features") },
       bar: segments(tones),
+      breakdown: statusBreakdown(counted.map((f) => ({ status: f.status ?? "" }))),
       features: loose,
     });
   }

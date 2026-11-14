@@ -79,8 +79,11 @@ export interface FeatureRow {
   progress: ProgressCount;
   /** The stories by stage tone, in bar order. */
   bar: Segment[];
+  /** What the bar says on hover or focus (STORY-15): "1 done · 1 needs your Accept · 2 in progress"; empty with none. */
+  breakdown: string;
   tasks: Count;
-  scope: { added: number; openBugs: number };
+  /** Added after the scope baseline, with "+3 added: 2 stories · 1 bug" (empty when none), and open bugs. */
+  scope: { added: number; addedBreakdown: string; openBugs: number };
   stories: StoryRow[];
 }
 
@@ -91,6 +94,8 @@ export interface EpicRow {
   progress: ProgressCount;
   /** The features by status tone, in bar order. */
   bar: Segment[];
+  /** What the bar says on hover or focus (STORY-15): "1 done · 2 in progress · 1 approved"; empty with none. */
+  breakdown: string;
   features: FeatureRow[];
 }
 
@@ -168,8 +173,9 @@ const feature = (r: Record<string, unknown>): FeatureRow => {
     filters: Array.isArray(r.filters) ? r.filters.filter((f): f is WorkFilter => isOneOf(WORK_FILTERS, f)) : [],
     progress: progress(r.progress),
     bar: bar(r.bar),
+    breakdown: text(r.breakdown),
     tasks: count(r.tasks),
-    scope: { added: num(scope.added), openBugs: num(scope.openBugs) },
+    scope: { added: num(scope.added), addedBreakdown: text(scope.addedBreakdown), openBugs: num(scope.openBugs) },
     stories: list(r.stories, story),
   };
 };
@@ -179,6 +185,7 @@ const epic = (r: Record<string, unknown>): EpicRow => ({
   title: text(r.title),
   progress: progress(r.progress),
   bar: bar(r.bar),
+  breakdown: text(r.breakdown),
   features: list(r.features, feature),
 });
 
