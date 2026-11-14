@@ -90,6 +90,8 @@ epics in `.featra/cards/`.
 
 - The Scope cell's tooltip lists the added items' titles and origins.
 - The burn-up marks the scope baseline (the moment the feature went in progress).
+- The burn-up redraws at local midnight when the pane is left open and nothing else changes.
+- Task ticks recorded in the history, so a tasks-mode burn-up shows when each task was ticked, not only now.
 
 - One "leads a feature" rule in work-format, used by the server (`leadOf`, card reports) and the client (`featuresLedBy`).
 - A feature picker in the chat header when a chat leads more than one feature.

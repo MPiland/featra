@@ -7,6 +7,7 @@ import { CHAT_COPY } from "../../chats.ts";
 import { featureStatusLabel, PROGRESS_COPY, WORK_COPY } from "../../work-list.ts";
 import { BugIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
+import { BurnUpChart } from "./BurnUpChart.tsx";
 import { DockedAside } from "./DockedAside.tsx";
 import { Status, ticks } from "./FeatureRows.tsx";
 import { PrChip } from "./PrChip.tsx";
@@ -28,6 +29,8 @@ export interface FeatureProgressProps {
   /** Opens the feature's own card in the pane. */
   onCard: () => void;
   onClose: () => void;
+  /** The clock the burn-up ends at, read on each render (the list pushes every change); tests give a fixed one. */
+  now?: () => Date;
 }
 
 /** One story: a button that opens it, its waiting mark, then its stage, criteria, tasks and PR. */
@@ -68,11 +71,13 @@ function branchText(branch: FeatureBranch): string {
 
 /**
  * A feature's progress (STORY-24), docked on the right like the card pane, from the same live Work list row (ADR 0003,
- * ADR 0016): its counts and bar, added scope, open bugs and branch, and each story's stage, criteria, tasks and PR. It
+ * ADR 0016): its counts and bar, added scope, open bugs and branch, its burn-up (STORY-16), and each story's stage,
+ * criteria, tasks and PR. It
  * reads nothing else and calls no agent. Escape closes it unless something inside is using Escape itself.
  */
 export function FeatureProgress(props: FeatureProgressProps) {
   const { id, feature, loading, chats, paneId, width, focusOnOpen = true, onStory, onCard, onClose } = props;
+  const { now = () => new Date() } = props;
   const storiesHead = useId();
   let body;
   if (!feature) body = <p className="meta">{loading ? CARD_COPY.loading : PROGRESS_COPY.gone}</p>;
@@ -98,7 +103,11 @@ export function FeatureProgress(props: FeatureProgressProps) {
             <dd>{branchText(featureBranch(feature))}</dd>
           </dl>
         </div>
-        {/* STORY-16: the burn-up goes here, between the counts and the stories. */}
+        {feature.burnUp ? (
+          <BurnUpChart chart={feature.burnUp} current={feature.progress} now={now()} />
+        ) : (
+          <p className="meta fp-burnup-wait">{PROGRESS_COPY.chartStarts}</p>
+        )}
         <section className="card-sec" aria-labelledby={storiesHead}>
           <h3 className="sh" id={storiesHead}>
             {PROGRESS_COPY.stories}

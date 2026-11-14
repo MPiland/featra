@@ -11,7 +11,7 @@ import { acceptedFeature, featureAcceptRefusal } from "./feature-end.ts";
 import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";
 import type { OwnedCard, Resolution } from "./owner-copies.ts";
-import { epicProgress, featureProgress, itemsOf, progressLabel, scopeSummary } from "./rollup.ts";
+import { burnUp, epicProgress, featureProgress, itemsOf, progressLabel, scopeSummary } from "./rollup.ts";
 import { stoppedIn } from "./story-stop.ts";
 import { featureTone, segments, stageBreakdown, stageTone, statusBreakdown } from "./work-tones.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
@@ -127,6 +127,9 @@ function featureRow(
       openBugs: scope?.bugs.open ?? openBugs,
     },
     ...(branch ? { branch } : {}),
+    ...(feature && scope?.baseline
+      ? { burnUp: { since: scope.baseline, points: burnUp(feature.id, cards, config) } }
+      : {}),
     stories: rows,
   };
 }

@@ -1,5 +1,6 @@
+import type { BurnUpPoint } from "./burn-up.ts";
 import { stageCategory } from "./config.ts";
-import { createdMs, existsAt, parentAt, statusAt } from "./history.ts";
+import { createdMs, existsAt, parentAt, statusAt, taskEditTimes, tasksAt } from "./history.ts";
 import {
   CANCELLED,
   type Card,
@@ -178,15 +179,12 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
   };
 }
 
-export interface BurnUpPoint {
-  at: string;
-  scope: number;
-  done: number;
-}
-
 /**
  * Burn-up series for a feature, built only from cards' `history[]` (never commit times),
- * so uncommitted changes are included. Counts items (stories and bugs). No forecast (ADR 0005).
+ * so uncommitted changes are included. It counts what the progress setting counts, as `featureProgress` does: items
+ * (stories and bugs, so a bug is added scope), or their tasks in `tasks` mode, where an item weighs the tasks it had
+ * then (`tasksAt`) and a done item counts them all. Ticks aren't in the history, so a ticked task of an open item counts
+ * only in the feature row's own count, the chart's last point (burn-up.ts). No forecast (ADR 0005).
  * It starts at the scope baseline (ADR 0038), so its scope line and "+N added" agree, and is empty before the feature
  * goes in progress. A point is emitted whenever scope or done changes.
  */
@@ -195,11 +193,13 @@ export function burnUp(featureId: string, cards: readonly Card[], config: Projec
   const relevant = everUnder(featureId, cards);
   if (baseline === null || !relevant.length) return [];
   const start = ms(baseline);
+  const tasks = config.progress === "tasks";
   const times = new Set<number>([start]);
   for (const c of relevant) {
     const created = createdMs(c);
     if (Number.isFinite(created)) times.add(created);
     for (const e of c.history) if (e.field === "status" || e.field === "parent") times.add(ms(e.at));
+    if (tasks) for (const t of taskEditTimes(c)) times.add(t);
   }
   const points: BurnUpPoint[] = [];
   for (const t of [...times].filter((x) => x >= start).toSorted((a, b) => a - b)) {
@@ -207,8 +207,9 @@ export function burnUp(featureId: string, cards: readonly Card[], config: Projec
     let done = 0;
     for (const c of relevant) {
       if (!memberAt(c, featureId, t)) continue;
-      scope += 1;
-      if (isDone(statusAt(c, t), config)) done += 1;
+      const weight = tasks ? tasksAt(c, t) : 1;
+      scope += weight;
+      if (isDone(statusAt(c, t), config)) done += weight;
     }
     const last = points.at(-1);
     if (!last || last.scope !== scope || last.done !== done) points.push({ at: iso(t), scope, done });

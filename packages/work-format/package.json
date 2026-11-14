@@ -24,6 +24,7 @@
     "./chat-list": "./src/chat-list.ts",
     "./chat-nest": "./src/chat-nest.ts",
     "./feature-progress": "./src/feature-progress.ts",
+    "./burn-up": "./src/burn-up.ts",
     "./inbox": "./src/inbox.ts",
     "./approvals": "./src/approvals.ts",
     "./questions": "./src/questions.ts",
