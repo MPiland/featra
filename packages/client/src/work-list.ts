@@ -110,6 +110,12 @@ export const PROGRESS_COPY = {
   pr: "PR",
   backTo: (id: string) => `Back to ${id} progress`,
   gone: "This feature isn't in the project any more.",
+  burnUp: "Burn-up chart",
+  burnUpByDay: "Burn-up by day",
+  chartStarts: "The chart starts when the feature goes in progress.",
+  scope: "Scope",
+  done: "Done",
+  day: "Day",
 } as const;
 
 /** How a feature's status reads in the list. */

@@ -23,7 +23,7 @@ test("A story session's turn ends and a notice appears in the Dev Lead's chat", 
     running = app;
     const draft = await draftInNewChat(page, "FEAT-2");
     await draft.getByRole("button", { name: "Approve", exact: true }).click();
-    await expect.poll(() => git(repo.dir, "status", "--porcelain")).toBe("");
+    await expect.poll(() => git(repo.dir, "status", "--porcelain"), { timeout: 30_000 }).toBe("");
     await draft.getByRole("button", { name: "Start", exact: true }).click();
     await expect.poll(() => git(repo.dir, "branch", "--format=%(refname:short)")).toContain("feature/2-shaping");
 

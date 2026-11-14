@@ -42,7 +42,9 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Scope baseline** — the moment the feature goes in progress (Start feature), read from its history; never stored
   (ADR 0038). Items that join the feature after it are **added scope**; stories added before it are planned.
 - **Origin** — why a card exists: `planned`, `added` (after the baseline) or `bug`.
-- **Burn-up** — chart of a feature's total scope and done count over time. Featra does not forecast.
+- **Burn-up** — chart of a feature's total scope and done count over time, in its feature progress pane: from the
+  scope baseline, one point per local day and a last point for now, counting stories (bugs as added scope) or tasks, as
+  the progress setting says. Uncommitted changes count. Featra does not forecast (ADR 0039).
 - **Feature progress pane** — one feature's progress docked on the right, from its row of the live Work list: counts
   and bar, added scope, open bugs, its branch, and each story's stage, criteria, tasks and PR. It opens from
   **Feature progress** in the header of a chat that leads the feature (its Dev Lead: the chat that drafted it, or that

@@ -27,7 +27,7 @@ test("Watch a story session, Stop it and Resume it: read-only, Stopped with the 
     running = app;
     const draft = await draftInNewChat(page, "FEAT-2");
     await draft.getByRole("button", { name: "Approve", exact: true }).click();
-    await expect.poll(() => git(repo.dir, "status", "--porcelain")).toBe("");
+    await expect.poll(() => git(repo.dir, "status", "--porcelain"), { timeout: 30_000 }).toBe("");
     await draft.getByRole("button", { name: "Start", exact: true }).click();
     await expect.poll(() => git(repo.dir, "branch", "--format=%(refname:short)")).toContain("feature/2-shaping");
 

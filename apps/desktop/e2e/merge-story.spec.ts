@@ -39,7 +39,7 @@ test("Merge a Verified story: its PR merges with a merge commit, and its worktre
 
     const draft = await draftInNewChat(page, "FEAT-2");
     await draft.getByRole("button", { name: "Approve", exact: true }).click();
-    await expect.poll(() => git(repo.dir, "status", "--porcelain")).toBe("");
+    await expect.poll(() => git(repo.dir, "status", "--porcelain"), { timeout: 30_000 }).toBe("");
     await draft.getByRole("button", { name: "Start", exact: true }).click();
     await expect.poll(() => git(repo.dir, "branch", "--format=%(refname:short)")).toContain("feature/2-shaping");
 
@@ -100,8 +100,9 @@ test("Merge a Verified story: its PR merges with a merge commit, and its worktre
 
     // AC5: the worktree and the story's local and remote branches are gone; the feature branch has the merged card.
     await expect.poll(() => existsSync(folder)).toBe(false);
-    expect(git(repo.dir, "branch", "--list", branch)).toBe("");
-    expect(git(remote, "branch", "--list", branch)).toBe("");
+    // The branches go after the folder, so they are waited for too.
+    await expect.poll(() => git(repo.dir, "branch", "--list", branch), { timeout: 30_000 }).toBe("");
+    await expect.poll(() => git(remote, "branch", "--list", branch), { timeout: 30_000 }).toBe("");
     expect(git(repo.dir, "log", "-1", "--format=%s", "feature/2-shaping")).toBe(`${id}: merged into feature/2-shaping`);
     await expect(merge).toHaveCount(0);
 

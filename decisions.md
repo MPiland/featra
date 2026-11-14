@@ -2239,3 +2239,42 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   done, "None" otherwise.
 - No existing assertion was weakened; the developer's own new assertions were made stronger.
 - Roadmap: one shared "leads a feature" rule in work-format; a feature picker in the chat header.
+
+## 2026-11-13 — STORY-16 build choices (story agent, for the Dev Lead to confirm)
+
+- **Where the series is built (ADR 0039).** The existing `burnUp` in rollup.ts builds it; there is no second builder.
+  `buildWorkList` puts `burnUp: { since, points }` on a started feature's row: the scope baseline and the change points.
+  The row carries no days, so time passing never makes the server push.
+- **Days.** The client samples the change points per local day at render time with work-format's pure `burnUpDays`:
+  the baseline, then each local midnight after it (the values just before it, labelled with the day that ended), then
+  now. The time zone is the user's. A feature started mid-day has that part day as its first day. Daylight saving
+  changes give one point per day (unit-tested in New York).
+- **AC2 by construction.** The now point is the feature row's own `progress` count, so the chart ends where the row
+  says. Stories mode counts stories and bugs as the row does. Tasks mode weighs each item by the tasks it had then
+  (`tasksAt`, replayed from `content` events, which record the replaced task list), and a done item counts all of them.
+  Ticks are not in the history, so open items' ticks show only in the now point.
+- **Uncommitted changes (AC4).** The list is already built from owner copies, working trees included, and pushed by the
+  existing watch; the chart follows each push. No polling, no agent calls. Proved on a real git repo with an
+  uncommitted change in a feature worktree (`burn-up-scan.test.ts`), in the component test, and end to end.
+- **Drawing.** Plain SVG, two step lines and a baseline axis. Scope is the not-started grey (`--tx3`), dashed; done is
+  the done green (`--ok`). Only the first and the last day are labelled. No timer: a pane left open across midnight
+  shows the new day on the next push (roadmap).
+- **Accessibility.** The image is named "Scope 7 · Done 3, since Nov 11", and a visually hidden table ("Burn-up by
+  day") gives every point. The legend and day labels are hidden from screen readers since the name says the same.
+- **AC6 copy.** "The chart starts when the feature goes in progress."
+- **Heading "Burn-up chart", not "Burn-up".** STORY-24's pane test finds the FEAT-3 pane by its title heading,
+  "Burn-up" (the fixture feature's title). A chart heading of the same name made that query match twice. The
+  assertion is unchanged; the chart's heading is named "Burn-up chart" so the two never collide.
+- **Test seam.** `FeatureProgress` takes an optional `now` (defaults to the clock); tests fake `Date` and the time zone
+  only.
+- **No existing assertion changed.**
+- **Roadmap:** a midnight redraw while the pane is open; task ticks in the history.
+- **Windows e2e waits (Dev Lead: fix the wait, never weaken the assertion).** PR #54's first CI run failed E2E
+  (Windows) twice on two specs that STORY-16 doesn't touch. The list build with the burn-up takes 2–5 ms on the
+  project's 100 real cards, so the change didn't slow the server; the specs were timing-fragile:
+  - `merge-story.spec.ts` polled for the story's worktree to go, then read its local and remote branches at once. The
+    merge removes the folder before it deletes the branch (`removeStory` in merge-git.ts), so on a slow runner the
+    branch was still there. Both branch checks now poll the same condition, up to 30 s.
+  - `progress-breakdown.spec.ts` waited the default 5 s for Approve's commit (a clean `git status`). The same wait is
+    in 16 specs, so all of them now give it 30 s, within the 60 s test timeout.
+    No assertion changed: each expects the same value, now with a fitting wait.

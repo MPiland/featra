@@ -4,6 +4,7 @@
  * parser.
  */
 import { normalizePrStatus, type PrStatus } from "./prs-types.ts";
+import type { BurnUp, BurnUpPoint } from "./burn-up.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /** How a status reads at a glance: the colour of its dot and its slice of a bar. */
@@ -86,6 +87,8 @@ export interface FeatureRow {
   scope: { added: number; addedBreakdown: string; openBugs: number };
   /** The feature's own branch while it owns the feature's cards (ADR 0002), as its progress pane shows it (STORY-24). */
   branch?: string;
+  /** Its burn-up from the scope baseline (STORY-16), counted as `progress` is; left out until it goes in progress. */
+  burnUp?: BurnUp;
   stories: StoryRow[];
 }
 
@@ -162,6 +165,17 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   merged: r.merged === true,
 });
 
+const isTime = (v: unknown): v is string => typeof v === "string" && Number.isFinite(Date.parse(v));
+
+/** A burn-up read defensively: left out without a valid baseline; steps without a valid time are dropped. */
+const burnUpOf = (raw: unknown): { burnUp?: BurnUp } => {
+  if (!isRecord(raw) || !isTime(raw.since)) return {};
+  const points = list(raw.points, (p) => ({ at: p.at, scope: num(p.scope), done: num(p.done) })).filter(
+    (p): p is BurnUpPoint => isTime(p.at),
+  );
+  return { burnUp: { since: raw.since, points } };
+};
+
 const feature = (r: Record<string, unknown>): FeatureRow => {
   const scope = isRecord(r.scope) ? r.scope : {};
   return {
@@ -179,6 +193,7 @@ const feature = (r: Record<string, unknown>): FeatureRow => {
     tasks: count(r.tasks),
     scope: { added: num(scope.added), addedBreakdown: text(scope.addedBreakdown), openBugs: num(scope.openBugs) },
     ...(typeof r.branch === "string" && r.branch ? { branch: r.branch } : {}),
+    ...burnUpOf(r.burnUp),
     stories: list(r.stories, story),
   };
 };
