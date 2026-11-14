@@ -2,7 +2,7 @@
 id: STORY-24
 type: story
 title: Feature progress pane
-status: In Review
+status: Acceptance
 parent: FEAT-7
 order: 2
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-24
+  - at: 2026-11-14T02:26:17Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

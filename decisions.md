@@ -2226,3 +2226,16 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   work-format test "is the features the chat drafted, newest first" is now titled "…, the active one first", with
   its assertion unchanged. The shared helpers of `feature-progress.test.tsx` moved to `test/progress-fixtures.tsx`
   unchanged. No other assertion changed.
+
+## 2026-11-13 — STORY-24 review rulings (dev-lead)
+
+- Build choices confirmed: one right pane (card or feature progress, one at a time, sharing `DockedAside` and the
+  docked width); a chat leads a feature if it drafted it or started one of its story sessions (ADR 0027/0028), no new
+  link; the leader pick prefers active, then approved, draft, done, then newest id; waiting on the user is Acceptance
+  or a session waiting on an approval or a question (the Inbox's set, via `isAsk`); the pane reads the existing watch,
+  no polling, no agent calls. No new ADR; ADR 0017 amended.
+- `DockedAside` in its own file instead of SidePane.tsx is accepted: it avoids an import cycle.
+- Branch wording: the branch name while the feature branch owns the card, "Not started" before Start, "Merged" when
+  done, "None" otherwise.
+- No existing assertion was weakened; the developer's own new assertions were made stronger.
+- Roadmap: one shared "leads a feature" rule in work-format; a feature picker in the chat header.
