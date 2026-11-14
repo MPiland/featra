@@ -2,7 +2,7 @@
 id: STORY-15
 type: story
 title: Feature counts and added scope
-status: In Review
+status: Acceptance
 parent: FEAT-7
 order: 1
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-15
+  - at: 2026-11-14T01:06:43Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

@@ -2154,3 +2154,16 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   - The earlier STORY-15 changes, from the build: rollup.test.ts baseline tests, card-approval.test.ts baseline
     blocks, draft-review-approve and draft-review-scope `baselineOf` checks, feature-start's `extra.baseline`, and new
     fields in the work-list normalizer and server-watch fixtures.
+
+## 2026-11-13 — STORY-15 review rulings (dev-lead)
+
+- Build choices confirmed: the scope baseline is derived from `history[]` (the feature's first move into active or
+  done), never stored; approval no longer writes `baseline`; stored approval baselines are ignored and round-trip
+  untouched; "added" means joined strictly after the baseline. ADR 0038 confirmed.
+- The fallback for an active feature with no recorded move into progress is the later of `created` and its last
+  recorded status change (review fix, with a regression test).
+- Every changed assertion encodes the old approval or first-story baseline rule, or tested a function removed for
+  having no product caller. None is a weakening. Approved under the AC2 rule change.
+- The bar is a focusable `role="img"` with the breakdown as its name; the tooltip only repeats that name, so
+  `pointer-events: none` is acceptable.
+- Roadmap: the Scope cell's own tooltip listing added items; a baseline marker on the burn-up.
