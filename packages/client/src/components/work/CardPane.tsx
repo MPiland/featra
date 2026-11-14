@@ -33,6 +33,8 @@ export interface CardPaneProps {
   focusOnOpen?: boolean;
   /** Whether the project still has a chat. Send back is off for a draft whose chat is gone; default: it has. */
   hasChat?: (chat: string) => boolean;
+  /** A way back out of the card, when it wasn't opened from another card: to a feature's progress (STORY-24). */
+  back?: { label: string; go: () => void };
 }
 
 const anyChat = () => true;
@@ -57,6 +59,7 @@ export function CardPane({
   openedFrom,
   focusOnOpen = true,
   hasChat = anyChat,
+  back,
 }: CardPaneProps) {
   const card = useCard(work, dir, id);
   const pane = useRef<HTMLElement>(null);
@@ -247,10 +250,16 @@ export function CardPane({
     >
       <div className="card-bar">
         <span className="card-id">{id}</span>
-        {onOpen && openedFrom && (
+        {onOpen && openedFrom ? (
           <button type="button" className="card-link" onClick={() => onOpen(openedFrom)}>
             {CARD_COPY.backTo(openedFrom)}
           </button>
+        ) : (
+          back && (
+            <button type="button" className="card-link" onClick={back.go}>
+              {back.label}
+            </button>
+          )
         )}
         <button
           type="button"

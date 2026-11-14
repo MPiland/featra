@@ -43,6 +43,11 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   (ADR 0038). Items that join the feature after it are **added scope**; stories added before it are planned.
 - **Origin** — why a card exists: `planned`, `added` (after the baseline) or `bug`.
 - **Burn-up** — chart of a feature's total scope and done count over time. Featra does not forecast.
+- **Feature progress pane** — one feature's progress docked on the right, from its row of the live Work list: counts
+  and bar, added scope, open bugs, its branch, and each story's stage, criteria, tasks and PR. It opens from
+  **Feature progress** in the header of a chat that leads the feature (its Dev Lead: the chat that drafted it, or that
+  started one of its story sessions) and from the progress icon on the feature's row in Work. One pane is docked at a time:
+  it and the card pane replace each other.
 - **Evidence state** — what is actually known about a story:
   - **Reported** — an agent said so (ticked a task, moved a stage).
   - **Verified** — the PR's CI checks passed.

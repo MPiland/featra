@@ -90,6 +90,25 @@ export const WORK_COPY = {
   showStories: (title: string) => `Show stories of ${title}`,
 } as const;
 
+/** The feature progress pane's words (STORY-24). */
+export const PROGRESS_COPY = {
+  open: "Feature progress",
+  rowOf: (id: string) => `Feature progress of ${id}`,
+  pane: (id: string) => `${id} progress`,
+  close: "Close feature progress",
+  card: "Card",
+  added: "Added",
+  openBugs: "Open bugs",
+  branch: "Branch",
+  stories: "Stories",
+  noStories: "No stories yet.",
+  criteria: "Criteria",
+  tasks: "Tasks",
+  pr: "PR",
+  backTo: (id: string) => `Back to ${id} progress`,
+  gone: "This feature isn't in the project any more.",
+} as const;
+
 /** How a feature's status reads in the list. */
 export const featureStatusLabel = (status: string | null) =>
   status === null ? WORK_COPY.none : (CONTAINER_STATUS_LABELS[status] ?? status);

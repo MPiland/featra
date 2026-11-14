@@ -239,6 +239,8 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 chat={chat}
                 dir={projectDir ?? ""}
                 onStarted={startedChat}
+                chatList={chatList.chats}
+                onOpenChat={openChat}
               />
             ) : view.id === "settings" ? (
               <SettingsView

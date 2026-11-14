@@ -2167,3 +2167,32 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - The bar is a focusable `role="img"` with the breakdown as its name; the tooltip only repeats that name, so
   `pointer-events: none` is acceptable.
 - Roadmap: the Scope cell's own tooltip listing added items; a baseline marker on the burn-up.
+
+## 2026-11-13 — STORY-24 build choices (story agent, for the Dev Lead to confirm)
+
+- **One pane on the right.** The progress pane and the card pane share one slot, handle and width (`SidePane`, over
+  `useDockedPane` and `PaneHandle`): opening either replaces the other, in Work and beside a chat. Two panes side by
+  side would squeeze the list or the chat below its minimum. A card opened from the progress pane carries "Back to
+  FEAT-N progress", so the pane is one click away again.
+- **Which chat leads a feature.** No new link: a chat leads a feature it drafted (`drafted-by`) or one whose story
+  session it spawned (`story.parent`), as ADR 0027 and ADR 0028 already define the Dev Lead. A story session leads
+  nothing. When a chat leads several, Feature progress opens the newest (highest id). Rule in
+  `work-format/src/feature-progress.ts` (`featuresLedBy`).
+- **The feature row.** An icon button (named "Feature progress of FEAT-N", titled "Feature progress") beside the title
+  of every feature row with a card. An icon, not a word, so the name cell still reads as the title alone (work-list
+  test AC2 reads that cell). The row's own toggle still opens its stories; Open and Review draft are unchanged. The feature's card stays
+  reachable through **Card** in the pane's bar.
+- **Branch.** `FeatureRow.branch` is the feature branch while it owns the feature's card (ADR 0002), set by
+  `buildWorkList` from the owner it already resolved; absent while main owns it ("None" in the pane). Optional in the
+  normalizer, so older servers and fixtures still read.
+- **Waiting on the user.** A story is marked "Waiting for you" when it is in Acceptance (`awaiting`), or its session
+  waits on an approval or a question. A session waiting for a reply waits on its Dev Lead, so it isn't marked
+  (`waitsOnUser`).
+- **A story's click.** Its latest session's chat when the project still lists it (`storyChat`), else its card.
+- **Live, no tokens.** The pane reads the Work list its host already watches (`work.watch`, ADR 0016) and the chat
+  list App already has; it opens no new watch and makes no call. `useChatDraft` became the pure `chatDraft(list,
+  chat)` so ChatDraft watches the list once for both the draft and the progress pane.
+- **Burn-up slot.** The pane leaves a marked place for STORY-16's chart between the counts and the stories; nothing
+  is built there.
+- No ADR: the shared slot reuses ADR 0017's docked pane, and the Dev Lead link is ADR 0027's. No existing assertion was
+  changed.

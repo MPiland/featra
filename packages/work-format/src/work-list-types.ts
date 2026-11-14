@@ -84,6 +84,8 @@ export interface FeatureRow {
   tasks: Count;
   /** Added after the scope baseline, with "+3 added: 2 stories · 1 bug" (empty when none), and open bugs. */
   scope: { added: number; addedBreakdown: string; openBugs: number };
+  /** The feature's own branch while it owns the feature's cards (ADR 0002), as its progress pane shows it (STORY-24). */
+  branch?: string;
   stories: StoryRow[];
 }
 
@@ -176,6 +178,7 @@ const feature = (r: Record<string, unknown>): FeatureRow => {
     breakdown: text(r.breakdown),
     tasks: count(r.tasks),
     scope: { added: num(scope.added), addedBreakdown: text(scope.addedBreakdown), openBugs: num(scope.openBugs) },
+    ...(typeof r.branch === "string" && r.branch ? { branch: r.branch } : {}),
     stories: list(r.stories, story),
   };
 };

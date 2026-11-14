@@ -23,6 +23,7 @@
     "./chat-events": "./src/chat-events.ts",
     "./chat-list": "./src/chat-list.ts",
     "./chat-nest": "./src/chat-nest.ts",
+    "./feature-progress": "./src/feature-progress.ts",
     "./inbox": "./src/inbox.ts",
     "./approvals": "./src/approvals.ts",
     "./questions": "./src/questions.ts",
