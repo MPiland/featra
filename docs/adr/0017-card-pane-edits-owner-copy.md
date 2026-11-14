@@ -46,6 +46,9 @@ fields use `InlineText`: Enter or a click edits, leaving the field saves, Escape
 don't replace what the user typed. A refused save keeps the typed text, shows the refusal and the value now, and the
 next save is made from that value.
 
+**One pane on the right (amended 2026-11-13, STORY-24).** The right slot holds the card or a feature's progress pane,
+one at a time; both use the same docked frame (`DockedAside`), so focus on open, Escape and Close work alike.
+
 **Width.** The list and the pane share the work area. `pane-width.ts` fits the pane: 40% of the area by default,
 between 320 and 720 px, always leaving the list 240 px; when the area is too narrow for both minimums (the app's
 smallest window), they share it in that proportion, so nothing scrolls sideways. The pane's left edge is a

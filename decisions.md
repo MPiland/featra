@@ -2196,3 +2196,33 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   is built there.
 - No ADR: the shared slot reuses ADR 0017's docked pane, and the Dev Lead link is ADR 0027's. No existing assertion was
   changed.
+
+## 2026-11-13 — STORY-24 review fixes
+
+- **One docked frame.** `DockedAside` (pane id, label, id, actions, Close, focus on open, Escape, width) is the frame of
+  both the card pane and the feature progress pane. It lives in its own `DockedAside.tsx`, not `SidePane.tsx` as
+  asked: `SidePane` imports `CardPane` and `FeatureProgress`, so their importing it back would break `import/no-cycle`.
+  The bar's actions and Close now sit together at its end (`.pane-actions`), so the card pane's back link moved next
+  to Close.
+- **One warning badge.** "Waiting for you" uses `.badge-review`; `.badge-wait` is gone. The class keeps its name
+  because `badge-contrast.test.ts` reads it.
+- **The row's button toggles.** `CardSelection` has `close`; a second click on a feature row's progress button closes
+  the pane, as the chat's button does (regression test failed first).
+- **Focus tests.** Closing a card opened from the progress pane puts focus on Feature progress in a chat, and on the
+  feature row's progress button in Work when the story's row is collapsed (`feature-progress-focus.test.tsx`).
+- **Leader pick.** A chat that leads several features opens active first, then approved, draft, done, then the newest
+  id (`featuresLedBy`; regression test failed first).
+- **Waiting.** `waitsOnUser` uses `isAsk`, now exported from `chat-list.ts`.
+- **Stories heading.** The section and the list are named by the "Stories" heading (`aria-labelledby`); the list keeps
+  its name because the component and e2e tests find it by it.
+- **ADR 0017 amended:** the right slot holds the card or the feature progress pane, one at a time.
+- **Branch wording (Dev Lead ruling).** `featureBranch`: the branch name while the feature branch owns the card, "Not
+  started" for a draft or approved feature, "Merged" for a done one, "None" otherwise (a cancelled feature, or one
+  main owns while active). Unit-tested for the three cases; the pane test adds Not started and Merged.
+- **The pane's Card button** is named "FEAT-N card".
+- **Assertions changed (all STORY-24's own, made stronger or renamed):** the component tests find the Card button as
+  "FEAT-2 card" (both the click and the gone-feature absence check); the e2e checks "In Progress" on that story's own
+  line, and that the opened chat is that story's session (its sidebar row is current and the log names its id); the
+  work-format test "is the features the chat drafted, newest first" is now titled "…, the active one first", with
+  its assertion unchanged. The shared helpers of `feature-progress.test.tsx` moved to `test/progress-fixtures.tsx`
+  unchanged. No other assertion changed.

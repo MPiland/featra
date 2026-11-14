@@ -3,6 +3,7 @@ import {
   DRAFTED_BY,
   MAIN,
   buildWorkList,
+  featureBranch,
   featureRowOf,
   featuresLedBy,
   normalizeWorkList,
@@ -23,6 +24,9 @@ const owned = (card: Card, owner: OwnerLocation = MAIN): OwnedCard => ({
   path: `.featra/cards/${card.id}.md`,
 });
 const drafted = (card: Card, chat: string): Card => ({ ...card, extra: { ...card.extra, [DRAFTED_BY]: chat } });
+
+/** A feature card the chat "lead" drafted. */
+const led = (id: string, status: string) => owned(drafted(feature(id, status, null), "lead"));
 
 const chat = (id: string, extra: Partial<ChatSummary> = {}): ChatSummary => ({
   id,
@@ -73,6 +77,40 @@ describe("a feature row's branch", () => {
   });
 });
 
+describe("featureBranch", () => {
+  const states = buildWorkList(
+    {
+      cards: [
+        owned(feature("FEAT-1", "active", null), FEATURE_BRANCH),
+        owned(feature("FEAT-2", "approved", null)),
+        owned(feature("FEAT-3", "draft", null)),
+        owned(feature("FEAT-4", "done", null)),
+      ],
+      stale: [],
+      problems: [],
+    },
+    config,
+  );
+  const of = (id: string) => {
+    const row = featureRowOf(states, id);
+    if (!row) throw new Error(`${id} is not in the list.`);
+    return featureBranch(row);
+  };
+
+  it("is the branch's name while the feature branch owns the card", () => {
+    expect(of("FEAT-1")).toEqual({ kind: "branch", name: "feature/1-progress" });
+  });
+
+  it("is not started before Start", () => {
+    expect(of("FEAT-2")).toEqual({ kind: "not-started" });
+    expect(of("FEAT-3")).toEqual({ kind: "not-started" });
+  });
+
+  it("is merged for a done feature", () => {
+    expect(of("FEAT-4")).toEqual({ kind: "merged" });
+  });
+});
+
 describe("featureRowOf", () => {
   it("finds a feature by id, and nothing for an unknown id or a story", () => {
     expect(featureRowOf(list, "FEAT-2")?.id).toBe("FEAT-2");
@@ -82,8 +120,34 @@ describe("featureRowOf", () => {
 });
 
 describe("featuresLedBy", () => {
-  it("is the features the chat drafted, newest first", () => {
+  it("is the features the chat drafted, the active one first", () => {
     expect(featuresLedBy("lead", list, [chat("lead")]).map((f) => f.id)).toEqual(["FEAT-12", "FEAT-2"]);
+  });
+
+  it("puts an active feature before one the chat just drafted, then approved, draft and done, then newest", () => {
+    const ranked = buildWorkList(
+      {
+        cards: [
+          led("FEAT-1", "done"),
+          led("FEAT-2", "active"),
+          led("FEAT-3", "approved"),
+          led("FEAT-12", "draft"),
+          led("FEAT-13", "draft"),
+          led("FEAT-14", "done"),
+        ],
+        stale: [],
+        problems: [],
+      },
+      config,
+    );
+    expect(featuresLedBy("lead", ranked, [chat("lead")]).map((f) => f.id)).toEqual([
+      "FEAT-2",
+      "FEAT-3",
+      "FEAT-13",
+      "FEAT-12",
+      "FEAT-14",
+      "FEAT-1",
+    ]);
   });
 
   it("includes a feature whose story session the chat spawned", () => {

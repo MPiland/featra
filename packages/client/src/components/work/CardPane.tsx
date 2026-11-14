@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { useRef, useState } from "react";
 import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
 import { InlineText } from "../controls/InlineText.tsx";
-import { CloseIcon } from "../icons.tsx";
 import { DraftReview } from "./DraftReview.tsx";
 import { SendBack } from "./SendBack.tsx";
 import { StartFeature } from "./StartFeature.tsx";
@@ -15,6 +14,7 @@ import { FeatureEnd } from "./FeatureEnd.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useCard } from "./useCard.ts";
+import { DockedAside } from "./DockedAside.tsx";
 import { AcSection, Evidence, TaskSection, TextSection, type SaveEdit } from "./CardSections.tsx";
 
 export interface CardPaneProps {
@@ -66,11 +66,6 @@ export function CardPane({
   const [error, setError] = useState<string | null>(null);
   const { view, setView } = card;
 
-  // Mounted once per card (keyed by id), so focus moves in each time a story is opened.
-  useEffect(() => {
-    if (focusOnOpen) pane.current?.focus();
-  }, [focusOnOpen]);
-
   const send = async (edit: CardEdit) => {
     const r = await work.updateCard(dir, id, edit);
     if (r.view) setView(r.view);
@@ -86,12 +81,6 @@ export function CardPane({
     const r = await send(edit);
     setError(r.ok ? null : r.error);
   };
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key !== "Escape" || e.defaultPrevented) return;
-    e.preventDefault();
-    onClose();
-  };
-
   let body;
   if (!view) body = <p className="meta">{card.loading ? CARD_COPY.loading : CARD_COPY.gone}</p>;
   else {
@@ -236,21 +225,19 @@ export function CardPane({
     );
   }
 
+  // Mounted once per card (keyed by id), so focus moves in each time a story is opened.
   return (
-    // The pane takes focus on open so Escape reaches it; it isn't a stop in the Tab order.
-    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-    <aside
-      id={paneId}
-      ref={pane}
-      className="card-pane"
-      style={{ width }}
-      aria-label={CARD_COPY.pane(id)}
-      tabIndex={-1}
-      onKeyDown={onKey}
-    >
-      <div className="card-bar">
-        <span className="card-id">{id}</span>
-        {onOpen && openedFrom ? (
+    <DockedAside
+      paneId={paneId}
+      paneRef={pane}
+      label={CARD_COPY.pane(id)}
+      id={id}
+      width={width}
+      focusOnOpen={focusOnOpen}
+      closeLabel={CARD_COPY.close}
+      onClose={onClose}
+      actions={
+        onOpen && openedFrom ? (
           <button type="button" className="card-link" onClick={() => onOpen(openedFrom)}>
             {CARD_COPY.backTo(openedFrom)}
           </button>
@@ -260,23 +247,15 @@ export function CardPane({
               {back.label}
             </button>
           )
-        )}
-        <button
-          type="button"
-          className="card-close"
-          aria-label={CARD_COPY.close}
-          title={CARD_COPY.close}
-          onClick={onClose}
-        >
-          <CloseIcon />
-        </button>
-      </div>
+        )
+      }
+    >
       {card.error && (
         <p className="card-error" role="alert">
           {card.error}
         </p>
       )}
       <div className="card-body">{body}</div>
-    </aside>
+    </DockedAside>
   );
 }

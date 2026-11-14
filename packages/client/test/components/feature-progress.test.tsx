@@ -8,7 +8,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   buildWorkList,
   DEFAULT_CONFIG,
-  DRAFTED_BY,
   MAIN,
   newCard,
   setStatus,
@@ -18,67 +17,19 @@ import {
 import { featureRowOf } from "@featra/work-format/feature-progress";
 import { PROJECT, renderApp } from "../harness.tsx";
 import { cardOf, PLAN } from "../work-fixtures.ts";
+import {
+  cards,
+  findPane,
+  fromWork,
+  pane,
+  progressButton,
+  sessionOf,
+  startChat,
+  startStory,
+  storyLine,
+} from "../progress-fixtures.tsx";
 
 afterEach(cleanup);
-
-type Host = Parameters<typeof renderApp>[0];
-type App = ReturnType<typeof renderApp>;
-
-const drafted = (card: Card, chat: string): Card => ({ ...card, extra: { ...card.extra, [DRAFTED_BY]: chat } });
-const FEATURE = cardOf({ id: "FEAT-2", type: "feature", status: "active", title: "Delegation" });
-const STORIES = [
-  cardOf({ id: "STORY-5", type: "story", parent: "FEAT-2", status: "New", title: "Spawn five", acs: [0, 2] }),
-  cardOf({ id: "STORY-6", type: "story", parent: "FEAT-2", status: "Ready", title: "Report back", tasks: [1, 3] }),
-];
-/** FEAT-2, drafted by the project's first chat; FEAT-3 drafted by nobody. */
-const cards = (lead: string | null = "chat-1") => ({
-  [PROJECT.dir]: [
-    lead ? drafted(FEATURE, lead) : FEATURE,
-    ...STORIES,
-    cardOf({ id: "FEAT-3", type: "feature", status: "approved", title: "Burn-up" }),
-  ],
-});
-
-const pane = (id = "FEAT-2") => screen.queryByRole("complementary", { name: `${id} progress` });
-const findPane = (id = "FEAT-2") => screen.findByRole("complementary", { name: `${id} progress` });
-const storyLine = (scope: HTMLElement, id: string) => scope.querySelector(`[data-card="${id}"]`) as HTMLElement;
-const progressButton = () => screen.queryByRole("button", { name: "Feature progress" });
-
-/** Starts a chat of `role` from the UI; it is the project's chat-1. */
-async function startChat(host: Host, role = "Dev Lead") {
-  const app = renderApp(host);
-  await app.user.click(screen.getByRole("button", { name: "New chat" }));
-  const dialog = await screen.findByRole("dialog", { name: "New chat" });
-  await app.user.click(await within(dialog).findByRole("button", { name: new RegExp(`^${role}`) }));
-  await screen.findByRole("region", { name: role });
-  return app;
-}
-
-/** Opens Work and the feature's progress from its row. */
-async function fromWork(app: App, id = "FEAT-2") {
-  await app.user.click(screen.getByRole("button", { name: "Work" }));
-  await screen.findByRole("region", { name: "Work list" });
-  await app.user.click(await screen.findByRole("button", { name: `Feature progress of ${id}` }));
-  return findPane(id);
-}
-
-/** Starts STORY-5 from its Work row: its session is a chat under the Dev Lead's. */
-async function startStory(app: App) {
-  await app.user.click(screen.getByRole("button", { name: "Delegation" }));
-  await app.user.click(await screen.findByRole("button", { name: "Start STORY-5" }));
-  await waitFor(() => expect(app.calls).toContain(`startStory:${PROJECT.dir}:STORY-5`));
-  const row = screen.getByRole("row", { name: /Spawn five/ });
-  await within(row).findByRole("button", { name: "Open the session of STORY-5" });
-}
-
-const sessionOf = (app: App) => {
-  const chat = app
-    .cardsIn(PROJECT.dir)
-    .find((c) => c.id === "STORY-5")
-    ?.sessions.at(-1);
-  if (!chat) throw new Error("STORY-5 has no session.");
-  return chat;
-};
 
 describe("AC1: Feature progress is on a chat that coordinates a feature, and opens docked on the right", () => {
   it("opens the pane beside the chat that drafted the feature, focused, from a button that says so", async () => {
@@ -175,12 +126,15 @@ describe("AC2: a feature's row in Work opens the same pane", () => {
   it("keeps the feature's card a click away", async () => {
     const app = renderApp({ cards: cards(null) });
     const found = await fromWork(app);
-    await app.user.click(within(found).getByRole("button", { name: "Card" }));
+    await app.user.click(within(found).getByRole("button", { name: "FEAT-2 card" }));
     const card = await screen.findByRole("complementary", { name: "FEAT-2 card" });
     await app.user.click(within(card).getByRole("button", { name: "Back to FEAT-2 progress" }));
     expect(await findPane()).toBeTruthy();
   });
 });
+
+/** The pane's Branch fact. */
+const branch = (found: HTMLElement) => found.querySelector(".fp-facts dd:last-of-type")?.textContent;
 
 /** Items that join FEAT-2 after it went in progress (the fixtures start it at 2026-11-01). */
 const later = (id: string, type: "story" | "bug"): Card =>
@@ -242,6 +196,14 @@ describe("AC3: the pane shows the feature's counts, scope, branch and each story
     const found = await fromWork(app);
     const values = [...found.querySelectorAll(".fp-facts dd")].map((dd) => dd.textContent);
     expect(values).toEqual(["None", "None", "None"]);
+  });
+
+  it("says the branch is Not started before Start, and Merged once the feature is done", async () => {
+    const done = cardOf({ id: "FEAT-4", type: "feature", status: "done", title: "Shipped" });
+    const app = renderApp({ cards: { [PROJECT.dir]: [...(cards(null)[PROJECT.dir] ?? []), done] } });
+    expect(branch(await fromWork(app, "FEAT-3"))).toBe("Not started");
+    await app.user.click(screen.getByRole("button", { name: "Feature progress of FEAT-4" }));
+    expect(branch(await findPane("FEAT-4"))).toBe("Merged");
   });
 });
 
@@ -333,6 +295,6 @@ describe("AC5: the pane updates live from the cards and spends no agent tokens",
     const found = await fromWork(app);
     app.pushWork(PROJECT.dir, buildWorkList({ cards: [], stale: [], problems: [] }, DEFAULT_CONFIG));
     expect(await within(found).findByText("This feature isn't in the project any more.")).toBeTruthy();
-    expect(within(found).queryByRole("button", { name: "Card" })).toBeNull();
+    expect(within(found).queryByRole("button", { name: "FEAT-2 card" })).toBeNull();
   });
 });

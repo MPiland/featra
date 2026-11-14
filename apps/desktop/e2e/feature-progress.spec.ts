@@ -82,10 +82,16 @@ test("Feature progress opens beside the chat and in Work, follows the cards live
     await page.getByRole("button", { name: "Shaping", exact: true }).click();
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    await expect(row.getByRole("button", { name: /^Open the session of STORY-\d+$/ })).toBeVisible();
-    await expect(progress).toContainText("In Progress");
+    const open = row.getByRole("button", { name: /^Open the session of STORY-\d+$/ });
+    await expect(open).toBeVisible();
+    const id = /STORY-\d+/.exec((await open.getAttribute("aria-label")) ?? "")?.[0];
+    expect(id).toBeDefined();
+    await expect(stories.locator(`[data-card="${id}"]`)).toContainText("In Progress");
     await stories.getByRole("button", { name: /Draft a feature/ }).click();
-    await expect(page.getByRole("log", { name: "Chat" })).toContainText("You are working on");
+    // The open chat is that story's own session: its row in the sidebar is current, and its first message is the card.
+    const sessions = page.getByRole("region", { name: "Chats" }).getByRole("list", { name: /^Story sessions of / });
+    await expect(sessions.getByRole("button", { name: /Draft a feature/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("log", { name: "Chat" })).toContainText(`You are working on ${id}`);
     await app.close();
   } finally {
     await running?.close().catch(() => {});

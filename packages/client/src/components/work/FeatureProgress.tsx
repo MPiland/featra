@@ -1,12 +1,13 @@
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useId } from "react";
 import type { ChatSummary } from "@featra/work-format/chat-list";
-import { waitsOnUser } from "@featra/work-format/feature-progress";
+import { featureBranch, waitsOnUser, type FeatureBranch } from "@featra/work-format/feature-progress";
 import type { FeatureRow, StoryRow } from "@featra/work-format/work-list";
 import { CARD_COPY } from "../../card-pane.ts";
 import { CHAT_COPY } from "../../chats.ts";
 import { featureStatusLabel, PROGRESS_COPY, WORK_COPY } from "../../work-list.ts";
-import { BugIcon, CloseIcon } from "../icons.tsx";
+import { BugIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
+import { DockedAside } from "./DockedAside.tsx";
 import { Status, ticks } from "./FeatureRows.tsx";
 import { PrChip } from "./PrChip.tsx";
 
@@ -42,7 +43,7 @@ function StoryLine({ story, waiting, onOpen }: { story: StoryRow; waiting: boole
         <button type="button" className="card-link fp-open" onClick={onOpen}>
           <span className="card-id">{story.id}</span> {story.title}
         </button>
-        {waiting && <span className="badge-wait">{CHAT_COPY.waiting}</span>}
+        {waiting && <span className="badge-review">{CHAT_COPY.waiting}</span>}
       </span>
       <span className="fp-meta">
         <Status tone={story.tone} label={story.stage} />
@@ -58,6 +59,13 @@ function StoryLine({ story, waiting, onOpen }: { story: StoryRow; waiting: boole
   );
 }
 
+/** A feature's branch as the pane says it: its name, Not started, Merged or None. */
+function branchText(branch: FeatureBranch): string {
+  if (branch.kind === "branch") return branch.name;
+  if (branch.kind === "not-started") return PROGRESS_COPY.notStarted;
+  return branch.kind === "merged" ? PROGRESS_COPY.merged : CARD_COPY.none;
+}
+
 /**
  * A feature's progress (STORY-24), docked on the right like the card pane, from the same live Work list row (ADR 0003,
  * ADR 0016): its counts and bar, added scope, open bugs and branch, and each story's stage, criteria, tasks and PR. It
@@ -65,15 +73,7 @@ function StoryLine({ story, waiting, onOpen }: { story: StoryRow; waiting: boole
  */
 export function FeatureProgress(props: FeatureProgressProps) {
   const { id, feature, loading, chats, paneId, width, focusOnOpen = true, onStory, onCard, onClose } = props;
-  const pane = useRef<HTMLElement>(null);
-  useEffect(() => {
-    if (focusOnOpen) pane.current?.focus();
-  }, [focusOnOpen]);
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key !== "Escape" || e.defaultPrevented) return;
-    e.preventDefault();
-    onClose();
-  };
+  const storiesHead = useId();
   let body;
   if (!feature) body = <p className="meta">{loading ? CARD_COPY.loading : PROGRESS_COPY.gone}</p>;
   else {
@@ -95,14 +95,16 @@ export function FeatureProgress(props: FeatureProgressProps) {
             <dt>{PROGRESS_COPY.openBugs}</dt>
             <dd>{scope.openBugs > 0 ? WORK_COPY.bugs(scope.openBugs) : CARD_COPY.none}</dd>
             <dt>{PROGRESS_COPY.branch}</dt>
-            <dd>{feature.branch ?? CARD_COPY.none}</dd>
+            <dd>{branchText(featureBranch(feature))}</dd>
           </dl>
         </div>
         {/* STORY-16: the burn-up goes here, between the counts and the stories. */}
-        <section className="card-sec" aria-label={PROGRESS_COPY.stories}>
-          <h3 className="sh">{PROGRESS_COPY.stories}</h3>
+        <section className="card-sec" aria-labelledby={storiesHead}>
+          <h3 className="sh" id={storiesHead}>
+            {PROGRESS_COPY.stories}
+          </h3>
           {feature.stories.length ? (
-            <ul className="fp-stories" aria-label={PROGRESS_COPY.stories}>
+            <ul className="fp-stories" aria-labelledby={storiesHead}>
               {feature.stories.map((s) => (
                 <StoryLine key={s.id} story={s} waiting={waitsOnUser(s, chats)} onOpen={() => onStory(s)} />
               ))}
@@ -115,37 +117,23 @@ export function FeatureProgress(props: FeatureProgressProps) {
     );
   }
   return (
-    // The pane takes focus on open so Escape reaches it; it isn't a stop in the Tab order.
-    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
-    <aside
-      id={paneId}
-      ref={pane}
-      className="card-pane"
-      style={{ width }}
-      aria-label={PROGRESS_COPY.pane(id)}
-      tabIndex={-1}
-      onKeyDown={onKey}
-    >
-      <div className="card-bar">
-        <span className="card-id">{id}</span>
-        <span className="fp-actions">
-          {feature && (
-            <button type="button" className="card-link" onClick={onCard}>
-              {PROGRESS_COPY.card}
-            </button>
-          )}
-          <button
-            type="button"
-            className="card-close"
-            aria-label={PROGRESS_COPY.close}
-            title={PROGRESS_COPY.close}
-            onClick={onClose}
-          >
-            <CloseIcon />
+    <DockedAside
+      paneId={paneId}
+      label={PROGRESS_COPY.pane(id)}
+      id={id}
+      width={width}
+      focusOnOpen={focusOnOpen}
+      closeLabel={PROGRESS_COPY.close}
+      onClose={onClose}
+      actions={
+        feature && (
+          <button type="button" className="card-link" aria-label={PROGRESS_COPY.cardOf(id)} onClick={onCard}>
+            {PROGRESS_COPY.card}
           </button>
-        </span>
-      </div>
+        )
+      }
+    >
       <div className="card-body">{body}</div>
-    </aside>
+    </DockedAside>
   );
 }

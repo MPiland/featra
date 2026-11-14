@@ -9,6 +9,8 @@ export interface CardSelection {
   progress?: string | null;
   /** Opens a feature's progress in the pane. */
   openProgress?: (feature: string) => void;
+  /** Closes the pane, as its close button does: a row's button that opened it closes it on a second click. */
+  close?: () => void;
 }
 
 export const SelectedCard = createContext<CardSelection>({ selected: null, paneId: "", open: () => {} });

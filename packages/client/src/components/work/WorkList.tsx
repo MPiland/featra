@@ -84,22 +84,21 @@ export function WorkList(props: {
   }, [update, chats, hasChat, work, project.dir, onOpenChat]);
   const selected = docked?.kind === "card" ? docked.id : null;
   const progress = docked?.kind === "progress" ? docked.feature : null;
-  const selection = useMemo(
-    () => ({ selected, paneId, open: select, progress, openProgress }),
-    [selected, paneId, select, progress, openProgress],
-  );
-  const find = (sel: string) => listRef.current?.querySelector<HTMLElement>(sel) ?? null;
-  // Focus goes back to the row the pane was opened from: a story's, or the feature's Progress.
-  const close = () => {
-    const was = docked;
+  // Focus goes back to the row the pane was opened from: a story's, or the feature's progress button.
+  const close = useCallback(() => {
     setDocked(null);
-    if (!was) return;
-    const feature = was.kind === "progress" ? was.feature : was.progress;
+    if (!docked) return;
+    const root = listRef.current;
+    const feature = docked.kind === "progress" ? docked.feature : docked.progress;
     const row =
-      (was.kind === "card" ? find(`[data-card="${was.id}"] .row-open`) : null) ??
-      (feature ? find(`[data-card="${feature}"] .row-progress`) : null);
+      (docked.kind === "card" ? root?.querySelector<HTMLElement>(`[data-card="${docked.id}"] .row-open`) : null) ??
+      (feature ? root?.querySelector<HTMLElement>(`[data-card="${feature}"] .row-progress`) : null);
     row?.focus();
-  };
+  }, [docked]);
+  const selection = useMemo(
+    () => ({ selected, paneId, open: select, progress, openProgress, close }),
+    [selected, paneId, select, progress, openProgress, close],
+  );
   const list = update?.list;
   const epics = list ? filterEpics(list.epics, filter) : [];
   const counts = filterCounts(list?.epics ?? []);

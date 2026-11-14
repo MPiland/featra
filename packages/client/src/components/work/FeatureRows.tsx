@@ -96,7 +96,7 @@ export function Story({ story }: { story: StoryRow }) {
 export function Feature({ feature }: { feature: FeatureRow }) {
   const [open, setOpen] = useState(false);
   const review = useReviewDraft();
-  const { open: openCard, paneId, progress, openProgress } = useCardSelection();
+  const { open: openCard, paneId, progress, openProgress, close } = useCardSelection();
   const title = feature.id === null ? WORK_COPY.noFeature : feature.title;
   const showing = feature.id !== null && progress === feature.id;
   return (
@@ -145,7 +145,7 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               title={PROGRESS_COPY.open}
               aria-expanded={showing}
               aria-controls={showing ? paneId : undefined}
-              onClick={() => openProgress(feature.id ?? "")}
+              onClick={() => (showing && close ? close() : openProgress(feature.id ?? ""))}
             >
               <ProgressIcon />
             </button>
