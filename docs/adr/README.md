@@ -69,3 +69,4 @@ What becomes easier or harder, and what we must now do.
 | [0035](0035-abandoning-a-story.md)                         | Abandoning a story                                                    | proposed |
 | [0036](0036-filing-and-placing-bugs.md)                    | Filing and placing bugs                                               | proposed |
 | [0037](0037-accepting-a-feature-and-merging-it-to-main.md) | Accepting a feature and merging it to main                            | proposed |
+| [0038](0038-scope-baseline-is-the-start-of-the-feature.md) | The scope baseline is the moment a feature goes in progress           | proposed |

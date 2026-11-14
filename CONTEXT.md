@@ -39,7 +39,8 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 
 - **Stage** — a story's position in the project's workflow (default: New, Ready, In Progress, In Review, Acceptance,
   Done). Each stage maps to a **stage category**: not started, active, done.
-- **Scope baseline** — set when the feature is approved: the time and the stories live then (a feature without one falls back to the moment its first story goes In Progress). Stories not in the stored list are **added scope**.
+- **Scope baseline** — the moment the feature goes in progress (Start feature), read from its history; never stored
+  (ADR 0038). Items that join the feature after it are **added scope**; stories added before it are planned.
 - **Origin** — why a card exists: `planned`, `added` (after the baseline) or `bug`.
 - **Burn-up** — chart of a feature's total scope and done count over time. Featra does not forecast.
 - **Evidence state** — what is actually known about a story:

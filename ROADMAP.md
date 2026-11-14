@@ -88,6 +88,9 @@ epics in `.featra/cards/`.
 
 - A feature merged to main with git outside Featra in local mode becomes Done.
 
+- The Scope cell's tooltip lists the added items' titles and origins.
+- The burn-up marks the scope baseline (the moment the feature went in progress).
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".

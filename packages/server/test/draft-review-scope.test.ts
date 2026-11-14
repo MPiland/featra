@@ -6,7 +6,7 @@
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { baselineOf, parseCard, serializeCard } from "@featra/work-format";
+import { DEFAULT_CONFIG, LEGACY_BASELINE, parseCard, scopeSummary, serializeCard } from "@featra/work-format";
 import { card } from "./card-repo.ts";
 import { input, draftFixture } from "./draft-review-fixture.ts";
 
@@ -16,14 +16,16 @@ const f = draftFixture();
 const cardFile = async (id: string) => `.featra/cards/${(await f.files()).find((n) => n.startsWith(`${id}-`))}`;
 
 describe("a story the user added during review", () => {
-  it("is approved with the draft: committed, New, and in the baseline", async () => {
+  it("is approved with the draft: committed, New, and planned scope", async () => {
     const feature = await f.draft();
     const added = await f.addStory(feature);
     await f.review.approve(f.repo.main, feature);
     expect(f.inCommit()).toContain(await cardFile(added));
     expect((await f.read(added)).status).toBe("New");
-    expect(baselineOf(await f.read(feature))?.stories).toContain(added);
-    expect(baselineOf(await f.read(feature))?.stories).toHaveLength(3);
+    // Approval sets no baseline (ADR 0038): nothing under the approved feature is added scope.
+    const approved = await f.read(feature);
+    expect(approved.extra[LEGACY_BASELINE]).toBeUndefined();
+    expect(scopeSummary(feature, [approved, await f.read(added)], DEFAULT_CONFIG).added).toEqual([]);
     expect(f.status()).toEqual([]);
   });
 
@@ -122,7 +124,8 @@ describe("a story git already tracks", () => {
     expect(f.inCommit()).toContain(path);
     expect(parseCard(f.repo.git(f.repo.main, "show", `HEAD:${path}`)).status).toBe("Cancelled");
     expect((await f.read(two)).status).toBe("Cancelled");
-    expect(baselineOf(await f.read(made.feature))?.stories).toEqual([one]);
+    expect((await f.read(one)).status).toBe("New");
+    expect((await f.read(made.feature)).extra[LEGACY_BASELINE]).toBeUndefined();
     expect(f.status()).toEqual([]);
   });
 });

@@ -143,6 +143,7 @@ describe("buildWorkList", () => {
           title: "",
           progress: { done: 0, total: 0, label: "" },
           bar: [],
+          breakdown: "",
           features: [
             {
               id: null,
@@ -152,8 +153,9 @@ describe("buildWorkList", () => {
               filters: [],
               progress: { done: 0, total: 0, label: "" },
               bar: [{ tone: "idle", count: 0 }],
+              breakdown: "",
               tasks: { done: 0, total: 0 },
-              scope: { added: 0, openBugs: 0 },
+              scope: { added: 0, addedBreakdown: "", openBugs: 0 },
               stories: [],
             },
           ],

@@ -72,7 +72,7 @@ export interface ServerMethods {
    */
   "draft.sendBack": { params: { dir: string; id: string; reason: string }; result: { recorded: boolean } };
   /**
-   * Approves a draft feature (STORY-51, ADR 0023): marks it approved, sets its scope baseline and commits its cards to
+   * Approves a draft feature (STORY-51, ADR 0023): marks it approved and commits its cards to
    * main's checkout, never pushing. All or nothing; refused when the feature isn't a draft any more.
    */
   "draft.approve": { params: { dir: string; id: string }; result: { commit: string } };

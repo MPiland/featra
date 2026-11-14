@@ -2108,3 +2108,62 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - **BUG-21** (PR refresh test counted reads before the first one) is fixed on main in PR #49; the test waits for both PR
   pollers to settle.
 - **Order:** STORY-15, STORY-24, STORY-16 (it needs the pane), STORY-17.
+
+## 2026-11-13 — STORY-15 build choices (story agent, for the Dev Lead to confirm)
+
+- **The baseline is derived from `history[]`, not stored** (ADR 0038): the first status event that moves the feature
+  into `active` or `done`. Start's existing approved → active event is the fact; Start writes nothing new. A feature
+  written as in progress by hand, with no such event, uses its `created` time.
+- **Approval no longer writes `baseline`.** Stored approval baselines are ignored, not migrated: the key stays in
+  `extra` and round-trips, nothing reads it. Migrating would mean writing to cards Featra doesn't own at that moment.
+  `baselineOf` and `Baseline` are removed; `LEGACY_BASELINE` names the key for tests.
+- **Added means joined strictly after the baseline.** Joining in the same instant as Start is planned scope.
+- **The burn-up starts at the baseline** and is empty for a feature that never went in progress or has no items.
+- **Wording.** A feature's bar: "done", "needs your Accept" (the wording Done refusals use), "in review", "in progress",
+  "not started", in bar order, cancelled left out. An epic's bar: the feature status labels in lower case, in bar
+  order (done, in progress, approved, draft). The Scope cell shows "+3 added: 2 stories · 1 bug", leaving out a kind
+  with none; the old "+N added" stays as the fallback when no breakdown is sent.
+- **Accessible pattern.** A bar with a breakdown is a focusable `role="img"` named by it (`aria-label`), and shows a
+  tooltip while hovered or focused; Escape hides it (WCAG 1.4.13). The tooltip is `aria-hidden` so a screen reader hears
+  the text once. A bar with nothing under it stays decorative. The tooltip sits above the bar because the list clips
+  below.
+- **Code layout.** Tones, bar slices and breakdowns moved from work-list.ts to a new work-tones.ts, to keep files near
+  300 lines.
+- **Superseded:** ADR 0023's stored baseline and its "first story In Progress" fallback; CONTEXT.md's Scope baseline.
+
+## 2026-11-13 — STORY-15 review fixes
+
+- **Old approval baseline in e2e.** `apps/desktop/e2e/approve-reject.spec.ts:45` expected the approved card to contain
+  `baseline:`; under AC2 it now expects it not to (`.not.toContain("baseline:")`). No other old-baseline leftovers in
+  apps/desktop/e2e.
+- **Bug: hand-started feature baseline.** A feature in progress with no recorded move into progress used its `created`
+  time, before approval, so planning-time stories counted as added. It now uses the later of `created` and its last
+  recorded status change. Regression test in rollup.test.ts, which failed first. ADR 0038 says so.
+- **Tooltip state.** Hovered and focused are tracked apart and either shows the tooltip; Escape dismisses it until the
+  next hover or focus. The tooltip only repeats the accessible name, so `pointer-events: none` is acceptable.
+- **Dead code removed:** the client's `WORK_COPY.added` and its fallback in the Scope cell, `ScopeSummary.addedLabel`,
+  and `originForNewItem` (no product callers).
+- **One wording:** `NEEDS_ACCEPT` ("needs your Accept") is exported from evidence.ts and used by the Done refusals and
+  the feature bar's breakdown.
+- **Assertions changed by STORY-15** (AC2's approved rule change, or removal of a removed function's checks):
+  - approve-reject.spec.ts:45: `toContain("baseline:")` became `.not.toContain("baseline:")`.
+  - rollup.test.ts: `addedLabel` "+4 added since start" removed; the `originForNewItem` "planned" check and the test
+    "new items are `added` after the baseline and bugs are always `bug`" removed.
+  - card-approval.test.ts: two `originForNewItem` checks ("planned", "added") and the `addedLabel` "+1 added since
+    start" check removed.
+  - The earlier STORY-15 changes, from the build: rollup.test.ts baseline tests, card-approval.test.ts baseline
+    blocks, draft-review-approve and draft-review-scope `baselineOf` checks, feature-start's `extra.baseline`, and new
+    fields in the work-list normalizer and server-watch fixtures.
+
+## 2026-11-13 — STORY-15 review rulings (dev-lead)
+
+- Build choices confirmed: the scope baseline is derived from `history[]` (the feature's first move into active or
+  done), never stored; approval no longer writes `baseline`; stored approval baselines are ignored and round-trip
+  untouched; "added" means joined strictly after the baseline. ADR 0038 confirmed.
+- The fallback for an active feature with no recorded move into progress is the later of `created` and its last
+  recorded status change (review fix, with a regression test).
+- Every changed assertion encodes the old approval or first-story baseline rule, or tested a function removed for
+  having no product caller. None is a weakening. Approved under the AC2 rule change.
+- The bar is a focusable `role="img"` with the breakdown as its name; the tooltip only repeats that name, so
+  `pointer-events: none` is acceptable.
+- Roadmap: the Scope cell's own tooltip listing added items; a baseline marker on the burn-up.

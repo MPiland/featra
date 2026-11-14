@@ -262,7 +262,7 @@ export function createDraftReview({
   }
 
   return {
-    /** Approves draft feature `id`: marks it approved, sets its baseline and commits its cards to main, unpushed. */
+    /** Approves draft feature `id`: marks it approved and commits its cards to main, unpushed. */
     approve: (dir: string, id: string): Promise<ApproveResult> => lane.exclusive(() => approve(dir, id)),
     /** Rejects draft feature `id`: deletes its feature and story files, which git must not track. */
     reject: (dir: string, id: string): Promise<RejectResult> => lane.exclusive(() => reject(dir, id)),
