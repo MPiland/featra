@@ -14,8 +14,8 @@ are the user's files (ADR 0002), so nothing may be lost or rewritten behind thei
 
 - **One baseline, derived, never stored.** A feature's scope baseline is the time of the first status event in its
   `history[]` that moves it into `active` or `done`. Start feature writes that event (approved → active) on the feature
-  branch, so the baseline is the moment of Start. A feature that was written as in progress by hand and has no such
-  event uses its `created` time. A feature that never went in progress has no baseline: nothing is added, and there is
+  branch, so the baseline is the moment of Start. A feature set in progress by hand, with no such event, uses the later
+  of its `created` time and its last recorded status change, so stories planned before then stay planned. A feature that never went in progress has no baseline: nothing is added, and there is
   no burn-up.
 - **Approval stores nothing.** `planApproval` only sets the status. Start stores nothing either; the status event it
   already writes is the fact.

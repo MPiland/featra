@@ -86,15 +86,19 @@ const STARTED: ReadonlySet<string | null> = new Set<ContainerStatus>(["active", 
 /**
  * The scope baseline (ADR 0038): the moment the feature went in progress, read from its own history (Start writes that
  * status event, ADR 0024). Null before then. The first such event wins, so the baseline never moves. A feature in
- * progress whose history never records the move (a card written by hand already active) went in progress when it was
- * created. A `baseline` an approval stored before ADR 0038 is ignored.
+ * progress whose history never records the move (its status edited by hand) went in progress no earlier than its
+ * last recorded status change or its creation, whichever is later, so stories planned before it stay planned. A
+ * `baseline` an approval stored before ADR 0038 is ignored.
  */
 export function scopeBaseline(featureId: string, cards: readonly Card[]): string | null {
   const feature = cards.find((c) => c.id === featureId && c.type === "feature");
   if (!feature) return null;
   const moved = feature.history.find((e) => e.field === "status" && STARTED.has(e.to));
   if (moved) return moved.at;
-  return STARTED.has(feature.status) ? feature.created || null : null;
+  if (!STARTED.has(feature.status)) return null;
+  const last = feature.history.findLast((e) => e.field === "status");
+  const times = [feature.created, last?.at].filter((t): t is string => !!t && Number.isFinite(ms(t)));
+  return times.length ? iso(Math.max(...times.map(ms))) : null;
 }
 
 /** The latest moment the card joined this feature (created under it, or moved under it), in milliseconds. */
@@ -132,8 +136,6 @@ export interface ScopeSummary {
   baseline: string | null;
   /** Items (not Cancelled) that joined after the baseline, with their origin. */
   added: AddedItem[];
-  /** e.g. "+3 added since start"; empty when nothing was added. */
-  addedLabel: string;
   addedCounts: AddedCounts;
   /** e.g. "+3 added: 2 stories · 1 bug"; empty when nothing was added. */
   addedBreakdown: string;
@@ -170,18 +172,10 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
   return {
     baseline,
     added,
-    addedLabel: added.length ? `+${added.length} added since start` : "",
     addedCounts,
     addedBreakdown: addedBreakdown(addedCounts),
     bugs: { total: bugs.length, open: bugs.filter((b) => !isDone(b.status, config)).length },
   };
-}
-
-/** Origin for a new item under a feature: bugs are `bug`; anything after the baseline is `added`. */
-export function originForNewItem(featureId: string | null, type: "story" | "bug", cards: readonly Card[]): Origin {
-  if (type === "bug") return "bug";
-  if (featureId === null) return "planned";
-  return scopeBaseline(featureId, cards) === null ? "planned" : "added";
 }
 
 export interface BurnUpPoint {

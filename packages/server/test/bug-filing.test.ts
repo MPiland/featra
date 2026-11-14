@@ -79,7 +79,7 @@ describe("proposing a place (AC2)", { timeout: 60_000 }, () => {
 describe("filing (AC2, AC3)", { timeout: 60_000 }, () => {
   it("commits a bug under the feature in progress on its branch, touching no checkout, as added scope", async () => {
     await start();
-    // Work on the feature started (its scope baseline), and the bug comes later.
+    // The feature went in progress at Start (its scope baseline, ADR 0038); the bug comes later.
     await w.moveOn("In Review");
     w.clock.advance(60_000);
     const tip = m.tip(FEATURE_BRANCH);

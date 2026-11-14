@@ -5,7 +5,6 @@ import {
   DEFAULT_CONFIG,
   LEGACY_BASELINE,
   newCard,
-  originForNewItem,
   parseCard,
   planApproval,
   scopeBaseline,
@@ -108,7 +107,6 @@ describe("AC2: the scope baseline is set when the feature goes in progress, not 
     const between = later("STORY-90", feature, "2026-11-11T00:00:00Z");
     const after = withFeature(cards, plan.feature, between);
     expect(scopeBaseline(feature, after)).toBeNull();
-    expect(originForNewItem(feature, "story", after)).toBe("planned");
     expect(scopeSummary(feature, after, DEFAULT_CONFIG)).toMatchObject({ baseline: null, added: [] });
   });
 
@@ -119,7 +117,6 @@ describe("AC2: the scope baseline is set when the feature goes in progress, not 
     const started = startedFeature(plan.feature, "user", START);
     const all = withFeature(cards, started, between, afterStart);
     expect(scopeBaseline(feature, all)).toBe(START);
-    expect(originForNewItem(feature, "story", all)).toBe("added");
     const summary = scopeSummary(feature, all, DEFAULT_CONFIG);
     expect(summary.baseline).toBe(START);
     expect(summary.added.map((a) => a.id)).toEqual(["STORY-91"]);
@@ -197,7 +194,6 @@ describe("AC3: a feature approved before this change keeps working", () => {
     const summary = scopeSummary("FEAT-8", [feature, first, joiner, early], DEFAULT_CONFIG);
     expect(summary.baseline).toBe("2026-11-02T00:00:00Z");
     expect(summary.added.map((a) => a.id)).toEqual(["STORY-81"]);
-    expect(summary.addedLabel).toBe("+1 added since start");
     expect(scopeSummary("FEAT-8", [approvedOnly, early], DEFAULT_CONFIG)).toMatchObject({ baseline: null, added: [] });
   });
 

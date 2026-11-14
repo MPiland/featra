@@ -48,6 +48,20 @@ describe("AC1: a bar shows its breakdown on hover or focus", () => {
     expect(document.activeElement).toBe(bar);
   });
 
+  it("keeps the tooltip while focused when the mouse leaves, and shows it again on hover after Escape", async () => {
+    const { user } = renderApp({ work: { [PROJECT.dir]: workList(PLAN) } });
+    await screen.findByRole("region", { name: "Work list" });
+    const bar = within(rowOf("Provider spike")).getByRole("img", { name: "1 done" });
+    act(() => bar.focus());
+    await user.hover(bar);
+    await user.unhover(bar);
+    expect(tip()?.textContent).toBe("1 done");
+    await user.keyboard("{Escape}");
+    expect(tip()).toBeNull();
+    await user.hover(bar);
+    expect(tip()?.textContent).toBe("1 done");
+  });
+
   it("names an epic's bar by its features' statuses", async () => {
     const { user } = renderApp({ work: { [PROJECT.dir]: workList(PLAN) } });
     const epic = await screen.findByRole("region", { name: "Prove the core" });

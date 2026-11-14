@@ -27,7 +27,7 @@ function Scope({ added, addedBreakdown, openBugs }: FeatureRow["scope"]) {
   const parts = [
     added > 0 && (
       <span key="added" className="scope-added">
-        {addedBreakdown || WORK_COPY.added(added)}
+        {addedBreakdown}
       </span>
     ),
     openBugs > 0 && (

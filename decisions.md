@@ -2130,3 +2130,27 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - **Code layout.** Tones, bar slices and breakdowns moved from work-list.ts to a new work-tones.ts, to keep files near
   300 lines.
 - **Superseded:** ADR 0023's stored baseline and its "first story In Progress" fallback; CONTEXT.md's Scope baseline.
+
+## 2026-11-13 — STORY-15 review fixes
+
+- **Old approval baseline in e2e.** `apps/desktop/e2e/approve-reject.spec.ts:45` expected the approved card to contain
+  `baseline:`; under AC2 it now expects it not to (`.not.toContain("baseline:")`). No other old-baseline leftovers in
+  apps/desktop/e2e.
+- **Bug: hand-started feature baseline.** A feature in progress with no recorded move into progress used its `created`
+  time, before approval, so planning-time stories counted as added. It now uses the later of `created` and its last
+  recorded status change. Regression test in rollup.test.ts, which failed first. ADR 0038 says so.
+- **Tooltip state.** Hovered and focused are tracked apart and either shows the tooltip; Escape dismisses it until the
+  next hover or focus. The tooltip only repeats the accessible name, so `pointer-events: none` is acceptable.
+- **Dead code removed:** the client's `WORK_COPY.added` and its fallback in the Scope cell, `ScopeSummary.addedLabel`,
+  and `originForNewItem` (no product callers).
+- **One wording:** `NEEDS_ACCEPT` ("needs your Accept") is exported from evidence.ts and used by the Done refusals and
+  the feature bar's breakdown.
+- **Assertions changed by STORY-15** (AC2's approved rule change, or removal of a removed function's checks):
+  - approve-reject.spec.ts:45: `toContain("baseline:")` became `.not.toContain("baseline:")`.
+  - rollup.test.ts: `addedLabel` "+4 added since start" removed; the `originForNewItem` "planned" check and the test
+    "new items are `added` after the baseline and bugs are always `bug`" removed.
+  - card-approval.test.ts: two `originForNewItem` checks ("planned", "added") and the `addedLabel` "+1 added since
+    start" check removed.
+  - The earlier STORY-15 changes, from the build: rollup.test.ts baseline tests, card-approval.test.ts baseline
+    blocks, draft-review-approve and draft-review-scope `baselineOf` checks, feature-start's `extra.baseline`, and new
+    fields in the work-list normalizer and server-watch fixtures.

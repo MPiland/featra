@@ -10,12 +10,16 @@ export interface BarProps {
 
 /**
  * A segmented count bar, one slice per item, coloured by tone. With a breakdown it is a focusable image named by it,
- * and shows it as a tooltip while hovered or focused; Escape hides the tooltip (WCAG 1.4.13). The tooltip repeats the
- * name for sight only, so a screen reader hears it once. Without one it is decorative: the label beside it says the
- * count.
+ * and shows it as a tooltip while hovered or focused (each tracked apart, so leaving with the mouse keeps it for the
+ * keyboard). Escape dismisses it until the next hover or focus (WCAG 1.4.13). The tooltip only repeats the accessible
+ * name, for sight, so a screen reader hears it once; with nothing in it to select or click, `pointer-events: none` on
+ * it is acceptable. Without a breakdown the bar is decorative: the label beside it says the count.
  */
 export function Bar({ segments, total, breakdown = "" }: BarProps) {
-  const [tip, setTip] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+  const tip = (hovered || focused) && !dismissed;
   const shown = segments.reduce((n, s) => n + s.count, 0);
   const slices = (
     <>
@@ -32,6 +36,10 @@ export function Bar({ segments, total, breakdown = "" }: BarProps) {
       </span>
     );
   }
+  const show = (set: (on: boolean) => void) => {
+    set(true);
+    setDismissed(false);
+  };
   return (
     <>
       {/* A Tab stop so a keyboard reaches what the bar says; its handlers only show and hide the tooltip. */}
@@ -42,14 +50,14 @@ export function Bar({ segments, total, breakdown = "" }: BarProps) {
         aria-label={breakdown}
         // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
         tabIndex={0}
-        onMouseEnter={() => setTip(true)}
-        onMouseLeave={() => setTip(false)}
-        onFocus={() => setTip(true)}
-        onBlur={() => setTip(false)}
+        onMouseEnter={() => show(setHovered)}
+        onMouseLeave={() => setHovered(false)}
+        onFocus={() => show(setFocused)}
+        onBlur={() => setFocused(false)}
         onKeyDown={(e) => {
           if (e.key === "Escape" && tip) {
             e.stopPropagation();
-            setTip(false);
+            setDismissed(true);
           }
         }}
       >

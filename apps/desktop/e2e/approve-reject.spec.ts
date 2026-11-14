@@ -42,7 +42,7 @@ test("Approve commits the draft's cards to main without pushing and takes the bu
     // Everything of the draft is in git, and git is clean.
     expect(git(repo.dir, "status", "--porcelain")).toBe("");
     expect(git(repo.dir, "show", "HEAD:.featra/cards/FEAT-2-shaping.md")).toContain("status: approved");
-    expect(git(repo.dir, "show", "HEAD:.featra/cards/FEAT-2-shaping.md")).toContain("baseline:");
+    expect(git(repo.dir, "show", "HEAD:.featra/cards/FEAT-2-shaping.md")).not.toContain("baseline:");
     expect(git(repo.dir, "remote")).toBe("");
 
     // AC3: Send back and Reject are gone, Approve too, and the chat stays open.

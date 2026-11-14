@@ -5,6 +5,7 @@
 import { awaitingAcceptance } from "./acceptance.ts";
 import { CONTAINER_STATUS_LABELS } from "./card-view-types.ts";
 import { stageCategory } from "./config.ts";
+import { NEEDS_ACCEPT } from "./evidence.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
 import type { Segment, Tone } from "./work-list-types.ts";
 
@@ -34,10 +35,10 @@ export function segments(tones: readonly Tone[]): Segment[] {
   return BAR_ORDER.map((tone) => ({ tone, count: tones.filter((t) => t === tone).length })).filter((s) => s.count);
 }
 
-/** The words of a feature's bar breakdown, in bar order. "needs your Accept" is the wording Done refusals use. */
+/** The words of a feature's bar breakdown, in bar order. A story waiting on the user reads as Done refusals say it. */
 export const STAGE_BREAKDOWN = {
   done: "done",
-  accept: "needs your Accept",
+  accept: NEEDS_ACCEPT,
   review: "in review",
   active: "in progress",
   idle: "not started",

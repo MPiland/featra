@@ -66,7 +66,6 @@ export const WORK_COPY = {
   apply: "Apply to owner",
   discard: "Discard",
   problems: "Some cards can't be shown",
-  added: (n: number) => `+${n} added`,
   bugs: (n: number) => (n === 1 ? "1 open bug" : `${n} open bugs`),
   addedLater: "added",
   review: "Review",

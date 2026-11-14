@@ -1,13 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  burnUp,
-  epicProgress,
-  featureProgress,
-  originForNewItem,
-  progressLabel,
-  scopeBaseline,
-  scopeSummary,
-} from "../src/index.ts";
+import { burnUp, epicProgress, featureProgress, progressLabel, scopeBaseline, scopeSummary } from "../src/index.ts";
 import { at, config, feature, moves, story, reparent } from "./fixtures.ts";
 
 const tasksMode = { ...config, progress: "tasks" as const };
@@ -73,7 +65,6 @@ describe("scope baseline and added items", () => {
 
   it("is null until the feature goes in progress", () => {
     expect(scopeBaseline("FEAT-1", [feature("FEAT-1", "approved"), story("STORY-1", "FEAT-1")])).toBeNull();
-    expect(originForNewItem("FEAT-1", "story", [feature("FEAT-1", "approved")])).toBe("planned");
   });
 
   it("is set by the feature going in progress and never moves", () => {
@@ -86,6 +77,14 @@ describe("scope baseline and added items", () => {
     const handWritten = { ...feature("FEAT-1", "approved"), status: "active", created: at(3) };
     expect(scopeBaseline("FEAT-1", [handWritten])).toBe(at(3));
     expect(scopeBaseline("FEAT-1", [{ ...handWritten, status: "approved" }])).toBeNull();
+  });
+
+  it("of a feature set in progress by hand after approval is its last recorded status change, not its creation", () => {
+    // Review fix 2: the history ends at approval (at 5), then the status was edited to active with no event.
+    const handStarted = { ...moves(feature("FEAT-1", "draft"), [5, "approved"]), status: "active" };
+    const planning = story("STORY-3", "FEAT-1", { created: 3 });
+    expect(scopeBaseline("FEAT-1", [handStarted])).toBe(at(5));
+    expect(scopeSummary("FEAT-1", [handStarted, planning], config).added).toEqual([]);
   });
 
   it("is never set by a story starting: a feature still approved has none", () => {
@@ -110,15 +109,9 @@ describe("scope baseline and added items", () => {
       ["BUG-2", "bug", at(26)],
       ["STORY-4", "planned", at(40)],
     ]);
-    expect(s.addedLabel).toBe("+4 added since start");
     expect(s.bugs).toEqual({ total: 2, open: 1 });
     expect(s.addedCounts).toEqual({ stories: 2, bugs: 2 });
     expect(s.addedBreakdown).toBe("+4 added: 2 stories · 2 bugs");
-  });
-
-  it("new items are `added` after the baseline and bugs are always `bug`", () => {
-    expect(originForNewItem("FEAT-1", "story", base)).toBe("added");
-    expect(originForNewItem("FEAT-1", "bug", [])).toBe("bug");
   });
 });
 
