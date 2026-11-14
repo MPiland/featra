@@ -93,6 +93,7 @@ function featureRow(
   config: ProjectConfig,
   editable: ReadonlySet<string>,
   mergeable: ReadonlySet<string>,
+  branch: string | null = null,
 ): FeatureRow {
   const scope = feature ? scopeSummary(feature.id, cards, config) : null;
   const added = new Set(scope?.added.map((a) => a.id));
@@ -125,6 +126,7 @@ function featureRow(
       addedBreakdown: scope?.addedBreakdown ?? "",
       openBugs: scope?.bugs.open ?? openBugs,
     },
+    ...(branch ? { branch } : {}),
     stories: rows,
   };
 }
@@ -154,6 +156,10 @@ export function buildWorkList(
     resolution.cards.filter((o) => mergeRefusal(o, o.card.id, config, canEdit(o)) === null).map((o) => o.card.id),
   );
   const cards = resolution.cards.map((c) => c.card);
+  // A started feature's branch: where its card is owned until it merges to main (ADR 0002).
+  const branches = new Map(
+    resolution.cards.flatMap((o) => (o.owner.kind === "feature" ? [[o.card.id, o.owner.branch] as const] : [])),
+  );
   const epics = cards.filter((c) => c.type === "epic").toSorted(byOrder);
   const features = cards.filter((c) => c.type === "feature").toSorted(byOrder);
   const featureIds = new Set(features.map((f) => f.id));
@@ -167,6 +173,7 @@ export function buildWorkList(
       config,
       editable,
       mergeable,
+      branches.get(f.id) ?? null,
     );
 
   const rows: EpicRow[] = epics.map((e) => {

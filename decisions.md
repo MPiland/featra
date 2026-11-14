@@ -2167,3 +2167,75 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - The bar is a focusable `role="img"` with the breakdown as its name; the tooltip only repeats that name, so
   `pointer-events: none` is acceptable.
 - Roadmap: the Scope cell's own tooltip listing added items; a baseline marker on the burn-up.
+
+## 2026-11-13 — STORY-24 build choices (story agent, for the Dev Lead to confirm)
+
+- **One pane on the right.** The progress pane and the card pane share one slot, handle and width (`SidePane`, over
+  `useDockedPane` and `PaneHandle`): opening either replaces the other, in Work and beside a chat. Two panes side by
+  side would squeeze the list or the chat below its minimum. A card opened from the progress pane carries "Back to
+  FEAT-N progress", so the pane is one click away again.
+- **Which chat leads a feature.** No new link: a chat leads a feature it drafted (`drafted-by`) or one whose story
+  session it spawned (`story.parent`), as ADR 0027 and ADR 0028 already define the Dev Lead. A story session leads
+  nothing. When a chat leads several, Feature progress opens the newest (highest id). Rule in
+  `work-format/src/feature-progress.ts` (`featuresLedBy`).
+- **The feature row.** An icon button (named "Feature progress of FEAT-N", titled "Feature progress") beside the title
+  of every feature row with a card. An icon, not a word, so the name cell still reads as the title alone (work-list
+  test AC2 reads that cell). The row's own toggle still opens its stories; Open and Review draft are unchanged. The feature's card stays
+  reachable through **Card** in the pane's bar.
+- **Branch.** `FeatureRow.branch` is the feature branch while it owns the feature's card (ADR 0002), set by
+  `buildWorkList` from the owner it already resolved; absent while main owns it ("None" in the pane). Optional in the
+  normalizer, so older servers and fixtures still read.
+- **Waiting on the user.** A story is marked "Waiting for you" when it is in Acceptance (`awaiting`), or its session
+  waits on an approval or a question. A session waiting for a reply waits on its Dev Lead, so it isn't marked
+  (`waitsOnUser`).
+- **A story's click.** Its latest session's chat when the project still lists it (`storyChat`), else its card.
+- **Live, no tokens.** The pane reads the Work list its host already watches (`work.watch`, ADR 0016) and the chat
+  list App already has; it opens no new watch and makes no call. `useChatDraft` became the pure `chatDraft(list,
+  chat)` so ChatDraft watches the list once for both the draft and the progress pane.
+- **Burn-up slot.** The pane leaves a marked place for STORY-16's chart between the counts and the stories; nothing
+  is built there.
+- No ADR: the shared slot reuses ADR 0017's docked pane, and the Dev Lead link is ADR 0027's. No existing assertion was
+  changed.
+
+## 2026-11-13 — STORY-24 review fixes
+
+- **One docked frame.** `DockedAside` (pane id, label, id, actions, Close, focus on open, Escape, width) is the frame of
+  both the card pane and the feature progress pane. It lives in its own `DockedAside.tsx`, not `SidePane.tsx` as
+  asked: `SidePane` imports `CardPane` and `FeatureProgress`, so their importing it back would break `import/no-cycle`.
+  The bar's actions and Close now sit together at its end (`.pane-actions`), so the card pane's back link moved next
+  to Close.
+- **One warning badge.** "Waiting for you" uses `.badge-review`; `.badge-wait` is gone. The class keeps its name
+  because `badge-contrast.test.ts` reads it.
+- **The row's button toggles.** `CardSelection` has `close`; a second click on a feature row's progress button closes
+  the pane, as the chat's button does (regression test failed first).
+- **Focus tests.** Closing a card opened from the progress pane puts focus on Feature progress in a chat, and on the
+  feature row's progress button in Work when the story's row is collapsed (`feature-progress-focus.test.tsx`).
+- **Leader pick.** A chat that leads several features opens active first, then approved, draft, done, then the newest
+  id (`featuresLedBy`; regression test failed first).
+- **Waiting.** `waitsOnUser` uses `isAsk`, now exported from `chat-list.ts`.
+- **Stories heading.** The section and the list are named by the "Stories" heading (`aria-labelledby`); the list keeps
+  its name because the component and e2e tests find it by it.
+- **ADR 0017 amended:** the right slot holds the card or the feature progress pane, one at a time.
+- **Branch wording (Dev Lead ruling).** `featureBranch`: the branch name while the feature branch owns the card, "Not
+  started" for a draft or approved feature, "Merged" for a done one, "None" otherwise (a cancelled feature, or one
+  main owns while active). Unit-tested for the three cases; the pane test adds Not started and Merged.
+- **The pane's Card button** is named "FEAT-N card".
+- **Assertions changed (all STORY-24's own, made stronger or renamed):** the component tests find the Card button as
+  "FEAT-2 card" (both the click and the gone-feature absence check); the e2e checks "In Progress" on that story's own
+  line, and that the opened chat is that story's session (its sidebar row is current and the log names its id); the
+  work-format test "is the features the chat drafted, newest first" is now titled "…, the active one first", with
+  its assertion unchanged. The shared helpers of `feature-progress.test.tsx` moved to `test/progress-fixtures.tsx`
+  unchanged. No other assertion changed.
+
+## 2026-11-13 — STORY-24 review rulings (dev-lead)
+
+- Build choices confirmed: one right pane (card or feature progress, one at a time, sharing `DockedAside` and the
+  docked width); a chat leads a feature if it drafted it or started one of its story sessions (ADR 0027/0028), no new
+  link; the leader pick prefers active, then approved, draft, done, then newest id; waiting on the user is Acceptance
+  or a session waiting on an approval or a question (the Inbox's set, via `isAsk`); the pane reads the existing watch,
+  no polling, no agent calls. No new ADR; ADR 0017 amended.
+- `DockedAside` in its own file instead of SidePane.tsx is accepted: it avoids an import cycle.
+- Branch wording: the branch name while the feature branch owns the card, "Not started" before Start, "Merged" when
+  done, "None" otherwise.
+- No existing assertion was weakened; the developer's own new assertions were made stronger.
+- Roadmap: one shared "leads a feature" rule in work-format; a feature picker in the chat header.

@@ -91,6 +91,9 @@ epics in `.featra/cards/`.
 - The Scope cell's tooltip lists the added items' titles and origins.
 - The burn-up marks the scope baseline (the moment the feature went in progress).
 
+- One "leads a feature" rule in work-format, used by the server (`leadOf`, card reports) and the client (`featuresLedBy`).
+- A feature picker in the chat header when a chat leads more than one feature.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".

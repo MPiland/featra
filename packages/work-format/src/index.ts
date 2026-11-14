@@ -22,6 +22,7 @@ export * from "./copy-edit.ts";
 export * from "./work-list-types.ts";
 export * from "./work-list.ts";
 export * from "./work-tones.ts";
+export * from "./feature-progress.ts";
 export * from "./card-view-types.ts";
 export * from "./card-edit.ts";
 export * from "./card-view.ts";

@@ -29,7 +29,8 @@ export interface Ask {
  */
 export type WaitReason = "reply" | AskReason;
 export const WAIT_REASONS: readonly WaitReason[] = ["reply", "approval", "question"];
-const isAsk = (w: WaitReason | null): w is AskReason => w !== null && w !== "reply";
+/** Whether a chat waits on a request the turn can't go on without, not on a reply. */
+export const isAsk = (w: WaitReason | null): w is AskReason => w !== null && w !== "reply";
 
 /** Who renamed a chat. */
 export type TitleBy = "draft" | "user";

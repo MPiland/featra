@@ -1,7 +1,7 @@
 import { useContext, useState } from "react";
 import type { FeatureRow, StoryRow, Tone } from "@featra/work-format/work-list";
-import { featureStatusLabel, WORK_COPY } from "../../work-list.ts";
-import { BugIcon, ChevronRightIcon } from "../icons.tsx";
+import { featureStatusLabel, PROGRESS_COPY, WORK_COPY } from "../../work-list.ts";
+import { BugIcon, ChevronRightIcon, ProgressIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
@@ -12,9 +12,9 @@ import { MergeStory } from "./MergeStory.tsx";
 import { PrChip } from "./PrChip.tsx";
 import { StoryAgent, StoryAgentsContext } from "./story-agents.tsx";
 
-const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
+export const ticks = (c: { done: number; total: number }) => (c.total ? `${c.done} / ${c.total}` : WORK_COPY.none);
 
-function Status({ tone, label }: { tone: Tone; label: string }) {
+export function Status({ tone, label }: { tone: Tone; label: string }) {
   return (
     <span className={`st tone-${tone}`}>
       <span className="dot" aria-hidden="true" />
@@ -96,8 +96,9 @@ export function Story({ story }: { story: StoryRow }) {
 export function Feature({ feature }: { feature: FeatureRow }) {
   const [open, setOpen] = useState(false);
   const review = useReviewDraft();
-  const { open: openCard } = useCardSelection();
+  const { open: openCard, paneId, progress, openProgress, close } = useCardSelection();
   const title = feature.id === null ? WORK_COPY.noFeature : feature.title;
+  const showing = feature.id !== null && progress === feature.id;
   return (
     <>
       <div className={open ? "frow open" : "frow"} role="row" data-card={feature.id ?? undefined}>
@@ -132,6 +133,21 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               onClick={() => openCard(feature.id ?? "")}
             >
               {WORK_COPY.openFeature}
+            </button>
+          )}
+          {feature.id && openProgress && (
+            // Its progress pane (STORY-24): counts, scope, branch and each story, docked like the card pane. An icon,
+            // so the name cell still reads as the feature's title.
+            <button
+              type="button"
+              className="row-progress"
+              aria-label={PROGRESS_COPY.rowOf(feature.id)}
+              title={PROGRESS_COPY.open}
+              aria-expanded={showing}
+              aria-controls={showing ? paneId : undefined}
+              onClick={() => (showing && close ? close() : openProgress(feature.id ?? ""))}
+            >
+              <ProgressIcon />
             </button>
           )}
           <StaleMark id={feature.id} />
