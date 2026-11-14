@@ -58,7 +58,7 @@ test("Approve commits the draft's cards to main without pushing and takes the bu
     await expect(second.getByText("Delete FEAT-3 and its 2 stories?")).toBeVisible();
     await second.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(pane(page, "FEAT-3")).toHaveCount(0);
-    await expect.poll(() => git(repo.dir, "status", "--porcelain")).toBe("");
+    await expect.poll(() => git(repo.dir, "status", "--porcelain"), { timeout: 30_000 }).toBe("");
     expect(await onDisk(repo.dir, "FEAT-3")).toEqual([]);
     expect(await onDisk(repo.dir, "FEAT-2")).toHaveLength(1);
     expect(git(repo.dir, "rev-list", "--count", "HEAD")).toBe(String(Number(before) + 1));

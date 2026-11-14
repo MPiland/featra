@@ -29,7 +29,7 @@ test("The burn-up starts when the feature goes in progress and follows card chan
     running = app;
     const draft = await draftInNewChat(page, "FEAT-2");
     await draft.getByRole("button", { name: "Approve", exact: true }).click();
-    await expect.poll(() => git(repo.dir, "status", "--porcelain")).toBe("");
+    await expect.poll(() => git(repo.dir, "status", "--porcelain"), { timeout: 30_000 }).toBe("");
 
     // AC6: before the feature goes in progress, the pane says the chart starts then.
     await page.getByRole("button", { name: "Feature progress", exact: true }).click();

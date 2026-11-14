@@ -2269,3 +2269,12 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   only.
 - **No existing assertion changed.**
 - **Roadmap:** a midnight redraw while the pane is open; task ticks in the history.
+- **Windows e2e waits (Dev Lead: fix the wait, never weaken the assertion).** PR #54's first CI run failed E2E
+  (Windows) twice on two specs that STORY-16 doesn't touch. The list build with the burn-up takes 2–5 ms on the
+  project's 100 real cards, so the change didn't slow the server; the specs were timing-fragile:
+  - `merge-story.spec.ts` polled for the story's worktree to go, then read its local and remote branches at once. The
+    merge removes the folder before it deletes the branch (`removeStory` in merge-git.ts), so on a slow runner the
+    branch was still there. Both branch checks now poll the same condition, up to 30 s.
+  - `progress-breakdown.spec.ts` waited the default 5 s for Approve's commit (a clean `git status`). The same wait is
+    in 16 specs, so all of them now give it 30 s, within the 60 s test timeout.
+    No assertion changed: each expects the same value, now with a fitting wait.
