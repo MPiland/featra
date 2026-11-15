@@ -17,10 +17,17 @@ describe("AC1: the List and Board choice is remembered per project", () => {
   it("keeps each project's choice, and the list everywhere stores nothing", () => {
     const both = withWorkLayout(withWorkLayout(DEFAULT_UI_STATE, A, "board"), B, "board");
     expect(both.boardProjects).toEqual([A, B]);
-    expect(withWorkLayout(both, A, "board").boardProjects).toEqual([B, A]);
+    expect(withWorkLayout(both, A, "board").boardProjects).toEqual([A, B]);
     const back = withWorkLayout(withWorkLayout(both, A, "list"), B, "list");
     expect(back.boardProjects).toBeUndefined();
     expect(JSON.parse(JSON.stringify(back))).toEqual(DEFAULT_UI_STATE);
+  });
+
+  it("returns the same state when the project already shows that layout", () => {
+    const onBoard = withWorkLayout(DEFAULT_UI_STATE, A, "board");
+    expect(withWorkLayout(onBoard, A, "board")).toBe(onBoard);
+    expect(withWorkLayout(DEFAULT_UI_STATE, A, "list")).toBe(DEFAULT_UI_STATE);
+    expect(withWorkLayout(onBoard, B, "list")).toBe(onBoard);
   });
 
   it("leaves the rest of the UI state alone", () => {

@@ -20,8 +20,12 @@ export function normalizeBoardProjects(raw: unknown): string[] {
 export const workLayoutOf = (state: BoardChoice, dir: string): WorkLayout =>
   state.boardProjects?.includes(dir) ? "board" : "list";
 
-/** `state` with `dir` showing `layout`; with the list everywhere the field is undefined, so it is not stored. */
+/**
+ * `state` with `dir` showing `layout`, or `state` itself when it already does; with the list everywhere the field is
+ * undefined, so it is not stored.
+ */
 export function withWorkLayout<S extends BoardChoice>(state: S, dir: string, layout: WorkLayout): S {
+  if (workLayoutOf(state, dir) === layout) return state;
   const others = (state.boardProjects ?? []).filter((d) => d !== dir);
   const boardProjects = layout === "board" ? [...others, dir] : others;
   return { ...state, boardProjects: boardProjects.length ? boardProjects : undefined };

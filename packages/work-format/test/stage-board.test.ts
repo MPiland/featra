@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   boardFeatures,
   boardFilter,
-  boardStages,
   buildWorkList,
   DEFAULT_CONFIG,
   MAIN,
@@ -69,13 +68,15 @@ describe("AC2: one column per stage, New through Done, in the project's stage or
     ]);
   });
 
-  it("sends the stages to the client, and an older server's list gets the stages its rows are in", () => {
+  it("sends the stages to the client", () => {
     expect(normalizeWorkList(JSON.parse(JSON.stringify(LIST))).stages).toEqual(LIST.stages);
-    const older: Record<string, unknown> = JSON.parse(JSON.stringify(LIST));
-    delete older.stages;
-    const read = normalizeWorkList(older);
-    expect(read.stages).toBeUndefined();
-    expect(boardStages(read).map((s) => s.name)).toEqual(["In Progress", "Done", "In Review", "New", "Ready"]);
+  });
+
+  it("leaves out a card whose stage the project's config does not list", () => {
+    const list = listOf([...CARDS, story("STORY-7", "FEAT-1", { status: "Blocked" })]);
+    const all = stageBoard(list, null).flatMap((c) => c.cards.map((x) => x.story.id));
+    expect(all).not.toContain("STORY-7");
+    expect(stageBoard(list, null).map((c) => c.name)).not.toContain("Blocked");
   });
 
   it("leaves out a cancelled story and the project's bugs, which are under no feature", () => {

@@ -252,8 +252,8 @@ const SIZE_TRIES = 5;
  * Sizes the window's content area, as a user dragging its edges would, and waits until the page has that size. A
  * window manager can apply a request late or drop it: one made before the window is first shown is lost when the
  * window is mapped at its default size (seen on WSLg). So the window is first shown, out of full screen and not
- * maximized, and the request is made again until it holds. A size the window manager never gives is a failure. Shared by the journeys that check layout at
- * 1280×800 and at the app's minimum size.
+ * maximized, and the request is made again until it holds. A size the window manager never gives is a failure.
+ * Shared by the journeys that check layout at 1280×800 and at the app's minimum size.
  */
 export async function sizeTo(app: ElectronApplication, page: Page, width: number, height: number) {
   let got: number[] = [];

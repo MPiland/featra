@@ -2,7 +2,7 @@
 id: STORY-17
 type: story
 title: Read-only stage board
-status: In Review
+status: Acceptance
 parent: FEAT-7
 order: 4
 origin: planned
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:story-17
+  - at: 2026-11-15T14:25:20Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description

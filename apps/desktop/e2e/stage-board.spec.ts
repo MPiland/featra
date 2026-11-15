@@ -61,7 +61,7 @@ test("Switch Work to the board, filter it to one feature, open a card from it, a
     await expect(layout.getByRole("radio", { name: "List" })).toBeChecked();
 
     // AC1, AC2: the toggle switches to the board, one column per stage with its count.
-    await layout.getByText("Board").click();
+    await layout.getByRole("radio", { name: "Board" }).check();
     const board = page.getByRole("region", { name: "Stage board" });
     await expect(board).toBeVisible();
     await expect(layout.getByRole("radio", { name: "Board" })).toBeChecked();

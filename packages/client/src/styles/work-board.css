@@ -123,7 +123,8 @@
   margin: 0;
 }
 
-.bcard-meta .pr-chip {
+.bcard-meta .pr-chip,
+.bcard-meta .bcard-feature {
   position: relative;
   z-index: 1;
 }

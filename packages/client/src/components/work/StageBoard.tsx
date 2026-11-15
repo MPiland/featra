@@ -33,7 +33,11 @@ function Card({ card, tagged, waiting }: { card: BoardCard; tagged: boolean; wai
           </span>
         )}
         {tagged && feature && (
-          <span className="bcard-feature" title={BOARD_COPY.feature(feature.id, feature.title)}>
+          <span
+            className="bcard-feature"
+            title={BOARD_COPY.feature(feature.id, feature.title)}
+            aria-label={BOARD_COPY.feature(feature.id, feature.title)}
+          >
             {feature.id}
           </span>
         )}
@@ -75,12 +79,12 @@ export function StageBoard({ list, chats }: { list: WorkList; chats: readonly Ch
       <section className="stage-board" aria-label={BOARD_COPY.region}>
         {columns.map((c, i) => (
           <section key={c.name} className="bcol" aria-labelledby={`${ids}-${i}`} data-stage={c.name}>
-            <h3 className="bcol-head">
+            <h2 className="bcol-head">
               <span id={`${ids}-${i}`}>
                 <Status tone={c.tone} label={c.name} />
               </span>
               <span className="bcol-count">{c.cards.length}</span>
-            </h3>
+            </h2>
             <ul className="bcol-cards" aria-labelledby={`${ids}-${i}`}>
               {c.cards.map((card) => (
                 <Card

@@ -2247,8 +2247,7 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   at Work is theirs, not the team's, and the config file is committed. The field is left out while every project shows
   the list, so existing UI-state files and exact assertions read unchanged. Rules in `client/src/work-layout.ts`.
 - **Stages reach the client.** The Work list now carries the project's stages in order, each with its stage pill's
-  tone (`WorkList.stages`, from `buildWorkList`). Optional in the normalizer: a list from an older server builds its
-  columns from the stages its rows are in. The board groups the list's rows in `work-format/src/stage-board.ts`
+  tone (`WorkList.stages`, from `buildWorkList`). Optional in the normalizer only (see the review rulings: no fallback). The board groups the list's rows in `work-format/src/stage-board.ts`
   (`stageBoard`, `boardFeatures`, `boardFilter`); it computes no second rollup (ADR 0003, ADR 0016).
 - **Bugs on the board.** A bug under a feature is a card in its stage with the bug icon, as in the list. The
   project's bugs (under no feature) stay in their own list (STORY-13) and are not on the board. A cancelled story is not
@@ -2264,3 +2263,30 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   stays its own. Escape returns focus to the card's button.
 - No ADR: the layout reuses the UI-state store, and the stages ride the Work list of ADR 0016. The e2e `sizeTo` helper
   moved from `card-pane.spec.ts` to `app.ts` unchanged, so both journeys share it. No existing assertion was changed.
+
+## 2026-11-15 — STORY-17 review rulings (dev-lead)
+
+- **Confirmed build choices.**
+  - The board groups the Work list's rows, with no second rollup (ADR 0003, ADR 0016).
+  - The column order comes from `config.stages`.
+  - The layout is remembered as `boardProjects` in `ui-state.json`, keyed by project folder (ADR 0016's live list,
+    the existing UI-state store; no ADR needed).
+  - Bugs under a feature show on the board with the bug icon; cancelled stories and the project's bugs are left out.
+  - The feature filter replaces the status chips while the board shows.
+  - Read-only, with a guard test: nothing draggable, and a drag and drop changes nothing.
+- **Review fixes.**
+  - The feature tag's tooltip showed under the card's full-size button: the tag now sits above it
+    (`position: relative; z-index: 1`) and is named by its feature's ID and title (`aria-label`).
+  - A card whose stage the project's config does not list is left off the board on purpose (card validation already
+    reports it as a problem). Said in `stageBoard`'s doc comment and asserted by a unit test.
+  - Column titles are level-2 headings, so the board skips no heading level under Work's title.
+  - No older-server fallback: the Electron app ships client and server together, so the columns always come from the
+    list's `stages`. `stages` stays optional in the normalizer only; `boardStages` and its test are gone.
+  - `withWorkLayout` returns the state unchanged when the project already shows that layout (unit test). The PR's own
+    unit test had asserted that choosing Board again moved the project to the end of `boardProjects`; it now asserts
+    the order is kept.
+  - A JSDoc line over 120 characters in `apps/desktop/e2e/app.ts` was rewrapped.
+  - CI: the e2e clicked the "Board" label's text, which the segmented control's radio covers on Ubuntu; it now checks
+    the radio, as the other e2e specs do.
+- **Roadmap.** Added to ROADMAP.md: forget a removed project's board layout; remember the feature filter per project;
+  the stale-copy mark on board cards; optional WIP limits or age per column.

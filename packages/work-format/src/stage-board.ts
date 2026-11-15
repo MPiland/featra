@@ -39,25 +39,14 @@ export function boardFilter(list: WorkList, chosen: string | null): string | nul
 }
 
 /**
- * The board's columns, in the project's stage order, each with its stage pill's tone. A list from an older server has
- * no stages: its columns are the stages its rows are in, in the order they first appear.
- */
-export function boardStages(list: WorkList): StageColumn[] {
-  if (list.stages?.length) return list.stages;
-  const seen = new Map<string, StageColumn>();
-  for (const s of features(list).flatMap((f) => f.stories))
-    if (s.tone !== "cancelled" && s.stage !== "" && !seen.has(s.stage))
-      seen.set(s.stage, { name: s.stage, tone: s.tone });
-  return [...seen.values()];
-}
-
-/**
  * One column per stage, each holding the stories and bugs of every feature (`feature` null) or of one feature, in the
- * Work list's order. A story under no feature shows only with all features. A card whose stage is not a column (a
- * cancelled one) is left out; so are the project's bugs, which belong to no feature (STORY-13).
+ * Work list's order, the columns in `config.stages` order (the client and server ship together, so the list always
+ * carries them). A story under no feature shows only with all features. A card whose stage is not a column is left
+ * out on purpose: a cancelled one, or one whose stage the project's config does not list, which card validation
+ * already reports as a problem. So are the project's bugs, which belong to no feature (STORY-13).
  */
 export function stageBoard(list: WorkList, feature: string | null): BoardColumn[] {
-  const columns = boardStages(list).map(({ name, tone }): BoardColumn => ({ name, tone, cards: [] }));
+  const columns = (list.stages ?? []).map(({ name, tone }): BoardColumn => ({ name, tone, cards: [] }));
   const byStage = new Map(columns.map((c) => [c.name, c]));
   for (const f of features(list)) {
     if (feature !== null && f.id !== feature) continue;

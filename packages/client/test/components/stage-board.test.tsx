@@ -110,6 +110,20 @@ describe("AC2: one column per stage, New through Done, in the project's stage or
     expect(within(cardIn("BUG-3") as HTMLElement).getByRole("img", { name: "Bug" })).toBeTruthy();
   });
 
+  it("titles each column with a level-2 heading, below Work's own title", async () => {
+    const app = renderApp(host());
+    const found = await toBoard(app);
+    const headings = within(found).getAllByRole("heading", { level: 2 });
+    expect(headings.map((h) => h.querySelector("[id]")?.textContent)).toEqual([
+      "New",
+      "Ready",
+      "In Progress",
+      "In Review",
+      "Acceptance",
+      "Done",
+    ]);
+  });
+
   it("follows the project's own stages", async () => {
     const config: ProjectConfig = {
       ...DEFAULT_CONFIG,
@@ -189,6 +203,13 @@ describe("AC4: a card shows its ID, title, feature, PR and whether it waits on t
     expect(cardIn("STORY-9")?.querySelector(".bcard-feature")).toBeNull();
     await app.user.click(chip("FEAT-3 Burn-up"));
     expect(cardIn("STORY-7")?.querySelector(".bcard-feature")).toBeNull();
+  });
+
+  it("names the feature tag by the feature's ID and title, for a screen reader as for the tooltip", async () => {
+    const app = renderApp(host());
+    await toBoard(app);
+    const tag = cardIn("STORY-7")?.querySelector(".bcard-feature");
+    expect(tag?.getAttribute("aria-label")).toBe("FEAT-3 Burn-up");
   });
 
   it("shows the PR chip of a story with a PR", async () => {
