@@ -2,7 +2,7 @@
 id: BUG-23
 type: bug
 title: Story PR not opened when a scan catches the card mid-write
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-23-prs-read-flake
-pr: null
+pr: https://github.com/MPiland/featra/pull/57
 created: 2026-11-15T17:00:00Z
 history:
   - at: 2026-11-15T17:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:bug-23
+  - at: 2026-11-15T18:00:00Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:bug-23
 ---
 
