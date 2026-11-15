@@ -52,6 +52,8 @@ export interface PrWorld {
   move: (status: string, extra?: Partial<Card>) => Promise<void>;
   /** The story's status changes in its worktree, its history kept, as a session moving it would write it. */
   moveOn: (status: string) => Promise<void>;
+  /** As `moveOn`, but a scan first catches the card mid-write: emptied, its new text not written yet (BUG-23). */
+  moveCaughtMidWrite: (status: string) => Promise<void>;
   read: () => Promise<Card>;
   /** The branches the remote has. */
   remoteBranches: () => string[];
@@ -90,6 +92,15 @@ export function prWorld(): PrWorld {
   };
   w.moveOn = async (status) => {
     await w.repo.write(w.tree, setStatus(await w.read(), status, "session:test", w.clock.now().toISOString()));
+    await w.settle();
+    await w.settle();
+  };
+  w.moveCaughtMidWrite = async (status) => {
+    const next = setStatus(await w.read(), status, "session:test", w.clock.now().toISOString());
+    // A write empties the file before it writes the text; a scan in between reads an empty card.
+    await writeFile(w.repo.file(w.tree, "STORY-1"), "");
+    await w.settle();
+    await w.repo.write(w.tree, next);
     await w.settle();
     await w.settle();
   };

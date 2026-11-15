@@ -35,7 +35,7 @@ import { ciRead, headIsStale, UNVERIFY } from "./pr-ci.ts";
 import { createPrPoller } from "./pr-poller.ts";
 import { watchProjects } from "./project-watch.ts";
 import { recordPr } from "./story-pr-record.ts";
-import { baseOf, keyOf, seenOf, type ProjectSeen } from "./story-prs-seen.ts";
+import { baseOf, keyOf, seenOf, type Followed, type ProjectSeen } from "./story-prs-seen.ts";
 import type { Scan } from "./work-scan.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
@@ -203,6 +203,9 @@ export function createStoryPrs(deps: StoryPrsDeps) {
     await refreshUse(dir);
     if (closed) return () => {};
     let baseline = true;
+    // Each story as last seen. A scan that caught its card mid-write leaves it out; that isn't the story leaving, so
+    // its move into review is still told from the last scan that had it (BUG-23).
+    const known = new Map<string, Followed>();
     const consider = (next: ProjectSeen) => {
       const before = seen.get(dir);
       seen.set(dir, next);
@@ -210,7 +213,8 @@ export function createStoryPrs(deps: StoryPrsDeps) {
       for (const story of next.stories) {
         const key = keyOf(dir, story.id);
         if (!story.inReview) notes.delete(key);
-        const was = before?.stories.find((s) => s.id === story.id);
+        const was = known.get(story.id);
+        known.set(story.id, story);
         // Only a move into review opens a PR or pushes again; stories already in review when Featra starts are left.
         if (baseline || !was || was.inReview || !story.inReview || !usable.get(dir)) continue;
         if (story.pr) void track(pushAgain(dir, story.id));

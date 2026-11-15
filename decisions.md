@@ -2355,3 +2355,22 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
     the radio, as the other e2e specs do.
 - **Roadmap.** Added to ROADMAP.md: forget a removed project's board layout; remember the feature filter per project;
   the stale-copy mark on board cards; optional WIP limits or age per column.
+
+## 2026-11-15 — BUG-23 build choices (story agent, for the Dev Lead to confirm)
+
+- **Product race, not a test race.** The reading that the card was read before the PR link was written does not hold:
+  `move` and `moveOn` wait for `prs.idle()`, which waits for every PR open in flight, and an open is tracked the moment
+  a scan sees the move. The cause: a write empties the card before it writes the new text, and a debounced watch scan
+  in between can't read it and leaves the story out. `story-prs.ts` told a move into review from the scan just before,
+  so the next scan saw the story as new and opened nothing (or pushed nothing again). The failed run took 353 ms
+  against about 1 s when it passes: no push or `gh` call happened.
+- **Fix.** Each watched project keeps every story as last seen (`known` in `watchProject`); a move into review is told
+  from that, so a scan that left the story out isn't the story leaving. A story never seen before that arrives in
+  review is still left alone, as before. Story checks (`story-checks.ts`) were looked at: a story dropping out and
+  coming back there reruns its checks rather than missing a run, so it was left as is.
+- **Deterministic regression.** The harness gained `moveCaughtMidWrite` (`story-prs-world.ts`): it empties the card,
+  lets a scan read it, then writes the new text. Only the file write is staged; scanner, watch and story PRs are the
+  real code. Two tests in `story-prs-open.test.ts` (open on the way into review, push again on the way back) failed on
+  the unfixed code every time and pass with the fix.
+- **No test reads changed.** The reads right after `move` and `moveOn` in `story-prs-read.test.ts` are correct once the
+  product doesn't miss the move, so no poll was added and no assertion changed.
