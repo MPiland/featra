@@ -81,3 +81,77 @@
   font-size: 12px;
   color: var(--tx2);
 }
+
+/* The burn-up (STORY-16): scope and done as step lines, in the bar's tones. */
+.fp-legend,
+.fp-days {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  font-size: 12px;
+  color: var(--tx2);
+}
+
+.fp-legend {
+  justify-content: flex-start;
+  margin-bottom: 6px;
+}
+
+.fp-key::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-top: 2px solid var(--key);
+}
+
+.fp-key-scope {
+  --key: var(--tx3);
+}
+
+.fp-key-scope::before {
+  border-top-style: dashed;
+}
+
+.fp-key-done {
+  --key: var(--ok);
+}
+
+.fp-chart {
+  display: block;
+  width: 100%;
+  height: 96px;
+  overflow: visible;
+}
+
+.fp-line,
+.fp-axis-line {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.fp-axis-line {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+
+.fp-line {
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.fp-line-scope {
+  stroke: var(--tx3);
+  stroke-dasharray: 5 3;
+}
+
+.fp-line-done {
+  stroke: var(--ok);
+}
+
+.fp-days {
+  margin-top: 4px;
+  color: var(--tx3);
+}

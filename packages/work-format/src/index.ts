@@ -4,6 +4,7 @@ export * from "./card.ts";
 export * from "./history.ts";
 export * from "./ownership.ts";
 export * from "./rollup.ts";
+export * from "./burn-up.ts";
 export * from "./evidence.ts";
 export * from "./bugs.ts";
 export * from "./bug-copy.ts";

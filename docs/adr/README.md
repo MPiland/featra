@@ -70,3 +70,4 @@ What becomes easier or harder, and what we must now do.
 | [0036](0036-filing-and-placing-bugs.md)                    | Filing and placing bugs                                               | proposed |
 | [0037](0037-accepting-a-feature-and-merging-it-to-main.md) | Accepting a feature and merging it to main                            | proposed |
 | [0038](0038-scope-baseline-is-the-start-of-the-feature.md) | The scope baseline is the moment a feature goes in progress           | proposed |
+| [0039](0039-burn-up-series-on-the-feature-row.md)          | The burn-up series rides on the feature row                           | proposed |
