@@ -2360,17 +2360,37 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 
 - **Product race, not a test race.** The reading that the card was read before the PR link was written does not hold:
   `move` and `moveOn` wait for `prs.idle()`, which waits for every PR open in flight, and an open is tracked the moment
-  a scan sees the move. The cause: a write empties the card before it writes the new text, and a debounced watch scan
-  in between can't read it and leaves the story out. `story-prs.ts` told a move into review from the scan just before,
-  so the next scan saw the story as new and opened nothing (or pushed nothing again). The failed run took 353 ms
-  against about 1 s when it passes: no push or `gh` call happened.
+  a scan sees the move. The cause: Featra's own card writes are atomic, but a writer outside Featra (a session's file
+  tools, an editor, git; in the test, `card-repo.ts`) empties the card before it writes the new text, and a debounced
+  watch scan in between can't parse it. The scanner (`work-scan.ts`, `resolve`/`deletedAtOwner`) classes an owner copy
+  that exists but can't be parsed as deleted at its owner (STORY-58), so the story is hidden although its main and
+  feature copies exist. `story-prs.ts` told a move into review from the scan just before, so the next scan saw the
+  story as new and opened nothing (or pushed nothing again). The failed run took 353 ms against about 1 s when it
+  passes: no push or `gh` call happened. The same drop makes story checks clear the check state shown on the card and
+  start a needless run (`story-checks.ts`); the deeper fix is BUG-24.
+- **Behaviour change.** A story that disappears and later comes back already In Review now opens its PR or pushes
+  again, where it used to be ignored. Accepted.
 - **Fix.** Each watched project keeps every story as last seen (`known` in `watchProject`); a move into review is told
   from that, so a scan that left the story out isn't the story leaving. A story never seen before that arrives in
-  review is still left alone, as before. Story checks (`story-checks.ts`) were looked at: a story dropping out and
-  coming back there reruns its checks rather than missing a run, so it was left as is.
+  review is still left alone, as before. Story checks (`story-checks.ts`) don't miss a run on a drop, but the drop
+  clears the check state shown on the card and starts a needless run; that is left to BUG-24's scanner fix.
 - **Deterministic regression.** The harness gained `moveCaughtMidWrite` (`story-prs-world.ts`): it empties the card,
   lets a scan read it, then writes the new text. Only the file write is staged; scanner, watch and story PRs are the
   real code. Two tests in `story-prs-open.test.ts` (open on the way into review, push again on the way back) failed on
   the unfixed code every time and pass with the fix.
 - **No test reads changed.** The reads right after `move` and `moveOn` in `story-prs-read.test.ts` are correct once the
   product doesn't miss the move, so no poll was added and no assertion changed.
+
+## 2026-11-15 — BUG-23 review rulings (dev-lead)
+
+- **`known` confirmed** as defense in depth: besides a story hidden by an unreadable owner copy, it also covers a scan
+  that returns null.
+- **The scanner fix is split out as BUG-24**: an empty or unparseable owner copy must never be treated as deleted at
+  its owner; the watch confirms an unreadable card before publishing it; story checks keep their state; applying a stale
+  copy (`copy-actions.ts`) writes the owner card atomically through the card lane.
+- **The Windows merge-story e2e failure is split out as BUG-25** (CI run 43749728537): the Work list blanked during the
+  merge and came back with its features collapsed.
+- **`story-prs.ts` is at 300 lines**, so the next change there splits out `watchProject`.
+- **Roadmap.** Added to ROADMAP.md: one shared card-file writer for every Featra write path, with a lint rule against
+  a bare `writeFile` to `.featra/cards`; showing a card that is unreadable only for a moment as being written, not as a
+  problem.

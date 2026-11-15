@@ -2,7 +2,7 @@
 id: BUG-23
 type: bug
 title: Story PR not opened when a scan catches the card mid-write
-status: In Review
+status: Acceptance
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-23
+  - at: 2026-11-15T19:17:36Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
@@ -52,11 +57,16 @@ so the story's PR is never opened (or its branch never pushed again).
 
 ## Notes
 
-Cause: a write empties the card file before it writes the new text. The project's watch is debounced and runs its scans
-on a timer (file events, and a scan that started new file watchers, queue one 50 ms later; BUG-12), so a scan in the
-same process can read the card in between. That scan can't read the card and leaves the story out. Story PRs (`story-prs.ts`) told a move into review
-from the scan just before, so on the next scan the story looked new (`!was`) and nothing opened. The failed CI run took
-353 ms where it passes in about 1 s: no push and no `gh` call were made, which fits a PR that never started opening.
+Cause: Featra's own card writes are atomic (`writeAtomic`, the card lane), but a writer outside Featra (a session's
+file tools, an editor, or git; in the test, `card-repo.ts`) empties the card file before it writes the new text. The
+project's watch is debounced and runs its scans on a timer (file events, and a scan that started new file watchers,
+queue one 50 ms later; BUG-12), so a scan can read the card in between. The scanner (`work-scan.ts`, `resolve` and
+`deletedAtOwner`) classes an owner copy that exists but can't be parsed as deleted at its owner (STORY-58), so the story
+is hidden although its main and feature copies exist. Story PRs (`story-prs.ts`) told a move into review from the scan
+just before, so on the next scan the story looked new (`!was`) and nothing opened. The failed CI run took 353 ms where
+it passes in about 1 s: no push and no `gh` call were made, which fits a PR that never started opening. The same drop
+makes story checks (`story-checks.ts`) clear the check state shown on the card and start a needless run; the deeper
+fix, in the scanner, is BUG-24.
 
 The harness was not at fault: `move` and `moveOn` already wait for every PR open in flight (`prs.idle()`), so the card
 is never read before an open that started has written its link. No test's read was changed.
