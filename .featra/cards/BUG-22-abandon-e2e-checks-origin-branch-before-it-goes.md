@@ -2,7 +2,7 @@
 id: BUG-22
 type: bug
 title: Abandon e2e checks origin's branch before it goes
-status: Acceptance
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-15T20:54:27Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-15T20:54:27Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description

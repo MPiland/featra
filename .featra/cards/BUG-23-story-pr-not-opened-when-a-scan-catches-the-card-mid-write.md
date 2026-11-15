@@ -2,7 +2,7 @@
 id: BUG-23
 type: bug
 title: Story PR not opened when a scan catches the card mid-write
-status: Acceptance
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-15T20:53:50Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-15T20:53:50Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
