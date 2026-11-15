@@ -18,6 +18,7 @@ import type { ChosenWidth } from "./PaneHandle.tsx";
 import { SidePane, type Docked } from "./SidePane.tsx";
 import { Epic } from "./Epic.tsx";
 import { NewBug } from "./NewBug.tsx";
+import { OpenFeaturesContext, useOpenFeatures } from "./open-features.tsx";
 import { ProjectBugs } from "./ProjectBugs.tsx";
 import { ReviewDraft } from "./review-draft.tsx";
 import { StageBoard } from "./StageBoard.tsx";
@@ -69,6 +70,7 @@ export function WorkList(props: {
   } = props;
   const update = useWorkList(work, project.dir);
   const [filter, setFilter] = useState<ListFilter>("all");
+  const openFeatures = useOpenFeatures();
   // One pane on the right: a card (with the card it was reached from, so it can go back) or a feature's progress.
   const [docked, setDocked] = useState<Docked | null>(null);
   const select = useCallback((id: string) => setDocked({ kind: "card", id, focus: true }), []);
@@ -152,9 +154,11 @@ export function WorkList(props: {
         <StaleCards value={new Set(list.stale.map((s) => s.cardId))}>
           <ReviewDraft.Provider value={reviewDraft}>
             <StoryAgentsContext.Provider value={storyAgents}>
-              {epics.map((e) => (
-                <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
-              ))}
+              <OpenFeaturesContext.Provider value={openFeatures}>
+                {epics.map((e) => (
+                  <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
+                ))}
+              </OpenFeaturesContext.Provider>
               <ProjectBugs bugs={list.bugs ?? []} />
             </StoryAgentsContext.Provider>
           </ReviewDraft.Provider>

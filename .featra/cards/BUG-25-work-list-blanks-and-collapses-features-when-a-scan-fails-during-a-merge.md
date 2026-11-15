@@ -2,7 +2,7 @@
 id: BUG-25
 type: bug
 title: Work list blanks and collapses features when a scan fails during a merge
-status: New
+status: In Progress
 parent: null
 order: 0
 origin: bug
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/bug-24-25-scan-resilience
 pr: null
 created: 2026-11-15T20:00:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: dev-lead
+  - at: 2026-11-15T21:00:00Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:bug-24-25
 ---
 
 ## Description
@@ -39,8 +44,8 @@ the card at the end still read In Review with the PR shown as Open (possibly a P
 
 ## Acceptance criteria
 
-- [ ] A failed scan keeps the last good list and shows the problem
-- [ ] A feature stays expanded or collapsed across list updates
+- [x] A failed scan keeps the last good list and shows the problem (test: packages/server/test/work-watch-settle.test.ts::a scan that fails (BUG-25 AC1) > keeps the last good list with the problem when it fails again, and still hears git after)
+- [x] A feature stays expanded or collapsed across list updates (test: packages/client/test/components/work-list-open.test.tsx::a feature's open state (BUG-25 AC2) > lasts through an update that blanks the list for a moment, with a problem)
 - [ ] merge-story.spec.ts no longer fails this way on Windows
 
 ## Tasks
