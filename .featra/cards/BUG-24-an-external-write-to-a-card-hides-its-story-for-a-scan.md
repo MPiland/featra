@@ -2,7 +2,7 @@
 id: BUG-24
 type: bug
 title: An external write to a card hides its story for a scan
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-24-25-scan-resilience
-pr: null
+pr: https://github.com/MPiland/featra/pull/58
 created: 2026-11-15T20:00:00Z
 history:
   - at: 2026-11-15T20:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:bug-24-25
+  - at: 2026-11-15T22:30:00Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:bug-24-25
 ---
 
