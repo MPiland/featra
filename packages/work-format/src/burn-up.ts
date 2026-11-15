@@ -3,11 +3,10 @@
  * history, from the scope baseline, read at the end of each of the user's local days, and a last point for now that is
  * the feature row's own count. Pure; the caller passes the clock. Nothing here forecasts (ADR 0005).
  */
-/** A count as the feature row has it. */
-interface Count {
-  done: number;
-  total: number;
-}
+import type { Count } from "./work-list-types.ts";
+
+/** What a burn-up counts, as the project's progress setting says. */
+export type BurnUpUnit = "stories" | "tasks";
 
 /** One step of the series: scope and done from this moment, as `burnUp` emits it. */
 export interface BurnUpPoint {
@@ -20,6 +19,8 @@ export interface BurnUpPoint {
 export interface BurnUp {
   /** The scope baseline: when the feature went in progress (ADR 0038). */
   since: string;
+  /** What it counts: stories (bugs with them) or tasks, as the feature row's count does. */
+  unit: BurnUpUnit;
   points: BurnUpPoint[];
 }
 
@@ -72,6 +73,12 @@ export function burnUpDays(chart: BurnUp, current: Count, now: Date): BurnUpDay[
   return days;
 }
 
-/** The chart's text alternative: "Scope 7 · Done 3, since Nov 11". */
-export const burnUpText = (current: Count, since: string): string =>
-  `Scope ${current.total} · Done ${current.done}, since ${dayLabel(since)}`;
+/** A number with its unit: "1 story", "6 tasks". */
+export function withUnit(n: number, unit: BurnUpUnit): string {
+  const [one, many] = unit === "tasks" ? ["task", "tasks"] : ["story", "stories"];
+  return `${n} ${n === 1 ? one : many}`;
+}
+
+/** The chart's text alternative: "Scope 7 stories · Done 3 stories, since Nov 11". */
+export const burnUpText = (current: Count, chart: Pick<BurnUp, "since" | "unit">): string =>
+  `Scope ${withUnit(current.total, chart.unit)} · Done ${withUnit(current.done, chart.unit)}, since ${dayLabel(chart.since)}`;

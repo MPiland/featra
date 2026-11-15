@@ -173,7 +173,7 @@ const burnUpOf = (raw: unknown): { burnUp?: BurnUp } => {
   const points = list(raw.points, (p) => ({ at: p.at, scope: num(p.scope), done: num(p.done) })).filter(
     (p): p is BurnUpPoint => isTime(p.at),
   );
-  return { burnUp: { since: raw.since, points } };
+  return { burnUp: { since: raw.since, unit: raw.unit === "tasks" ? "tasks" : "stories", points } };
 };
 
 const feature = (r: Record<string, unknown>): FeatureRow => {

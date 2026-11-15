@@ -128,7 +128,13 @@ function featureRow(
     },
     ...(branch ? { branch } : {}),
     ...(feature && scope?.baseline
-      ? { burnUp: { since: scope.baseline, points: burnUp(feature.id, cards, config) } }
+      ? {
+          burnUp: {
+            since: scope.baseline,
+            unit: config.progress,
+            points: burnUp(feature.id, cards, config, scope.baseline),
+          },
+        }
       : {}),
     stories: rows,
   };

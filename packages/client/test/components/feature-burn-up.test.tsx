@@ -36,6 +36,7 @@ const rows = (pane: HTMLElement) =>
   [...pane.querySelectorAll(".fp-burnup tbody tr")].map((tr) =>
     [...tr.querySelectorAll("th, td")].map((c) => c.textContent),
   );
+const legend = (pane: HTMLElement) => [...pane.querySelectorAll(".fp-legend span")].map((s) => s.textContent);
 const owned = (card: Card): OwnedCard => ({ card, owner: MAIN, shownFrom: MAIN, path: `.featra/cards/${card.id}.md` });
 
 describe("AC1: the pane shows a burn-up with a scope line and a done line", () => {
@@ -43,7 +44,8 @@ describe("AC1: the pane shows a burn-up with a scope line and a done line", () =
     const app = renderApp({ cards: cards(null) });
     const pane = await fromWork(app);
     const burnUp = within(pane).getByRole("region", { name: "Burn-up chart" });
-    expect(chart(pane).getAttribute("aria-label")).toBe("Scope 2 · Done 0, since Nov 1");
+    expect(chart(pane).getAttribute("aria-label")).toBe("Scope 2 stories · Done 0 stories, since Nov 1");
+    expect(legend(pane)).toEqual(["Scope 2 stories", "Done 0 stories"]);
     expect([...burnUp.querySelectorAll("path")].map((p) => p.getAttribute("class"))).toEqual([
       "fp-line fp-line-scope",
       "fp-line fp-line-done",
@@ -71,7 +73,9 @@ describe("AC2: it counts what the feature row counts", () => {
     expect(row?.progress.label).toBe("1 of 3 tasks done");
     const app = renderApp({ work: { [PROJECT.dir]: list } });
     const pane = await fromWork(app);
-    expect(chart(pane).getAttribute("aria-label")).toBe("Scope 3 · Done 1, since Nov 1");
+    expect(chart(pane).getAttribute("aria-label")).toBe("Scope 3 tasks · Done 1 task, since Nov 1");
+    // The unit is named, in the legend as in the name.
+    expect(legend(pane)).toEqual(["Scope 3 tasks", "Done 1 task"]);
     // The history doesn't say when the task was ticked: it counts from now, the row's own count.
     expect(rows(pane).at(-2)).toEqual(["Nov 3", "3", "0"]);
     expect(rows(pane).at(-1)).toEqual(["Now", "3", "1"]);
@@ -85,10 +89,10 @@ describe("AC4: changes that were never committed still appear in the chart", () 
     const before = app.calls.length;
     const story = app.cardsIn(PROJECT.dir).find((c) => c.id === "STORY-5") as Card;
     app.pushCard(PROJECT.dir, setStatus(story, "Done", "user", "2026-11-03T10:00:00Z"));
-    await within(pane).findByRole("img", { name: "Scope 2 · Done 1, since Nov 1" });
+    await within(pane).findByRole("img", { name: "Scope 2 stories · Done 1 story, since Nov 1" });
     const later = { id: "STORY-8", type: "story" as const, title: "Later", status: "New", parent: "FEAT-2" };
     app.pushCard(PROJECT.dir, newCard({ ...later, origin: "added" }, "user", "2026-11-04T08:00:00Z"));
-    await within(pane).findByRole("img", { name: "Scope 3 · Done 1, since Nov 1" });
+    await within(pane).findByRole("img", { name: "Scope 3 stories · Done 1 story, since Nov 1" });
     expect(rows(pane).at(-2)).toEqual(["Nov 3", "2", "1"]);
     expect(app.calls.slice(before)).toEqual([]);
   });
@@ -119,7 +123,7 @@ describe("AC6: before the feature goes in progress the pane says the chart start
     expect(within(pane).queryByRole("img", { name: /^Scope / })).toBeNull();
     expect(within(pane).queryByRole("region", { name: "Burn-up chart" })).toBeNull();
     app.pushCard(PROJECT.dir, setStatus(approved, "active", "user", "2026-11-03T09:00:00Z"));
-    await within(pane).findByRole("img", { name: "Scope 2 · Done 0, since Nov 3" });
+    await within(pane).findByRole("img", { name: "Scope 2 stories · Done 0 stories, since Nov 3" });
     expect(within(pane).queryByText("The chart starts when the feature goes in progress.")).toBeNull();
   });
 });

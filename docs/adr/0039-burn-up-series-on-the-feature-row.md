@@ -21,12 +21,16 @@ have to know, and on the clock, which moves without any card changing.
   baseline itself, then each local midnight after it (the values strictly before that midnight, labelled with the day
   that ended), then now. The time zone is the platform's (`Date` in local time), so days follow daylight saving changes.
   A feature started mid-day has that part day as its first day.
+- **The series ends at the cards' current state.** Its last change point is counted from the cards as they are, so a
+  status edited by hand (no history event) counts from the last recorded change, as the baseline does (ADR 0038).
+- **The row says what it counts** (`unit`: stories or tasks), and the chart names it.
 - **The last point is the row's own count.** The now point takes `progress.done` and `progress.total` from the feature
   row, so the chart and the row agree by construction.
 - **Tasks mode is replayed from `content` events.** Each item weighs the tasks it had at the time (`tasksAt`: a task
   edit records the list it replaced in `from`), and a done item counts all of them. Ticks are not recorded in the
   history, so the ticks of open items show only in the now point.
-- **No timer.** The chart redraws when the list is pushed or the pane opens; a day boundary passed while the pane sits
+- **No timer.** The chart reads the clock when it mounts and is keyed by the row's burn-up and count, so it redraws
+  when the row changes or the pane opens; a day boundary passed while the pane sits
   open shows on the next push.
 - **Plain SVG**, two step lines, no chart library. The image is named by the current numbers and the start day, and a
   visually hidden table gives every point.

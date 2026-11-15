@@ -36,7 +36,7 @@ const burnUpOf = (list: WorkList) => list.epics.flatMap((e) => e.features).find(
 describe("AC4: changes that were never committed still appear in the chart", () => {
   it("has a story moved to Done and a story added in the feature's checkout, with no commit", async () => {
     const before = burnUpOf(await scanner.list(repo.main));
-    expect(before).toEqual({ since: STARTED, points: [{ at: STARTED, scope: 2, done: 0 }] });
+    expect(before).toEqual({ since: STARTED, unit: "stories", points: [{ at: STARTED, scope: 2, done: 0 }] });
 
     await repo.write(tree, moved(card("STORY-1", "story", "FEAT-1", "New"), "Done", "2026-11-01T02:00:00Z"));
     await repo.write(tree, card("STORY-3", "story", "FEAT-1", "New", { created: "2026-11-01T03:00:00Z" }));

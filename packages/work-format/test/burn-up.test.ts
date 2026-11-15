@@ -52,8 +52,12 @@ const plan = () => [
 
 describe("AC1: the burn-up is built from the cards' history, with a scope line and a done line", () => {
   it("is on a started feature's row: its baseline, and scope and done each time either changed", () => {
-    expect(rowOf(plan())?.burnUp).toEqual({
+    const row = rowOf(plan());
+    // The series itself, not only the chart's now point, ends at the row's count.
+    expect(row?.burnUp?.points.at(-1)).toMatchObject({ scope: row?.progress.total, done: row?.progress.done });
+    expect(row?.burnUp).toEqual({
       since: at(10),
+      unit: "stories",
       points: [
         { at: at(10), scope: 2, done: 0 },
         { at: at(30), scope: 2, done: 1 },
@@ -77,8 +81,10 @@ describe("AC1: the burn-up is built from the cards' history, with a scope line a
       }),
     ).toEqual({
       since: at(10),
+      unit: "stories",
       points: [{ at: at(20), scope: 0, done: 0 }],
     });
+    expect(read({ since: at(10), unit: "tasks", points: [] })?.unit).toBe("tasks");
   });
 });
 
@@ -92,13 +98,26 @@ describe("AC2: it counts what the feature row counts", () => {
     ];
     const row = rowOf(cards);
     expect(row?.progress).toMatchObject({ done: 1, total: 3 });
+    expect(row?.burnUp?.points.at(-1)).toMatchObject({ scope: row?.progress.total, done: row?.progress.done });
     const days = burnUpDays(
-      row?.burnUp ?? { since: "", points: [] },
+      row?.burnUp ?? { since: "", unit: "stories" as const, points: [] },
       row?.progress ?? { done: 0, total: 0 },
       new Date(at(60)),
     );
     expect(days.at(-1)).toMatchObject({ kind: "now", scope: 3, done: 1 });
     expect(days.at(-1)).toMatchObject({ scope: row?.progress.total, done: row?.progress.done });
+  });
+
+  it("follows a status edited by hand, with no history event, from the last recorded change", () => {
+    // STORY-1 went In Progress at 30, then its file was set to Done by hand: the row counts it done.
+    const handDone = { ...moves(story("STORY-1", "FEAT-1"), [30, "In Progress"]), status: "Done" };
+    const cards = [started(), handDone, story("STORY-2", "FEAT-1"), story("STORY-3", "FEAT-1", { created: 40 })];
+    const row = rowOf(cards);
+    expect(row?.progress).toMatchObject({ done: 1, total: 3 });
+    expect(row?.burnUp?.points).toEqual([
+      { at: at(10), scope: 2, done: 0 },
+      { at: at(40), scope: 3, done: 1 },
+    ]);
   });
 
   it("counts tasks in tasks mode: each item weighs the tasks it had then, and a done item counts them all", () => {
@@ -121,7 +140,7 @@ describe("AC2: it counts what the feature row counts", () => {
     expect(row?.progress).toMatchObject({ done: 3, total: 6, label: "3 of 6 tasks done" });
     expect(row?.burnUp?.points.at(-1)).toMatchObject({ scope: 6, done: 1 });
     const days = burnUpDays(
-      row?.burnUp ?? { since: "", points: [] },
+      row?.burnUp ?? { since: "", unit: "stories" as const, points: [] },
       row?.progress ?? { done: 0, total: 0 },
       new Date(at(60)),
     );
@@ -174,7 +193,11 @@ describe("AC3: it starts at the baseline, with one point per local day and a las
   it("follows local days across a daylight saving change: one point per day", () => {
     vi.stubEnv("TZ", "America/New_York");
     // Oct 31, 12:00 EDT to Nov 3, 12:00 EST; clocks go back on Nov 1.
-    const chart = { since: "2026-10-31T16:00:00Z", points: [{ at: "2026-10-31T16:00:00Z", scope: 2, done: 0 }] };
+    const chart = {
+      since: "2026-10-31T16:00:00Z",
+      unit: "stories" as const,
+      points: [{ at: "2026-10-31T16:00:00Z", scope: 2, done: 0 }],
+    };
     const out = burnUpDays(chart, { done: 1, total: 2 }, new Date("2026-11-03T17:00:00Z"));
     expect(out.map((d) => [d.label, d.at])).toEqual([
       ["Started Oct 31", "2026-10-31T16:00:00Z"],
@@ -187,8 +210,10 @@ describe("AC3: it starts at the baseline, with one point per local day and a las
 
   it("starts with zeros for a started feature with nothing under it yet", () => {
     const empty = rowOf([started()]);
-    expect(empty?.burnUp).toEqual({ since: at(10), points: [] });
-    expect(burnUpDays(empty?.burnUp ?? { since: "", points: [] }, { done: 0, total: 0 }, new Date(at(60)))).toEqual([
+    expect(empty?.burnUp).toEqual({ since: at(10), unit: "stories", points: [] });
+    expect(
+      burnUpDays(empty?.burnUp ?? { since: "", unit: "stories", points: [] }, { done: 0, total: 0 }, new Date(at(60))),
+    ).toEqual([
       { at: at(10), scope: 0, done: 0, kind: "start", label: "Started Nov 1" },
       { at: at(60), scope: 0, done: 0, kind: "now", label: "Now" },
     ]);
@@ -205,9 +230,21 @@ describe("AC3: it starts at the baseline, with one point per local day and a las
 
 describe("AC5 and AC6: what the chart says, and nothing before the feature goes in progress", () => {
   it("names the current numbers and the day it started, and nothing to come", () => {
-    const text = burnUpText({ done: 3, total: 7 }, at(10));
-    expect(text).toBe("Scope 7 · Done 3, since Nov 1");
+    const text = burnUpText({ done: 3, total: 7 }, { since: at(10), unit: "stories" });
+    expect(text).toBe("Scope 7 stories · Done 3 stories, since Nov 1");
     expect(text).not.toMatch(/forecast|trend|projected|on track|estimate|eta\b|complet/i);
+  });
+
+  it("names the unit the row counts in: stories, or tasks in tasks mode", () => {
+    expect(burnUpText({ done: 1, total: 1 }, { since: at(10), unit: "stories" })).toBe(
+      "Scope 1 story · Done 1 story, since Nov 1",
+    );
+    const cards = [started(), withTasks(story("STORY-1", "FEAT-1"), 3, 6)];
+    const row = rowOf(cards, tasksMode);
+    expect(row?.burnUp?.unit).toBe("tasks");
+    expect(burnUpText(row?.progress ?? { done: 0, total: 0 }, row?.burnUp ?? { since: at(10), unit: "stories" })).toBe(
+      "Scope 6 tasks · Done 3 tasks, since Nov 1",
+    );
   });
 
   it("is left off the row of a feature that never went in progress", () => {

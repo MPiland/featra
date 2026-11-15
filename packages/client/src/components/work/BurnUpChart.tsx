@@ -1,5 +1,5 @@
-import { useId } from "react";
-import { burnUpDays, burnUpText, dayLabel, type BurnUp, type BurnUpDay } from "@featra/work-format/burn-up";
+import { useId, useState } from "react";
+import { burnUpDays, burnUpText, dayLabel, withUnit, type BurnUp, type BurnUpDay } from "@featra/work-format/burn-up";
 import type { Count } from "@featra/work-format/work-list";
 import { PROGRESS_COPY } from "../../work-list.ts";
 
@@ -7,7 +7,6 @@ export interface BurnUpChartProps {
   chart: BurnUp;
   /** The feature row's count: the chart's last point, so the two always agree. */
   current: Count;
-  now: Date;
 }
 
 /** The drawing's own units; it stretches to the pane's width, and its lines keep their width. */
@@ -29,10 +28,12 @@ function stepPath(
  * A feature's burn-up (STORY-16): two step lines, scope and done, from the scope baseline to now, one point per local
  * day (work-format's `burnUpDays`). Drawn as plain SVG in the work tones: scope in the not-started grey, dashed, done in
  * the done green. The image is named by the current numbers, and a visually hidden table gives every point. It shows
- * what happened only: no forecast, trend or date to come (ADR 0005).
+ * what happened only: no forecast, trend or date to come (ADR 0005). Its days end at the clock as of the row, read again`n * each time the list pushes the row and when the pane opens (ADR 0039).
  */
-export function BurnUpChart({ chart, current, now }: BurnUpChartProps) {
+export function BurnUpChart({ chart, current }: BurnUpChartProps) {
   const head = useId();
+  // The clock as the chart mounts; its host remounts it when the row's numbers change (see urnUpKey).
+  const [now] = useState(() => new Date());
   const days = burnUpDays(chart, current, now);
   const t0 = Date.parse(days[0]?.at ?? chart.since);
   const span = Math.max(Date.parse(days.at(-1)?.at ?? chart.since) - t0, 1);
@@ -41,7 +42,7 @@ export function BurnUpChart({ chart, current, now }: BurnUpChartProps) {
   const x = (i: number) => (i === last ? W : Math.round(((Date.parse(days[i]?.at ?? "") - t0) / span) * W * 10) / 10);
   const y = (v: number) => Math.round((H - PAD - (v / top) * (H - 2 * PAD)) * 10) / 10;
   const first = dayLabel(chart.since);
-  const today = dayLabel(now);
+  const today = dayLabel(days.at(-1)?.at ?? chart.since);
   return (
     <section className="card-sec fp-burnup" aria-labelledby={head}>
       <h3 className="sh" id={head}>
@@ -49,16 +50,16 @@ export function BurnUpChart({ chart, current, now }: BurnUpChartProps) {
       </h3>
       <p className="fp-legend" aria-hidden="true">
         <span className="fp-key fp-key-scope">
-          {PROGRESS_COPY.scope} {current.total}
+          {PROGRESS_COPY.scope} {withUnit(current.total, chart.unit)}
         </span>
         <span className="fp-key fp-key-done">
-          {PROGRESS_COPY.done} {current.done}
+          {PROGRESS_COPY.done} {withUnit(current.done, chart.unit)}
         </span>
       </p>
       <svg
         className="fp-chart"
         role="img"
-        aria-label={burnUpText(current, chart.since)}
+        aria-label={burnUpText(current, chart)}
         viewBox={`0 0 ${W} ${H}`}
         preserveAspectRatio="none"
       >
@@ -92,3 +93,7 @@ export function BurnUpChart({ chart, current, now }: BurnUpChartProps) {
     </section>
   );
 }
+
+/** What the chart is drawn from: its host keys it by this, so a change to the row redraws it to the clock of that moment. */
+export const burnUpKey = (chart: BurnUp, current: Count): string =>
+  JSON.stringify([chart, current.done, current.total]);

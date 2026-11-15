@@ -47,7 +47,9 @@ test("The burn-up starts when the feature goes in progress and follows card chan
     await page.getByRole("button", { name: "Feature progress", exact: true }).click();
     await expect(progress).toBeVisible();
     await expect(progress.getByRole("region", { name: "Burn-up chart" })).toBeVisible();
-    await expect(progress.getByRole("img", { name: /^Scope 2 · Done 0, since \w{3} \d{1,2}$/ })).toBeVisible();
+    await expect(
+      progress.getByRole("img", { name: /^Scope 2 stories · Done 0 stories, since \w{3} \d{1,2}$/ }),
+    ).toBeVisible();
     await expect(progress).not.toContainText("The chart starts when the feature goes in progress.");
 
     // AC4: in a checkout of the feature's branch, a story moves to Done and a story is added, and nothing is committed.
@@ -65,7 +67,7 @@ test("The burn-up starts when the feature goes in progress and follows card chan
       at,
     );
     await mkdir(join(side, ".featra", "cards"), { recursive: true });
-    const chart = progress.getByRole("img", { name: /^Scope 3 · Done 1, since / });
+    const chart = progress.getByRole("img", { name: /^Scope 3 stories · Done 1 story, since / });
     // The server watches the new checkout once it has seen it; writing again covers an edit made before that.
     await expect(async () => {
       await writeFile(join(side, first), serializeCard(done), "utf8");

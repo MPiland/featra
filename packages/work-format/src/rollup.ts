@@ -186,10 +186,16 @@ export function scopeSummary(featureId: string, cards: readonly Card[], config: 
  * then (`tasksAt`) and a done item counts them all. Ticks aren't in the history, so a ticked task of an open item counts
  * only in the feature row's own count, the chart's last point (burn-up.ts). No forecast (ADR 0005).
  * It starts at the scope baseline (ADR 0038), so its scope line and "+N added" agree, and is empty before the feature
- * goes in progress. A point is emitted whenever scope or done changes.
+ * goes in progress. A point is emitted whenever scope or done changes. The last point is the cards' current state: a
+ * status or parent edited by hand, with no history event, counts from the last recorded change, as the baseline does.
+ * The caller may pass the baseline it already has.
  */
-export function burnUp(featureId: string, cards: readonly Card[], config: ProjectConfig): BurnUpPoint[] {
-  const baseline = scopeBaseline(featureId, cards);
+export function burnUp(
+  featureId: string,
+  cards: readonly Card[],
+  config: ProjectConfig,
+  baseline: string | null = scopeBaseline(featureId, cards),
+): BurnUpPoint[] {
   const relevant = everUnder(featureId, cards);
   if (baseline === null || !relevant.length) return [];
   const start = ms(baseline);
@@ -202,7 +208,12 @@ export function burnUp(featureId: string, cards: readonly Card[], config: Projec
     if (tasks) for (const t of taskEditTimes(c)) times.add(t);
   }
   const points: BurnUpPoint[] = [];
-  for (const t of [...times].filter((x) => x >= start).toSorted((a, b) => a - b)) {
+  const step = (t: number, scope: number, done: number) => {
+    const last = points.at(-1);
+    if (!last || last.scope !== scope || last.done !== done) points.push({ at: iso(t), scope, done });
+  };
+  const sorted = [...times].filter((x) => x >= start).toSorted((a, b) => a - b);
+  for (const t of sorted) {
     let scope = 0;
     let done = 0;
     for (const c of relevant) {
@@ -211,8 +222,23 @@ export function burnUp(featureId: string, cards: readonly Card[], config: Projec
       scope += weight;
       if (isDone(statusAt(c, t), config)) done += weight;
     }
-    const last = points.at(-1);
-    if (!last || last.scope !== scope || last.done !== done) points.push({ at: iso(t), scope, done });
+    step(t, scope, done);
+  }
+  // The cards as they are now, counted as `featureProgress` counts them (ticks of open items aside: they aren't in the
+  // history). They differ from the replay only after an edit made by hand, placed at the last recorded change.
+  const now = itemsOf(featureId, cards).reduce(
+    (sum, c) => {
+      const weight = tasks ? c.tasks.length : 1;
+      return { scope: sum.scope + weight, done: sum.done + (isDone(c.status, config) ? weight : 0) };
+    },
+    { scope: 0, done: 0 },
+  );
+  const lastAt = sorted.at(-1) ?? start;
+  if (points.at(-1)?.at === iso(lastAt)) points.pop();
+  const before = points.at(-1);
+  if (!before || before.scope !== now.scope || before.done !== now.done) {
+    // Re-add the last replayed step with the current numbers, or keep the previous one when they are the same.
+    points.push({ at: iso(lastAt), ...now });
   }
   return points;
 }

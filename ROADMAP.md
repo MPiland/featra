@@ -96,6 +96,9 @@ epics in `.featra/cards/`.
 - One "leads a feature" rule in work-format, used by the server (`leadOf`, card reports) and the client (`featuresLedBy`).
 - A feature picker in the chat header when a chat leads more than one feature.
 
+- A done or cancelled feature's burn-up ends at the moment it finished instead of running flat to now.
+- The burn-up's screen-reader table summarises by week for long features.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".
