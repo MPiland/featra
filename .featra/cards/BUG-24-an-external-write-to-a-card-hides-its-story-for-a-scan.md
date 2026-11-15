@@ -2,7 +2,7 @@
 id: BUG-24
 type: bug
 title: An external write to a card hides its story for a scan
-status: New
+status: In Progress
 parent: null
 order: 0
 origin: bug
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/bug-24-25-scan-resilience
 pr: null
 created: 2026-11-15T20:00:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: dev-lead
+  - at: 2026-11-15T21:00:00Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:bug-24-25
 ---
 
 ## Description
@@ -35,10 +40,10 @@ story checks clear the check state shown on the card and start a needless run (`
 
 ## Acceptance criteria
 
-- [ ] An empty or unparseable owner copy is never treated as deleted; the story stays shown, with the read problem listed
-- [ ] The watch rescans once after it settles before telling observers about an unreadable or zero-length card, so a transient one is never published
-- [ ] Story checks keep their state and don't rerun when a card is briefly unreadable
-- [ ] Applying a stale copy writes the owner card atomically, through the card lane
+- [x] An empty or unparseable owner copy is never treated as deleted; the story stays shown, with the read problem listed (test: packages/server/test/work-scan-unread.test.ts::an owner copy that can't be read (BUG-24 AC1) > is never taken as deleted when the file is empty: the feature branch's copy shows)
+- [x] The watch rescans once after it settles before telling observers about an unreadable or zero-length card, so a transient one is never published (test: packages/server/test/work-watch-settle.test.ts::a card a writer has just emptied (BUG-24 AC2) > is never published when the write finishes before the rescan)
+- [x] Story checks keep their state and don't rerun when a card is briefly unreadable (test: packages/server/test/story-checks-run.test.ts::what a failing run leaves behind > keeps a story's checks, and does not run them again, while its card is briefly unreadable (BUG-24 AC3))
+- [x] Applying a stale copy writes the owner card atomically, through the card lane (test: packages/server/test/copy-actions.test.ts::apply, as a card write (BUG-24 AC4) > waits for the card lane before it reads or writes anything)
 
 ## Tasks
 

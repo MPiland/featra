@@ -14,7 +14,7 @@ import {
   type WorkList,
 } from "@featra/work-format";
 import { indexFile, openCardIndex, type CardIndex } from "./card-index.ts";
-import { collect, locationKey, type Collected, type GitState } from "./collect.ts";
+import { collect, locationKey, unreadableIn, type Collected, type GitState } from "./collect.ts";
 import type { RepoGit } from "./repo-git.ts";
 
 export interface Scan {
@@ -62,7 +62,8 @@ export function createScanner(git: RepoGit): Scanner {
   /** The copies resolved, leaving out the cards their owner deleted. */
   const resolve = async (collected: Collected): Promise<Resolution> => {
     const first = resolveCopies(collected.copies, collected.state);
-    const lost = orphans(first);
+    // An owner whose file can't be read is mid-write or broken, never deleted: the card stays shown (BUG-24).
+    const lost = orphans(first).filter((o) => !unreadableIn(collected.copies, o.owner, o.card.id));
     if (!lost.length) return first;
     const seen = deletions.get(collected.git) ?? new Map<string, boolean>();
     deletions.set(collected.git, seen);

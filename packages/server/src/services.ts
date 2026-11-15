@@ -103,9 +103,9 @@ export function createServices({
 } {
   const scanner = createScanner(repoGit);
   const watches = createWorkWatches(scanner, log);
-  const copies = createCopyActions({ git: repoGit, scan: watches.scan, now });
   // One lane for every card write: a draft that allocates IDs and a card edit never interleave (ADR 0002).
   const lane = createCardLane();
+  const copies = createCopyActions({ git: repoGit, scan: watches.scan, now, lane });
   const cards = createCardActions({
     scan: watches.scan,
     now,

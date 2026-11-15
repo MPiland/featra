@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs";
+import { rename, writeFile } from "node:fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { parseCard } from "@featra/work-format";
+import { createCardLane } from "../src/card-lane.ts";
 import { createCopyActions } from "../src/copy-actions.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
@@ -112,5 +114,48 @@ describe("discard", () => {
     expect(await actions.discard(repo.main, `main|${cardPath("STORY-9")}`)).toEqual({ ok: true });
     expect(existsSync(repo.file(repo.main, "STORY-9"))).toBe(false);
     expect(status()).toBe("");
+  });
+});
+
+describe("apply, as a card write (BUG-24 AC4)", () => {
+  it("waits for the card lane before it reads or writes anything", async () => {
+    const lane = createCardLane();
+    let scans = 0;
+    const laned = createCopyActions({ git, scan: (dir) => (scans++, scanner.scan(dir)), now: () => NOW, lane });
+    await repo.write(repo.main, { ...base, title: "Better title" });
+    let release!: () => void;
+    const held = lane.exclusive(() => new Promise<void>((r) => (release = r)));
+    const applied = laned.apply(repo.main, KEY);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(scans).toBe(0);
+    release();
+    await held;
+    expect(await applied).toEqual({ ok: true });
+    expect(parseCard(await repo.read(tree, "STORY-1")).title).toBe("Better title");
+  });
+
+  it("writes the owner's file atomically, through a temporary file renamed into place", async () => {
+    const moves: [string, string][] = [];
+    const watched = createCopyActions({
+      git,
+      scan: scanner.scan,
+      now: () => NOW,
+      io: { rename: (from, to) => (moves.push([String(from), String(to)]), rename(from, to)) },
+    });
+    await repo.write(repo.main, { ...base, title: "Better title" });
+    expect(await watched.apply(repo.main, KEY)).toEqual({ ok: true });
+    expect(moves).toEqual([[expect.stringMatching(/\.featra-tmp$/), repo.file(tree, "STORY-1")]]);
+  });
+
+  it("refuses while the owner's file can't be read, and touches neither file", async () => {
+    await writeFile(repo.file(tree, "STORY-1"), "");
+    await repo.write(repo.main, { ...base, title: "edited" });
+    const copyBefore = await repo.read(repo.main, "STORY-1");
+    expect(await actions.apply(repo.main, KEY)).toEqual({
+      ok: false,
+      error: "The owner's copy can't be read. Fix it first.",
+    });
+    expect(await repo.read(tree, "STORY-1")).toBe("");
+    expect(await repo.read(repo.main, "STORY-1")).toBe(copyBefore);
   });
 });

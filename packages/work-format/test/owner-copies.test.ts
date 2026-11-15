@@ -64,6 +64,17 @@ describe("resolveCopies: one owner per card", () => {
     expect(r.problems).toEqual([expect.stringContaining("STORY-1 isn't in its owner")]);
   });
 
+  it("when the owner's file can't be read, shows the copy nearest the work and says why (BUG-24)", () => {
+    const unread: CardCopy = { ...copy(WT, s1), text: "", card: null, error: "no frontmatter" };
+    const onBranch = moves(s1, [5, "In Progress"]);
+    const r = resolveCopies([copy(MAIN, s1), copy(FB, onBranch), copy(FB, f1), unread], active);
+    expect(r.cards.find((c) => c.card.id === "STORY-1")).toMatchObject({ card: onBranch, owner: WT, shownFrom: FB });
+    expect(r.problems).toEqual([
+      "Can't read .featra/cards/STORY-1-x.md in worktree claude/story-1: no frontmatter",
+      "STORY-1 can't be read in its owner (worktree claude/story-1); showing feature branch feature/1.",
+    ]);
+  });
+
   it("finds the cards shown from a copy that isn't their owner's", () => {
     const r = resolveCopies([copy(MAIN, s1), copy(MAIN, f1), copy(FB, f1)], active);
     expect(orphans(r).map((c) => c.card.id)).toEqual(["STORY-1"]);

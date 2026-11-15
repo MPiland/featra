@@ -93,13 +93,16 @@ export function resolveCopies(
 ): Resolution {
   const problems: string[] = [];
   const byId = new Map<string, Parsed[]>();
+  /** The copies that can't be read, by the card ID their file name gives. */
+  const unread = new Map<string, OwnerLocation[]>();
   const ordered = copies.toSorted((a, b) => rank(a.location) - rank(b.location) || a.path.localeCompare(b.path));
   for (const c of ordered) {
+    const fileId = idFromFileName(c.path.split("/").at(-1) ?? "");
     if (!c.card) {
       if (c.workingTree) problems.push(`Can't read ${c.path} in ${locationLabel(c.location)}: ${c.error ?? ""}`);
+      if (fileId) unread.set(fileId, [...(unread.get(fileId) ?? []), c.location]);
       continue;
     }
-    const fileId = idFromFileName(c.path.split("/").at(-1) ?? "");
     if (fileId && fileId !== c.card.id && c.workingTree) {
       problems.push(`${c.path} in ${locationLabel(c.location)} holds ${c.card.id}.`);
     }
@@ -125,8 +128,11 @@ export function resolveCopies(
     const own = group.find((c) => sameLocation(c.location, owner));
     const shown = own ?? group[0];
     if (!shown) continue;
-    if (!own)
-      problems.push(`${id} isn't in its owner (${locationLabel(owner)}); showing ${locationLabel(shown.location)}.`);
+    if (!own) {
+      // An owner whose file can't be read is likely mid-write (BUG-24): the card shows from the copy nearest the work.
+      const why = unread.get(id)?.some((l) => sameLocation(l, owner)) ? "can't be read in" : "isn't in";
+      problems.push(`${id} ${why} its owner (${locationLabel(owner)}); showing ${locationLabel(shown.location)}.`);
+    }
     cards.push({ card: shown.card, owner, shownFrom: shown.location, path: shown.path });
     for (const c of group) {
       if (c === own || !c.workingTree || !c.edited) continue;

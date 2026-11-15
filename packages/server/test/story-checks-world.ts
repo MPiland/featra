@@ -16,6 +16,7 @@ import { createStoryChecks, type StoryChecks } from "../src/story-checks.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { createWorkWatches, type WorkWatches } from "../src/work-watch.ts";
 import { card, cardRepo, moved, type CardRepo } from "./card-repo.ts";
+import { stagedScanner } from "./staged-scanner.ts";
 import { until } from "./until.ts";
 
 const CHECK = `const fs = require("fs");
@@ -78,6 +79,8 @@ export interface World {
   lines: (name: string) => Promise<string[]>;
   inTree: (name: string) => string;
   state: () => CardChecks | undefined;
+  /** The scanner under the watches, which can stage a write at the moment a scan reads a card unparseable (BUG-24). */
+  staged: ReturnType<typeof stagedScanner>;
 }
 
 export const clock = new Date("2026-11-12T10:00:00Z");
@@ -163,7 +166,8 @@ export function checksWorld(): World {
     w.repo.commit(w.repo.main, "plan");
     allowed = createAllowedProjects();
     scanner = createScanner(createRepoGit());
-    w.watches = createWorkWatches(scanner, () => {});
+    w.staged = stagedScanner(scanner);
+    w.watches = createWorkWatches(w.staged.scanner, () => {});
   });
   afterEach(async () => {
     w.checks?.close();

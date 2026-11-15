@@ -2,11 +2,13 @@
  * Keeps each watched project's Work list current (ADR 0016). File-system watches on every working tree's `.featra`
  * and on git's refs and worktree list trigger a rescan, debounced and one at a time; listeners hear only lists that
  * changed. A rescan reuses what git said last time unless a git target fired, so a card edit runs no git. Watches are
- * shared per folder and end when the last listener stops.
+ * shared per folder and end when the last listener stops. A scan that fails, or reads a card a writer has just emptied,
+ * is tried once more when that settles; one that fails again keeps the last good list, with the problem (BUG-24, BUG-25).
  */
 import { watch, type FSWatcher } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
-import { EMPTY_WORK_LIST, errorMessage, FEATRA_DIR, type WorkList } from "@featra/work-format";
+import { setTimeout as pause } from "node:timers/promises";
+import { copyKey, EMPTY_WORK_LIST, errorMessage, FEATRA_DIR, type WorkList } from "@featra/work-format";
 import type { Scan, Scanner } from "./work-scan.ts";
 
 export type WorkListener = (list: WorkList) => void;
@@ -47,11 +49,35 @@ interface Target {
 /** Hears every scan; it decides itself whether anything it cares about changed. */
 type ScanListener = (scan: Scan | null, list: WorkList) => void;
 
+/** What one scan of a watch gave: on a failure, the last good scan and its list with the problem. */
+interface Outcome {
+  scan: Scan | null;
+  list: WorkList;
+  failed: boolean;
+}
+
+/** The working-tree cards `scan` couldn't read or parse, each with what it read. */
+const unreadable = (scan: Scan | null) =>
+  new Set(
+    scan?.collected.copies
+      .filter((c) => c.workingTree && !c.card)
+      .map((c) => `${copyKey(c.location, c.path)}\0${c.text}`),
+  );
+
+/**
+ * Whether `scan` read a working-tree card it couldn't read or parse that `before` read fine, as when a writer has
+ * emptied it to write the new text (BUG-24). A card broken the same way as before is settled: it is a problem.
+ */
+const unsettled = (scan: Scan | null, before: Scan | null) => {
+  const was = unreadable(before);
+  return [...unreadable(scan)].some((c) => !was.has(c));
+};
+
 interface Entry {
   dir: string;
   listeners: Set<ScanListener>;
   watchers: Map<string, FSWatcher>;
-  queue: Promise<{ scan: Scan | null; list: WorkList }>;
+  queue: Promise<Outcome>;
   timer: ReturnType<typeof setTimeout> | undefined;
   closed: boolean;
   /** The last scan, whose git state the next rescan reuses unless `gitChanged`. */
@@ -134,28 +160,40 @@ export function createWorkWatches(
     return started;
   };
 
-  const scanOnce = async (e: Entry): Promise<{ scan: Scan | null; list: WorkList }> => {
-    // A scan queued before the watch ended would start after the scanner closed and reopen its index (BUG-6).
-    if (e.closed) return { scan: e.last, list: e.last?.list ?? EMPTY_WORK_LIST };
-    let list: WorkList;
-    let scan: Scan | null = null;
+  /** One scan. One that fails keeps the last good scan and list, with the problem added (BUG-25). */
+  const attempt = async (e: Entry): Promise<Outcome> => {
     // Taken before the scan: a git event while it runs marks the next one.
     const reuse = e.gitChanged ? undefined : e.last?.collected.git;
     e.gitChanged = false;
     try {
-      scan = await scanner.scan(e.dir, reuse);
-      list = scan?.list ?? EMPTY_WORK_LIST;
+      const scan = await scanner.scan(e.dir, reuse);
+      e.last = scan;
+      return { scan, list: scan?.list ?? EMPTY_WORK_LIST, failed: false };
     } catch (err) {
       e.gitChanged = true;
       log(`work scan failed: ${errorMessage(err)}`);
-      list = { ...EMPTY_WORK_LIST, problems: [`Can't read the cards: ${errorMessage(err)}`] };
+      const kept = e.last?.list ?? EMPTY_WORK_LIST;
+      const list = { ...kept, problems: [...kept.problems, `Can't read the cards: ${errorMessage(err)}`] };
+      return { scan: e.last, list, failed: true };
     }
-    e.last = scan;
-    if (e.closed) return { scan, list };
+  };
+
+  const scanOnce = async (e: Entry): Promise<Outcome> => {
+    // A scan queued before the watch ended would start after the scanner closed and reopen its index (BUG-6).
+    if (e.closed) return { scan: e.last, list: e.last?.list ?? EMPTY_WORK_LIST, failed: false };
+    const before = e.last;
+    let out = await attempt(e);
+    // A scan that failed, or read a card a writer outside Featra had emptied, is likely caught mid-change (a merge
+    // rewriting git's config, an editor saving): it is looked at once more when that settles, before anyone hears it.
+    if ((out.failed || unsettled(out.scan, before)) && !e.closed) {
+      await pause(SETTLE_MS);
+      if (!e.closed) out = await attempt(e);
+    }
+    if (e.closed) return out;
     // An edit between the scan's read and a new watcher starting was heard by nobody: look once more (BUG-12).
-    if (rewatch(e, targetsOf(e.dir, scan))) trigger(e);
-    for (const listener of e.listeners) listener(scan, list);
-    return { scan, list };
+    if (rewatch(e, targetsOf(e.dir, e.last))) trigger(e);
+    for (const listener of e.listeners) listener(out.scan, out.list);
+    return out;
   };
 
   const run = (e: Entry) => {
@@ -187,7 +225,7 @@ export function createWorkWatches(
         dir,
         listeners: new Set(),
         watchers: new Map(),
-        queue: Promise.resolve({ scan: null, list: EMPTY_WORK_LIST }),
+        queue: Promise.resolve({ scan: null, list: EMPTY_WORK_LIST, failed: false }),
         timer: undefined,
         closed: false,
         last: null,
@@ -230,7 +268,10 @@ export function createWorkWatches(
     observe,
     async scan(dir) {
       const e = entries.get(dir);
-      return e ? (await run(e)).scan : scanner.scan(dir);
+      if (!e) return scanner.scan(dir);
+      // An action needs the cards as they are now: the last good scan kept for display won't do.
+      const out = await run(e);
+      return out.failed ? null : out.scan;
     },
     close() {
       for (const e of entries.values()) end(e);
