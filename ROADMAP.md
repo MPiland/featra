@@ -98,6 +98,10 @@ epics in `.featra/cards/`.
 
 - A done or cancelled feature's burn-up ends at the moment it finished instead of running flat to now.
 - The burn-up's screen-reader table summarises by week for long features.
+- Remove a project's remembered board layout when the project is removed from the app.
+- Remember the board's feature filter per project.
+- Show the stale-copy mark on board cards, as list rows do.
+- Optional WIP limits or age per board column.
 
 ## Before public release
 

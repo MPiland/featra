@@ -227,5 +227,7 @@ export function buildWorkList(
     owner: locationLabel(s.owner),
     path: s.path,
   }));
-  return { epics: rows, stale, problems: resolution.problems, ...(bugs.length ? { bugs } : {}) };
+  // The stage board's columns (STORY-17): the project's stages, in its order.
+  const stages = config.stages.map((s) => ({ name: s.name, tone: stageTone(s.name, config) }));
+  return { epics: rows, stale, problems: resolution.problems, ...(bugs.length ? { bugs } : {}), stages };
 }

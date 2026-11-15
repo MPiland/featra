@@ -24,6 +24,7 @@ import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./pr
 import { noWork, type WorkBridge } from "./work-list.ts";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
 import { normalizePaneWidth } from "./pane-width.ts";
+import { normalizeBoardProjects } from "./work-layout.ts";
 import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
 import { DEFAULT_WINDOW_STATE, type WindowState } from "./window-state.ts";
 
@@ -45,6 +46,8 @@ export interface UiState {
   zoomFactor: number;
   /** The card pane width the user chose by its handle; null for the default (STORY-4, `pane-width.ts`). */
   cardPaneWidth: number | null;
+  /** The projects whose Work shows the stage board (STORY-17, `work-layout.ts`); left out while every one shows the list. */
+  boardProjects?: string[];
 }
 
 export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: DEFAULT_ZOOM, cardPaneWidth: null };
@@ -52,10 +55,12 @@ export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: 
 /** Reads stored state defensively: unknown or malformed fields fall back to defaults. */
 export function normalizeUiState(raw: unknown): UiState {
   const r = isRecord(raw) ? raw : {};
+  const boardProjects = normalizeBoardProjects(r.boardProjects);
   return {
     sidebarCollapsed: typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
     zoomFactor: normalizeZoom(r.zoomFactor),
     cardPaneWidth: normalizePaneWidth(r.cardPaneWidth),
+    ...(boardProjects.length ? { boardProjects } : {}),
   };
 }
 

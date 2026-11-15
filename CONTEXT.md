@@ -50,6 +50,9 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   **Feature progress** in the header of a chat that leads the feature (its Dev Lead: the chat that drafted it, or that
   started one of its story sessions) and from the progress icon on the feature's row in Work. One pane is docked at a time:
   it and the card pane replace each other.
+- **Stage board** — Work's other layout: one column per stage, New through Done, each with its count, holding the
+  stories and bugs of all features or of one. Read-only: a card opens its card pane, and its stage changes only through
+  agents, merges and the card pane. List or Board is remembered per project, for the user only.
 - **Evidence state** — what is actually known about a story:
   - **Reported** — an agent said so (ticked a task, moved a stage).
   - **Verified** — the PR's CI checks passed.
