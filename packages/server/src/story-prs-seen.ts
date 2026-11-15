@@ -1,6 +1,6 @@
 /**
  * What story PRs (STORY-11) follow of a project between scans: each story's review state, PR and owner, and the
- * project's PR settings. A move into review is told from the scan before.
+ * project's PR settings. A move into review is judged against the last scan that had the story (BUG-23).
  */
 import { checksApply, type Card } from "@featra/work-format";
 import type { Scan } from "./work-scan.ts";

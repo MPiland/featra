@@ -70,6 +70,23 @@ describe("a story moving into review (AC2)", { timeout: 60_000 }, () => {
     expect(prOf()).toMatchObject({ status: { state: "open" }, create: false, opening: false, note: null });
   });
 
+  it("opens it when a scan caught the card mid-write on its way into review (BUG-23)", async () => {
+    await w.start();
+    await w.moveCaughtMidWrite("In Review");
+    expect((await w.read()).pr).toBe("https://github.com/acme/app/pull/1");
+    expect(w.remoteBranches()).toEqual(expect.arrayContaining([FEATURE_BRANCH, STORY_BRANCH]));
+  });
+
+  it("pushes again when a scan caught the card mid-write on its way back into review (BUG-23)", async () => {
+    await w.start();
+    await w.moveOn("In Review");
+    await w.moveOn("In Progress");
+    w.repo.commit(w.tree, "B");
+    await w.moveCaughtMidWrite("In Review");
+    const tip = w.repo.git(w.tree, "rev-parse", "HEAD").trim();
+    expect(w.repo.git(w.remote, "rev-parse", STORY_BRANCH).trim()).toBe(tip);
+  });
+
   it("adopts the open PR from the story's branch instead of opening another", async () => {
     const url = "https://github.com/acme/app/pull/14";
     await w.start({
