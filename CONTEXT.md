@@ -39,9 +39,20 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 
 - **Stage** — a story's position in the project's workflow (default: New, Ready, In Progress, In Review, Acceptance,
   Done). Each stage maps to a **stage category**: not started, active, done.
-- **Scope baseline** — set when the feature is approved: the time and the stories live then (a feature without one falls back to the moment its first story goes In Progress). Stories not in the stored list are **added scope**.
+- **Scope baseline** — the moment the feature goes in progress (Start feature), read from its history; never stored
+  (ADR 0038). Items that join the feature after it are **added scope**; stories added before it are planned.
 - **Origin** — why a card exists: `planned`, `added` (after the baseline) or `bug`.
-- **Burn-up** — chart of a feature's total scope and done count over time. Featra does not forecast.
+- **Burn-up** — chart of a feature's total scope and done count over time, in its feature progress pane: from the
+  scope baseline, one point per local day and a last point for now, counting stories (bugs as added scope) or tasks, as
+  the progress setting says. Uncommitted changes count. Featra does not forecast (ADR 0039).
+- **Feature progress pane** — one feature's progress docked on the right, from its row of the live Work list: counts
+  and bar, added scope, open bugs, its branch, and each story's stage, criteria, tasks and PR. It opens from
+  **Feature progress** in the header of a chat that leads the feature (its Dev Lead: the chat that drafted it, or that
+  started one of its story sessions) and from the progress icon on the feature's row in Work. One pane is docked at a time:
+  it and the card pane replace each other.
+- **Stage board** — Work's other layout: one column per stage, New through Done, each with its count, holding the
+  stories and bugs of all features or of one. Read-only: a card opens its card pane, and its stage changes only through
+  agents, merges and the card pane. List or Board is remembered per project, for the user only.
 - **Evidence state** — what is actually known about a story:
   - **Reported** — an agent said so (ticked a task, moved a stage).
   - **Verified** — the PR's CI checks passed.

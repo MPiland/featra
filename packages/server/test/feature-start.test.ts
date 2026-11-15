@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { featureBranchName, parseCard } from "@featra/work-format";
+import { featureBranchName, parseCard, scopeBaseline } from "@featra/work-format";
 import { cardViewIn } from "../src/card-actions.ts";
 import { gitEnv } from "../src/git-run.ts";
 import { lines } from "./draft-review-fixture.ts";
@@ -47,7 +47,9 @@ describe("AC1: Start creates the feature's branch and the feature is active on i
       to: "active",
       by: "user",
     });
-    expect(started.extra["baseline"]).toBeDefined();
+    // The baseline is this status event (ADR 0038); Start stores no snapshot.
+    expect(started.extra["baseline"]).toBeUndefined();
+    expect(scopeBaseline(feature, [started])).toBe("2026-11-10T09:30:00Z");
     expect(git("rev-parse", "main")).toBe(base);
   });
 

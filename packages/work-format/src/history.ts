@@ -1,4 +1,5 @@
 import type { Card, HistoryEvent, HistoryField } from "./types.ts";
+import { isRecord } from "./utils/guards.ts";
 
 /** ISO-8601 UTC to the second, the format used in card files. */
 export function toIso(date: Date): string {
@@ -94,4 +95,34 @@ export function statusAt(card: Card, t: number): string | null {
 
 export function parentAt(card: Card, t: number): string | null {
   return valueAt(card, "parent", t);
+}
+
+/** The task list a `content` event's `from` records as the one before the edit, or null when it records none. */
+function tasksBefore(from: string | null): number | null {
+  if (!from) return null;
+  try {
+    const old: unknown = JSON.parse(from);
+    return isRecord(old) && Array.isArray(old.tasks) ? old.tasks.length : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How many tasks the card had at time `t`, replayed from its `content` events: each edit to the tasks records the list
+ * it replaced, so the count before the first such edit after `t` is that list's. With none after `t`, the current count.
+ * Ticks are not recorded, so only the number of tasks is replayed, never which were done.
+ */
+export function tasksAt(card: Card, t: number): number {
+  for (const e of card.history) {
+    if (e.field !== "content" || ms(e.at) <= t) continue;
+    const before = tasksBefore(e.from);
+    if (before !== null) return before;
+  }
+  return card.tasks.length;
+}
+
+/** When the card's task list changed, from its `content` events, in milliseconds. */
+export function taskEditTimes(card: Card): number[] {
+  return card.history.filter((e) => e.field === "content" && tasksBefore(e.from) !== null).map((e) => ms(e.at));
 }

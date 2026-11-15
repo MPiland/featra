@@ -7,7 +7,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { baselineOf, parseCard } from "@featra/work-format";
+import { LEGACY_BASELINE, parseCard } from "@featra/work-format";
 import { createCardActions } from "../src/card-actions.ts";
 import { gitEnv } from "../src/git-run.ts";
 import { clock, input, lines, draftFixture } from "./draft-review-fixture.ts";
@@ -15,7 +15,7 @@ import { clock, input, lines, draftFixture } from "./draft-review-fixture.ts";
 const f = draftFixture();
 
 describe("approving a draft", () => {
-  it("marks the feature approved, sets its baseline, and commits its cards to main with the message", async () => {
+  it("marks the feature approved, sets no baseline (ADR 0038), and commits its cards to main with the message", async () => {
     const feature = await f.draft();
     const before = f.commitCount();
     const result = await f.review.approve(f.repo.main, feature);
@@ -28,7 +28,7 @@ describe("approving a draft", () => {
       to: "approved",
       by: "user",
     });
-    expect(baselineOf(approved)?.stories).toHaveLength(2);
+    expect(approved.extra[LEGACY_BASELINE]).toBeUndefined();
     expect(f.commitCount()).toBe(before + 1);
     expect(f.repo.git(f.repo.main, "log", "-1", "--format=%s")).toBe(`${feature}: approved Shaping`);
     expect(result.commit).toBe(f.repo.git(f.repo.main, "rev-parse", "--short", "HEAD"));
@@ -65,7 +65,8 @@ describe("approving a draft", () => {
     ).toBe(false);
     expect((await f.files()).some((n) => n.startsWith(`${two}-`))).toBe(false);
     expect(f.inCommit().some((p) => p.includes(`${two}-`))).toBe(false);
-    expect(baselineOf(await f.read(feature))?.stories).toEqual([one]);
+    expect((await f.read(one)).status).toBe("New");
+    expect((await f.read(feature)).extra[LEGACY_BASELINE]).toBeUndefined();
     expect(f.status()).toEqual([]);
   });
 

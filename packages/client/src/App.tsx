@@ -33,6 +33,7 @@ import { useAppNav } from "./use-app-nav.ts";
 import { firstSettingsPage, type SettingsPage } from "./settings-pages.ts";
 import { applyTheme } from "./theme.ts";
 import { viewDef } from "./views.ts";
+import { sameBoardProjects, withWorkLayout, workLayoutOf, type WorkLayout } from "./work-layout.ts";
 import { DEFAULT_ZOOM, zoomIn, zoomOut } from "./zoom.ts";
 
 export interface AppProps {
@@ -45,7 +46,10 @@ export interface AppProps {
 type OpenDialog = "about" | "resetAppData" | "newChat" | null;
 
 const sameUiState = (a: UiState, b: UiState) =>
-  a.sidebarCollapsed === b.sidebarCollapsed && a.zoomFactor === b.zoomFactor && a.cardPaneWidth === b.cardPaneWidth;
+  a.sidebarCollapsed === b.sidebarCollapsed &&
+  a.zoomFactor === b.zoomFactor &&
+  a.cardPaneWidth === b.cardPaneWidth &&
+  sameBoardProjects(a, b);
 
 export function App({ bridge, initialUiState, initialSettings, initialProjects }: AppProps) {
   const [nav, setNav] = useState(() => initialNav());
@@ -71,6 +75,10 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   const { reviewChat, openChat, reviewDraft, reviewed, open, back, forward } = useAppNav(setNav);
   const setZoom = useCallback((f: (z: number) => number) => setUi((s) => ({ ...s, zoomFactor: f(s.zoomFactor) })), []);
   const setPaneWidth = useCallback((w: number) => setUi((s) => ({ ...s, cardPaneWidth: w })), []);
+  const setWorkLayout = useCallback(
+    (dir: string, layout: WorkLayout) => setUi((s) => withWorkLayout(s, dir, layout)),
+    [],
+  );
   const showKeyboardShortcuts = useCallback(() => {
     setSettingsPage("shortcuts");
     open("settings");
@@ -239,6 +247,8 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 chat={chat}
                 dir={projectDir ?? ""}
                 onStarted={startedChat}
+                chatList={chatList.chats}
+                onOpenChat={openChat}
               />
             ) : view.id === "settings" ? (
               <SettingsView
@@ -259,6 +269,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 actions={projectActions}
                 work={bridge.work}
                 paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
+                layout={{ of: (dir) => workLayoutOf(ui, dir), choose: setWorkLayout }}
                 onReviewDraft={reviewDraft}
                 hasChat={(id) => chatList.chats.some((c) => c.id === id)}
                 chats={chatList.chats}

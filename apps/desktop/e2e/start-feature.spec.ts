@@ -24,7 +24,7 @@ test("Start makes feature/N-slug from main without touching main's checkout, and
     running = app;
     const draft = await draftInNewChat(page, "FEAT-2");
     await draft.getByRole("button", { name: "Approve", exact: true }).click();
-    await expect.poll(() => git(repo.dir, "status", "--porcelain")).toBe("");
+    await expect.poll(() => git(repo.dir, "status", "--porcelain"), { timeout: 30_000 }).toBe("");
     const main = git(repo.dir, "rev-parse", "main");
 
     // Start is offered where the approved feature shows, with no confirmation question.

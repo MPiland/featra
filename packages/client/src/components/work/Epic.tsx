@@ -22,7 +22,12 @@ export function Epic({ epic }: { epic: EpicRow }) {
         </h2>
         {epic.id !== null && <span className="meta">{WORK_COPY.epic}</span>}
         <StaleMark id={epic.id} />
-        <Progress label={epic.progress.label} segments={epic.bar} total={epic.progress.total} />
+        <Progress
+          label={epic.progress.label}
+          segments={epic.bar}
+          total={epic.progress.total}
+          breakdown={epic.breakdown}
+        />
       </div>
       {open && (
         <div className="fl" role="table" aria-label={title}>

@@ -113,6 +113,14 @@
   white-space: nowrap;
 }
 
+/* The bar's actions and Close, kept together at its end. */
+.pane-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
 .card-close {
   flex: 0 0 auto;
   display: grid;

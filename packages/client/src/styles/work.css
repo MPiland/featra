@@ -212,6 +212,7 @@
 }
 
 .prog {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -220,6 +221,26 @@
 
 .prog .pl {
   white-space: nowrap;
+}
+
+/* A bar with a breakdown takes focus and shows it in a tooltip above it (STORY-15); the list clips what goes below. */
+.pbar[tabindex]:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.pbar-tip {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  background: var(--tip-bg);
+  color: var(--tip-tx);
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 5px;
+  white-space: nowrap;
+  z-index: 9;
+  pointer-events: none;
 }
 
 .pbar {

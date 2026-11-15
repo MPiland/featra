@@ -1,6 +1,6 @@
 # 0023 — Approving a draft commits its cards to main, all or nothing; rejecting deletes them
 
-Date: 2026-11-10 · Status: accepted
+Date: 2026-11-10 · Status: accepted; the scope baseline part is superseded by ADR 0038
 
 ## Context
 

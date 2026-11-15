@@ -3,6 +3,7 @@ import type { ChatSummary } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
 import type { ProjectRef } from "../../projects.ts";
 import {
+  BOARD_COPY,
   filterCounts,
   filterEpics,
   LIST_FILTERS,
@@ -10,29 +11,42 @@ import {
   type ListFilter,
   type WorkBridge,
 } from "../../work-list.ts";
+import type { WorkLayout } from "../../work-layout.ts";
+import { SegmentedControl } from "../controls/SegmentedControl.tsx";
 import { SelectedCard } from "./card-selection.tsx";
-import { CardPane } from "./CardPane.tsx";
-import { PaneHandle, type ChosenWidth } from "./PaneHandle.tsx";
+import type { ChosenWidth } from "./PaneHandle.tsx";
+import { SidePane, type Docked } from "./SidePane.tsx";
 import { Epic } from "./Epic.tsx";
 import { NewBug } from "./NewBug.tsx";
 import { ProjectBugs } from "./ProjectBugs.tsx";
 import { ReviewDraft } from "./review-draft.tsx";
+import { StageBoard } from "./StageBoard.tsx";
 import { StoryAgentsContext, type StoryAgents } from "./story-agents.tsx";
 import { useDockedPane } from "./useDockedPane.ts";
 import { StaleCopies } from "./StaleCopies.tsx";
 import { StaleCards } from "./stale-mark.tsx";
 import { useWorkList } from "./useWorkList.ts";
 
+const LAYOUTS = [
+  { value: "list", label: BOARD_COPY.list },
+  { value: "board", label: BOARD_COPY.board },
+] as const satisfies readonly { value: WorkLayout; label: string }[];
+
 /**
  * The project's epics, features and stories, each from its owner (ADR 0002), kept live by the server (ADR 0016).
  * Filter chips narrow the features; stale copies are flagged above the list. A story opens in the card pane, docked
- * beside the list (ADR 0017); closing it puts focus back on the story. The pane's width is the user's choice, fitted
- * to the work area so the list keeps its minimum (`pane-width.ts`).
+ * beside the list (ADR 0017); a feature's Progress opens its progress pane in the same place (STORY-24). Closing either
+ * puts focus back on the row it came from. The pane's width is the user's choice, fitted
+ * to the work area so the list keeps its minimum (`pane-width.ts`). The header's toggle shows the stage board instead
+ * of the list (STORY-17), remembered per project by the host.
  */
 export function WorkList(props: {
   work: WorkBridge;
   project: ProjectRef;
   paneWidth: ChosenWidth;
+  /** The list or the stage board (STORY-17), and the header toggle's choice. */
+  layout: WorkLayout;
+  onLayout: (layout: WorkLayout) => void;
   /** Opens the chat that drafted a feature, with the draft pane (STORY-49). */
   onReviewDraft: (chat: string) => void;
   /** Whether the project has that chat; Review draft falls back to this pane when its chat is gone. */
@@ -42,17 +56,25 @@ export function WorkList(props: {
   /** Opens a chat: a story row's link to its session (STORY-9). */
   onOpenChat?: (chat: string) => void;
 }) {
-  const { work, project, paneWidth, onReviewDraft, hasChat, chats = [], onOpenChat = () => {} } = props;
+  const {
+    work,
+    project,
+    paneWidth,
+    layout,
+    onLayout,
+    onReviewDraft,
+    hasChat,
+    chats = [],
+    onOpenChat = () => {},
+  } = props;
   const update = useWorkList(work, project.dir);
   const [filter, setFilter] = useState<ListFilter>("all");
-  const [selected, setSelected] = useState<string | null>(null);
-  // The card the open one was reached from (a draft's feature, then one of its stories), so the pane can go back.
-  const [from, setFrom] = useState<string | undefined>(undefined);
-  const select = useCallback((id: string | null, cameFrom?: string) => {
-    setSelected(id);
-    setFrom(cameFrom);
-  }, []);
+  // One pane on the right: a card (with the card it was reached from, so it can go back) or a feature's progress.
+  const [docked, setDocked] = useState<Docked | null>(null);
+  const select = useCallback((id: string) => setDocked({ kind: "card", id, focus: true }), []);
+  const openProgress = useCallback((feature: string) => setDocked({ kind: "progress", feature, focus: true }), []);
   const paneId = useId();
+  const layoutName = useId();
   const listRef = useRef<HTMLElement>(null);
   const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
   const reviewDraft = useCallback(
@@ -84,19 +106,32 @@ export function WorkList(props: {
       open: onOpenChat,
     };
   }, [update, chats, hasChat, work, project.dir, onOpenChat]);
-  const selection = useMemo(() => ({ selected, paneId, open: select }), [selected, paneId, select]);
-  const close = () => {
-    const id = selected;
-    setSelected(null);
-    const row = id && listRef.current?.querySelector<HTMLElement>(`[data-card="${id}"] .row-open`);
-    if (row) row.focus();
-  };
+  const selected = docked?.kind === "card" ? docked.id : null;
+  const progress = docked?.kind === "progress" ? docked.feature : null;
+  // Focus goes back to the row the pane was opened from: a story's (or its card on the board), or the feature's
+  // progress button.
+  const close = useCallback(() => {
+    setDocked(null);
+    if (!docked) return;
+    const root = listRef.current;
+    const feature = docked.kind === "progress" ? docked.feature : docked.progress;
+    const row =
+      (docked.kind === "card"
+        ? root?.querySelector<HTMLElement>(`[data-card="${docked.id}"] :is(.row-open, .bcard-open)`)
+        : null) ?? (feature ? root?.querySelector<HTMLElement>(`[data-card="${feature}"] .row-progress`) : null);
+    row?.focus();
+  }, [docked]);
+  const selection = useMemo(
+    () => ({ selected, paneId, open: select, progress, openProgress, close }),
+    [selected, paneId, select, progress, openProgress, close],
+  );
   const list = update?.list;
   const epics = list ? filterEpics(list.epics, filter) : [];
   const counts = filterCounts(list?.epics ?? []);
   let body;
   if (!list) body = <p className="meta">{WORK_COPY.loading}</p>;
   else if (!list.epics.length && !list.bugs?.length) body = <p className="meta">{WORK_COPY.empty}</p>;
+  else if (layout === "board") body = <StageBoard list={list} chats={chats} />;
   else {
     body = (
       <>
@@ -115,16 +150,14 @@ export function WorkList(props: {
         </div>
         {epics.length === 0 && <p className="meta">{WORK_COPY.noMatch}</p>}
         <StaleCards value={new Set(list.stale.map((s) => s.cardId))}>
-          <SelectedCard.Provider value={selection}>
-            <ReviewDraft.Provider value={reviewDraft}>
-              <StoryAgentsContext.Provider value={storyAgents}>
-                {epics.map((e) => (
-                  <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
-                ))}
-                <ProjectBugs bugs={list.bugs ?? []} />
-              </StoryAgentsContext.Provider>
-            </ReviewDraft.Provider>
-          </SelectedCard.Provider>
+          <ReviewDraft.Provider value={reviewDraft}>
+            <StoryAgentsContext.Provider value={storyAgents}>
+              {epics.map((e) => (
+                <Epic key={`${filter}|${e.id ?? "none"}`} epic={e} />
+              ))}
+              <ProjectBugs bugs={list.bugs ?? []} />
+            </StoryAgentsContext.Provider>
+          </ReviewDraft.Provider>
         </StaleCards>
       </>
     );
@@ -133,11 +166,22 @@ export function WorkList(props: {
     <div ref={splitRef} className="work-split">
       <section
         ref={listRef}
-        className="work-list"
+        className={layout === "board" ? "work-list on-board" : "work-list"}
         aria-label={WORK_COPY.region}
         data-view="work"
         data-project={project.dir}
       >
+        {list && (
+          <div className="work-head">
+            <SegmentedControl
+              name={layoutName}
+              label={BOARD_COPY.layout}
+              value={layout}
+              options={LAYOUTS}
+              onChange={onLayout}
+            />
+          </div>
+        )}
         {update?.error && (
           <p className="work-error" role="alert">
             {update.error}
@@ -161,22 +205,22 @@ export function WorkList(props: {
           />
         )}
         {list && <NewBug bugs={work} dir={project.dir} list={list} />}
-        {body}
+        <SelectedCard.Provider value={selection}>{body}</SelectedCard.Provider>
       </section>
-      {selected && (
+      {docked && (
         <StoryAgentsContext.Provider value={storyAgents}>
-          <PaneHandle width={width} split={split} paneId={paneId} onMove={onMove} onChoose={choose} onClose={close} />
-          <CardPane
-            key={selected}
+          <SidePane
+            docked={docked}
+            onDock={setDocked}
+            onClose={close}
             work={work}
             dir={project.dir}
-            id={selected}
+            layout={{ split, width, onMove, choose }}
             paneId={paneId}
-            width={width}
-            openedFrom={from}
+            list={list}
+            chats={chats}
+            onOpenChat={onOpenChat}
             hasChat={hasChat}
-            onOpen={(id) => select(id, id === from ? undefined : (selected ?? undefined))}
-            onClose={close}
           />
         </StoryAgentsContext.Provider>
       )}

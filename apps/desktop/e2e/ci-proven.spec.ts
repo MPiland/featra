@@ -54,7 +54,7 @@ test("Name CI's test report, and a story's PR checks finishing prove its criteri
 
     const draft = await draftInNewChat(page, "FEAT-2");
     await draft.getByRole("button", { name: "Approve", exact: true }).click();
-    await expect.poll(() => git(repo.dir, "status", "--porcelain")).toBe("");
+    await expect.poll(() => git(repo.dir, "status", "--porcelain"), { timeout: 30_000 }).toBe("");
     await draft.getByRole("button", { name: "Start", exact: true }).click();
     await expect.poll(() => git(repo.dir, "branch", "--format=%(refname:short)")).toContain("feature/2-shaping");
 

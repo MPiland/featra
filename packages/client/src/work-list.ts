@@ -66,7 +66,6 @@ export const WORK_COPY = {
   apply: "Apply to owner",
   discard: "Discard",
   problems: "Some cards can't be shown",
-  added: (n: number) => `+${n} added`,
   bugs: (n: number) => (n === 1 ? "1 open bug" : `${n} open bugs`),
   addedLater: "added",
   review: "Review",
@@ -89,6 +88,45 @@ export const WORK_COPY = {
   epic: "epic",
   bug: "Bug",
   showStories: (title: string) => `Show stories of ${title}`,
+} as const;
+
+/** The feature progress pane's words (STORY-24). */
+export const PROGRESS_COPY = {
+  open: "Feature progress",
+  rowOf: (id: string) => `Feature progress of ${id}`,
+  pane: (id: string) => `${id} progress`,
+  close: "Close feature progress",
+  card: "Card",
+  cardOf: (id: string) => `${id} card`,
+  added: "Added",
+  openBugs: "Open bugs",
+  branch: "Branch",
+  notStarted: "Not started",
+  merged: "Merged",
+  stories: "Stories",
+  noStories: "No stories yet.",
+  criteria: "Criteria",
+  tasks: "Tasks",
+  pr: "PR",
+  backTo: (id: string) => `Back to ${id} progress`,
+  gone: "This feature isn't in the project any more.",
+  burnUp: "Burn-up chart",
+  burnUpByDay: "Burn-up by day",
+  chartStarts: "The chart starts when the feature goes in progress.",
+  scope: "Scope",
+  done: "Done",
+  day: "Day",
+} as const;
+
+/** The List and Board toggle and the stage board's words (STORY-17). */
+export const BOARD_COPY = {
+  layout: "Layout",
+  list: "List",
+  board: "Board",
+  region: "Stage board",
+  features: "Filter by feature",
+  allFeatures: "All features",
+  feature: (id: string, title: string) => `${id} ${title}`,
 } as const;
 
 /** How a feature's status reads in the list. */

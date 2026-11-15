@@ -2108,3 +2108,250 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - **BUG-21** (PR refresh test counted reads before the first one) is fixed on main in PR #49; the test waits for both PR
   pollers to settle.
 - **Order:** STORY-15, STORY-24, STORY-16 (it needs the pane), STORY-17.
+
+## 2026-11-13 — STORY-15 build choices (story agent, for the Dev Lead to confirm)
+
+- **The baseline is derived from `history[]`, not stored** (ADR 0038): the first status event that moves the feature
+  into `active` or `done`. Start's existing approved → active event is the fact; Start writes nothing new. A feature
+  written as in progress by hand, with no such event, uses its `created` time.
+- **Approval no longer writes `baseline`.** Stored approval baselines are ignored, not migrated: the key stays in
+  `extra` and round-trips, nothing reads it. Migrating would mean writing to cards Featra doesn't own at that moment.
+  `baselineOf` and `Baseline` are removed; `LEGACY_BASELINE` names the key for tests.
+- **Added means joined strictly after the baseline.** Joining in the same instant as Start is planned scope.
+- **The burn-up starts at the baseline** and is empty for a feature that never went in progress or has no items.
+- **Wording.** A feature's bar: "done", "needs your Accept" (the wording Done refusals use), "in review", "in progress",
+  "not started", in bar order, cancelled left out. An epic's bar: the feature status labels in lower case, in bar
+  order (done, in progress, approved, draft). The Scope cell shows "+3 added: 2 stories · 1 bug", leaving out a kind
+  with none; the old "+N added" stays as the fallback when no breakdown is sent.
+- **Accessible pattern.** A bar with a breakdown is a focusable `role="img"` named by it (`aria-label`), and shows a
+  tooltip while hovered or focused; Escape hides it (WCAG 1.4.13). The tooltip is `aria-hidden` so a screen reader hears
+  the text once. A bar with nothing under it stays decorative. The tooltip sits above the bar because the list clips
+  below.
+- **Code layout.** Tones, bar slices and breakdowns moved from work-list.ts to a new work-tones.ts, to keep files near
+  300 lines.
+- **Superseded:** ADR 0023's stored baseline and its "first story In Progress" fallback; CONTEXT.md's Scope baseline.
+
+## 2026-11-13 — STORY-15 review fixes
+
+- **Old approval baseline in e2e.** `apps/desktop/e2e/approve-reject.spec.ts:45` expected the approved card to contain
+  `baseline:`; under AC2 it now expects it not to (`.not.toContain("baseline:")`). No other old-baseline leftovers in
+  apps/desktop/e2e.
+- **Bug: hand-started feature baseline.** A feature in progress with no recorded move into progress used its `created`
+  time, before approval, so planning-time stories counted as added. It now uses the later of `created` and its last
+  recorded status change. Regression test in rollup.test.ts, which failed first. ADR 0038 says so.
+- **Tooltip state.** Hovered and focused are tracked apart and either shows the tooltip; Escape dismisses it until the
+  next hover or focus. The tooltip only repeats the accessible name, so `pointer-events: none` is acceptable.
+- **Dead code removed:** the client's `WORK_COPY.added` and its fallback in the Scope cell, `ScopeSummary.addedLabel`,
+  and `originForNewItem` (no product callers).
+- **One wording:** `NEEDS_ACCEPT` ("needs your Accept") is exported from evidence.ts and used by the Done refusals and
+  the feature bar's breakdown.
+- **Assertions changed by STORY-15** (AC2's approved rule change, or removal of a removed function's checks):
+  - approve-reject.spec.ts:45: `toContain("baseline:")` became `.not.toContain("baseline:")`.
+  - rollup.test.ts: `addedLabel` "+4 added since start" removed; the `originForNewItem` "planned" check and the test
+    "new items are `added` after the baseline and bugs are always `bug`" removed.
+  - card-approval.test.ts: two `originForNewItem` checks ("planned", "added") and the `addedLabel` "+1 added since
+    start" check removed.
+  - The earlier STORY-15 changes, from the build: rollup.test.ts baseline tests, card-approval.test.ts baseline
+    blocks, draft-review-approve and draft-review-scope `baselineOf` checks, feature-start's `extra.baseline`, and new
+    fields in the work-list normalizer and server-watch fixtures.
+
+## 2026-11-13 — STORY-15 review rulings (dev-lead)
+
+- Build choices confirmed: the scope baseline is derived from `history[]` (the feature's first move into active or
+  done), never stored; approval no longer writes `baseline`; stored approval baselines are ignored and round-trip
+  untouched; "added" means joined strictly after the baseline. ADR 0038 confirmed.
+- The fallback for an active feature with no recorded move into progress is the later of `created` and its last
+  recorded status change (review fix, with a regression test).
+- Every changed assertion encodes the old approval or first-story baseline rule, or tested a function removed for
+  having no product caller. None is a weakening. Approved under the AC2 rule change.
+- The bar is a focusable `role="img"` with the breakdown as its name; the tooltip only repeats that name, so
+  `pointer-events: none` is acceptable.
+- Roadmap: the Scope cell's own tooltip listing added items; a baseline marker on the burn-up.
+
+## 2026-11-13 — STORY-24 build choices (story agent, for the Dev Lead to confirm)
+
+- **One pane on the right.** The progress pane and the card pane share one slot, handle and width (`SidePane`, over
+  `useDockedPane` and `PaneHandle`): opening either replaces the other, in Work and beside a chat. Two panes side by
+  side would squeeze the list or the chat below its minimum. A card opened from the progress pane carries "Back to
+  FEAT-N progress", so the pane is one click away again.
+- **Which chat leads a feature.** No new link: a chat leads a feature it drafted (`drafted-by`) or one whose story
+  session it spawned (`story.parent`), as ADR 0027 and ADR 0028 already define the Dev Lead. A story session leads
+  nothing. When a chat leads several, Feature progress opens the newest (highest id). Rule in
+  `work-format/src/feature-progress.ts` (`featuresLedBy`).
+- **The feature row.** An icon button (named "Feature progress of FEAT-N", titled "Feature progress") beside the title
+  of every feature row with a card. An icon, not a word, so the name cell still reads as the title alone (work-list
+  test AC2 reads that cell). The row's own toggle still opens its stories; Open and Review draft are unchanged. The feature's card stays
+  reachable through **Card** in the pane's bar.
+- **Branch.** `FeatureRow.branch` is the feature branch while it owns the feature's card (ADR 0002), set by
+  `buildWorkList` from the owner it already resolved; absent while main owns it ("None" in the pane). Optional in the
+  normalizer, so older servers and fixtures still read.
+- **Waiting on the user.** A story is marked "Waiting for you" when it is in Acceptance (`awaiting`), or its session
+  waits on an approval or a question. A session waiting for a reply waits on its Dev Lead, so it isn't marked
+  (`waitsOnUser`).
+- **A story's click.** Its latest session's chat when the project still lists it (`storyChat`), else its card.
+- **Live, no tokens.** The pane reads the Work list its host already watches (`work.watch`, ADR 0016) and the chat
+  list App already has; it opens no new watch and makes no call. `useChatDraft` became the pure `chatDraft(list,
+  chat)` so ChatDraft watches the list once for both the draft and the progress pane.
+- **Burn-up slot.** The pane leaves a marked place for STORY-16's chart between the counts and the stories; nothing
+  is built there.
+- No ADR: the shared slot reuses ADR 0017's docked pane, and the Dev Lead link is ADR 0027's. No existing assertion was
+  changed.
+
+## 2026-11-13 — STORY-24 review fixes
+
+- **One docked frame.** `DockedAside` (pane id, label, id, actions, Close, focus on open, Escape, width) is the frame of
+  both the card pane and the feature progress pane. It lives in its own `DockedAside.tsx`, not `SidePane.tsx` as
+  asked: `SidePane` imports `CardPane` and `FeatureProgress`, so their importing it back would break `import/no-cycle`.
+  The bar's actions and Close now sit together at its end (`.pane-actions`), so the card pane's back link moved next
+  to Close.
+- **One warning badge.** "Waiting for you" uses `.badge-review`; `.badge-wait` is gone. The class keeps its name
+  because `badge-contrast.test.ts` reads it.
+- **The row's button toggles.** `CardSelection` has `close`; a second click on a feature row's progress button closes
+  the pane, as the chat's button does (regression test failed first).
+- **Focus tests.** Closing a card opened from the progress pane puts focus on Feature progress in a chat, and on the
+  feature row's progress button in Work when the story's row is collapsed (`feature-progress-focus.test.tsx`).
+- **Leader pick.** A chat that leads several features opens active first, then approved, draft, done, then the newest
+  id (`featuresLedBy`; regression test failed first).
+- **Waiting.** `waitsOnUser` uses `isAsk`, now exported from `chat-list.ts`.
+- **Stories heading.** The section and the list are named by the "Stories" heading (`aria-labelledby`); the list keeps
+  its name because the component and e2e tests find it by it.
+- **ADR 0017 amended:** the right slot holds the card or the feature progress pane, one at a time.
+- **Branch wording (Dev Lead ruling).** `featureBranch`: the branch name while the feature branch owns the card, "Not
+  started" for a draft or approved feature, "Merged" for a done one, "None" otherwise (a cancelled feature, or one
+  main owns while active). Unit-tested for the three cases; the pane test adds Not started and Merged.
+- **The pane's Card button** is named "FEAT-N card".
+- **Assertions changed (all STORY-24's own, made stronger or renamed):** the component tests find the Card button as
+  "FEAT-2 card" (both the click and the gone-feature absence check); the e2e checks "In Progress" on that story's own
+  line, and that the opened chat is that story's session (its sidebar row is current and the log names its id); the
+  work-format test "is the features the chat drafted, newest first" is now titled "…, the active one first", with
+  its assertion unchanged. The shared helpers of `feature-progress.test.tsx` moved to `test/progress-fixtures.tsx`
+  unchanged. No other assertion changed.
+
+## 2026-11-13 — STORY-24 review rulings (dev-lead)
+
+- Build choices confirmed: one right pane (card or feature progress, one at a time, sharing `DockedAside` and the
+  docked width); a chat leads a feature if it drafted it or started one of its story sessions (ADR 0027/0028), no new
+  link; the leader pick prefers active, then approved, draft, done, then newest id; waiting on the user is Acceptance
+  or a session waiting on an approval or a question (the Inbox's set, via `isAsk`); the pane reads the existing watch,
+  no polling, no agent calls. No new ADR; ADR 0017 amended.
+- `DockedAside` in its own file instead of SidePane.tsx is accepted: it avoids an import cycle.
+- Branch wording: the branch name while the feature branch owns the card, "Not started" before Start, "Merged" when
+  done, "None" otherwise.
+- No existing assertion was weakened; the developer's own new assertions were made stronger.
+- Roadmap: one shared "leads a feature" rule in work-format; a feature picker in the chat header.
+
+## 2026-11-13 — STORY-16 build choices (story agent, for the Dev Lead to confirm)
+
+- **Where the series is built (ADR 0039).** The existing `burnUp` in rollup.ts builds it; there is no second builder.
+  `buildWorkList` puts `burnUp: { since, points }` on a started feature's row: the scope baseline and the change points.
+  The row carries no days, so time passing never makes the server push.
+- **Days.** The client samples the change points per local day at render time with work-format's pure `burnUpDays`:
+  the baseline, then each local midnight after it (the values just before it, labelled with the day that ended), then
+  now. The time zone is the user's. A feature started mid-day has that part day as its first day. Daylight saving
+  changes give one point per day (unit-tested in New York).
+- **AC2 by construction.** The now point is the feature row's own `progress` count, so the chart ends where the row
+  says. Stories mode counts stories and bugs as the row does. Tasks mode weighs each item by the tasks it had then
+  (`tasksAt`, replayed from `content` events, which record the replaced task list), and a done item counts all of them.
+  Ticks are not in the history, so open items' ticks show only in the now point.
+- **Uncommitted changes (AC4).** The list is already built from owner copies, working trees included, and pushed by the
+  existing watch; the chart follows each push. No polling, no agent calls. Proved on a real git repo with an
+  uncommitted change in a feature worktree (`burn-up-scan.test.ts`), in the component test, and end to end.
+- **Drawing.** Plain SVG, two step lines and a baseline axis. Scope is the not-started grey (`--tx3`), dashed; done is
+  the done green (`--ok`). Only the first and the last day are labelled. No timer: a pane left open across midnight
+  shows the new day on the next push (roadmap).
+- **Accessibility.** The image is named "Scope 7 stories · Done 3 stories, since Nov 11", and a visually hidden table ("Burn-up by
+  day") gives every point. The legend and day labels are hidden from screen readers since the name says the same.
+- **AC6 copy.** "The chart starts when the feature goes in progress."
+- **Heading "Burn-up chart", not "Burn-up".** STORY-24's pane test finds the FEAT-3 pane by its title heading,
+  "Burn-up" (the fixture feature's title). A chart heading of the same name made that query match twice. The
+  assertion is unchanged; the chart's heading is named "Burn-up chart" so the two never collide.
+- **Test seam.** None in the product: the chart reads the clock when it mounts (a lazy `useState`), and the pane keys it
+  by the row's burn-up and count, so each change to the row redraws it to the clock of that moment. Tests fake `Date`
+  and the time zone only. (The optional `now` prop on `FeatureProgress` was dropped in review: nothing passed it.)
+- **No existing assertion changed.**
+- **Roadmap:** a midnight redraw while the pane is open; task ticks in the history.
+- **Windows e2e waits (Dev Lead: fix the wait, never weaken the assertion).** PR #54's first CI run failed E2E
+  (Windows) twice on two specs that STORY-16 doesn't touch. The list build with the burn-up takes 2–5 ms on the
+  project's 100 real cards, so the change didn't slow the server; the specs were timing-fragile:
+  - `merge-story.spec.ts` polled for the story's worktree to go, then read its local and remote branches at once. The
+    merge removes the folder before it deletes the branch (`removeStory` in merge-git.ts), so on a slow runner the
+    branch was still there. Both branch checks now poll the same condition, up to 30 s.
+  - `progress-breakdown.spec.ts` waited the default 5 s for Approve's commit (a clean `git status`). The same wait is
+    in 16 specs, so all of them now give it 30 s, within the 60 s test timeout.
+    No assertion changed: each expects the same value, now with a fitting wait.
+
+## 2026-11-15 — STORY-16 review rulings (dev-lead)
+
+- Build choices confirmed: `burnUp` is extended, one series builder; the row carries `{ since, points }` (now with its
+  `unit`) and the client samples local days, ADR 0039 confirmed; tasks are replayed from `content` events and ticks show
+  only at Now; no forecast, with the guard test.
+- The Windows e2e wait fixes strengthened waits and weakened no assertion.
+- Review fixes:
+  - The series itself ends at the row's count: the AC1 and AC2 stories tests check its last change point against the
+    row. A status edited by hand (no history event) made the series disagree with the row, a bug: the last change point
+    now follows the cards' current state, placed at the last recorded change (regression test failed first, "follows a
+    status edited by hand, with no history event, from the last recorded change").
+  - The unused `now` prop on `FeatureProgress` is gone. The chart reads the clock once per mount and is keyed by the
+    row's burn-up and count, which satisfies React's purity rule and redraws on each change, as ADR 0039 says.
+  - `burn-up.ts` imports `Count` from work-list-types instead of repeating it.
+  - The scope baseline is computed once: `buildWorkList` passes `scopeSummary`'s baseline to `burnUp` (an optional
+    parameter that defaults to `scopeBaseline`).
+  - The FeatureProgress JSDoc is re-wrapped.
+  - The legend and the image name say the unit in both modes ("Scope 6 tasks · Done 3 tasks", "Scope 1 story"),
+    tested in work-format and in the pane. The row's burn-up carries `unit`.
+- Assertions changed, all STORY-16's own: the chart's names gained their unit ("Scope 2 stories · Done 0 stories, since
+  Nov 1", and so on) in the component and e2e tests; the work-format AC1 and empty-feature expectations gained
+  `unit: "stories"`, as did the server AC4 test's `toEqual`; new assertions were added as above. No assertion from another story changed.
+- Roadmap: a done or cancelled feature's burn-up ends when it finished; the screen-reader table summarises by week for
+  long features.
+
+## 2026-11-15 — STORY-17 build choices (story agent, for the Dev Lead to confirm)
+
+- **Where the layout is remembered.** In the app's UI state (`ui-state.json` in userData, beside the card pane's
+  width), as `boardProjects`: the project folders that show the board. Not `.featra/config.yaml`: how one person looks
+  at Work is theirs, not the team's, and the config file is committed. The field is left out while every project shows
+  the list, so existing UI-state files and exact assertions read unchanged. Rules in `client/src/work-layout.ts`.
+- **Stages reach the client.** The Work list now carries the project's stages in order, each with its stage pill's
+  tone (`WorkList.stages`, from `buildWorkList`). Optional in the normalizer only (see the review rulings: no fallback). The board groups the list's rows in `work-format/src/stage-board.ts`
+  (`stageBoard`, `boardFeatures`, `boardFilter`); it computes no second rollup (ADR 0003, ADR 0016).
+- **Bugs on the board.** A bug under a feature is a card in its stage with the bug icon, as in the list. The
+  project's bugs (under no feature) stay in their own list (STORY-13) and are not on the board. A cancelled story is not
+  on the board: Cancelled is not a column (it is not New through Done).
+- **A story under no feature** shows only with All features, without a feature tag.
+- **The feature filter** takes the place of the status chips while the board shows, in their style (`.wfilter`,
+  `aria-pressed`). It is not remembered; a chosen feature that leaves the list falls back to All features.
+- **The toggle** is the existing `SegmentedControl` (a radiogroup, its checked radio is the pressed state), labelled
+  "Layout"; it gained an optional `label`. It sits in a new header row at the top of Work.
+- **Scrolling.** Columns share Work's width (at least 152 px each) and scroll vertically on their own. The board
+  scrolls sideways inside Work only when they don't fit (at the app's minimum size); the window never does.
+- **The card.** The whole card is one button (ID and title) that opens the card pane; the PR link sits above it and
+  stays its own. Escape returns focus to the card's button.
+- No ADR: the layout reuses the UI-state store, and the stages ride the Work list of ADR 0016. The e2e `sizeTo` helper
+  moved from `card-pane.spec.ts` to `app.ts` unchanged, so both journeys share it. No existing assertion was changed.
+
+## 2026-11-15 — STORY-17 review rulings (dev-lead)
+
+- **Confirmed build choices.**
+  - The board groups the Work list's rows, with no second rollup (ADR 0003, ADR 0016).
+  - The column order comes from `config.stages`.
+  - The layout is remembered as `boardProjects` in `ui-state.json`, keyed by project folder (ADR 0016's live list,
+    the existing UI-state store; no ADR needed).
+  - Bugs under a feature show on the board with the bug icon; cancelled stories and the project's bugs are left out.
+  - The feature filter replaces the status chips while the board shows.
+  - Read-only, with a guard test: nothing draggable, and a drag and drop changes nothing.
+- **Review fixes.**
+  - The feature tag's tooltip showed under the card's full-size button: the tag now sits above it
+    (`position: relative; z-index: 1`) and is named by its feature's ID and title (`aria-label`).
+  - A card whose stage the project's config does not list is left off the board on purpose (card validation already
+    reports it as a problem). Said in `stageBoard`'s doc comment and asserted by a unit test.
+  - Column titles are level-2 headings, so the board skips no heading level under Work's title.
+  - No older-server fallback: the Electron app ships client and server together, so the columns always come from the
+    list's `stages`. `stages` stays optional in the normalizer only; `boardStages` and its test are gone.
+  - `withWorkLayout` returns the state unchanged when the project already shows that layout (unit test). The PR's own
+    unit test had asserted that choosing Board again moved the project to the end of `boardProjects`; it now asserts
+    the order is kept.
+  - A JSDoc line over 120 characters in `apps/desktop/e2e/app.ts` was rewrapped.
+  - CI: the e2e clicked the "Board" label's text, which the segmented control's radio covers on Ubuntu; it now checks
+    the radio, as the other e2e specs do.
+- **Roadmap.** Added to ROADMAP.md: forget a removed project's board layout; remember the feature filter per project;
+  the stale-copy mark on board cards; optional WIP limits or age per column.

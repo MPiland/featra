@@ -8,7 +8,7 @@ afterEach(() => vi.useRealTimers());
 const LIST = { epics: [], stale: [], problems: [] };
 const withTitle = (title: string) => ({
   ...LIST,
-  epics: [{ id: "EPIC-1", title, progress: { done: 0, total: 0, label: "" }, bar: [], features: [] }],
+  epics: [{ id: "EPIC-1", title, progress: { done: 0, total: 0, label: "" }, bar: [], breakdown: "", features: [] }],
 });
 const titles = (updates: WorkUpdate[]) => updates.map((u) => u.list.epics[0]?.title ?? null);
 

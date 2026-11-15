@@ -33,6 +33,9 @@ export interface EvidenceState {
   checkedHead: string | null;
 }
 
+/** What a story waiting on the user's Accept needs, in a Done refusal and on a feature's bar (STORY-15). */
+export const NEEDS_ACCEPT = "needs your Accept";
+
 export function evidenceState(card: Card): EvidenceState {
   let verified = false;
   let accepted = false;
@@ -85,9 +88,9 @@ export function checkTransition(
       const ev = evidenceState(card);
       // Researcher stories produce findings, not code: there is no CI, so the user's Accept is the evidence.
       if (card.role === "researcher")
-        return ev.accepted ? { ok: true } : { ok: false, reason: "needs your Accept (research has no CI to verify)" };
+        return ev.accepted ? { ok: true } : { ok: false, reason: `${NEEDS_ACCEPT} (research has no CI to verify)` };
       if (!ev.verified) return { ok: false, reason: "needs Verified: the PR's CI checks have not passed" };
-      if (config.requireAccept && !ev.accepted) return { ok: false, reason: "needs your Accept" };
+      if (config.requireAccept && !ev.accepted) return { ok: false, reason: NEEDS_ACCEPT };
     }
     return { ok: true };
   }
@@ -102,7 +105,7 @@ export function checkTransition(
     );
     if (open.length)
       return { ok: false, reason: `${open.length} item(s) not done: ${open.map((c) => c.id).join(", ")}` };
-    if (config.requireAccept && !evidenceState(card).accepted) return { ok: false, reason: "needs your Accept" };
+    if (config.requireAccept && !evidenceState(card).accepted) return { ok: false, reason: NEEDS_ACCEPT };
   }
   return { ok: true };
 }

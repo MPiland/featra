@@ -94,6 +94,12 @@ export const BugIcon = () => (
     <path d="M10 7a2 2 0 0 1 4 0M12 11v8M4 9l4 2M20 9l-4 2M4 15h4M20 15h-4M5 20l3-2M19 20l-3-2" />
   </Icon>
 );
+/** A feature's progress (STORY-24): bars of stories done. */
+export const ProgressIcon = () => (
+  <Icon>
+    <path d="M5 20v-6M12 20V8M19 20V4" />
+  </Icon>
+);
 export const CloseIcon = () => (
   <Icon>
     <path d="M6 6l12 12M18 6L6 18" />

@@ -4,6 +4,7 @@
  * parser.
  */
 import { normalizePrStatus, type PrStatus } from "./prs-types.ts";
+import type { BurnUp, BurnUpPoint } from "./burn-up.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /** How a status reads at a glance: the colour of its dot and its slice of a bar. */
@@ -79,8 +80,15 @@ export interface FeatureRow {
   progress: ProgressCount;
   /** The stories by stage tone, in bar order. */
   bar: Segment[];
+  /** What the bar says on hover or focus (STORY-15): "1 done · 1 needs your Accept · 2 in progress"; empty with none. */
+  breakdown: string;
   tasks: Count;
-  scope: { added: number; openBugs: number };
+  /** Added after the scope baseline, with "+3 added: 2 stories · 1 bug" (empty when none), and open bugs. */
+  scope: { added: number; addedBreakdown: string; openBugs: number };
+  /** The feature's own branch while it owns the feature's cards (ADR 0002), as its progress pane shows it (STORY-24). */
+  branch?: string;
+  /** Its burn-up from the scope baseline (STORY-16), counted as `progress` is; left out until it goes in progress. */
+  burnUp?: BurnUp;
   stories: StoryRow[];
 }
 
@@ -91,6 +99,8 @@ export interface EpicRow {
   progress: ProgressCount;
   /** The features by status tone, in bar order. */
   bar: Segment[];
+  /** What the bar says on hover or focus (STORY-15): "1 done · 2 in progress · 1 approved"; empty with none. */
+  breakdown: string;
   features: FeatureRow[];
 }
 
@@ -111,6 +121,14 @@ export interface WorkList {
   problems: string[];
   /** The project bug list (STORY-13): bugs under no feature, which no feature row holds. Left out when there are none. */
   bugs?: StoryRow[];
+  /** The project's stages in workflow order (STORY-17): the stage board's columns. Left out by older servers. */
+  stages?: StageColumn[];
+}
+
+/** One of the project's stages, with the tone its stage pill has. */
+export interface StageColumn {
+  name: string;
+  tone: Tone;
 }
 
 export const EMPTY_WORK_LIST: WorkList = { epics: [], stale: [], problems: [] };
@@ -155,6 +173,17 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   merged: r.merged === true,
 });
 
+const isTime = (v: unknown): v is string => typeof v === "string" && Number.isFinite(Date.parse(v));
+
+/** A burn-up read defensively: left out without a valid baseline; steps without a valid time are dropped. */
+const burnUpOf = (raw: unknown): { burnUp?: BurnUp } => {
+  if (!isRecord(raw) || !isTime(raw.since)) return {};
+  const points = list(raw.points, (p) => ({ at: p.at, scope: num(p.scope), done: num(p.done) })).filter(
+    (p): p is BurnUpPoint => isTime(p.at),
+  );
+  return { burnUp: { since: raw.since, unit: raw.unit === "tasks" ? "tasks" : "stories", points } };
+};
+
 const feature = (r: Record<string, unknown>): FeatureRow => {
   const scope = isRecord(r.scope) ? r.scope : {};
   return {
@@ -168,8 +197,11 @@ const feature = (r: Record<string, unknown>): FeatureRow => {
     filters: Array.isArray(r.filters) ? r.filters.filter((f): f is WorkFilter => isOneOf(WORK_FILTERS, f)) : [],
     progress: progress(r.progress),
     bar: bar(r.bar),
+    breakdown: text(r.breakdown),
     tasks: count(r.tasks),
-    scope: { added: num(scope.added), openBugs: num(scope.openBugs) },
+    scope: { added: num(scope.added), addedBreakdown: text(scope.addedBreakdown), openBugs: num(scope.openBugs) },
+    ...(typeof r.branch === "string" && r.branch ? { branch: r.branch } : {}),
+    ...burnUpOf(r.burnUp),
     stories: list(r.stories, story),
   };
 };
@@ -179,6 +211,7 @@ const epic = (r: Record<string, unknown>): EpicRow => ({
   title: text(r.title),
   progress: progress(r.progress),
   bar: bar(r.bar),
+  breakdown: text(r.breakdown),
   features: list(r.features, feature),
 });
 
@@ -193,10 +226,12 @@ const staleRow = (r: Record<string, unknown>): StaleRow => ({
 export function normalizeWorkList(raw: unknown): WorkList {
   const r = isRecord(raw) ? raw : {};
   const bugs = list(r.bugs, story);
+  const stages = list(r.stages, (s): StageColumn => ({ name: text(s.name), tone: tone(s.tone) })).filter((s) => s.name);
   return {
     epics: list(r.epics, epic),
     stale: list(r.stale, staleRow),
     problems: Array.isArray(r.problems) ? r.problems.filter((p): p is string => typeof p === "string") : [],
     ...(bugs.length ? { bugs } : {}),
+    ...(stages.length ? { stages } : {}),
   };
 }
