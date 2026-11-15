@@ -2,7 +2,7 @@
 id: FEAT-7
 type: feature
 title: Progress
-status: active
+status: done
 parent: EPIC-1
 order: 9
 origin: planned
@@ -18,6 +18,16 @@ history:
     from: approved
     to: active
     by: dev-lead
+  - at: 2026-11-15T16:11:01Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-15T16:11:01Z
+    field: status
+    from: active
+    to: done
+    by: user
 ---
 
 ## Description
