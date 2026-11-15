@@ -112,6 +112,17 @@ export const PROGRESS_COPY = {
   gone: "This feature isn't in the project any more.",
 } as const;
 
+/** The List and Board toggle and the stage board's words (STORY-17). */
+export const BOARD_COPY = {
+  layout: "Layout",
+  list: "List",
+  board: "Board",
+  region: "Stage board",
+  features: "Filter by feature",
+  allFeatures: "All features",
+  feature: (id: string, title: string) => `${id} ${title}`,
+} as const;
+
 /** How a feature's status reads in the list. */
 export const featureStatusLabel = (status: string | null) =>
   status === null ? WORK_COPY.none : (CONTAINER_STATUS_LABELS[status] ?? status);

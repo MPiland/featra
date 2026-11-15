@@ -1,0 +1,138 @@
+/* Work's header and the stage board (STORY-17): one column per stage, read-only cards that open the card pane. */
+.work-head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* On the board, the columns scroll on their own; Work scrolls only when its header and notices leave them no room. */
+.work-list.on-board {
+  overflow: hidden auto;
+}
+
+.stage-board {
+  flex: 1 0 240px;
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto hidden;
+}
+
+.bcol {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 152px;
+  min-height: 0;
+  border-radius: 8px;
+  background: var(--side);
+}
+
+.bcol-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.bcol-count {
+  color: var(--tx3);
+  font-variant-numeric: tabular-nums;
+}
+
+.bcol-cards {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  margin: 0;
+  padding: 0 6px 6px;
+  overflow: hidden auto;
+  list-style: none;
+}
+
+.bcard {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.bcard:hover,
+.bcard.shown {
+  background: var(--row);
+}
+
+/* The whole card is the button's target; the PR link above it stays its own. */
+.bcard-open {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tx);
+  font: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.bcard-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+}
+
+.bcard-open:focus-visible {
+  outline: none;
+}
+
+.bcard-open:focus-visible::after {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+
+.bcard-open .card-id {
+  color: var(--tx3);
+}
+
+.bcard-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--tx2);
+}
+
+.bcard-meta:empty {
+  display: none;
+}
+
+.bcard-meta .row-bug,
+.bcard-meta .badge-review {
+  margin: 0;
+}
+
+.bcard-meta .pr-chip,
+.bcard-meta .bcard-feature {
+  position: relative;
+  z-index: 1;
+}
+
+.bcard-feature {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--row2);
+  color: var(--tx2);
+  line-height: 18px;
+}

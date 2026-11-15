@@ -94,6 +94,11 @@ epics in `.featra/cards/`.
 - One "leads a feature" rule in work-format, used by the server (`leadOf`, card reports) and the client (`featuresLedBy`).
 - A feature picker in the chat header when a chat leads more than one feature.
 
+- Remove a project's remembered board layout when the project is removed from the app.
+- Remember the board's feature filter per project.
+- Show the stale-copy mark on board cards, as list rows do.
+- Optional WIP limits or age per board column.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".
