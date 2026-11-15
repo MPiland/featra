@@ -2,7 +2,7 @@
 id: STORY-16
 type: story
 title: Feature burn-up chart
-status: Acceptance
+status: Done
 parent: FEAT-7
 order: 3
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-15T15:52:06Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-15T15:52:06Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
