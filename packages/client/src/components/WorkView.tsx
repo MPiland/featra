@@ -3,6 +3,7 @@ import type { ChatSummary } from "@featra/work-format";
 import type { ProjectMenuActions } from "../project-menu.ts";
 import { PROJECT_LABELS, type ProjectsSnapshot } from "../projects.ts";
 import type { WorkBridge } from "../work-list.ts";
+import type { WorkLayout } from "../work-layout.ts";
 import type { ChosenWidth } from "./work/PaneHandle.tsx";
 import { ViewIcon } from "./icons.tsx";
 import { WorkList } from "./work/WorkList.tsx";
@@ -13,6 +14,8 @@ export interface WorkViewProps {
   actions: ProjectMenuActions;
   work: WorkBridge;
   paneWidth: ChosenWidth;
+  /** Each project's list or board, and how the header's toggle chooses it (STORY-17). */
+  layout: { of: (dir: string) => WorkLayout; choose: (dir: string, layout: WorkLayout) => void };
   /** Opens the chat that drafted a feature, with the draft pane (STORY-49). */
   onReviewDraft: (chat: string) => void;
   /** Whether the project has that chat (a draft's chat may have been deleted). */
@@ -31,6 +34,7 @@ export function WorkView({
   actions,
   work,
   paneWidth,
+  layout,
   onReviewDraft,
   hasChat,
   chats,
@@ -38,13 +42,16 @@ export function WorkView({
   setupPage,
 }: WorkViewProps) {
   if (projects.current && setupPage) return setupPage;
-  if (projects.current)
+  const project = projects.current;
+  if (project)
     return (
       <WorkList
-        key={projects.current.dir}
+        key={project.dir}
         work={work}
-        project={projects.current}
+        project={project}
         paneWidth={paneWidth}
+        layout={layout.of(project.dir)}
+        onLayout={(chosen) => layout.choose(project.dir, chosen)}
         onReviewDraft={onReviewDraft}
         hasChat={hasChat}
         chats={chats}

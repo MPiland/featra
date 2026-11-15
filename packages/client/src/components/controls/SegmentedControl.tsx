@@ -6,6 +6,8 @@ export interface SegmentedControlProps<V extends string> {
   value: V;
   options: readonly ChoiceDef<V>[];
   onChange: (value: V) => void;
+  /** Names the group when no visible label does. */
+  label?: string | undefined;
   labelledBy?: string | undefined;
   describedBy?: string | undefined;
   disabled?: boolean | undefined;
@@ -16,11 +18,12 @@ export interface SegmentedControlProps<V extends string> {
  * radio group.
  */
 export function SegmentedControl<V extends string>(props: SegmentedControlProps<V>) {
-  const { name, value, options, onChange, labelledBy, describedBy, disabled } = props;
+  const { name, value, options, onChange, label, labelledBy, describedBy, disabled } = props;
   return (
     <div
       className="segmented"
       role="radiogroup"
+      aria-label={label}
       aria-labelledby={labelledBy}
       aria-describedby={describedBy}
       aria-disabled={disabled || undefined}

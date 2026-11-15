@@ -2239,3 +2239,28 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   done, "None" otherwise.
 - No existing assertion was weakened; the developer's own new assertions were made stronger.
 - Roadmap: one shared "leads a feature" rule in work-format; a feature picker in the chat header.
+
+## 2026-11-15 — STORY-17 build choices (story agent, for the Dev Lead to confirm)
+
+- **Where the layout is remembered.** In the app's UI state (`ui-state.json` in userData, beside the card pane's
+  width), as `boardProjects`: the project folders that show the board. Not `.featra/config.yaml`: how one person looks
+  at Work is theirs, not the team's, and the config file is committed. The field is left out while every project shows
+  the list, so existing UI-state files and exact assertions read unchanged. Rules in `client/src/work-layout.ts`.
+- **Stages reach the client.** The Work list now carries the project's stages in order, each with its stage pill's
+  tone (`WorkList.stages`, from `buildWorkList`). Optional in the normalizer: a list from an older server builds its
+  columns from the stages its rows are in. The board groups the list's rows in `work-format/src/stage-board.ts`
+  (`stageBoard`, `boardFeatures`, `boardFilter`); it computes no second rollup (ADR 0003, ADR 0016).
+- **Bugs on the board.** A bug under a feature is a card in its stage with the bug icon, as in the list. The
+  project's bugs (under no feature) stay in their own list (STORY-13) and are not on the board. A cancelled story is not
+  on the board: Cancelled is not a column (it is not New through Done).
+- **A story under no feature** shows only with All features, without a feature tag.
+- **The feature filter** takes the place of the status chips while the board shows, in their style (`.wfilter`,
+  `aria-pressed`). It is not remembered; a chosen feature that leaves the list falls back to All features.
+- **The toggle** is the existing `SegmentedControl` (a radiogroup, its checked radio is the pressed state), labelled
+  "Layout"; it gained an optional `label`. It sits in a new header row at the top of Work.
+- **Scrolling.** Columns share Work's width (at least 152 px each) and scroll vertically on their own. The board
+  scrolls sideways inside Work only when they don't fit (at the app's minimum size); the window never does.
+- **The card.** The whole card is one button (ID and title) that opens the card pane; the PR link sits above it and
+  stays its own. Escape returns focus to the card's button.
+- No ADR: the layout reuses the UI-state store, and the stages ride the Work list of ADR 0016. The e2e `sizeTo` helper
+  moved from `card-pane.spec.ts` to `app.ts` unchanged, so both journeys share it. No existing assertion was changed.
