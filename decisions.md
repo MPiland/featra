@@ -2451,9 +2451,18 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   app has shown the evidence written there.
 - **No failing-first test.** The race is a timing window on Windows CI; a spec can't open it on demand and Electron
   e2e runs in CI only. The card's notes say so.
-- **Product checked, no bug.** `story-spawn` reads the card from the scan and writes the worktree only after
-  `git worktree add` returns. The scan treats a worktree as a card's owner only when a card there parses and names its
-  branch (`branchStateOf`), and a missing cards folder there is skipped. Noted, not changed: git writes checkout files
-  in place, so a watch scan in that window could read a half-written card in the new worktree and show "Can't read"
-  for one scan; it is never the owner then, so nothing acts on it.
+- **Product checked, no bug.** A scan during the checkout is likely: `git worktree add` writes
+  `.git/worktrees/<name>/HEAD` before it checks out, and the watch fires on it. The half-made worktree already owns the
+  card then, since `branchStateOf` falls back to the ID in a story branch's name (`itemIdOfBranch`). It is safe because
+  every card writer shares one card lane (`services.ts`), and Start's `prepare` holds it across the worktree add and the
+  card write (`story-spawn.ts`), so nothing writes into the half-made worktree, and queued actions rescan first. For one
+  scan the card can show "isn't in its owner", "Can't read …" (owner unread, so actions refuse) or its pre-Start
+  status. All cosmetic.
 - **No ADR.** Test-only change.
+
+## 2026-11-15 — BUG-26 review rulings (dev-lead)
+
+- Build choices confirmed: one shared wait for the story worktree's card (it exists, parses and names the story's branch), not just for its folder, because Start writes the card last with writeAtomic.
+- Product: no bug. Writes are safe because the shared card lane is held across the worktree add and the card write. The record of why is corrected.
+- The wait condition has a fast unit test. The e2e race itself can't fail first on demand.
+- No existing assertion was weakened; start-story's branch assertion was made stronger.

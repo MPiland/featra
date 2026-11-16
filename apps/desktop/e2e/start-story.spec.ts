@@ -4,7 +4,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
-import { startedStory } from "./story-worktree.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-9: the user starts a story of a started feature from its row in Work. The real app, its real local server, the
@@ -39,8 +39,8 @@ test("Start on a story row makes its worktree, nests the session in the sidebar,
     await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
     // The worktree is where Claude keeps them, on the story's own branch, cut from the feature's.
-    const { branch, id, folder } = await startedStory(repo.dir);
-    expect(branch).toBeDefined();
+    const { branch, id, folder } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
+    expect(branch).toMatch(/^featra\/story-\d+-draft-a-feature$/);
     expect(existsSync(folder)).toBe(true);
     expect(git(repo.dir, "status", "--porcelain")).toBe("");
 

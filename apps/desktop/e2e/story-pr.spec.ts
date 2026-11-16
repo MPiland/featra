@@ -6,7 +6,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, openedExternal, tempUserData } from "./app.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
-import { startedStory } from "./story-worktree.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-11: a story's PR. The real app, its real local server and real git; only the platform, the agent (agent.ts)
@@ -60,7 +60,7 @@ test("A story moving to review opens its PR, the chip shows it, and CI checks ve
     await page.getByRole("button", { name: "Shaping", exact: true }).click();
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    const { branch, id } = await startedStory(repo.dir);
+    const { branch, id } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
 
     // AC2: moving the story to In Review pushes its branch and opens its PR against the feature branch.
     await row.getByRole("button", { name: "Draft a feature" }).click();

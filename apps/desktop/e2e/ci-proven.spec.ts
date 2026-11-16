@@ -7,7 +7,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
-import { startedStory } from "./story-worktree.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-57: criteria proven from the test report CI uploads. The real app, its real local server and real git; only
@@ -62,7 +62,7 @@ test("Name CI's test report, and a story's PR checks finishing prove its criteri
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
     // BUG-26: the card is read once Start has written it in the checked-out worktree, not when the branch shows.
-    const { branch, id, file } = await startedStory(repo.dir);
+    const { branch, id, file } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
     await linkTests(file);
 
     // AC1: the user names the artifact CI uploads its JUnit report in.

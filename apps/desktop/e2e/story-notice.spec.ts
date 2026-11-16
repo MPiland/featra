@@ -3,7 +3,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
-import { startedStory } from "./story-worktree.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-54: a story agent ends a turn and the Dev Lead that drafted the feature is told, in its own chat. The real app,
@@ -32,7 +32,7 @@ test("A story session's turn ends and a notice appears in the Dev Lead's chat", 
     await page.getByRole("button", { name: "Shaping", exact: true }).click();
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    const { id } = await startedStory(repo.dir);
+    const { id } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
 
     // The story's turn is over at once with the fake agent; the Dev Lead's chat is the first row, the session nests under it.
     await page.getByRole("region", { name: "Chats" }).locator(".chat-row").first().click();

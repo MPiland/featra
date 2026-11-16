@@ -7,7 +7,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
-import { startedStory } from "./story-worktree.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-58: abandoning a story from its card pane. The real app, its real local server and real git; only the
@@ -47,7 +47,7 @@ test("Abandon a story: it warns, closes the PR, removes its worktree and branche
     await page.getByRole("button", { name: "Shaping", exact: true }).click();
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    const { branch, id, folder } = await startedStory(repo.dir);
+    const { branch, id, folder } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
 
     // The story's work, committed in its worktree as its session would; it goes to review, so its PR opens.
     await writeFile(join(folder, "work.txt"), "the story's work\n");

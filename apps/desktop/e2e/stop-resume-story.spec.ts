@@ -5,7 +5,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
-import { startedStory } from "./story-worktree.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-53: the user watches a story's agent, stops it and resumes it. The real app, its real local server, the real MCP
@@ -36,7 +36,7 @@ test("Watch a story session, Stop it and Resume it: read-only, Stopped with the 
     await page.getByRole("button", { name: "Shaping", exact: true }).click();
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    const { id, folder } = await startedStory(repo.dir);
+    const { id, folder } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
 
     // AC1: the session shows the live transcript with the agent's thinking, and has no composer.
     await row.getByRole("button", { name: `Open the session of ${id}` }).click();

@@ -105,6 +105,9 @@ epics in `.featra/cards/`.
 - One shared card-file writer for every Featra write path (atomic, through the lane, retrying a busy rename), with a lint rule against a bare writeFile to .featra/cards. It finds where to write through one "writable owner" lookup that every card writer uses, which refuses when the shown copy isn't the owner's.
 - Show a card that is unreadable only for a moment as being written, not as a problem: the owner's last copy, marked as being written, instead of a fall back to a copy that isn't the owner's.
 - After two failed scans, look again later with a backoff, so a kept problem clears without waiting for a file event.
+- Hide the one-scan flash ("isn't in its owner", "Can't read", or the pre-Start status) for a worktree that Start is still making.
+- Decide whether the branch-name fallback in branchStateOf should wait until the worktree has a card file, so a bare git worktree add outside Featra doesn't take ownership.
+- Fast, non-Electron tests for shared e2e helpers.
 
 ## Before public release
 

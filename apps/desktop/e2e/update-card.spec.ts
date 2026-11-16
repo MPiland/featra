@@ -5,6 +5,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
+import { storyOf } from "./story-worktree.ts";
 
 /**
  * STORY-10: a story's agent updates its own card and the user sees it on the Work list, marked Reported. The real app,
@@ -45,11 +46,7 @@ test("a story session's update_card shows on its Work row at once, marked Report
     await expect(page.getByRole("row", { name: /Review the draft/ })).not.toContainText("Reported");
 
     // It was written to the owner copy in the worktree and left there, with its evidence: nothing was committed.
-    const branch = git(repo.dir, "branch", "--format=%(refname:short)")
-      .split("\n")
-      .find((b) => b.startsWith("featra/story-"));
-    const id = `STORY-${/story-(\d+)-/.exec(branch ?? "")?.[1]}`;
-    const folder = join(repo.dir, ".claude", "worktrees", `${id}-draft-a-feature`);
+    const { id, folder } = storyOf(repo.dir, "draft-a-feature");
     expect(existsSync(join(folder, ".featra", "evidence", "FEAT-2", id, "draft-shows.txt"))).toBe(true);
     expect(git(folder, "ls-files", "--modified", "--others", "--exclude-standard")).toContain(
       `.featra/evidence/FEAT-2/${id}/draft-shows.txt`,
