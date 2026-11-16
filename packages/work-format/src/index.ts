@@ -59,6 +59,7 @@ export * from "./story-notice.ts";
 export * from "./story-stop.ts";
 export * from "./acceptance.ts";
 export * from "./merge.ts";
+export * from "./auto-merge.ts";
 export * from "./merge-copy.ts";
 export * from "./abandon.ts";
 export * from "./abandon-copy.ts";

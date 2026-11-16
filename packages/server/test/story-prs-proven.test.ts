@@ -111,8 +111,8 @@ describe("reading the report when checks finish (AC2)", { timeout: 60_000 }, () 
     const card = await w.read();
     expect(evidenceState(card).provenAcs).toEqual([1, 2]);
     expect(card.history.filter((e) => e.field === "evidence" && e.to?.startsWith("proven"))).toEqual([
-      expect.objectContaining({ to: "proven:1", by: "system" }),
-      expect.objectContaining({ to: "proven:2", by: "system" }),
+      expect.objectContaining({ to: `proven:1@${a}`, by: "system" }),
+      expect.objectContaining({ to: `proven:2@${a}`, by: "system" }),
     ]);
   });
 

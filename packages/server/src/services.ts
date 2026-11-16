@@ -31,7 +31,8 @@ import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createLogWriter, type LogWriterDeps } from "./log-writer.ts";
-import { readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
+import { readAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
+import { createAutoMerge } from "./auto-merge.ts";
 import { createRepoGit, type RepoGit } from "./repo-git.ts";
 import { createClaudeReader } from "./claude-reader.ts";
 import { createCodexReader } from "./codex-reader.ts";
@@ -99,6 +100,8 @@ export function createServices({
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
   agents: AgentBridge;
+  /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
+  settingsChanged: () => void;
   close: () => Promise<void>;
 } {
   const scanner = createScanner(repoGit);
@@ -180,6 +183,15 @@ export function createServices({
     gitCommand,
     ghCommand,
     ending,
+  });
+  // A Verified and Proven story merges on its own while the project's auto-merge is on (STORY-59).
+  const autoMerges = createAutoMerge({
+    observe: watches.observe,
+    allowed,
+    enabled: readAutoMerge(dataDir),
+    merge: merges.merge,
+    chats,
+    log,
   });
   const abandons = createStoryAbandon({
     scan: watches.scan,
@@ -264,14 +276,17 @@ export function createServices({
   return {
     api,
     agents,
+    settingsChanged: () => autoMerges.recheck(),
     async close() {
       stopClosing();
       checks.close();
       prs.close();
       features.close();
+      autoMerges.close();
       // A project watch still starting finishes against open watches, then stops itself.
       await prs.idle();
       await features.idle();
+      await autoMerges.idle();
       chats.close();
       await chats.flush();
       watches.close();

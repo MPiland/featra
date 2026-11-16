@@ -90,7 +90,11 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
     app: settings.current(),
     closeToTray: closeToTraySupport(lifecycle, process.platform),
   }));
-  ipcMain.handle(IPC.settingsSaveApp, (_e, next: unknown) => settings.apply(normalizeAppSettings(next)));
+  // The server reads the app defaults from the data folder; it is told they changed (STORY-59: auto-merge turned on).
+  ipcMain.handle(IPC.settingsSaveApp, async (_e, next: unknown) => {
+    await settings.apply(normalizeAppSettings(next));
+    server.settingsChanged();
+  });
   // The page may only reach projects on the list: the folders the user opened or created.
   const knownProject = projects.has;
   ipcMain.handle(IPC.settingsLoadProject, (_e, dir: unknown) =>

@@ -5,7 +5,8 @@ import { isOneOf } from "./utils/guards.ts";
 /**
  * Evidence vocabulary written to `history[]` with field `evidence` (ADR 0004):
  * - `verified` / `unverified`: the PR's required CI checks passed / stopped passing (e.g. a new push)
- * - `proven:<n>` / `unproven:<n>`: AC number n (1-based) had its linked test pass / fail
+ * - `proven:<n>` / `unproven:<n>`: AC number n (1-based) had its linked test pass / fail; `proven:<n>@<commit>` when
+ *   the commit the test passed on is known (STORY-59), so auto-merge can tell proof for the commit it merges
  * - `checked:<commit>`: the commit the latest verdict was for, recorded when it changes (STORY-12), so a merge after a
  *   restart knows whether Verified is for the branch's current head; `checked:` alone when a verdict's commit wasn't
  *   known, so an older commit never stands beside a newer verdict
@@ -13,7 +14,7 @@ import { isOneOf } from "./utils/guards.ts";
  */
 export const VERIFIED = "verified";
 export const UNVERIFIED = "unverified";
-export const provenEvent = (ac: number) => `proven:${ac}`;
+export const provenEvent = (ac: number, head?: string) => `proven:${ac}${head ? `@${head}` : ""}`;
 export const unprovenEvent = (ac: number) => `unproven:${ac}`;
 const CHECKED = "checked:";
 export const checkedEvent = (commit: string) => `${CHECKED}${commit}`;
@@ -36,28 +37,46 @@ export interface EvidenceState {
 /** What a story waiting on the user's Accept needs, in a Done refusal and on a feature's bar (STORY-15). */
 export const NEEDS_ACCEPT = "needs your Accept";
 
+/** Each proven AC number with the commit its test passed on (null when not recorded), in history order. */
+export function provenCommits(card: Card): Map<number, string | null> {
+  const proven = new Map<number, string | null>();
+  for (const e of card.history) {
+    if (e.field !== "evidence") continue;
+    const m = /^(proven|unproven):(\d+)(?:@(\S+))?$/.exec(e.to ?? "");
+    if (m?.[1] === "proven") proven.set(Number(m[2]), m[3] ?? null);
+    else if (m?.[1] === "unproven") proven.delete(Number(m[2]));
+  }
+  return proven;
+}
+
+/**
+ * Whether every AC of `card` is proven by a test that passed on commit `head` (STORY-59). Proof recorded without a
+ * commit, or for another commit, doesn't count: auto-merge merges only what was proven at the commit it merges.
+ */
+export function provenAt(card: Card, head: string | null): boolean {
+  if (!head || card.acs.length === 0) return false;
+  const proven = provenCommits(card);
+  return card.acs.every((_, i) => proven.get(i + 1) === head);
+}
+
 export function evidenceState(card: Card): EvidenceState {
   let verified = false;
   let accepted = false;
   let checkedHead: string | null = null;
-  const proven = new Set<number>();
   for (const e of card.history) {
     if (e.field === "evidence") {
       if (e.to === VERIFIED) verified = true;
       else if (e.to === UNVERIFIED) verified = false;
       else if (e.to?.startsWith(CHECKED)) checkedHead = e.to.slice(CHECKED.length) || null;
-      else {
-        const m = /^(proven|unproven):(\d+)$/.exec(e.to ?? "");
-        if (m?.[1] === "proven") proven.add(Number(m[2]));
-        else if (m?.[1] === "unproven") proven.delete(Number(m[2]));
-      }
     } else if (e.field === "accepted") {
       accepted = e.to === "accepted";
     }
   }
   // A card's creation (no `from`) isn't progress: an agent that drafted a story hasn't reported on it.
   const lastClaim = card.history.findLast((e) => (e.field === "status" && e.from !== null) || e.field === "report");
-  const provenAcs = [...proven].filter((n) => n >= 1 && n <= card.acs.length).toSorted((a, b) => a - b);
+  const provenAcs = [...provenCommits(card).keys()]
+    .filter((n) => n >= 1 && n <= card.acs.length)
+    .toSorted((a, b) => a - b);
   return {
     reported: !!lastClaim && lastClaim.by.startsWith("session:"),
     verified,

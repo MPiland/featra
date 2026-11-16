@@ -14,6 +14,8 @@ export interface ServerProcess {
   endpoint: () => Promise<ServerEndpoint | null>;
   /** The folders the page may act on. Resolves once the server has the list. */
   setProjects: (dirs: string[]) => Promise<void>;
+  /** Tells a running server the app's settings were saved; a server not running reads them when it starts. */
+  settingsChanged: () => void;
   /**
    * Stops the server. A stop main asked for is expected, so nothing about it is logged, neither now nor when the child
    * exits: a quit's "Quitting" stays the log's last line. Resolves when the child has exited.
@@ -133,6 +135,9 @@ export function createServerProcess({ script, execPath, log, dataDir, mcpEntry }
     setProjects(next) {
       dirs = [...next];
       return sendProjects(current().child);
+    },
+    settingsChanged() {
+      if (running) send(running.child, { type: "settings" });
     },
     stop() {
       const stopping = running;

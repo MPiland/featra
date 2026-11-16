@@ -2477,3 +2477,54 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - A Hold toggle on a story keeps it from merging on its own. Merge still works on a held story.
 - Dev-lead calls: stories under one feature merge one at a time; a story is checked when its evidence changes and once when the project opens; ADR 0034 ("only the user merges") is amended in STORY-59.
 - Stories: STORY-59 Merge a proven story on its own; STORY-60 An automatic merge that fails; STORY-61 Hold a story back from auto-merge. STORY-60 and STORY-61 depend on STORY-59.
+
+## 2026-11-16 — STORY-59 build choices (story agent; confirmed by the Dev Lead)
+
+Confirmed by dev-lead in review. The two points the story agent left open, a story whose session is running and the app
+default turned on, are resolved by review fixes 1 and 3 below; the bullets say what is now built.
+
+- **The rule is pure.** `mergesOnItsOwn(owned, config, writable, on, { head, feature })` in `work-format/src/auto-merge.ts`:
+  the setting on, the owner copy readable (not `ownerUnread`, BUG-24), `mergeRefusal` null, every criterion proven at
+  `head` (`provenAt`), and the feature active. Proven implies Verified. STORY-61's Hold has a marked place in it and isn't built.
+- **The setting.** `autoMerge` defaults to true in `DEFAULT_CONFIG` and `DEFAULT_WORK_SETTINGS`. The server reads it as
+  `readMcpEnabled` does: the project's own key, else the app default from settings.json, else on (`readAutoMerge`,
+  `autoMergeOn`). It is read again just before each merge, so turning it off stops a story still waiting its turn. The
+  label is "Auto-merge stories", under Progress and review right after Require acceptance.
+- **When stories are looked at.** A server observer (`server/src/auto-merge.ts`) watches each allowed project with
+  `watches.observe` and a pick of the stories that would merge, each with its worktree HEAD and its card's checked
+  commit, plus the project's own `autoMerge`. It looks once when the project opens and again whenever that pick
+  changes. Changing the project's setting re-checks at once. Saving the app's settings re-checks every watched project
+  (fix 3), and a change to the project's chats re-checks it (fix 1).
+- **Tried once per commit.** A story is tried once for each `head|checked` pair. A story whose session is running or queued is passed over without
+  being recorded (fix 1). A merge that fails (uncommitted work, a GitHub refusal) is logged as "<id> didn't merge on its own: <reason>" and isn't tried again until
+  its head or checked commit changes. Telling the Dev Lead and retrying are STORY-60's. The record is dropped when the
+  project stops being watched, and for a story that reached its turn with the setting off.
+- **One at a time per feature, outside the lane.** Merges queue in a promise line per project and feature branch, and
+  call the same `merge()` Merge uses, which takes the card lane itself. Different features may merge at once, as manual
+  merges may.
+- **Merged by system.** The merge is Merge's own, so the card records `merged` by `system`, and nothing is accepted.
+- **The Dev Lead's notice.** The lead is read before the merge ends the story session (its row's `story.parent`). The
+  notice is outcome `merged` with the summary "<feature branch>, on its own." followed by anything the merge left
+  behind. `tellLead` is moved out of `merge-request.ts` so both paths send notices the same way.
+- **This repo's config.** `autoMerge: false` is gone from `.featra/config.yaml`. `uat` stays.
+- **ADR 0034 amended:** the user merges, or auto-merge when it's on.
+
+## 2026-11-16 — STORY-59 review rulings (dev-lead)
+
+1. **A working session doesn't use up a try.** Auto-merge passes over a story whose session is running or queued (the
+   check Merge makes, `sessionBusy`) without recording it, and looks again when that project's chat list changes, so
+   the story merges once its session is idle. An attempt that finds the session working when its turn comes is dropped
+   the same way.
+2. **Proof must be for the commit that merges.** Each proven event records the commit its test passed on
+   (`proven:<n>@<commit>`; local checks and CI reports both know it). Old events without a commit still parse and
+   count for the Proven mark, but not for auto-merge. `mergesOnItsOwn` requires every criterion proven at the story
+   branch's tip, the commit `merge()` merges. The Proven mark shown elsewhere keeps its meaning (any proof, of any
+   commit); only auto-merge reads the commit.
+3. **Turning the app default on starts merges.** The desktop tells the server when app settings are saved (host
+   message `settings`), and the server re-checks every watched project (`recheck`).
+4. **No duplicate tries.** An attempt runs only while it is still its story's latest try; a project removed and added
+   back adopts the tries still queued or running instead of queuing them again, and an older look at a project gives
+   way to a newer one. A rejection in a feature's line is logged, so it can't stall the merges after it. Tries of
+   stories no longer picked are forgotten.
+5. **Auto-merge skips stories whose feature is not active** (Cancelled, Done, or merged to main). Manual Merge is
+   unchanged; whether it should refuse a story under a Cancelled feature is on the roadmap.

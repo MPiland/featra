@@ -1,11 +1,16 @@
 /**
  * Messages between the desktop host and the server child process, over Node's IPC channel (not the WebSocket).
- * The host starts the server with the token and keeps its list of open projects current; the server says where it
+ * The host starts the server with the token, keeps its list of open projects current and says when the app's settings
+ * are saved; the server says where it
  * listens, acknowledges each list and forwards failures for the host's log.
  */
 import { isRecord } from "@featra/work-format";
 
-export type HostMessage = { type: "start"; token: string } | { type: "projects"; seq: number; dirs: string[] };
+/** `settings`: the host saved the app's settings, which the server reads from the data folder as it needs them. */
+export type HostMessage =
+  | { type: "start"; token: string }
+  | { type: "projects"; seq: number; dirs: string[] }
+  | { type: "settings" };
 
 export type ServerMessage =
   | { type: "listening"; port: number }
@@ -21,6 +26,7 @@ export function parseHostMessage(raw: unknown): HostMessage | null {
   if (raw.type === "projects" && typeof raw.seq === "number" && strings(raw.dirs)) {
     return { type: "projects", seq: raw.seq, dirs: raw.dirs };
   }
+  if (raw.type === "settings") return { type: "settings" };
   return null;
 }
 
