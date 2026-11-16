@@ -2,7 +2,7 @@
 id: STORY-60
 type: story
 title: An automatic merge that fails
-status: Acceptance
+status: Done
 parent: FEAT-8
 order: 2
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-16T19:46:54Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-16T19:46:54Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
