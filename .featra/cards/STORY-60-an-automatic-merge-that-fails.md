@@ -2,7 +2,7 @@
 id: STORY-60
 type: story
 title: An automatic merge that fails
-status: In Progress
+status: In Review
 parent: FEAT-8
 order: 2
 origin: planned
@@ -11,8 +11,8 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
-pr: null
+branch: claude/story-60-auto-merge-fails
+pr: https://github.com/MPiland/featra/pull/63
 created: 2026-11-16T12:00:00Z
 history:
   - at: 2026-11-16T12:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:story-60
+  - at: 2026-11-16T17:49:34Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:story-60
 ---
 
