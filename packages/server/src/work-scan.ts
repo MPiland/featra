@@ -57,7 +57,15 @@ async function deletedAtOwner(git: RepoGit, state: GitState, owned: OwnedCard, s
   return gone;
 }
 
-export function createScanner(git: RepoGit): Scanner {
+export interface ScannerOptions {
+  /**
+   * The auto-merge setting in effect for a project: its own `autoMerge`, else the app default (`readAutoMerge`). A scan's
+   * config carries it, so Hold shows only while auto-merge is on (STORY-61). Left out, the project's config alone says.
+   */
+  autoMerge?: (dir: string) => Promise<boolean>;
+}
+
+export function createScanner(git: RepoGit, { autoMerge }: ScannerOptions = {}): Scanner {
   const deletions = new WeakMap<GitState, Map<string, boolean>>();
   /** The copies resolved, leaving out the cards their owner deleted. */
   const resolve = async (collected: Collected): Promise<Resolution> => {
@@ -83,8 +91,11 @@ export function createScanner(git: RepoGit): Scanner {
 
   const inFlight = new Set<Promise<Scan | null>>();
   const scanNow = async (dir: string, reuse?: GitState): Promise<Scan | null> => {
-    const collected = await collect(dir, { git, index: indexOf }, reuse);
-    if (!collected) return null;
+    const read = await collect(dir, { git, index: indexOf }, reuse);
+    if (!read) return null;
+    const collected = autoMerge
+      ? { ...read, config: { ...read.config, autoMerge: await autoMerge(read.paths.top) } }
+      : read;
     const resolution = await resolve(collected);
     const { config } = collected;
     const list = buildWorkList(

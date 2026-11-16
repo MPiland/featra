@@ -17,6 +17,7 @@ import type { FeatureMergeState } from "./feature-end-copy.ts";
 import { featureEndOf } from "./feature-end.ts";
 import { locationLabel, sameLocation } from "./ownership.ts";
 import type { OwnedCard } from "./owner-copies.ts";
+import { holdOf } from "./story-hold.ts";
 import { CANCELLED, type Card } from "./types.ts";
 
 /**
@@ -71,6 +72,7 @@ export function buildCardView(
   const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   const readOnly = readOnlyReason(owned, checkedOut, ctx.config.baseBranch);
   const featureEnd = featureEndOf(card, ctx.cards, ctx.config, merge);
+  const held = holdOf(owned, ctx.config, readOnly === null);
   return {
     id: card.id,
     type: card.type,
@@ -95,6 +97,7 @@ export function buildCardView(
     ...(mergeRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { mergeable: true as const } : {}),
     ...(abandonRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { abandonable: true as const } : {}),
     ...(isMerged(card) && card.type === "story" ? { merged: true as const } : {}),
+    ...(held === undefined ? {} : { held }),
     ...(featureEnd ? { featureEnd } : {}),
     ...(draftChat === null
       ? {}

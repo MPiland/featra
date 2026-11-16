@@ -1,3 +1,4 @@
+import { errorMessage } from "@featra/work-format";
 import { createAgentBridge, type AgentBridge } from "./agent-bridge.ts";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { createApi, type Api } from "./api.ts";
@@ -31,6 +32,7 @@ import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
 import { createLogWriter, type LogWriterDeps } from "./log-writer.ts";
+import { createStoryHold } from "./story-hold.ts";
 import { readAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
 import { createAutoMerge } from "./auto-merge.ts";
 import { createRepoGit, type RepoGit } from "./repo-git.ts";
@@ -104,7 +106,8 @@ export function createServices({
   settingsChanged: () => void;
   close: () => Promise<void>;
 } {
-  const scanner = createScanner(repoGit);
+  // A scan's config carries the auto-merge setting in effect, the app default included, for Hold (STORY-61).
+  const scanner = createScanner(repoGit, { autoMerge: readAutoMerge(dataDir) });
   const watches = createWorkWatches(scanner, log);
   // One lane for every card write: a draft that allocates IDs and a card edit never interleave (ADR 0002).
   const lane = createCardLane();
@@ -171,6 +174,7 @@ export function createServices({
     busy,
     ...(interruptMs ? { interruptMs } : {}),
   });
+  const holds = createStoryHold({ scan: watches.scan, now, lane });
   const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats, busy });
   const merges = createStoryMerge({
     scan: watches.scan,
@@ -262,6 +266,7 @@ export function createServices({
     acceptance,
     merges,
     abandons,
+    holds,
     features,
     bugs,
     busy,
@@ -276,7 +281,11 @@ export function createServices({
   return {
     api,
     agents,
-    settingsChanged: () => autoMerges.recheck(),
+    settingsChanged: () => {
+      autoMerges.recheck();
+      // The app default may change whether Hold applies: the open projects' rows and cards are read again.
+      for (const dir of allowed.dirs()) watches.scan(dir).catch((err: unknown) => log(errorMessage(err)));
+    },
     async close() {
       stopClosing();
       checks.close();

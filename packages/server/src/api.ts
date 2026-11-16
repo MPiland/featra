@@ -34,6 +34,7 @@ import type { StorySpawn } from "./story-spawn.ts";
 import type { StoryAcceptance } from "./story-acceptance.ts";
 import type { StoryMerge } from "./story-merge.ts";
 import type { StoryAbandon } from "./story-abandon.ts";
+import type { StoryHold } from "./story-hold.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import type { StoryChecks } from "./story-checks.ts";
 import type { StoryPrs } from "./story-prs.ts";
@@ -63,6 +64,8 @@ export interface ApiDeps {
   merges?: Pick<StoryMerge, "merge">;
   /** Abandons stories (STORY-58). Without it `story.abandonCheck` and `story.abandon` are refused. */
   abandons?: Pick<StoryAbandon, "check" | "abandon">;
+  /** Holds stories back from auto-merge (STORY-61). Without it `story.hold` is refused. */
+  holds?: Pick<StoryHold, "hold">;
   /** Accepts and merges features (STORY-14). Without it the `feature.*` ending methods are refused. */
   features?: FeatureApiDeps["features"];
   /** Files bugs from Work's New bug (STORY-13). Without it `bug.propose` and `bug.file` are refused. */
@@ -113,6 +116,7 @@ export function createApi({
   acceptance,
   merges,
   abandons,
+  holds,
   features,
   bugs,
   busy,
@@ -145,7 +149,7 @@ export function createApi({
     allow(p.dir);
     return p;
   };
-  const storyEnd = createStoryEndApi({ merges, abandons, allow });
+  const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
   const bugApi = createBugApi({ bugs, allow });
   const featureApi = createFeatureApi({ features, card });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, ...(busy ? { busy } : {}) });
@@ -237,6 +241,7 @@ export function createApi({
       case "story.accept":
         return acceptance.accept(...card(params));
       case "story.merge":
+      case "story.hold":
       case "story.abandonCheck":
       case "story.abandon":
         return storyEnd(method, params);

@@ -20,6 +20,10 @@ export const MERGE_COPY = {
   merging: "Merging…",
   decline: "Decline",
   merged: "Merged",
+  /** The toggle that holds a story back from auto-merge (STORY-61), and the mark on a held story's row. */
+  hold: "Hold",
+  holdOf: (id: string) => `Hold ${id}`,
+  held: "Held",
   /** The request card's question. */
   ask: (story: string, into: string) => `Merge ${story} into ${into}?`,
   /** The request card's line about who asks. */

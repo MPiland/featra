@@ -2528,3 +2528,28 @@ default turned on, are resolved by review fixes 1 and 3 below; the bullets say w
    stories no longer picked are forgotten.
 5. **Auto-merge skips stories whose feature is not active** (Cancelled, Done, or merged to main). Manual Merge is
    unchanged; whether it should refuse a story under a Cancelled feature is on the roadmap.
+
+## 2026-11-16 — STORY-61 build choices
+
+- **Held is history, not a field.** As Stopped is, Hold is the last `held` event in the card's history (`to: held`
+  holds, `from: held, to: null` lets go), by `user`. Every turn of the toggle is in the history (AC1) and the card
+  format gains no field. Turning it to the state it is already in writes nothing.
+- **When Hold applies.** To a started story (its card owned by its own worktree, as merging needs) that isn't merged
+  or Cancelled, in any stage, whose owner copy can be written, while the auto-merge setting in effect is on. Holding
+  early (before review) is allowed. A story not started yet can't merge on its own, so it gets no toggle: showing Hold
+  on every planned row was clutter (the Work list's column test caught it). Letting go is refused the same way, so the
+  toggle shows exactly when it works. With
+  auto-merge off the toggle and the Held mark are hidden: Hold means nothing then (AC1 "while auto-merge is on").
+  The history is kept, so a story held before the setting was turned off is still held when it's turned on again.
+- **The setting in effect reaches the scan.** The scanner takes the server's `readAutoMerge` (project value, else app
+  default, else on), so the scan's `config.autoMerge` is the effective setting for the Work list, the card view and
+  Hold's refusal. Saving app settings now also rescans every open project, so the toggle appears or goes without a
+  file change. Auto-merge itself still reads the setting the same way, so nothing changes for it.
+- **The observer is unchanged.** `mergesOnItsOwn` returns false for a held story, so it drops out of auto-merge's pick
+  and its try is forgotten. Let go, the write rescans and it is picked again: a story already Verified and Proven
+  merges (AC3). If Hold lands while an attempt is already merging, that merge goes on; Hold is read when a story is
+  picked and again in its turn in the feature's line, not inside `merge()`.
+- **Merge by hand ignores Hold** (AC2); `mergeRefusal` doesn't read it.
+- **The toggle.** "Hold", a button with `aria-pressed`, beside Merge in the card pane and the Work row, filled when
+  on, with "· Held" after it on a held story (AC4). No confirmation, like Stop; a refusal shows in one sentence
+  beside it. Server method `story.hold { dir, id, held }`, written to the owner copy in the card lane.
