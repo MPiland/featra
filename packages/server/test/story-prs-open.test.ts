@@ -3,6 +3,7 @@
  * pushed and its PR opened through the user's `gh` (or adopts the open one); with the setting off, the card offers
  * Create PR instead. Real repository, watches, lane and rules; GitHub, the remote and the clock are faked.
  */
+import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { GITHUB_COPY, serializeCard } from "@featra/work-format";
@@ -85,6 +86,22 @@ describe("a story moving into review (AC2)", { timeout: 60_000 }, () => {
     await w.moveCaughtMidWrite("In Review");
     const tip = w.repo.git(w.tree, "rev-parse", "HEAD").trim();
     expect(w.repo.git(w.remote, "rev-parse", STORY_BRANCH).trim()).toBe(tip);
+  });
+
+  it("doesn't push again while the card can't be read past the retry, then reads the same (BUG-24 review)", async () => {
+    await w.start();
+    await w.moveOn("In Review");
+    const pushed = w.repo.git(w.remote, "rev-parse", STORY_BRANCH).trim();
+    w.repo.commit(w.tree, "B");
+    const text = await w.repo.read(w.tree, "STORY-1");
+    // Unreadable on both tries of a scan: shown from feature branch's Ready copy, which isn't the story's state.
+    await writeFile(w.repo.file(w.tree, "STORY-1"), "");
+    await w.settle();
+    await writeFile(w.repo.file(w.tree, "STORY-1"), text);
+    await w.settle();
+    await w.settle();
+    expect(w.repo.git(w.remote, "rev-parse", STORY_BRANCH).trim()).toBe(pushed);
+    expect(await w.callsOf("api")).toHaveLength(1);
   });
 
   it("adopts the open PR from the story's branch instead of opening another", async () => {

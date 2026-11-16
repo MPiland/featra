@@ -29,6 +29,11 @@ export interface OwnedCard {
   /** Where the shown copy is: the owner, unless the owner has none. */
   shownFrom: OwnerLocation;
   path: string;
+  /**
+   * The owner has a file of this card that can't be read, likely mid-write (BUG-24): the copy shown is for display only.
+   * Nothing writes it, and observers keep the card's last real state.
+   */
+  ownerUnread?: true;
 }
 
 /** An uncommitted edit to a copy that isn't the owner's: flagged, never merged on its own. */
@@ -77,6 +82,9 @@ function ownerOfCopies(copies: readonly Parsed[], state: BranchState): OwnerLoca
   const fallback = copies.find((c) => c.location.kind === "main") ?? copies[0];
   return fallback ? ownerOf(fallback.card, state) : { kind: "main" };
 }
+
+/** Why card `id` can't be acted on while its owner's copy can't be read (BUG-24): the copy shown may be stale. */
+export const ownerUnreadReason = (id: string) => `${id} can't be read in its owner now. Try again once it's saved.`;
 
 /** Cards shown from a copy that isn't their owner's: the owner has none. */
 export const orphans = (resolution: Resolution): OwnedCard[] =>
@@ -128,12 +136,19 @@ export function resolveCopies(
     const own = group.find((c) => sameLocation(c.location, owner));
     const shown = own ?? group[0];
     if (!shown) continue;
+    // An owner whose file can't be read is likely mid-write (BUG-24): the card shows from the copy nearest the work.
+    const ownerUnread = !own && (unread.get(id)?.some((l) => sameLocation(l, owner)) ?? false);
     if (!own) {
-      // An owner whose file can't be read is likely mid-write (BUG-24): the card shows from the copy nearest the work.
-      const why = unread.get(id)?.some((l) => sameLocation(l, owner)) ? "can't be read in" : "isn't in";
+      const why = ownerUnread ? "can't be read in" : "isn't in";
       problems.push(`${id} ${why} its owner (${locationLabel(owner)}); showing ${locationLabel(shown.location)}.`);
     }
-    cards.push({ card: shown.card, owner, shownFrom: shown.location, path: shown.path });
+    cards.push({
+      card: shown.card,
+      owner,
+      shownFrom: shown.location,
+      path: shown.path,
+      ...(ownerUnread ? { ownerUnread: true as const } : {}),
+    });
     for (const c of group) {
       if (c === own || !c.workingTree || !c.edited) continue;
       if (own && normalized(own.text) === normalized(c.text)) continue;

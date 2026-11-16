@@ -153,6 +153,8 @@ export function createWorkWatches(
         w.on("error", gone);
         e.watchers.set(key, w);
         started = true;
+        // What git said before this watcher started may be out of date already: the next scan asks again.
+        if (t.git) e.gitChanged = true;
       } catch {
         // Not there (yet): the next scan tries again.
       }
@@ -173,7 +175,9 @@ export function createWorkWatches(
       e.gitChanged = true;
       log(`work scan failed: ${errorMessage(err)}`);
       const kept = e.last?.list ?? EMPTY_WORK_LIST;
-      const list = { ...kept, problems: [...kept.problems, `Can't read the cards: ${errorMessage(err)}`] };
+      // Git's stderr can run to several lines; the first says what failed.
+      const why = errorMessage(err).split(/\r?\n/)[0];
+      const list = { ...kept, problems: [...kept.problems, `Can't read the cards: ${why}`] };
       return { scan: e.last, list, failed: true };
     }
   };

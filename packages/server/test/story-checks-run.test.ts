@@ -203,4 +203,22 @@ describe("what a failing run leaves behind", () => {
     expect(w.state()).toBe(kept);
     expect(await w.lines("runs.log")).toHaveLength(1);
   });
+
+  it("keeps a story's checks while its card stays unreadable past the retry, then reads the same (BUG-24 review)", async () => {
+    await w.start();
+    await w.toReview();
+    const kept = w.state();
+    const file = w.repo.file(w.tree, "STORY-1");
+    const text = await readFile(file, "utf8");
+    // Unreadable on both tries of the scan: it is shown from another copy, which isn't the story's state.
+    await writeFile(file, "");
+    await w.watches.scan(w.repo.main);
+    await w.checks.idle();
+    expect(w.state()).toBe(kept);
+    await writeFile(file, text);
+    await w.watches.scan(w.repo.main);
+    await w.checks.idle();
+    expect(w.state()).toBe(kept);
+    expect(await w.lines("runs.log")).toHaveLength(1);
+  });
 });

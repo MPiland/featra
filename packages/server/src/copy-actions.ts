@@ -18,7 +18,7 @@ import {
 } from "@featra/work-format";
 import { fileIn, writeAtomic, type AtomicIo } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
-import { locationKey, unreadableIn } from "./collect.ts";
+import { locationKey } from "./collect.ts";
 import type { RepoGit } from "./repo-git.ts";
 import type { Scan } from "./work-scan.ts";
 
@@ -60,7 +60,7 @@ export function createCopyActions({ git, scan: scanDir, now, lane = createCardLa
       (c) => c.card.id === stale.cardId && sameLocation(c.shownFrom, stale.owner),
     );
     // An owner file that can't be read may be mid-write (BUG-24): writing over it would lose that write.
-    if (!ownerCopy && unreadableIn(scan.collected.copies, stale.owner, stale.cardId)) return UNREAD;
+    if (scan.resolution.cards.some((c) => c.card.id === stale.cardId && c.ownerUnread)) return UNREAD;
     let base: Card | null = null;
     const committed = scan.collected.headTexts.get(key);
     try {

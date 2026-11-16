@@ -2,7 +2,7 @@
 id: BUG-24
 type: bug
 title: An external write to a card hides its story for a scan
-status: In Review
+status: Acceptance
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,11 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-24-25
+  - at: 2026-11-16T00:14:50Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
 ---
 
 ## Description
@@ -45,9 +50,9 @@ story checks clear the check state shown on the card and start a needless run (`
 
 ## Acceptance criteria
 
-- [x] An empty or unparseable owner copy is never treated as deleted; the story stays shown, with the read problem listed (test: packages/server/test/work-scan-unread.test.ts::an owner copy that can't be read (BUG-24 AC1) > is never taken as deleted when the file is empty: the feature branch's copy shows)
+- [x] An empty or unparseable owner copy is never treated as deleted; the story stays shown, with the read problem listed (test: packages/server/test/work-scan-unread.test.ts::an owner copy that can't be read (BUG-24 AC1) > is never taken as deleted when the file is empty: the feature branch's copy shows; packages/server/test/card-writers-owner.test.ts::card writers, while the owner's copy can't be read (BUG-24 review) > records no PR over the owner's file; packages/work-format/test/card-view.test.ts::readOnlyReason > is read-only when the owner's copy can't be read, and says so rather than that it has none (BUG-24))
 - [x] The watch rescans once after it settles before telling observers about an unreadable or zero-length card, so a transient one is never published (test: packages/server/test/work-watch-settle.test.ts::a card a writer has just emptied (BUG-24 AC2) > is never published when the write finishes before the rescan)
-- [x] Story checks keep their state and don't rerun when a card is briefly unreadable (test: packages/server/test/story-checks-run.test.ts::what a failing run leaves behind > keeps a story's checks, and does not run them again, while its card is briefly unreadable (BUG-24 AC3))
+- [x] Story checks keep their state and don't rerun when a card is briefly unreadable (test: packages/server/test/story-checks-run.test.ts::what a failing run leaves behind > keeps a story's checks, and does not run them again, while its card is briefly unreadable (BUG-24 AC3); packages/server/test/story-checks-run.test.ts::what a failing run leaves behind > keeps a story's checks while its card stays unreadable past the retry, then reads the same (BUG-24 review); packages/server/test/story-prs-open.test.ts::a story moving into review (AC2) > doesn't push again while the card can't be read past the retry, then reads the same (BUG-24 review))
 - [x] Applying a stale copy writes the owner card atomically, through the card lane (test: packages/server/test/copy-actions.test.ts::apply, as a card write (BUG-24 AC4) > waits for the card lane before it reads or writes anything)
 
 ## Tasks

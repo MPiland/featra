@@ -11,6 +11,7 @@ import { dirname, resolve } from "node:path";
 import {
   draftedBy,
   notSpawnableReason,
+  ownerUnreadReason,
   serializeCard,
   spawner,
   STORY_ROLE,
@@ -73,6 +74,10 @@ function situation(scan: Scan | null, id: string) {
   return { top, owned, feature, featureBranch };
 }
 
+/** Why the story can't start: a stale copy shown while the owner's can't be read never makes it look startable (BUG-24). */
+const refusalOf = ({ owned, feature, featureBranch }: ReturnType<typeof situation>, id: string) =>
+  owned?.ownerUnread ? ownerUnreadReason(id) : notSpawnableReason(owned?.card, feature, featureBranch, id);
+
 export function createStorySpawn({
   scan: scanDir,
   now,
@@ -134,8 +139,9 @@ export function createStorySpawn({
   /** Makes the story's worktree and card, and says where the agent works and what its first message is. */
   async function prepare(dir: string, input: SpawnInput, by: string, prep: StoryPrep): Promise<Prepared> {
     const { role, settings, spot } = prep;
-    const { top, owned, feature, featureBranch } = situation(await scanDir(dir), input.story);
-    const refusal = notSpawnableReason(owned?.card, feature, featureBranch, input.story);
+    const found = situation(await scanDir(dir), input.story);
+    const { top, owned, featureBranch } = found;
+    const refusal = refusalOf(found, input.story);
     if (refusal !== null || !top || !owned || !featureBranch) throw new ApiError(refusal ?? SPAWN_MESSAGES.notProject);
     const folder = spot.folder(top, storyFolderName(owned.card));
     const branch = storyBranchName(owned.card);
@@ -200,8 +206,9 @@ export function createStorySpawn({
     known?: Scan | null,
   ): Promise<SpawnResult> {
     const scan = known ?? (await scanDir(dir));
-    const { top, owned, feature, featureBranch } = situation(scan, input.story);
-    const refusal = notSpawnableReason(owned?.card, feature, featureBranch, input.story);
+    const found = situation(scan, input.story);
+    const { top, owned, feature } = found;
+    const refusal = refusalOf(found, input.story);
     if (refusal !== null || !top || !feature) throw new ApiError(refusal ?? SPAWN_MESSAGES.notProject);
     if (chats.queuedStory(dir, input.story)) throw new ApiError(SPAWN_MESSAGES.queued(input.story));
     return chats.startStory({

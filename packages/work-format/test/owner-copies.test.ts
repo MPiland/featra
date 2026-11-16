@@ -33,6 +33,9 @@ function copy(location: OwnerLocation, card: Card, opts: Partial<CardCopy> = {})
   };
 }
 
+/** STORY-1 as `copies` resolve it. */
+const shownStory = (copies: CardCopy[]) => resolveCopies(copies, active).cards.find((c) => c.card.id === "STORY-1");
+
 const s1 = story("STORY-1", "FEAT-1");
 const f1 = feature("FEAT-1");
 
@@ -73,6 +76,13 @@ describe("resolveCopies: one owner per card", () => {
       "Can't read .featra/cards/STORY-1-x.md in worktree claude/story-1: no frontmatter",
       "STORY-1 can't be read in its owner (worktree claude/story-1); showing feature branch feature/1.",
     ]);
+  });
+
+  it("flags a card whose owner's file can't be read, and not one whose owner has none (BUG-24 review)", () => {
+    const unread: CardCopy = { ...copy(WT, s1), text: "", card: null, error: "no frontmatter" };
+    expect(shownStory([copy(FB, s1), copy(FB, f1), unread])?.ownerUnread).toBe(true);
+    expect(shownStory([copy(FB, s1), copy(FB, f1)])?.ownerUnread).toBeUndefined();
+    expect(shownStory([copy(WT, s1), copy(FB, f1)])?.ownerUnread).toBeUndefined();
   });
 
   it("finds the cards shown from a copy that isn't their owner's", () => {

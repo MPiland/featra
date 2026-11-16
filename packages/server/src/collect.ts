@@ -15,7 +15,6 @@ import {
   errorMessage,
   FEATRA_DIR,
   featureIdOfBranch,
-  idFromFileName,
   isRecord,
   parseCard,
   parseConfig,
@@ -47,18 +46,6 @@ export interface Collected {
 }
 
 export const locationKey = (loc: OwnerLocation) => copyKey(loc, "");
-
-/**
- * Whether `location` has a file of card `id` (by its file name) that can't be read or parsed (BUG-24): a writer outside
- * Featra empties a card before it writes the new text, so that file is being written, never deleted.
- */
-export const unreadableIn = (copies: readonly CardCopy[], location: OwnerLocation, id: string) =>
-  copies.some(
-    (c) =>
-      c.card === null &&
-      locationKey(c.location) === locationKey(location) &&
-      idFromFileName(c.path.split("/").at(-1) ?? "") === id,
-  );
 
 const normalized = (text: string) => text.replace(/\r\n/g, "\n");
 const missing = (err: unknown) => isRecord(err) && (err.code === "ENOENT" || err.code === "ENOTDIR");

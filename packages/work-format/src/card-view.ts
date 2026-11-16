@@ -24,6 +24,7 @@ import { CANCELLED, type Card } from "./types.ts";
  * owner must have a copy and be checked out in a working tree.
  */
 export function readOnlyReason(owned: OwnedCard, checkedOut: boolean, baseBranch: string): string | null {
+  if (owned.ownerUnread) return `Its owner's copy, in ${locationLabel(owned.owner)}, can't be read.`;
   if (!sameLocation(owned.shownFrom, owned.owner)) return `Its owner, ${locationLabel(owned.owner)}, has no copy.`;
   if (checkedOut) return null;
   const branch = owned.owner.kind === "main" ? baseBranch : owned.owner.branch;

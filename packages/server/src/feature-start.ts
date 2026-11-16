@@ -13,6 +13,7 @@ import {
   existingBranchOf,
   featureBranchName,
   notStartableReason,
+  ownerUnreadReason,
   parseCard,
   serializeCard,
   startedFeature,
@@ -79,7 +80,8 @@ export function createFeatureStart({
     const top = scan?.collected.paths.top;
     if (!scan || !top) throw new ApiError(START_MESSAGES.notProject);
     const owned = scan.resolution.cards.find((c) => c.card.id === id);
-    const refusal = notStartableReason(owned?.card, id);
+    // A stale copy shown while the owner's can't be read never makes the feature look startable (BUG-24).
+    const refusal = owned?.ownerUnread ? ownerUnreadReason(id) : notStartableReason(owned?.card, id);
     if (refusal !== null || !owned) throw new ApiError(refusal ?? "That card is gone.");
 
     // Git answers here, not the scan, which may be reusing what git said earlier.

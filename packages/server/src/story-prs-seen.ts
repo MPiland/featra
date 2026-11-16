@@ -1,6 +1,7 @@
 /**
  * What story PRs (STORY-11) follow of a project between scans: each story's review state, PR and owner, and the
- * project's PR settings. A move into review is judged against the last scan that had the story (BUG-23).
+ * project's PR settings. A move into review is judged against the last scan that had the story and could read its owner's
+ * copy (BUG-23, BUG-24).
  */
 import { checksApply, type Card } from "@featra/work-format";
 import type { Scan } from "./work-scan.ts";
@@ -30,8 +31,10 @@ export const baseOf = (scan: Scan, card: Card) =>
 export function seenOf(scan: Scan | null): ProjectSeen {
   if (!scan) return { auto: false, minutes: 2, stories: [] };
   const { config } = scan.collected;
-  const stories = scan.resolution.cards.flatMap(({ card, owner }): Followed[] =>
-    card.type === "story"
+  // A story whose owner's copy can't be read is left out: the copy shown may be stale, so the last real state stands
+  // (BUG-24).
+  const stories = scan.resolution.cards.flatMap(({ card, owner, ownerUnread }): Followed[] =>
+    card.type === "story" && !ownerUnread
       ? [{ id: card.id, inReview: checksApply(card, config), pr: card.pr, worktree: owner.kind === "worktree" }]
       : [],
   );

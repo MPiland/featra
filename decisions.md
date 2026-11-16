@@ -2430,3 +2430,10 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
   in that gap still reuses the old git state. It mattered only because watchers were dropped on a failure, which no
   longer happens.
 - **No ADR.** These are fixes within ADR 0002 and ADR 0016; nothing architectural changed.
+
+## 2026-11-15 — BUG-24 and BUG-25 review rulings (dev-lead)
+
+- The build choices are confirmed, with one change. The nearest readable copy is for display only: a card whose owner's copy can't be read is read-only (ownedIn gives no root) and is flagged ownerUnread. Observers (story PRs, story checks) keep its last real state. This keeps ADR 0002: writers and observers only ever act on the owner's copy.
+- The watch also marks git changed when a git watcher first starts, which closes the gap that the build left open.
+- The commit split is accepted: the watch retry serves both bugs, so the server half of BUG-25 shipped in the BUG-24 commit.
+- No existing assertion was weakened.

@@ -143,7 +143,8 @@ describe("a scan that fails (BUG-25 AC1)", () => {
       expect(heard[0]).toEqual({
         branches: expect.not.arrayContaining(["feature/9"]),
         stories: ["STORY-1"],
-        problems: [`Can't read the cards: ${LOCKED}`],
+        // Only the first line of git's stderr is shown; the log keeps all of it.
+        problems: [`Can't read the cards: ${LOCKED.split("\n")[0]}`],
       });
       // Its file watchers were kept: the next change to git is still heard, and the problem goes.
       repo.git(repo.main, "branch", "feature/10");
