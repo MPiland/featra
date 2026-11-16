@@ -29,6 +29,11 @@ export interface OwnedCard {
   /** Where the shown copy is: the owner, unless the owner has none. */
   shownFrom: OwnerLocation;
   path: string;
+  /**
+   * The owner has a file of this card that can't be read, likely mid-write (BUG-24): the copy shown is for display only.
+   * Nothing writes it, and observers keep the card's last real state.
+   */
+  ownerUnread?: true;
 }
 
 /** An uncommitted edit to a copy that isn't the owner's: flagged, never merged on its own. */
@@ -78,6 +83,9 @@ function ownerOfCopies(copies: readonly Parsed[], state: BranchState): OwnerLoca
   return fallback ? ownerOf(fallback.card, state) : { kind: "main" };
 }
 
+/** Why card `id` can't be acted on while its owner's copy can't be read (BUG-24): the copy shown may be stale. */
+export const ownerUnreadReason = (id: string) => `${id} can't be read in its owner now. Try again once it's saved.`;
+
 /** Cards shown from a copy that isn't their owner's: the owner has none. */
 export const orphans = (resolution: Resolution): OwnedCard[] =>
   resolution.cards.filter((c) => !sameLocation(c.owner, c.shownFrom));
@@ -93,13 +101,16 @@ export function resolveCopies(
 ): Resolution {
   const problems: string[] = [];
   const byId = new Map<string, Parsed[]>();
+  /** The copies that can't be read, by the card ID their file name gives. */
+  const unread = new Map<string, OwnerLocation[]>();
   const ordered = copies.toSorted((a, b) => rank(a.location) - rank(b.location) || a.path.localeCompare(b.path));
   for (const c of ordered) {
+    const fileId = idFromFileName(c.path.split("/").at(-1) ?? "");
     if (!c.card) {
       if (c.workingTree) problems.push(`Can't read ${c.path} in ${locationLabel(c.location)}: ${c.error ?? ""}`);
+      if (fileId) unread.set(fileId, [...(unread.get(fileId) ?? []), c.location]);
       continue;
     }
-    const fileId = idFromFileName(c.path.split("/").at(-1) ?? "");
     if (fileId && fileId !== c.card.id && c.workingTree) {
       problems.push(`${c.path} in ${locationLabel(c.location)} holds ${c.card.id}.`);
     }
@@ -125,9 +136,19 @@ export function resolveCopies(
     const own = group.find((c) => sameLocation(c.location, owner));
     const shown = own ?? group[0];
     if (!shown) continue;
-    if (!own)
-      problems.push(`${id} isn't in its owner (${locationLabel(owner)}); showing ${locationLabel(shown.location)}.`);
-    cards.push({ card: shown.card, owner, shownFrom: shown.location, path: shown.path });
+    // An owner whose file can't be read is likely mid-write (BUG-24): the card shows from the copy nearest the work.
+    const ownerUnread = !own && (unread.get(id)?.some((l) => sameLocation(l, owner)) ?? false);
+    if (!own) {
+      const why = ownerUnread ? "can't be read in" : "isn't in";
+      problems.push(`${id} ${why} its owner (${locationLabel(owner)}); showing ${locationLabel(shown.location)}.`);
+    }
+    cards.push({
+      card: shown.card,
+      owner,
+      shownFrom: shown.location,
+      path: shown.path,
+      ...(ownerUnread ? { ownerUnread: true as const } : {}),
+    });
     for (const c of group) {
       if (c === own || !c.workingTree || !c.edited) continue;
       if (own && normalized(own.text) === normalized(c.text)) continue;

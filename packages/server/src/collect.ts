@@ -169,7 +169,19 @@ export async function collect(dir: string, deps: CollectDeps, reuse?: GitState):
       try {
         text = await readFile(join(tree.path, ...path.split("/")), "utf8");
       } catch (err) {
-        if (!missing(err)) problems.push(`Can't read ${path} in ${tree.path}: ${errorMessage(err)}`);
+        // A file there that can't be read (a writer has it open on Windows) is a copy that can't be shown, never one
+        // the owner deleted (BUG-24).
+        if (!missing(err)) {
+          out.push({
+            location,
+            path,
+            text: "",
+            card: null,
+            error: errorMessage(err),
+            workingTree: true,
+            edited: false,
+          });
+        }
         continue;
       }
       const committed = inHead.get(path);

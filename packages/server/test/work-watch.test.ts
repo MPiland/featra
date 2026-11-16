@@ -10,7 +10,19 @@ import { GIT_ASKED_MS, until } from "./until.ts";
 /** The shared per-folder watch (ADR 0016), on a real repository, the real git and the real file watcher. */
 // Every call the scans make to git.
 const { git, calls: gitCalls } = countedGit();
-const scanner = createScanner(git);
+const real = createScanner(git);
+// The scans that have finished, so a test can wait for the look a new watch takes once its watchers start (BUG-12).
+let scansDone = 0;
+const scanner = {
+  ...real,
+  scan: async (...args: Parameters<typeof real.scan>) => {
+    try {
+      return await real.scan(...args);
+    } finally {
+      scansDone++;
+    }
+  },
+};
 const logged: string[] = [];
 const watches = createWorkWatches(scanner, (m) => logged.push(m));
 let repo: CardRepo;
@@ -74,8 +86,12 @@ describe("work watches", () => {
 
   it("rescans a card edit from disk alone, without running git", async () => {
     const heard = hearing();
+    const before = scansDone;
     const { stop } = await watches.watch(repo.main, heard.listener);
     try {
+      // The watchers the first scan started make the watch look once more and ask git again (BUG-24 review): an
+      // edit is from disk alone once that look is done.
+      await until(() => scansDone >= before + 2, GIT_ASKED_MS);
       gitCalls.length = 0;
       await repo.write(repo.main, card("STORY-1", "story", "FEAT-1", "Ready", { title: "Edited on disk" }));
       expect(titles(await heard.next(1000))).toEqual(["Edited on disk"]);

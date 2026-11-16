@@ -185,4 +185,40 @@ describe("what a failing run leaves behind", () => {
     await w.watches.scan(w.repo.main);
     await until(() => w.state() === undefined, GIT_ASKED_MS);
   });
+
+  it("keeps a story's checks, and does not run them again, while its card is briefly unreadable (BUG-24 AC3)", async () => {
+    await w.start();
+    await w.toReview();
+    expect(await w.lines("runs.log")).toHaveLength(1);
+    const kept = w.state();
+    const file = w.repo.file(w.tree, "STORY-1");
+    const text = await readFile(file, "utf8");
+    // An editor saves the card: it empties the file, and the scan that reads it so is followed by the new text.
+    w.staged.stage("STORY-1", () => writeFile(file, text));
+    await writeFile(file, "");
+    await w.watches.scan(w.repo.main);
+    expect(w.staged.done()).toBe(true);
+    await w.watches.scan(w.repo.main);
+    await w.checks.idle();
+    expect(w.state()).toBe(kept);
+    expect(await w.lines("runs.log")).toHaveLength(1);
+  });
+
+  it("keeps a story's checks while its card stays unreadable past the retry, then reads the same (BUG-24 review)", async () => {
+    await w.start();
+    await w.toReview();
+    const kept = w.state();
+    const file = w.repo.file(w.tree, "STORY-1");
+    const text = await readFile(file, "utf8");
+    // Unreadable on both tries of the scan: it is shown from another copy, which isn't the story's state.
+    await writeFile(file, "");
+    await w.watches.scan(w.repo.main);
+    await w.checks.idle();
+    expect(w.state()).toBe(kept);
+    await writeFile(file, text);
+    await w.watches.scan(w.repo.main);
+    await w.checks.idle();
+    expect(w.state()).toBe(kept);
+    expect(await w.lines("runs.log")).toHaveLength(1);
+  });
 });

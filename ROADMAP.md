@@ -102,8 +102,9 @@ epics in `.featra/cards/`.
 - Remember the board's feature filter per project.
 - Show the stale-copy mark on board cards, as list rows do.
 - Optional WIP limits or age per board column.
-- One shared card-file writer for every Featra write path (atomic, through the lane, retrying a busy rename), with a lint rule against a bare writeFile to .featra/cards.
-- Show a card that is unreadable only for a moment as being written, not as a problem.
+- One shared card-file writer for every Featra write path (atomic, through the lane, retrying a busy rename), with a lint rule against a bare writeFile to .featra/cards. It finds where to write through one "writable owner" lookup that every card writer uses, which refuses when the shown copy isn't the owner's.
+- Show a card that is unreadable only for a moment as being written, not as a problem: the owner's last copy, marked as being written, instead of a fall back to a copy that isn't the owner's.
+- After two failed scans, look again later with a backoff, so a kept problem clears without waiting for a file event.
 
 ## Before public release
 

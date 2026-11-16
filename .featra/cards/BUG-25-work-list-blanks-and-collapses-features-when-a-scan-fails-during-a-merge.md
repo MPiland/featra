@@ -2,7 +2,7 @@
 id: BUG-25
 type: bug
 title: Work list blanks and collapses features when a scan fails during a merge
-status: New
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -11,8 +11,8 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
-pr: null
+branch: claude/bug-24-25-scan-resilience
+pr: https://github.com/MPiland/featra/pull/58
 created: 2026-11-15T20:00:00Z
 history:
   - at: 2026-11-15T20:00:00Z
@@ -20,6 +20,31 @@ history:
     from: null
     to: New
     by: dev-lead
+  - at: 2026-11-15T21:00:00Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:bug-24-25
+  - at: 2026-11-15T22:30:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:bug-24-25
+  - at: 2026-11-16T00:14:51Z
+    field: status
+    from: In Review
+    to: Acceptance
+    by: dev-lead
+  - at: 2026-11-16T01:22:23Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-16T01:22:23Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -39,9 +64,9 @@ the card at the end still read In Review with the PR shown as Open (possibly a P
 
 ## Acceptance criteria
 
-- [ ] A failed scan keeps the last good list and shows the problem
-- [ ] A feature stays expanded or collapsed across list updates
-- [ ] merge-story.spec.ts no longer fails this way on Windows
+- [x] A failed scan keeps the last good list and shows the problem (test: packages/server/test/work-watch-settle.test.ts::a scan that fails (BUG-25 AC1) > keeps the last good list with the problem when it fails again, and still hears git after; packages/server/test/work-watch-late.test.ts::a watch's first scan > asks git again for a branch made just before its git watchers started (BUG-24 review))
+- [x] A feature stays expanded or collapsed across list updates (test: packages/client/test/components/work-list-open.test.tsx::a feature's open state (BUG-25 AC2) > lasts through an update that blanks the list for a moment, with a problem)
+- [x] merge-story.spec.ts no longer fails this way on Windows (test: apps/desktop/e2e/merge-story.spec.ts::Merge a Verified story: its PR merges with a merge commit, and its worktree and branches go)
 
 ## Tasks
 

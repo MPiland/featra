@@ -4,6 +4,7 @@ import { featureStatusLabel, PROGRESS_COPY, WORK_COPY } from "../../work-list.ts
 import { BugIcon, ChevronRightIcon, ProgressIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
+import { useFeatureOpen } from "./open-features.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
 import { StaleMark } from "./stale-mark.tsx";
 import { MERGE_COPY } from "@featra/work-format/merge-copy";
@@ -92,9 +93,9 @@ export function Story({ story }: { story: StoryRow }) {
   );
 }
 
-/** A feature on the shared grid; it opens to its stories, which use the same columns. */
+/** A feature on the shared grid; it opens to its stories, which use the same columns. The list keeps it open (BUG-25). */
 export function Feature({ feature }: { feature: FeatureRow }) {
-  const [open, setOpen] = useState(false);
+  const [open, toggle] = useFeatureOpen(feature.id);
   const review = useReviewDraft();
   const { open: openCard, paneId, progress, openProgress, close } = useCardSelection();
   const title = feature.id === null ? WORK_COPY.noFeature : feature.title;
@@ -104,7 +105,7 @@ export function Feature({ feature }: { feature: FeatureRow }) {
       <div className={open ? "frow open" : "frow"} role="row" data-card={feature.id ?? undefined}>
         <span aria-hidden="true" />
         <span role="cell" className="fn">
-          <button type="button" className="row-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button type="button" className="row-toggle" aria-expanded={open} onClick={toggle}>
             <ChevronRightIcon />
             <span>{title}</span>
           </button>

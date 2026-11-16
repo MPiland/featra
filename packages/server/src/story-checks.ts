@@ -42,10 +42,14 @@ export interface StoryChecksDeps {
   timeoutMs?: number;
 }
 
-/** A story the checks apply to: its id, and what a new run depends on (its stage and its worktree's HEAD). */
+/**
+ * A story the checks apply to: its id, and what a new run depends on (its stage and its worktree's HEAD). With `unread`,
+ * its owner's copy can't be read now: whatever the checks last saw of it stands (BUG-24).
+ */
 interface Reviewed {
   id: string;
   trigger: string;
+  unread?: true;
 }
 
 const NOTES = {
@@ -68,8 +72,10 @@ const headIn = (scan: Scan, owner: OwnerLocation) =>
 function reviewed(scan: Scan | null): Reviewed[] {
   if (!scan) return [];
   const { config } = scan.collected;
-  return scan.resolution.cards.flatMap(({ card, owner }) => {
-    if (owner.kind !== "worktree" || !checksApply(card, config)) return [];
+  return scan.resolution.cards.flatMap(({ card, owner, ownerUnread }): Reviewed[] => {
+    if (owner.kind !== "worktree") return [];
+    if (ownerUnread) return [{ id: card.id, trigger: "", unread: true }];
+    if (!checksApply(card, config)) return [];
     return [{ id: card.id, trigger: `${card.status}@${headIn(scan, owner)}` }];
   });
 }
@@ -222,6 +228,7 @@ export function createStoryChecks({
         if (!slots.has(key)) states.delete(key);
       }
       for (const s of items) {
+        if (s.unread) continue;
         const key = keyOf(dir, s.id);
         const changed = seen.get(key) !== s.trigger;
         seen.set(key, s.trigger);

@@ -74,6 +74,15 @@ describe("readOnlyReason", () => {
     );
     expect(readOnlyReason(owned, true, "main")).toBeNull();
   });
+
+  it("is read-only when the owner's copy can't be read, and says so rather than that it has none (BUG-24)", () => {
+    const shown = {
+      ...owned,
+      shownFrom: { kind: "feature" as const, branch: "feature/2" },
+      ownerUnread: true as const,
+    };
+    expect(readOnlyReason(shown, true, "main")).toBe("Its owner's copy, in worktree story-4, can't be read.");
+  });
 });
 
 describe("card params", () => {

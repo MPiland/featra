@@ -10,6 +10,7 @@ import {
   applyCardEdit,
   buildCardView,
   errorMessage,
+  sameLocation,
   serializeCard,
   toIso,
   type CardEdit,
@@ -47,10 +48,16 @@ const contextOf = (scan: Scan): CardEditContext => ({
   cards: scan.resolution.cards.map((c) => c.card),
 });
 
+/**
+ * Card `id` as `scan` shows it, and the folder its owner's copy is written in: null when the owner isn't checked out,
+ * or when the copy shown isn't the owner's (none, or one that can't be read: BUG-24). A writer that wrote the shown
+ * copy there would put a stale card over the owner's (ADR 0002).
+ */
 export function ownedIn(scan: Scan | null, id: string) {
   const owned = scan?.resolution.cards.find((c) => c.card.id === id);
   if (!scan || !owned) return null;
-  return { owned, root: scan.collected.roots.get(locationKey(owned.owner)) ?? null };
+  const own = sameLocation(owned.shownFrom, owned.owner);
+  return { owned, root: own ? (scan.collected.roots.get(locationKey(owned.owner)) ?? null) : null };
 }
 
 /** The pane's view of card `id` in `scan`, or null when there is no such card. */

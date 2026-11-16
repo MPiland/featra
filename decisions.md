@@ -2394,3 +2394,46 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - **Roadmap.** Added to ROADMAP.md: one shared card-file writer for every Featra write path, with a lint rule against
   a bare `writeFile` to `.featra/cards`; showing a card that is unreadable only for a moment as being written, not as a
   problem.
+
+## 2026-11-15 — BUG-24 and BUG-25 build choices (story agent, for the Dev Lead to confirm)
+
+- **BUG-25 root cause, from the trace of CI run 43749728537.** The websocket frames show the failed scan's problem:
+  `git rev-parse failed: warning: unable to access '.git/config': Permission denied`. The merge was rewriting git's
+  config on Windows; no worktree had vanished (a missing worktree folder never threw: `fromDisk` skips it, now with a
+  test). The watch then blanked the list, and because the failed scan set the last scan to null it closed every git and
+  `.featra` watcher. The rescan after they restarted reused the stale git state, so the merge's ref change was never
+  heard: the card stayed In Review with its PR Open until the end. In the client, the blank list unmounted the features
+  and `Feature`'s local `useState(false)` collapsed Shaping on its return, so the row wasn't in the page.
+- **Which copy shows when the owner's file can't be read (BUG-24 AC1).** A read error other than "not there" is now a
+  copy with no card, like a parse error, so an unreadable owner is never an orphan for `deletedAtOwner`. The card shows
+  from the readable copy nearest the work (worktree, then feature branch, then main: `resolveCopies`' usual rank), with
+  two problems: "Can't read <path> in <location>: <error>" and "<id> can't be read in its owner (<owner>); showing
+  <location>." With no readable copy anywhere the card isn't shown, and the read problem is.
+- **One more look before anyone hears (BUG-24 AC2, BUG-25 AC1).** A watch scan that throws, or reads a working-tree
+  card it can't parse that the scan before it read fine, waits the settle delay (50 ms) and scans again; listeners hear
+  only the second. A card broken the same way as last time is settled and isn't looked at twice again, so a really
+  broken card costs one extra scan, not one per scan.
+- **A failed scan keeps the last good list (BUG-25 AC1).** When the second try fails too, listeners get the last good
+  scan and list with "Can't read the cards: <error>" added, and the watchers stay as that scan set them, so the next
+  git event is heard. The watch's `scan()` for actions still answers null on a failure: an action must act on the cards
+  as they are now, not on a kept list.
+- **Copy apply (BUG-24 AC4).** Apply and discard run in the shared card lane; apply writes the owner with `writeAtomic`
+  and refuses with "The owner's copy can't be read. Fix it first." when the owner's file can't be read, since writing
+  over it would lose a write in progress.
+- **Story checks (BUG-24 AC3)** needed no change of their own: with the scan fixed, a briefly unreadable card never
+  reaches them. `story-prs.ts` wasn't touched, so `watchProject` wasn't split out; the BUG-23 `known` map stays.
+- **A feature's open state (BUG-25 AC2)** is kept by the Work list, by feature ID, in a context (`open-features.tsx`),
+  so a list update that blanks the list or a filter chip that remounts the epics leaves it as the user left it. It
+  lasts for the session of that list only, like the filter and the docked pane: not persisted to `ui-state.json`, so
+  no stale feature IDs build up there, and a project switch or restart starts with features closed as before.
+- **Not changed, noted.** A git watcher that starts after a scan doesn't mark git as changed, so an event that lands
+  in that gap still reuses the old git state. It mattered only because watchers were dropped on a failure, which no
+  longer happens.
+- **No ADR.** These are fixes within ADR 0002 and ADR 0016; nothing architectural changed.
+
+## 2026-11-15 — BUG-24 and BUG-25 review rulings (dev-lead)
+
+- The build choices are confirmed, with one change. The nearest readable copy is for display only: a card whose owner's copy can't be read is read-only (ownedIn gives no root) and is flagged ownerUnread. Observers (story PRs, story checks) keep its last real state. This keeps ADR 0002: writers and observers only ever act on the owner's copy.
+- The watch also marks git changed when a git watcher first starts, which closes the gap that the build left open.
+- The commit split is accepted: the watch retry serves both bugs, so the server half of BUG-25 shipped in the BUG-24 commit.
+- No existing assertion was weakened.
