@@ -2,7 +2,7 @@
 id: STORY-59
 type: story
 title: Merge a proven story on its own
-status: In Progress
+status: In Review
 parent: FEAT-8
 order: 1
 origin: planned
@@ -11,8 +11,8 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
-pr: null
+branch: claude/story-59-auto-merge
+pr: https://github.com/MPiland/featra/pull/62
 created: 2026-11-16T12:00:00Z
 history:
   - at: 2026-11-16T12:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:story-59
+  - at: 2026-11-16T15:31:49Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:story-59
 ---
 
