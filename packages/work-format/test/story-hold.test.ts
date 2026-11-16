@@ -86,6 +86,13 @@ describe("STORY-61 AC1: Hold is a toggle on a story while auto-merge is on, each
     const onMain = owned(inReview("Ready"), { owner: { kind: "main" }, shownFrom: { kind: "main" } });
     expect(holdRefusal(onMain, "STORY-1", config, true)).toBe("STORY-1 isn't started yet.");
     expect(holdOf(onMain, config, true)).toBeUndefined();
+    // Review: one owned by its feature branch past the first stages, not merged, isn't "not started": it has no worktree.
+    const onFeature = owned(inReview(), {
+      owner: { kind: "feature", branch: "feature/1-x" },
+      shownFrom: { kind: "feature", branch: "feature/1-x" },
+    });
+    expect(holdRefusal(onFeature, "STORY-1", config, true)).toBe("STORY-1 has no worktree.");
+    expect(holdOf(onFeature, config, true)).toBeUndefined();
     expect(holdRefusal(undefined, "STORY-1", config, true)).toBe(HOLD_MESSAGES.gone);
     expect(holdRefusal(owned(inReview()), "STORY-1", off, true)).toBe(HOLD_MESSAGES.off);
     expect(holdRefusal(owned(held(inReview())), "STORY-1", off, true)).toBe(HOLD_MESSAGES.off);

@@ -7,10 +7,10 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { HOLD_MESSAGES, isHeld, isMerged, parseCard, withCheckEvidence } from "@featra/work-format";
+import { HOLD_MESSAGES, isHeld, isMerged, MERGE_MESSAGES, parseCard, withCheckEvidence } from "@featra/work-format";
 import { createApi, type Connection } from "../src/api.ts";
 import { createAutoMerge, type AutoMerge } from "../src/auto-merge.ts";
-import { readAutoMerge } from "../src/mcp-enabled.ts";
+import { readAppAutoMerge, readAutoMerge } from "../src/mcp-enabled.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createStoryHold } from "../src/story-hold.ts";
 import { createScanner } from "../src/work-scan.ts";
@@ -18,7 +18,8 @@ import { FEATURE_BRANCH, mergeWorld, STORY_BRANCH } from "./story-merge-world.ts
 
 const m = mergeWorld();
 const { w } = m;
-const holds = () => createStoryHold({ scan: w.watches.scan, now: w.clock.now });
+/** The real Hold, writing through the merge's card lane, as the server shares one. */
+const holds = () => createStoryHold({ scan: w.watches.scan, now: w.clock.now, lane: m.lane });
 
 const autos: AutoMerge[] = [];
 /** Auto-merge as the server runs it, merging through `merge` (the real one by default). */
@@ -109,7 +110,7 @@ describe(
       await m.verified();
       const data = await mkdtemp(join(w.repo.root, "data-"));
       await writeFile(join(data, "settings.json"), JSON.stringify({ work: { autoMerge: false } }));
-      const scanner = createScanner(createRepoGit(), { autoMerge: readAutoMerge(data) });
+      const scanner = createScanner(createRepoGit(), { appAutoMerge: readAppAutoMerge(data) });
       const rows = async () =>
         (await scanner.scan(w.repo.main))!.list.epics.flatMap((e) => e.features.flatMap((f) => f.stories));
       try {
@@ -186,6 +187,48 @@ describe("STORY-61 AC2: a held story never merges on its own, and Merge still wo
     expect(m.treeExists()).toBe(true);
     stopAll();
   });
+
+  // Review regression: a try already inside merge() waited on the card lane behind the Hold, then merged the held story.
+  it("doesn't merge a story held while its merge waits on the card lane", async () => {
+    await m.start({ remote: false });
+    await m.verified();
+    // Every job that enters the lane is counted, so the test knows the Hold and then the merge are waiting in it.
+    const enter = m.lane.exclusive;
+    let jobs = 0;
+    m.lane.exclusive = (job) => {
+      jobs += 1;
+      return enter(job);
+    };
+    let free!: () => void;
+    const blocker = m.lane.exclusive(() => new Promise<void>((resolve) => (free = resolve)));
+    let go!: () => void;
+    const going = new Promise<void>((resolve) => (go = resolve));
+    const called: string[] = [];
+    const auto = autoMerge(async (dir, id, options) => {
+      called.push(id);
+      await going;
+      return m.merges.merge(dir, id, options);
+    });
+    await proveTip();
+    await expect.poll(() => called).toEqual(["STORY-1"]);
+    const held = holds().hold(w.repo.main, "STORY-1", true);
+    await expect.poll(() => jobs).toBe(2);
+    go();
+    await expect.poll(() => jobs).toBe(3);
+    free();
+    await blocker;
+    await held;
+    await settled(auto);
+    expect(m.treeExists()).toBe(true);
+    expect(onFeature().history.some((e) => e.field === "merged")).toBe(false);
+    const card = await inTree();
+    expect(isHeld(card)).toBe(true);
+    // A race, not the story's failure: nothing is recorded on the card and nobody is told.
+    expect(card.history.at(-1)).toMatchObject({ field: "held", to: "held", by: "user" });
+    expect(m.notices).toEqual([]);
+    expect(m.logs).toEqual([`STORY-1 didn't merge on its own: ${MERGE_MESSAGES.held("STORY-1")}`]);
+    stopAll();
+  });
 });
 
 describe(
@@ -208,6 +251,34 @@ describe(
       expect(isMerged(card)).toBe(true);
       expect(card.history.at(-1)).toMatchObject({ field: "merged", by: "system" });
       expect(card.history.filter((e) => e.field === "held").map((e) => e.to)).toEqual(["held", null]);
+      expect(m.treeExists()).toBe(false);
+      stopAll();
+    });
+
+    it("merges a story let go after a try that failed at the same commits", async () => {
+      await m.start({ remote: false });
+      await m.verified();
+      let calls = 0;
+      const auto = autoMerge(async (dir, id, options) => {
+        calls += 1;
+        if (calls === 1) throw new Error("The merge failed.");
+        return m.merges.merge(dir, id, options);
+      });
+      await proveTip();
+      await settled(auto);
+      expect(calls).toBe(1);
+      expect(m.treeExists()).toBe(true);
+      // Tried once at these commits: nothing tries it again on its own.
+      await settled(auto);
+      expect(calls).toBe(1);
+
+      const hold = holds();
+      await hold.hold(w.repo.main, "STORY-1", true);
+      await settled(auto);
+      await hold.hold(w.repo.main, "STORY-1", false);
+      await settled(auto);
+      expect(calls).toBe(2);
+      expect(isMerged(onFeature())).toBe(true);
       expect(m.treeExists()).toBe(false);
       stopAll();
     });

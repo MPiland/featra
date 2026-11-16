@@ -1,0 +1,44 @@
+/** What the server process gives `createServices`: the platform it runs on, which tests stand in for. */
+import type { AllowedProjects } from "./allowed-projects.ts";
+import type { ChatStore } from "./chat-store.ts";
+import type { ClaudeDeps } from "./claude-provider.ts";
+import type { Timers } from "./inbox.ts";
+import type { LogWriterDeps } from "./log-writer.ts";
+import type { RepoGit } from "./repo-git.ts";
+import type { RoleFs } from "./role-fs.ts";
+import type { WatchFolder } from "./work-watch.ts";
+
+export interface ServiceOptions {
+  allowed: AllowedProjects;
+  log: (message: string) => void;
+  /** The clock history events are stamped with. */
+  now?: () => Date;
+  /** The git to run; the one on the PATH by default. */
+  gitCommand?: string;
+  /** The repository reads and restores; the real ones through `gitCommand` by default. */
+  repoGit?: RepoGit;
+  /** How the Claude adapter loads the Agent SDK and finds `claude`; the real ones by default. */
+  claude?: ClaudeDeps;
+  /** The app's data folder, where chats are saved (`chats.json`, STORY-44); without it they last until exit. */
+  dataDir?: string;
+  /** Where chats are kept, in place of `chats.json` in `dataDir`: tests give a slow or failing store. */
+  chatStore?: ChatStore;
+  /** The disk the roles and the providers' settings are read from; none by default (no home), so a test never reads the real one: `main.ts` gives it this machine's. */
+  roleFs?: RoleFs;
+  /** How the role watches open folders, in place of `fs.watch`: tests count the watchers still open. */
+  roleWatchFolder?: WatchFolder;
+  /** The Featra MCP's script (`dist/mcp.cjs`); without it no agent gets the MCP (STORY-47). */
+  mcpEntry?: string;
+  /** The runtime that runs the MCP script: this process's by default. */
+  mcpExecPath?: string;
+  /** How entries agents log are written and dated: the real disk and clock by default. */
+  logs?: LogWriterDeps;
+  /** How long Stop waits for a provider to end the turn it interrupts; ten seconds by default. */
+  interruptMs?: number;
+  /** The GitHub CLI to ask whether a repo is public; the one on the PATH by default (STORY-56). */
+  ghCommand?: string;
+  /** How long a check command may run before it is killed (STORY-56). */
+  checkTimeoutMs?: number;
+  /** The timers PR reads wait on (STORY-11); the real ones by default. */
+  prTimers?: Timers;
+}

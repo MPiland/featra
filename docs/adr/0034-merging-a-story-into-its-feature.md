@@ -23,7 +23,9 @@ on its own unless auto-merge is on. The card is owned by its worktree while the 
   own. Merge by hand is unchanged. (Amended 2026-11-16, STORY-61.) A started story the user holds (**Hold**, a toggle on
   its card pane and Work row while auto-merge is on; each turn is a `held` event in its history, by `user`) never
   merges on its own. Merge by hand still works on it. Let go, it is among the stories auto-merge picks again, so a
-  story already Verified and Proven merges.
+  story already Verified and Proven merges. Auto-merge's try reads Hold again after the merge's own scan (in the card
+  lane, locally). A story held while the try waited is refused there: the refusal is logged, not recorded on the card
+  or told. A settings save looks again only at projects whose setting in effect changed.
 - **Merge, by hand.** Merge is offered in the story's card pane, Work row and session when it is Verified, from
   review on (or Done), with a live worktree, and not merged yet. The Dev Lead can only ask with `request_merge`: an
   approval card in its chat and the Inbox, with Merge and Decline. The call answers once the user is asked. How it ends

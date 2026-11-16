@@ -10,6 +10,7 @@ import { join } from "node:path";
 import { beforeEach } from "vitest";
 import { withCheckEvidence, type Notice } from "@featra/work-format";
 import type { AppApproval, ChatManager } from "../src/chat-manager-types.ts";
+import { createCardLane, type CardLane } from "../src/card-lane.ts";
 import { runGit } from "../src/git-run.ts";
 import { createMergeRequest, type MergeRequest } from "../src/merge-request.ts";
 import { createStoryChecks } from "../src/story-checks.ts";
@@ -32,6 +33,8 @@ export const SESSION = "chat-1";
 export interface MergeWorld {
   w: PrWorld;
   merges: StoryMerge;
+  /** The card lane the merge writes through, for a test that puts another writer beside it. */
+  lane: CardLane;
   requests: MergeRequest;
   /** What the fake chat manager was asked: opened and retired chats, sent messages, approvals and notices. */
   opened: string[];
@@ -154,9 +157,11 @@ export function mergeWorld(): MergeWorld {
       now: w.clock.now,
       log: () => {},
     });
+    m.lane = createCardLane();
     m.merges = createStoryMerge({
       scan: w.watches.scan,
       now: w.clock.now,
+      lane: m.lane,
       log: (line) => m.logs.push(line),
       settings: w.settings,
       chats,

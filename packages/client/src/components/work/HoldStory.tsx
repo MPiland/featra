@@ -14,7 +14,7 @@ export function HoldStory({ id, held, hold }: { id: string; held: boolean | unde
   const { busy, error, run } = useAction();
   if (held === undefined && !error) return null;
   return (
-    <span className="accept-story">
+    <span className="story-action">
       {held !== undefined && (
         <button
           type="button"

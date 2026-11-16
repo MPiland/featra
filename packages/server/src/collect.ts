@@ -64,20 +64,29 @@ function parsed(location: OwnerLocation, path: string, text: string, workingTree
   }
 }
 
-/** The project's config, and whether its file names a base branch (else the repository's default is used). */
-async function readConfig(top: string, problems: string[]): Promise<{ config: ProjectConfig; baseSet: boolean }> {
+/**
+ * The project's config over `defaults` (the keys its file leaves out), and whether its file names a base branch (else
+ * the repository's default is used).
+ */
+async function readConfig(
+  top: string,
+  problems: string[],
+  defaults: ProjectConfig,
+): Promise<{ config: ProjectConfig; baseSet: boolean }> {
   try {
     const text = await readFile(join(top, ...CONFIG_FILE.split("/")), "utf8");
-    return { config: parseConfig(text), baseSet: configOverrides(text).baseBranch !== undefined };
+    return { config: parseConfig(text, defaults), baseSet: configOverrides(text).baseBranch !== undefined };
   } catch (err) {
     if (!missing(err)) problems.push(`Can't read ${CONFIG_FILE}: ${errorMessage(err)}`);
-    return { config: DEFAULT_CONFIG, baseSet: false };
+    return { config: defaults, baseSet: false };
   }
 }
 
 export interface CollectDeps {
   git: RepoGit;
   index: (paths: RepoPaths) => CardIndex;
+  /** What a key the project's config leaves out is: Featra's own defaults unless the scanner says otherwise. */
+  defaults?: ProjectConfig;
 }
 
 /** One location to read: from disk with what its HEAD has, or the card files of a commit. */
@@ -140,7 +149,7 @@ export async function collect(dir: string, deps: CollectDeps, reuse?: GitState):
   const paths = reuse?.paths ?? (await deps.git.paths(dir));
   if (!paths || !(await isDir(join(paths.top, FEATRA_DIR)))) return null;
   const problems: string[] = [];
-  const configRead = await readConfig(paths.top, problems);
+  const configRead = await readConfig(paths.top, problems, deps.defaults ?? DEFAULT_CONFIG);
   // The config's `baseBranch` wins; without one, the repository's default (origin/HEAD, main, master), found once and
   // kept for rescans that reuse git's part (ADR 0016).
   const found = configRead.baseSet

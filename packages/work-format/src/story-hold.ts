@@ -3,6 +3,7 @@
  * is, it is what the card's history says last about it, so the toggle's every turn is in the history and the last event
  * is the mark. A held story never merges on its own; Merge by hand still works on it.
  */
+import { stageCategory } from "./config.ts";
 import { appendHistory, isMerged } from "./history.ts";
 import type { OwnedCard } from "./owner-copies.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
@@ -21,6 +22,8 @@ export const HOLD_MESSAGES = {
   merged: (id: string) => `${id} is already merged.`,
   cancelled: (id: string) => `${id} is cancelled.`,
   notStarted: (id: string) => `${id} isn't started yet.`,
+  /** Past its first stages and not merged, but its card isn't in a worktree of its own: nothing would merge. */
+  noWorktree: (id: string) => `${id} has no worktree.`,
   off: "Auto-merge is off for this project.",
   readOnly: "Can't edit it here.",
 } as const;
@@ -42,7 +45,10 @@ export function holdRefusal(
   if (card.type !== "story") return HOLD_MESSAGES.notStory(id);
   if (isMerged(card)) return HOLD_MESSAGES.merged(id);
   if (card.status === CANCELLED) return HOLD_MESSAGES.cancelled(id);
-  if (owned.owner.kind !== "worktree") return HOLD_MESSAGES.notStarted(id);
+  if (owned.owner.kind !== "worktree") {
+    const fresh = stageCategory(card.status, config) === "not-started";
+    return fresh ? HOLD_MESSAGES.notStarted(id) : HOLD_MESSAGES.noWorktree(id);
+  }
   if (!config.autoMerge) return HOLD_MESSAGES.off;
   if (owned.ownerUnread || !writable) return HOLD_MESSAGES.readOnly;
   return null;

@@ -2531,6 +2531,8 @@ default turned on, are resolved by review fixes 1 and 3 below; the bullets say w
 
 ## 2026-11-16 — STORY-61 build choices
 
+Confirmed by the Dev Lead in review (rulings below); updated where a ruling changed them.
+
 - **Held is history, not a field.** As Stopped is, Hold is the last `held` event in the card's history (`to: held`
   holds, `from: held, to: null` lets go), by `user`. Every turn of the toggle is in the history (AC1) and the card
   format gains no field. Turning it to the state it is already in writes nothing.
@@ -2541,15 +2543,42 @@ default turned on, are resolved by review fixes 1 and 3 below; the bullets say w
   toggle shows exactly when it works. With
   auto-merge off the toggle and the Held mark are hidden: Hold means nothing then (AC1 "while auto-merge is on").
   The history is kept, so a story held before the setting was turned off is still held when it's turned on again.
-- **The setting in effect reaches the scan.** The scanner takes the server's `readAutoMerge` (project value, else app
-  default, else on), so the scan's `config.autoMerge` is the effective setting for the Work list, the card view and
-  Hold's refusal. Saving app settings now also rescans every open project, so the toggle appears or goes without a
-  file change. Auto-merge itself still reads the setting the same way, so nothing changes for it.
+- **The setting in effect reaches the scan.** The scanner reads the app default for `autoMerge` (`readAppAutoMerge`)
+  and parses the project's config over it, so the scan's `config.autoMerge` is the setting in effect (project value,
+  else app default, else on) for the Work list, the card view, Hold's refusal and auto-merge's pick. Saving app
+  settings rescans an open project only when its setting in effect changed, and auto-merge looks again once any did, so
+  the toggle appears or goes without a file change. Auto-merge's own check in a story's turn reads the same setting in
+  effect (`readAutoMerge`).
 - **The observer is unchanged.** `mergesOnItsOwn` returns false for a held story, so it drops out of auto-merge's pick
   and its try is forgotten. Let go, the write rescans and it is picked again: a story already Verified and Proven
-  merges (AC3). If Hold lands while an attempt is already merging, that merge goes on; Hold is read when a story is
-  picked and again in its turn in the feature's line, not inside `merge()`.
+  merges (AC3). A story held while an attempt is already in `merge()` is refused inside it, after the merge's own scan
+  (in the card lane, locally): see the review rulings below.
 - **Merge by hand ignores Hold** (AC2); `mergeRefusal` doesn't read it.
 - **The toggle.** "Hold", a button with `aria-pressed`, beside Merge in the card pane and the Work row, filled when
   on, with "· Held" after it on a held story (AC4). No confirmation, like Stop; a refusal shows in one sentence
   beside it. Server method `story.hold { dir, id, held }`, written to the owner copy in the card lane.
+
+## 2026-11-16 — STORY-61 review rulings (dev-lead)
+
+- Build choices confirmed, except the merge already in flight.
+- **A story held while its auto-merge waits never merges.** Auto-merge calls `merge(dir, id, { auto: true })`. That
+  try refuses a held story after the merge's own scan: inside the card lane locally, so a Hold queued ahead of it
+  wins. Merge by hand and `request_merge` pass no option and still ignore Hold. On GitHub the scan comes before the PR
+  merge, outside the lane, so a Hold landing during GitHub's own calls isn't seen. That window is left, as holding the
+  lane through network calls would stall every card write.
+- **The refusal is a race, not the story's failure.** It throws `HeldRefusal` (an `ApiError` with `kind: "held"`): it
+  is logged, not recorded on the card, and the Dev Lead isn't told. STORY-60's review fix gives merge errors a kind,
+  and records and tells only the story's own refusals. `held` is outside that set: whichever branch lands second fits
+  it in with no record and no notice.
+- **Tests.** A regression test holds the story while its merge waits on the lane behind an exclusive job. It failed
+  before the fix: the held story merged. A second test lets a story go after a failed try at the same commits, and it
+  merges.
+- **Nits.**
+  - A settings save rescans and re-checks only projects whose setting in effect changed.
+  - The scan reads only the app default and parses the project's config over it, not a second time.
+  - Hold's refusal for a story past its first stages whose card isn't in a worktree says "has no worktree".
+  - The story-action class is shared and neutral (`story-action`, was `accept-story`).
+  - The e2e's fixed 5 s wait stays: there is no deterministic signal (a held story is never picked, so auto-merge
+    logs nothing).
+  - `api.ts` and `services.ts` are under 300 lines: the project setup and roles methods moved to `api-project.ts` and
+    `api-roles.ts`, `ServiceOptions` to `services-options.ts`, and the settings save to `settings-changes.ts`.

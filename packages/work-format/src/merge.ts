@@ -38,6 +38,8 @@ export const MERGE_MESSAGES = {
   stale: (id: string) => `${id}'s checks haven't passed on its latest commit yet.`,
   noPr: (id: string) => `${id} has no PR. Open its PR first.`,
   prClosed: (id: string) => `${id}'s PR is closed.`,
+  /** Auto-merge's try of a story held since it was picked (STORY-61); Merge by hand ignores Hold. */
+  held: (id: string) => `${id} is held.`,
   targetBusy: (branch: string) => `${branch} has local changes in the way. Commit or stash them, then merge again.`,
   failed: "Couldn't merge",
   conflict: (id: string, files: readonly string[], stage: string) =>

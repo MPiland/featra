@@ -19,7 +19,7 @@ export function AcceptStory({
 }) {
   const { busy, error, run } = useAction();
   return (
-    <span className="accept-story">
+    <span className="story-action">
       <button
         type="button"
         className="review-draft"

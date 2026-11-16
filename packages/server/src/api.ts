@@ -4,11 +4,9 @@ import {
   cardUpdateParams,
   copyParams,
   dirParams,
-  roleEditParams,
   sendBackParams,
   storySendBackParams,
   checksSetParams,
-  setupParams,
   starter,
   unwatchParams,
   type PushEvent,
@@ -23,6 +21,8 @@ import { createChatApi } from "./api-chat.ts";
 import { createBugApi } from "./api-bugs.ts";
 import { createStoryEndApi } from "./api-story-end.ts";
 import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
+import { createProjectApi } from "./api-project.ts";
+import { createRoleApi } from "./api-roles.ts";
 import type { BugFiling } from "./bug-filing.ts";
 import { cardViewIn, type CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
@@ -42,8 +42,6 @@ import type { StoryStop } from "./story-stop.ts";
 import type { Git } from "./git.ts";
 import type { RoleRegistry } from "./role-registry.ts";
 import type { RoleWatches } from "./role-watch.ts";
-import { initFeatra, initGit, setupStatus } from "./project-setup.ts";
-import { setUpProject, setupPlan } from "./project-setup-plan.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
 export { ApiError };
@@ -149,6 +147,8 @@ export function createApi({
     allow(p.dir);
     return p;
   };
+  const projectApi = createProjectApi({ git, allow, project });
+  const roleApi = createRoleApi({ roles, roleWatches, allowed, allow, project });
   const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
   const bugApi = createBugApi({ bugs, allow });
   const featureApi = createFeatureApi({ features, card });
@@ -157,18 +157,11 @@ export function createApi({
   const answer: Api = async (method, params, id, connection) => {
     switch (method) {
       case "project.setupStatus":
-        return setupStatus(project(params), git);
       case "project.gitInit":
-        return initGit(project(params), git);
       case "project.init":
-        return initFeatra(project(params), git);
       case "project.setupPlan":
-        return setupPlan(project(params), git);
-      case "project.setup": {
-        const p = setupParams(params);
-        if (!p) throw new ApiError("Expected { dir, items }.");
-        return setUpProject(allow(p.dir), p.items, git);
-      }
+      case "project.setup":
+        return projectApi(method, params);
       case "work.watch": {
         const dir = project(params);
         // The rows carry each story's PR state as last read (STORY-11), which a new read changes without a file event.
@@ -273,19 +266,9 @@ export function createApi({
         if (!p) throw new ApiError("Expected { dir, id, reason }.");
         return acceptance.sendBack(allow(p.dir), p.id, p.reason, p.addCriterion);
       }
-      case "roles.watch": {
-        const dir = project(params);
-        const { list, stop } = await roleWatches.watch(dir, (next) => {
-          if (allowed.has(dir)) connection.push("roles.list", id, next);
-        });
-        connection.keep(id, stop);
-        return list;
-      }
-      case "roles.edit": {
-        const p = roleEditParams(params);
-        if (!p) throw new ApiError("Expected { dir, edit }.");
-        return roles.edit(allow(p.dir), p.edit);
-      }
+      case "roles.watch":
+      case "roles.edit":
+        return roleApi(method, params, id, connection);
       case "chat.roles":
       case "chat.start":
       case "chat.watch":

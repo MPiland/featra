@@ -112,7 +112,9 @@ test("A held story doesn't merge on its own until Hold is turned off", async () 
         { timeout: 30_000 },
       )
       .toBe(true);
-    // Auto-merge has had the proven story in front of it; give it time to (wrongly) act.
+    // Auto-merge has had the proven story in front of it; give it time to (wrongly) act. A fixed wait, as nothing
+    // deterministic says it is done: a held story is never picked, so auto-merge logs nothing, and the app exposes no
+    // idle of its own. The merge world's tests prove the same with `idle()` (packages/server/test/story-hold.test.ts).
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
     await page.waitForTimeout(5_000);
     expect((await gh.calls()).some((c) => c.args.slice(0, 2).join(" ") === "pr merge")).toBe(false);

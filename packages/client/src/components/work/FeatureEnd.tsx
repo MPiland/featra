@@ -38,7 +38,7 @@ export function FeatureEnd({
   const accepted = end?.accepted === true;
   const reason = accepted && end.blocked && !merging.busy ? end.blocked : null;
   return (
-    <span className="accept-story">
+    <span className="story-action">
       {end?.acceptable && (
         <button
           type="button"
