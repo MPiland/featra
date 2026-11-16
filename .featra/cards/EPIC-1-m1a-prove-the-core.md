@@ -2,7 +2,7 @@
 id: EPIC-1
 type: epic
 title: "M1a: prove the core"
-status: active
+status: done
 parent: null
 order: 1
 origin: planned
@@ -12,6 +12,16 @@ history:
     field: status
     from: null
     to: active
+    by: user
+  - at: 2026-11-16T14:00:27Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-16T14:00:27Z
+    field: status
+    from: active
+    to: done
     by: user
 ---
 
