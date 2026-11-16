@@ -2466,3 +2466,14 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - Product: no bug. Writes are safe because the shared card lane is held across the worktree add and the card write. The record of why is corrected.
 - The wait condition has a fast unit test. The e2e race itself can't fail first on demand.
 - No existing assertion was weakened; start-story's branch assertion was made stronger.
+
+## 2026-11-16 — FEAT-8 Auto-merge shaping (user and dev-lead)
+
+- A story merges into its feature branch on its own once it is Verified and Proven. A story with a criterion that has no linked test is never Proven, so it keeps the manual Merge button.
+- An automatic merge doesn't wait for Accept. Accept still gates Done, not the merge.
+- Auto-merge is on by default: in the app default, for new projects, and in this repo, whose `autoMerge: false` line goes. A project can turn it off under Workflow, next to Require acceptance.
+- On a conflict, an automatic merge does what Merge does: nothing merges, the story returns to In Progress and its session gets the files.
+- The Dev Lead that started the story hears about every automatic merge, both merged and not merged.
+- A Hold toggle on a story keeps it from merging on its own. Merge still works on a held story.
+- Dev-lead calls: stories under one feature merge one at a time; a story is checked when its evidence changes and once when the project opens; ADR 0034 ("only the user merges") is amended in STORY-59.
+- Stories: STORY-59 Merge a proven story on its own; STORY-60 An automatic merge that fails; STORY-61 Hold a story back from auto-merge. STORY-60 and STORY-61 depend on STORY-59.
