@@ -7,6 +7,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
+import { startedStory } from "./story-worktree.ts";
 
 /**
  * STORY-12: merging a Verified story into its feature. The real app, its real local server and real git; only the
@@ -47,15 +48,7 @@ test("Merge a Verified story: its PR merges with a merge commit, and its worktre
     await page.getByRole("button", { name: "Shaping", exact: true }).click();
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    await expect
-      .poll(() => git(repo.dir, "branch", "--format=%(refname:short)"))
-      .toMatch(/featra\/story-\d+-draft-a-feature/);
-    const branch =
-      git(repo.dir, "branch", "--format=%(refname:short)")
-        .split("\n")
-        .find((b) => b.startsWith("featra/story-")) ?? "";
-    const id = `STORY-${/story-(\d+)-/.exec(branch)?.[1]}`;
-    const folder = join(repo.dir, ".claude", "worktrees", `${id}-draft-a-feature`);
+    const { branch, id, folder } = await startedStory(repo.dir);
     const merge = row.getByRole("button", { name: `Merge ${id}` });
 
     // The story's work, committed in its worktree as its session would.

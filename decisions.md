@@ -2437,3 +2437,23 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - The watch also marks git changed when a git watcher first starts, which closes the gap that the build left open.
 - The commit split is accepted: the watch retry serves both bugs, so the server half of BUG-25 shipped in the BUG-24 commit.
 - No existing assertion was weakened.
+
+## 2026-11-15 — BUG-26 build choices (story agent, for the Dev Lead to confirm)
+
+- **What the spec waits for.** Not the cards folder alone: the story's card in the worktree, parsed, naming the
+  story's branch. Start writes that card after `git worktree add` returns, so it shows the checkout is done and that
+  Start's own write is over. A spec that edits the card on sight of the checked-out file could have Start write over
+  its edit.
+- **One helper for every spec.** `startedStory(dir)` in `apps/desktop/e2e/story-worktree.ts` holds the branch poll
+  (same assertion, moved), the ID and folder, and the card wait, with a 30 s timeout. It replaces the copied block in
+  nine specs: `ci-proven`, `abandon-story`, `merge-story`, `start-story`, `accept-story`, `local-checks`,
+  `stop-resume-story`, `story-notice` and `story-pr`. `update-card` is left alone: it reads the worktree only after the
+  app has shown the evidence written there.
+- **No failing-first test.** The race is a timing window on Windows CI; a spec can't open it on demand and Electron
+  e2e runs in CI only. The card's notes say so.
+- **Product checked, no bug.** `story-spawn` reads the card from the scan and writes the worktree only after
+  `git worktree add` returns. The scan treats a worktree as a card's owner only when a card there parses and names its
+  branch (`branchStateOf`), and a missing cards folder there is skipped. Noted, not changed: git writes checkout files
+  in place, so a watch scan in that window could read a half-written card in the new worktree and show "Can't read"
+  for one scan; it is never the owner then, so nothing acts on it.
+- **No ADR.** Test-only change.
