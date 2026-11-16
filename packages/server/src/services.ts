@@ -100,6 +100,8 @@ export function createServices({
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
   agents: AgentBridge;
+  /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
+  settingsChanged: () => void;
   close: () => Promise<void>;
 } {
   const scanner = createScanner(repoGit);
@@ -274,6 +276,7 @@ export function createServices({
   return {
     api,
     agents,
+    settingsChanged: () => autoMerges.recheck(),
     async close() {
       stopClosing();
       checks.close();

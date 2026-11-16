@@ -7,17 +7,20 @@ Date: 2026-11-12 · Status: proposed
 A story is built in its own worktree and branch (ADR 0025), checked locally or in CI (ADR 0031), and has a PR when
 GitHub is usable (ADR 0032). Its work then has to reach the feature branch. Accept gates Done, not the merge: a story can
 be Verified and merged before the user accepts it. A merge must never lose work, never rewrite history, and never happen
-on its own unless the user lets it. The card is owned by its worktree while the worktree exists (ADR 0002), so the merge also moves ownership.
+on its own unless auto-merge is on. The card is owned by its worktree while the worktree exists (ADR 0002), so the merge also moves ownership.
 
 ## Decision
 
 - **The user merges, or auto-merge when it's on.** (Amended 2026-11-16, STORY-59.) With the Workflow setting
-  `autoMerge` on (the project's own value, else the app default, else on), a story that is Verified and Proven, whose
-  owner copy can be read and that Merge would take, merges on its own through the same merge, by `system`, without
-  Accept. Each project's stories are looked at when it opens and whenever a scan changes which could merge. Stories of
-  one feature merge one at a time. A story is tried once for each head and checked commit: a merge that fails is logged
-  and waits until one of them changes. The Dev Lead that started the story is told it merged. With the setting off,
-  nothing merges on its own.
+  `autoMerge` on (the project's own value, else the app default, else on), a story that is Verified, with every
+  criterion proven at the commit Merge would merge (`proven:<n>@<commit>`; proof recorded without a commit doesn't
+  count), under an active feature (not Cancelled, Done or merged to main), whose owner copy can be read and that Merge
+  would take, merges on its own through the same merge, by `system`, without Accept. Each project's stories are looked
+  at when it opens, whenever a scan changes which could merge, when a chat changes, and when the app's settings are
+  saved. A story whose session is running or waiting is passed over until it is idle. Stories of one feature merge one
+  at a time. A story is tried once for each head and checked commit: a merge that fails is logged and waits until one
+  of them changes. The Dev Lead that started the story is told it merged. With the setting off, nothing merges on its
+  own. Merge by hand is unchanged.
 - **Merge, by hand.** Merge is offered in the story's card pane, Work row and session when it is Verified, from
   review on (or Done), with a live worktree, and not merged yet. The Dev Lead can only ask with `request_merge`: an
   approval card in its chat and the Inbox, with Merge and Decline. The call answers once the user is asked. How it ends

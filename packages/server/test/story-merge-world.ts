@@ -45,9 +45,11 @@ export interface MergeWorld {
   /** What happens as STORY-1's session is retired, mid-merge (a turn that ran meanwhile); nothing unless a test sets it. */
   onRetire: (() => Promise<void>) | undefined;
   /** The fake chat manager, for the other modules a test puts beside the merge. */
-  chats: Pick<ChatManager, "storySession" | "list" | "open" | "send" | "retire">;
+  chats: Pick<ChatManager, "storySession" | "list" | "open" | "send" | "retire" | "watchList">;
   /** Whether STORY-1's session is running a turn. */
   running: boolean;
+  /** Tells those watching the chat list it changed, as the chat manager does when a session's turn ends. */
+  chatsChanged: () => void;
   /**
    * The commit the story's local checks settled on, when a test sets it. Unset, it is what the real checks of a
    * Featra that has just started say: none of their own, so the commit the card recorded.
@@ -77,6 +79,7 @@ export function mergeWorld(): MergeWorld {
   const w = prWorld();
   const m = { w } as MergeWorld;
   let answers: ((allow: boolean) => void)[] = [];
+  const listeners = new Set<() => void>();
 
   const chats = {
     storySession: () => SESSION,
@@ -84,6 +87,11 @@ export function mergeWorld(): MergeWorld {
       [
         { id: SESSION, running: m.running, queued: false, story: { id: "STORY-1", parent: LEAD } },
       ] as unknown as ReturnType<ChatManager["list"]>,
+    watchList: (_dir: string, listener: (list: ReturnType<ChatManager["list"]>) => void) => {
+      const told = () => listener(chats.list());
+      listeners.add(told);
+      return { chats: chats.list(), stop: () => listeners.delete(told) };
+    },
     open: async (id: string) => {
       m.opened.push(id);
     },
@@ -120,6 +128,9 @@ export function mergeWorld(): MergeWorld {
   });
 
   m.chats = chats;
+  m.chatsChanged = () => {
+    for (const told of listeners) told();
+  };
   m.answer = (allow) => answers.shift()?.(allow);
   m.tip = (branch) => w.repo.git(w.repo.main, "rev-parse", `refs/heads/${branch}`).trim();
   m.parents = (cwd, rev) => w.repo.git(cwd, "log", "-1", "--format=%P", rev).trim().split(" ").filter(Boolean);

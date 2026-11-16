@@ -1,6 +1,7 @@
 /**
- * Merging a story into its feature (STORY-12, ADR 0034). The user's Merge, or the Dev Lead's `request_merge` once the
- * user approves it; never on its own. Merge needs Verified for the commit the story's branch is at, not Accept.
+ * Merging a story into its feature (STORY-12, ADR 0034). The user's Merge, the Dev Lead's `request_merge` once the
+ * user approves it, or auto-merge when it is on (STORY-59, auto-merge.ts). Merge needs Verified for the commit the
+ * story's branch is at, not Accept.
  *
  * With GitHub usable it merges the story's PR (`gh pr merge --merge --match-head-commit`); else it makes the merge
  * commit into the feature branch with git (merge-git.ts). Either way it is a merge commit: never squash, rebase or
@@ -63,6 +64,13 @@ type Attempt =
   | { kind: "merged"; into: string; remote: GithubRemote | null }
   | { kind: "conflict"; into: string; files: string[] };
 
+/** Whether story `id`'s session is running or waiting to run a turn, which Merge refuses (`MERGE_MESSAGES.working`). */
+export function sessionBusy(chats: Pick<ChatManager, "storySession" | "list">, dir: string, id: string): boolean {
+  const session = chats.storySession(dir, id);
+  const row = session === null ? undefined : chats.list(dir).find((c) => c.id === session);
+  return !!(row?.running || row?.queued);
+}
+
 /** The story, read fresh, with everything a merge of it needs; throws why it can't merge. */
 interface Ready {
   card: Card;
@@ -92,9 +100,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     const top = scan.collected.paths.top;
     const tip = card.branch ? await git.commitOf(top, `refs/heads/${card.branch}`) : null;
     if (!into || !tip) throw new ApiError(MERGE_MESSAGES.noFeature(id));
-    const session = chats.storySession(dir, id);
-    const row = session === null ? undefined : chats.list(dir).find((c) => c.id === session);
-    if (row?.running || row?.queued) throw new ApiError(MERGE_MESSAGES.working(id));
+    if (sessionBusy(chats, dir, id)) throw new ApiError(MERGE_MESSAGES.working(id));
     const dirty = await git.uncommitted(found.root, path);
     if (dirty.length > 0) throw new ApiError(MERGE_MESSAGES.dirty(id, dirty));
     return { card, config, top, path, into, tip };

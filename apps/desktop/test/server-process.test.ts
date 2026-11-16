@@ -76,6 +76,15 @@ describe("the server child process", () => {
     expect(await setup.status(second)).toEqual({ state: "no-featra" });
   }, 20_000);
 
+  it("tells the server the app's settings were saved, a message it takes (STORY-59)", async () => {
+    await server.endpoint();
+    const before = logged.length;
+    server.settingsChanged();
+    // The list after it is acknowledged once the server has read both, in order.
+    await server.setProjects([]);
+    expect(logged.slice(before).filter((l) => l.includes("malformed"))).toEqual([]);
+  }, 20_000);
+
   // Regression (STORY-2 review): the exit of a server main stopped was logged after "Quitting", which must stay last.
   it("a stop main asks for logs nothing, then or when the child exits", async () => {
     await server.endpoint();
