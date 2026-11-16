@@ -12,7 +12,7 @@ import { BRANCH, startFixture } from "./feature-start-fixture.ts";
 import { withoutInheritedGitConfig } from "./git-config-env.ts";
 
 withoutInheritedGitConfig();
-const { f, s, git, branches, worktrees, indexesLeft, approved, snapshot, nothingChanged } = startFixture();
+const { f, s, git, branches, worktrees, indexesLeft, cardFile, approved, snapshot, nothingChanged } = startFixture();
 
 describe("AC4: Start is refused with a clear message", () => {
   it("refuses a feature that is still a draft", async () => {
@@ -86,6 +86,24 @@ describe("AC4: Start is refused with a clear message", () => {
       "FEAT-7 isn't approved on main yet. Commit it there first.",
     );
     nothingChanged(before);
+  });
+
+  it("refuses while the started feature's own copy can't be read, though another copy says approved (BUG-24 review)", async () => {
+    const feature = await approved();
+    await s.starts.start(f.repo.main, feature, "user");
+    // The feature branch is checked out, so its working copy is the owner's; an editor saving it has emptied it.
+    const held = join(f.repo.root, "feature-held");
+    git("worktree", "add", "-q", held, BRANCH);
+    const owner = join(held, ".featra", "cards", await cardFile(feature));
+    writeFileSync(owner, "");
+    const shown = (await f.scanner.scan(f.repo.main))?.resolution.cards.find((c) => c.card.id === feature);
+    expect(shown).toMatchObject({ ownerUnread: true, card: { status: "approved" } });
+    const before = snapshot();
+    await expect(s.starts.start(f.repo.main, feature, "user")).rejects.toThrow(
+      `${feature} can't be read in its owner now. Try again once it's saved.`,
+    );
+    expect(branches()).toEqual(before.branches);
+    expect(readFileSync(owner, "utf8")).toBe("");
   });
 
   it("refuses a folder that isn't a Featra project in git", async () => {

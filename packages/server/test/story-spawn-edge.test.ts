@@ -4,7 +4,7 @@
  * into the worktree; an id that isn't a STORY id never names a path; a failed start says what remains; a project closed
  * while the worktree is made leaves nothing behind. Real services, sockets and git; only the Agent SDK and clock are faked.
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { chmod, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -104,6 +104,20 @@ describe("the owner's copy", () => {
       status: "In Progress",
       description: "Changed, not committed.",
     });
+  });
+});
+
+describe("an owner's copy that can't be read", () => {
+  it("refuses a second start, though the feature branch's copy is still startable (BUG-24 review)", async () => {
+    expect(await start("STORY-11")).toMatchObject({ ok: true });
+    const owner = w.repo.file(folder("STORY-11-spawn-11"), "STORY-11");
+    expect(existsSync(owner)).toBe(true);
+    // An editor saving the story's card in its worktree has emptied it.
+    await writeFile(owner, "");
+    const reply = await start("STORY-11");
+    expect(reply).toMatchObject({ ok: false });
+    expect(String(reply.error)).toBe("STORY-11 can't be read in its owner now. Try again once it's saved.");
+    expect(readFileSync(owner, "utf8")).toBe("");
   });
 });
 
