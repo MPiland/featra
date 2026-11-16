@@ -2,7 +2,7 @@
 id: BUG-26
 type: bug
 title: Proven e2e reads a story worktree before its files are checked out
-status: Acceptance
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -40,6 +40,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-16T04:48:45Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-16T04:48:45Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
