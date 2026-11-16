@@ -2,7 +2,7 @@
 id: BUG-26
 type: bug
 title: Proven e2e reads a story worktree before its files are checked out
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-26-proven-e2e-race
-pr: null
+pr: https://github.com/MPiland/featra/pull/59
 created: 2026-11-16T00:47:09Z
 history:
   - at: 2026-11-16T00:47:09Z
@@ -24,6 +24,16 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:bug-26
+  - at: 2026-11-16T02:20:21Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:bug-26
+  - at: 2026-11-16T02:20:21Z
+    field: pr
+    from: null
+    to: https://github.com/MPiland/featra/pull/59
     by: session:bug-26
 ---
 
