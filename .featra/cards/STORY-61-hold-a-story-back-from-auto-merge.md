@@ -2,7 +2,7 @@
 id: STORY-61
 type: story
 title: Hold a story back from auto-merge
-status: Acceptance
+status: Done
 parent: FEAT-8
 order: 3
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-16T21:15:07Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-16T21:15:07Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
