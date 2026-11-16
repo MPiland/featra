@@ -40,7 +40,7 @@ export function firstSettingsPage(snapshot: SettingsSnapshot): SettingsPage {
 
 /** Work settings, in titled groups. Both Workflow pages show them so. */
 export const WORK_GROUPS: readonly { title: string; keys: readonly WorkSettingKey[] }[] = [
-  { title: "Progress and review", keys: ["progress", "requireAccept"] },
+  { title: "Progress and review", keys: ["progress", "requireAccept", "autoMerge"] },
   { title: "Agents", keys: ["worktrees", "mcp", "knowledge", "maxStoryAgents"] },
 ];
 

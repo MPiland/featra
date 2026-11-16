@@ -16,7 +16,7 @@ export const CLOSE_BUTTON_CHOICES: readonly CloseButton[] = ["tray", "quit"];
 /** Project settings that also have an app-wide default. Featra's own defaults match work-format's DEFAULT_CONFIG. */
 export type WorkSettings = Pick<
   ProjectConfig,
-  "progress" | "requireAccept" | "worktrees" | "mcp" | "knowledge" | "maxStoryAgents"
+  "progress" | "requireAccept" | "autoMerge" | "worktrees" | "mcp" | "knowledge" | "maxStoryAgents"
 >;
 export type WorkSettingKey = keyof WorkSettings;
 export type WorkOverrides = Partial<WorkSettings>;
@@ -24,6 +24,7 @@ export type WorkOverrides = Partial<WorkSettings>;
 export const DEFAULT_WORK_SETTINGS: WorkSettings = {
   progress: "stories",
   requireAccept: true,
+  autoMerge: true,
   worktrees: true,
   mcp: true,
   knowledge: "propose",
@@ -64,7 +65,7 @@ export type WorkSettingDef =
       choices: readonly ChoiceDef<KnowledgePermission>[];
     }
   | { key: "maxStoryAgents"; kind: "choice"; label: string; help?: string; choices: readonly ChoiceDef<number>[] }
-  | { key: "requireAccept" | "worktrees" | "mcp"; kind: "toggle"; label: string; help?: string };
+  | { key: "requireAccept" | "autoMerge" | "worktrees" | "mcp"; kind: "toggle"; label: string; help?: string };
 
 /** Work settings in the order Settings shows them, with their wording. */
 export const WORK_SETTINGS: readonly WorkSettingDef[] = [
@@ -78,6 +79,12 @@ export const WORK_SETTINGS: readonly WorkSettingDef[] = [
     ],
   },
   { key: "requireAccept", kind: "toggle", label: "Require acceptance before Done" },
+  {
+    key: "autoMerge",
+    kind: "toggle",
+    label: "Auto-merge stories",
+    help: "A story merges into its feature once it's Verified and Proven.",
+  },
   { key: "worktrees", kind: "toggle", label: "Use a worktree per story" },
   {
     key: "mcp",

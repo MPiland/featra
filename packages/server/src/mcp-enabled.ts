@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  autoMergeOn,
   CONFIG_FILE,
   isKnowledgePermission,
   isRecord,
@@ -57,6 +58,18 @@ export function readKnowledge(dataDir: string | undefined): (dir: string) => Pro
     const { config, settings } = await settingsText(dataDir, dir);
     const fallback = appDefault(settings, "knowledge");
     return knowledgePermission(config, isKnowledgePermission(fallback) ? fallback : undefined);
+  };
+}
+
+/**
+ * Whether a project's Verified and Proven stories merge on their own (STORY-59): its `autoMerge`, else the app default,
+ * else on. Read before each check, so a change in Settings applies to the next one.
+ */
+export function readAutoMerge(dataDir: string | undefined): (dir: string) => Promise<boolean> {
+  return async (dir) => {
+    const { config, settings } = await settingsText(dataDir, dir);
+    const fallback = appDefault(settings, "autoMerge");
+    return autoMergeOn(config, typeof fallback === "boolean" ? fallback : undefined);
   };
 }
 

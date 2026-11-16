@@ -27,6 +27,21 @@ export interface MergeRequestDeps {
   log: (message: string) => void;
 }
 
+/** Tells the Dev Lead's chat `lead` how a story's merge went; one that can't be told is logged (STORY-12, STORY-59). */
+export function tellLead(
+  chats: Pick<ChatManager, "notify">,
+  log: (message: string) => void,
+  lead: string,
+  notice: Notice,
+): void {
+  try {
+    chats.notify(lead, notice);
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    log(`The Dev Lead couldn't be told how ${notice.story}'s merge went: ${why}`);
+  }
+}
+
 export function createMergeRequest({ scan: scanDir, chats, merge, log }: MergeRequestDeps) {
   const waiting = new Set<string>();
   let asks = 0;
@@ -48,13 +63,7 @@ export function createMergeRequest({ scan: scanDir, chats, merge, log }: MergeRe
     } finally {
       waiting.delete(keyOf(dir, story));
     }
-    try {
-      chats.notify(lead, notice);
-    } catch (err) {
-      log(
-        `The Dev Lead couldn't be told how ${story}'s merge went: ${err instanceof Error ? err.message : String(err)}`,
-      );
-    }
+    tellLead(chats, log, lead, notice);
   }
 
   return {
