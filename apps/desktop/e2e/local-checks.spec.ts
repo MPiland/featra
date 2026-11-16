@@ -5,6 +5,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-56: checks run on this computer. The real app, its real local server, real git and a real child process; only
@@ -38,14 +39,7 @@ test("Confirm a check command, move a story to review: it fails with its output,
     await page.getByRole("button", { name: "Shaping", exact: true }).click();
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    await expect
-      .poll(() => git(repo.dir, "branch", "--format=%(refname:short)"))
-      .toMatch(/featra\/story-\d+-draft-a-feature/);
-    const branch = git(repo.dir, "branch", "--format=%(refname:short)")
-      .split("\n")
-      .find((b) => b.startsWith("featra/story-"));
-    const id = `STORY-${/story-(\d+)-/.exec(branch ?? "")?.[1]}`;
-    const folder = join(repo.dir, ".claude", "worktrees", `${id}-draft-a-feature`);
+    const { id, folder } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
 
     // AC2: the user confirms the check command in Project settings.
     await nav.getByRole("button", { name: "Settings" }).click();

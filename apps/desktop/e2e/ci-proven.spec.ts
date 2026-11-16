@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { expect, test, type ElectronApplication } from "@playwright/test";
 import { parseCard, serializeCard } from "@featra/work-format";
@@ -7,6 +7,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-57: criteria proven from the test report CI uploads. The real app, its real local server and real git; only
@@ -23,11 +24,9 @@ const ACS = [
 ];
 
 /** The story's criteria, as a session working on it would write them in its worktree. */
-async function linkTests(folder: string, id: string) {
-  const cards = join(folder, ".featra", "cards");
-  const name = (await readdir(cards)).find((f) => f.startsWith(`${id}-`)) ?? "";
-  const card = parseCard(await readFile(join(cards, name), "utf8"));
-  await writeFile(join(cards, name), serializeCard({ ...card, acs: ACS }), "utf8");
+async function linkTests(file: string) {
+  const card = parseCard(await readFile(file, "utf8"));
+  await writeFile(file, serializeCard({ ...card, acs: ACS }), "utf8");
 }
 
 test("Name CI's test report, and a story's PR checks finishing prove its criteria from it", async () => {
@@ -62,15 +61,9 @@ test("Name CI's test report, and a story's PR checks finishing prove its criteri
     await page.getByRole("button", { name: "Shaping", exact: true }).click();
     const row = page.getByRole("row", { name: /Draft a feature/ });
     await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    await expect
-      .poll(() => git(repo.dir, "branch", "--format=%(refname:short)"))
-      .toMatch(/featra\/story-\d+-draft-a-feature/);
-    const branch =
-      git(repo.dir, "branch", "--format=%(refname:short)")
-        .split("\n")
-        .find((b) => b.startsWith("featra/story-")) ?? "";
-    const id = `STORY-${/story-(\d+)-/.exec(branch)?.[1]}`;
-    await linkTests(join(repo.dir, ".claude", "worktrees", `${id}-draft-a-feature`), id);
+    // BUG-26: the card is read once Start has written it in the checked-out worktree, not when the branch shows.
+    const { branch, id, file } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
+    await linkTests(file);
 
     // AC1: the user names the artifact CI uploads its JUnit report in.
     await nav.getByRole("button", { name: "Settings" }).click();

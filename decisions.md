@@ -2437,3 +2437,32 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - The watch also marks git changed when a git watcher first starts, which closes the gap that the build left open.
 - The commit split is accepted: the watch retry serves both bugs, so the server half of BUG-25 shipped in the BUG-24 commit.
 - No existing assertion was weakened.
+
+## 2026-11-15 — BUG-26 build choices (story agent, for the Dev Lead to confirm)
+
+- **What the spec waits for.** Not the cards folder alone: the story's card in the worktree, parsed, naming the
+  story's branch. Start writes that card after `git worktree add` returns, so it shows the checkout is done and that
+  Start's own write is over. A spec that edits the card on sight of the checked-out file could have Start write over
+  its edit.
+- **One helper for every spec.** `startedStory(dir)` in `apps/desktop/e2e/story-worktree.ts` holds the branch poll
+  (same assertion, moved), the ID and folder, and the card wait, with a 30 s timeout. It replaces the copied block in
+  nine specs: `ci-proven`, `abandon-story`, `merge-story`, `start-story`, `accept-story`, `local-checks`,
+  `stop-resume-story`, `story-notice` and `story-pr`. `update-card` is left alone: it reads the worktree only after the
+  app has shown the evidence written there.
+- **No failing-first test.** The race is a timing window on Windows CI; a spec can't open it on demand and Electron
+  e2e runs in CI only. The card's notes say so.
+- **Product checked, no bug.** A scan during the checkout is likely: `git worktree add` writes
+  `.git/worktrees/<name>/HEAD` before it checks out, and the watch fires on it. The half-made worktree already owns the
+  card then, since `branchStateOf` falls back to the ID in a story branch's name (`itemIdOfBranch`). It is safe because
+  every card writer shares one card lane (`services.ts`), and Start's `prepare` holds it across the worktree add and the
+  card write (`story-spawn.ts`), so nothing writes into the half-made worktree, and queued actions rescan first. For one
+  scan the card can show "isn't in its owner", "Can't read …" (owner unread, so actions refuse) or its pre-Start
+  status. All cosmetic.
+- **No ADR.** Test-only change.
+
+## 2026-11-15 — BUG-26 review rulings (dev-lead)
+
+- Build choices confirmed: one shared wait for the story worktree's card (it exists, parses and names the story's branch), not just for its folder, because Start writes the card last with writeAtomic.
+- Product: no bug. Writes are safe because the shared card lane is held across the worktree add and the card write. The record of why is corrected.
+- The wait condition has a fast unit test. The e2e race itself can't fail first on demand.
+- No existing assertion was weakened; start-story's branch assertion was made stronger.

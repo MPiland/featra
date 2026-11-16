@@ -1,10 +1,10 @@
 import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { expect, test, type ElectronApplication } from "@playwright/test";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
+import { awaitStoryWorktree } from "./story-worktree.ts";
 
 /**
  * STORY-9: the user starts a story of a started feature from its row in Work. The real app, its real local server, the
@@ -39,15 +39,8 @@ test("Start on a story row makes its worktree, nests the session in the sidebar,
     await expect(page.getByRole("alertdialog")).toHaveCount(0);
 
     // The worktree is where Claude keeps them, on the story's own branch, cut from the feature's.
-    await expect
-      .poll(() => git(repo.dir, "branch", "--format=%(refname:short)"))
-      .toMatch(/featra\/story-\d+-draft-a-feature/);
-    const branch = git(repo.dir, "branch", "--format=%(refname:short)")
-      .split("\n")
-      .find((b) => b.startsWith("featra/story-"));
-    expect(branch).toBeDefined();
-    const id = `STORY-${/story-(\d+)-/.exec(branch ?? "")?.[1]}`;
-    const folder = join(repo.dir, ".claude", "worktrees", `${id}-draft-a-feature`);
+    const { branch, id, folder } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
+    expect(branch).toMatch(/^featra\/story-\d+-draft-a-feature$/);
     expect(existsSync(folder)).toBe(true);
     expect(git(repo.dir, "status", "--porcelain")).toBe("");
 
