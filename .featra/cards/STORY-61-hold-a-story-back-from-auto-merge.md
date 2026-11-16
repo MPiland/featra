@@ -2,7 +2,7 @@
 id: STORY-61
 type: story
 title: Hold a story back from auto-merge
-status: In Progress
+status: In Review
 parent: FEAT-8
 order: 3
 origin: planned
@@ -11,8 +11,8 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
-pr: null
+branch: claude/story-61-hold
+pr: https://github.com/MPiland/featra/pull/64
 created: 2026-11-16T12:00:00Z
 history:
   - at: 2026-11-16T12:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:story-61
+  - at: 2026-11-16T18:03:33Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:story-61
 ---
 
@@ -44,7 +49,7 @@ As a builder, I hold one story back from merging on its own, so I can look at it
 - [x] Server: set and clear Hold at the owner's copy; the observer skips held stories and checks a story again when Hold is cleared
 - [x] Client: the Hold toggle in the card pane and Work row, and a held mark on the row
 - [x] Unit and integration tests for each criterion; Playwright journey; tests linked on the criteria
-- [ ] Decisions recorded for the Dev Lead; move to In Review
+- [x] Decisions recorded for the Dev Lead; move to In Review
 
 ## Notes
 
