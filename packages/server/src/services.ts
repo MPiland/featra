@@ -192,7 +192,7 @@ export function createServices({
     enabled: readAutoMerge(dataDir),
     merge: merges.merge,
     chats,
-    record: (dir, id, head, reason) => recordNotMerged({ scan: watches.scan, lane, now }, dir, id, head, reason),
+    record: (dir, id, tried, reason) => recordNotMerged({ scan: watches.scan, lane, now }, dir, id, tried, reason),
     log,
   });
   const abandons = createStoryAbandon({

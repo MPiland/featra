@@ -16,14 +16,15 @@ const BRANCH_RULE = "X Pull request acme/app#1 is not mergeable: the base branch
 const lastNotMerged = (card: Card) => card.history.findLast((e) => e.field === "not-merged");
 const notMergedEvents = (card: Card) => card.history.filter((e) => e.field === "not-merged");
 
-/** STORY-1 Proven at a commit whose work.txt conflicts with the feature branch's. */
+/** STORY-1 Proven at a commit whose work.txt conflicts with the feature branch's, which is at `base` before it tries. */
 async function conflicting() {
   await m.start({ remote: false });
   await m.onFeature("work.txt", "feature's\n");
+  const base = m.tip(FEATURE_BRANCH);
   const auto = autoMerge();
   await proven();
   await settled(auto);
-  return auto;
+  return { auto, base };
 }
 
 /** STORY-1 Proven, with its PR open on GitHub, which refuses to merge it for its branch rules. */
@@ -40,12 +41,7 @@ describe(
   { timeout: 60_000 },
   () => {
     it("leaves the feature branch, moves the story to In Progress and sends its session the files, as Merge does", async () => {
-      await m.start({ remote: false });
-      await m.onFeature("work.txt", "feature's\n");
-      const base = m.tip(FEATURE_BRANCH);
-      const auto = autoMerge();
-      await proven();
-      await settled(auto);
+      const { base } = await conflicting();
 
       expect(m.tip(FEATURE_BRANCH)).toBe(base);
       expect(m.treeExists()).toBe(true);

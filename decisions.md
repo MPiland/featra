@@ -2529,7 +2529,7 @@ default turned on, are resolved by review fixes 1 and 3 below; the bullets say w
 5. **Auto-merge skips stories whose feature is not active** (Cancelled, Done, or merged to main). Manual Merge is
    unchanged; whether it should refuse a story under a Cancelled feature is on the roadmap.
 
-## 2026-11-16 — STORY-60 build choices (story agent)
+## 2026-11-16 — STORY-60 build choices (story agent; confirmed by the Dev Lead)
 
 - **The refusal is on the card.** A new history field, `not-merged` (`HISTORY_FIELDS`), by `system`: from is the
   commit tried, to is the reason. Recording it on the card is what makes "not retried until the story changes" survive
@@ -2539,15 +2539,36 @@ default turned on, are resolved by review fixes 1 and 3 below; the bullets say w
   event) or the story merges (`notMergedOf`). A move between stages doesn't clear it, which keeps STORY-59's rule
   that a move to Acceptance doesn't retry. Auto-merge skips a story whose standing refusal is for its current head.
 - **Conflicts are recorded too.** AC3 names refusals that aren't conflicts, but a conflict also gets the record, so
-  AC4's "card shows why" holds for it. It goes back to In Progress either way, and its fix makes a new commit.
+  AC4's "card shows why" holds for it. It goes back to In Progress either way. (Review ruling 4: a conflict also
+  names the feature tip.)
 - **Races aren't refusals.** `MERGE_MESSAGES.working` and `merging` (the session started a turn, or a Merge runs) are
   passed over: no notice, no record, and the try is dropped so the story is looked at again (STORY-59 ruling 1).
+  (Superseded by review ruling 1: by error kind, not copy.)
 - **One path for any failure.** Whatever `merge()` throws goes to the Dev Lead as outcome `not merged`, with the
   summary "<feature branch>, on its own. <reason>", matching the merged notice. A failure reading the setting is only
-  logged, as before.
+  logged, as before. (Superseded by review ruling 1: only the story's own refusals.)
 - **Where it shows.** The card view and the Work row carry `notMerged`; the card pane and the story's session show
   "Didn't merge on its own. <reason>" (`MERGE_COPY.notMerged`) as a status line, next to Merge, which stays offered.
 - **Tests.** Auto-merge's server test world moved to `auto-merge-world.ts`, shared with `auto-merge-fails.test.ts`. The
   e2e setup (GitHub stand-in, a story proven in review) moved to `e2e/proven-story.ts`, shared by the STORY-59 and
   STORY-60 journeys.
 - **ADR 0034 amended:** an automatic merge that fails.
+
+## 2026-11-16 — STORY-60 review rulings (dev-lead)
+
+1. **Only the story's own refusal is recorded and told.** A merge's error carries a kind (`StoryRefusal` with
+   `kind`), never matched by its copy. Conflict, conflictUnknown, dirty, GitHub refusing the merge (`mergePr`'s
+   `refused`), prClosed and noPr are the story's own at its commit: recorded and sent to the Dev Lead. Any other
+   `ApiError` (not ready after a move while queued, merged by hand meanwhile, `failed` or `stale` when gh or CI can't
+   be read, `targetBusy`, `merging`, `working`, a busy abandon) is treated like `working`: the try is forgotten and it
+   is logged, with nothing recorded or told. Anything else thrown is a bug and is only logged. The copy-string skip
+   list is gone.
+2. **No false notice for a story already merged.** Ruling 1 covers it: a Merge by hand that finishes while the
+   automatic one waits leaves `merged`, which isn't the story's refusal.
+3. **Both races are tested:** a turn starting as the merge begins, and a Merge by hand running.
+4. **A conflict names the feature tip.** Its record is `from: <head>@<feature tip>` (the tip as the scan read it).
+   It stands only while both are unchanged; when either moves, auto-merge tries once more. Auto-merge's try key now
+   includes the feature tip too.
+5. **The docs say what happens without a record.** Nothing is recorded when the head is unknown or the write fails;
+   that story is tried again after a restart. ADR 0034 says so, with the error-kind and conflict-tip rules.
+6. **Copy unchanged.** No hint about Merge by hand is added to the not merged line.

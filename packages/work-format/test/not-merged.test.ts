@@ -36,6 +36,13 @@ describe("STORY-60: the not-merged record", () => {
     expect(notMergedOf(refused())).toEqual({ head: HEAD, reason: WHY });
   });
 
+  it("names the feature branch's tip too for a conflict, and stands or goes by the commit tried as any other", () => {
+    const conflict = notMergedStory(inReview(), HEAD, WHY, "system", at(3), "fe1234");
+    expect(conflict.history.at(-1)).toMatchObject({ field: "not-merged", from: `${HEAD}@fe1234`, to: WHY });
+    expect(notMergedOf(conflict)).toEqual({ head: HEAD, tip: "fe1234", reason: WHY });
+    expect(notMergedOf(recordEvidence(conflict, checkedEvent("def456"), "system", at(4)))).toBeNull();
+  });
+
   it("is absent from a story that never failed to merge on its own", () => {
     expect(notMergedOf(inReview())).toBeNull();
   });

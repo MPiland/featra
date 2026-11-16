@@ -34,8 +34,8 @@ export function autoMergeWorld() {
       enabled,
       merge,
       chats: { ...m.chats, notify: (chat, notice) => void m.notices.push({ chat, notice }) },
-      record: (dir, id, head, reason) =>
-        recordNotMerged({ scan: w.watches.scan, lane, now: w.clock.now }, dir, id, head, reason),
+      record: (dir, id, tried, reason) =>
+        recordNotMerged({ scan: w.watches.scan, lane, now: w.clock.now }, dir, id, tried, reason),
       log: (line) => m.logs.push(line),
     });
     autos.push(auto);

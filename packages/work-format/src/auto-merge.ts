@@ -41,25 +41,37 @@ export const autoMergedSummary = (into: string, remains: readonly string[]): str
 
 /**
  * An automatic merge that didn't happen (STORY-60): a `not-merged` event by `system`, from the commit it was tried at,
- * to why. The story isn't tried again at that commit, and its card and chat say why.
+ * to why. A conflict also names the feature branch's tip it conflicted with (`<head>@<tip>`). The story isn't tried
+ * again at that commit (and, for a conflict, that tip), and its card and chat say why.
  */
-export const notMergedStory = (card: Card, head: string, reason: string, by: string, at: string): Card =>
-  appendHistory(card, { at, field: "not-merged", from: head, to: reason, by });
+export const notMergedStory = (card: Card, head: string, reason: string, by: string, at: string, tip?: string): Card =>
+  appendHistory(card, { at, field: "not-merged", from: tip ? `${head}@${tip}` : head, to: reason, by });
 
-/** The automatic merge that didn't happen, while it still stands: the commit it was tried at, and why. */
+/**
+ * The automatic merge that didn't happen, while it still stands: the commit it was tried at, and why; for a conflict,
+ * the feature branch's tip it conflicted with.
+ */
 export interface NotMerged {
   head: string | null;
+  tip?: string;
   reason: string;
+}
+
+/** The commit and, for a conflict, the feature tip a `not-merged` event's `from` names. */
+function triedAt(from: string | null): Pick<NotMerged, "head" | "tip"> {
+  const at = from?.indexOf("@") ?? -1;
+  return from === null || at < 0 ? { head: from } : { head: from.slice(0, at), tip: from.slice(at + 1) };
 }
 
 /**
  * The latest automatic merge of `card` that didn't happen, until the story changes: its checks settle on another
  * commit (`checked:`), or it merges. A move between stages doesn't change it, as it doesn't change the commit tried.
+ * Whether a conflict still stands also depends on the feature branch's tip, which auto-merge compares.
  */
 export function notMergedOf(card: Pick<Card, "history">): NotMerged | null {
   let standing: NotMerged | null = null;
   for (const e of card.history) {
-    if (e.field === "not-merged") standing = { head: e.from, reason: e.to ?? "" };
+    if (e.field === "not-merged") standing = { ...triedAt(e.from), reason: e.to ?? "" };
     else if (e.field === "merged") standing = null;
     else if (standing && e.field === "evidence" && e.to?.startsWith(checkedEvent("")))
       standing = e.to === checkedEvent(standing.head ?? "") ? standing : null;
