@@ -23,20 +23,23 @@ export async function prMergeable(dir: string, url: string, deps: GithubPrDeps =
 /** What GitHub says when a PR's merge commit can't be made cleanly. */
 const CONFLICT = /cannot be cleanly created|merge conflict/i;
 
-/** Merges the PR at `url` with a merge commit, at `head` only. Null once merged; else that it conflicts, or why not. */
+/**
+ * Merges the PR at `url` with a merge commit, at `head` only. Null once merged; else that it conflicts, or why not:
+ * `refused` when GitHub answered and refused it (STORY-60), not when `gh` couldn't be asked.
+ */
 export async function mergePr(
   dir: string,
   url: string,
   head: string,
   deps: GithubPrDeps = {},
-): Promise<null | { conflict: true } | { error: string }> {
+): Promise<null | { conflict: true } | { error: string; refused: boolean }> {
   const safe = githubPrUrl(url);
-  if (!safe || !/^[0-9a-f]{7,64}$/.test(head)) return { error: "Couldn't merge the PR." };
+  if (!safe || !/^[0-9a-f]{7,64}$/.test(head)) return { error: "Couldn't merge the PR.", refused: false };
   const r = await runGh(dir, ["pr", "merge", safe, "--merge", "--match-head-commit", head], ghOptions(deps));
-  if (!r) return { error: "Couldn't merge the PR." };
+  if (!r) return { error: "Couldn't merge the PR.", refused: false };
   if (r.code === 0) return null;
   const said = r.stderr || r.stdout;
-  return CONFLICT.test(said) ? { conflict: true } : { error: because("Couldn't merge the PR", said) };
+  return CONFLICT.test(said) ? { conflict: true } : { error: because("Couldn't merge the PR", said), refused: true };
 }
 
 /**

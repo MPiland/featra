@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { EMPTY_CHAT } from "@featra/work-format/chat";
 import { ASK_MODE, modeLabel, modeWhere } from "@featra/work-format/modes";
+import { MERGE_COPY } from "@featra/work-format/merge-copy";
 import { CHAT_COPY, type ChatBridge, type ChatRoleRef, type ChatUpdate } from "../../chats.ts";
 import { Composer } from "./Composer.tsx";
 import { ComposerControls } from "./ComposerControls.tsx";
@@ -41,6 +42,8 @@ export interface ChatViewProps {
     /** The story is Verified and can merge: Merge is offered beside Accept (STORY-12). */
     mergeable: boolean;
     merge: MergeAction;
+    /** Why the story didn't merge on its own, while that stands (STORY-60); null otherwise. */
+    notMerged: string | null;
   };
 }
 
@@ -120,6 +123,11 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
         <div className="chat-accept">
           {story.awaiting && <AcceptStory id={chat.story} actions={story.acceptance} />}
           <MergeStory id={chat.story} mergeable={story.mergeable} merge={story.merge} />
+          {story.notMerged && (
+            <p className="meta" role="status">
+              {MERGE_COPY.notMerged(story.notMerged)}
+            </p>
+          )}
         </div>
       )}
       {readOnly && (

@@ -28,4 +28,6 @@ export const MERGE_COPY = {
   ask: (story: string, into: string) => `Merge ${story} into ${into}?`,
   /** The request card's line about who asks. */
   asked: "The Dev Lead asks to merge this story.",
+  /** On the card and in the session of a story that didn't merge on its own (STORY-60). */
+  notMerged: (reason: string) => `Didn't merge on its own. ${reason}`,
 } as const;

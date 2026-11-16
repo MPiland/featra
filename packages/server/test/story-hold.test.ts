@@ -7,10 +7,19 @@
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { HOLD_MESSAGES, isHeld, isMerged, MERGE_MESSAGES, parseCard, withCheckEvidence } from "@featra/work-format";
+import {
+  HOLD_MESSAGES,
+  isHeld,
+  isMerged,
+  MERGE_MESSAGES,
+  notMergedOf,
+  parseCard,
+  withCheckEvidence,
+} from "@featra/work-format";
 import { createApi, type Connection } from "../src/api.ts";
 import { createAutoMerge, type AutoMerge } from "../src/auto-merge.ts";
 import { readAppAutoMerge, readAutoMerge } from "../src/mcp-enabled.ts";
+import { recordNotMerged } from "../src/not-merged-record.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createStoryHold } from "../src/story-hold.ts";
 import { createScanner } from "../src/work-scan.ts";
@@ -22,6 +31,8 @@ const { w } = m;
 const holds = () => createStoryHold({ scan: w.watches.scan, now: w.clock.now, lane: m.lane });
 
 const autos: AutoMerge[] = [];
+/** Each story auto-merge recorded on its card as not merged (STORY-60), through the real record. */
+const recorded: string[] = [];
 /** Auto-merge as the server runs it, merging through `merge` (the real one by default). */
 function autoMerge(merge = m.merges.merge, enabled = readAutoMerge(undefined)): AutoMerge {
   const auto = createAutoMerge({
@@ -30,6 +41,10 @@ function autoMerge(merge = m.merges.merge, enabled = readAutoMerge(undefined)): 
     enabled,
     merge,
     chats: { ...m.chats, notify: (chat, notice) => void m.notices.push({ chat, notice }) },
+    record: (dir, id, tried, reason) => {
+      recorded.push(id);
+      return recordNotMerged({ scan: w.watches.scan, lane: m.lane, now: w.clock.now }, dir, id, tried, reason);
+    },
     log: (line) => m.logs.push(line),
   });
   autos.push(auto);
@@ -37,6 +52,7 @@ function autoMerge(merge = m.merges.merge, enabled = readAutoMerge(undefined)): 
 }
 const stopAll = () => {
   for (const auto of autos.splice(0)) auto.close();
+  recorded.splice(0);
 };
 const settled = async (auto: AutoMerge) => {
   await w.settle();
@@ -227,6 +243,10 @@ describe("STORY-61 AC2: a held story never merges on its own, and Merge still wo
     expect(card.history.at(-1)).toMatchObject({ field: "held", to: "held", by: "user" });
     expect(m.notices).toEqual([]);
     expect(m.logs).toEqual([`STORY-1 didn't merge on its own: ${MERGE_MESSAGES.held("STORY-1")}`]);
+    // STORY-60's scheme: a HeldRefusal isn't the story's own refusal, so nothing is recorded as not merged.
+    expect(recorded).toEqual([]);
+    expect(notMergedOf(card)).toBeNull();
+    expect(card.history.some((e) => e.field === "not-merged")).toBe(false);
     stopAll();
   });
 });

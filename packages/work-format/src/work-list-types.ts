@@ -60,6 +60,8 @@ export interface StoryRow {
   merged: boolean;
   /** Hold applies to it while auto-merge is on (STORY-61): whether it is held; left out when Hold doesn't apply. */
   held?: boolean;
+  /** Why it didn't merge on its own, while that stands (STORY-60): its session says so. Left out otherwise. */
+  notMerged?: string;
 }
 
 export interface FeatureRow {
@@ -174,6 +176,7 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   mergeable: r.mergeable === true,
   merged: r.merged === true,
   ...(typeof r.held === "boolean" ? { held: r.held } : {}),
+  ...(typeof r.notMerged === "string" && r.notMerged ? { notMerged: r.notMerged } : {}),
 });
 
 const isTime = (v: unknown): v is string => typeof v === "string" && Number.isFinite(Date.parse(v));

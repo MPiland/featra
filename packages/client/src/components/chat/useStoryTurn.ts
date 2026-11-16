@@ -29,5 +29,6 @@ export function useStoryTurn(work: WorkBridge, { chats, chat, dir }: Pick<ChatVi
     queued: summary.queued,
     awaiting: row?.awaiting === true,
     mergeable: row?.mergeable === true,
+    notMerged: row?.notMerged ?? null,
   };
 }

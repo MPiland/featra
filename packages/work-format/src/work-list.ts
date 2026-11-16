@@ -5,6 +5,7 @@
 import { awaitingAcceptance } from "./acceptance.ts";
 import { isMerged } from "./history.ts";
 import { mergeRefusal } from "./merge.ts";
+import { notMergedOf } from "./auto-merge.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { evidenceState } from "./evidence.ts";
 import { acceptedFeature, featureAcceptRefusal } from "./feature-end.ts";
@@ -69,6 +70,7 @@ function storyRow(
 ): StoryRow {
   const tone = stageTone(card.status, config);
   const held = marks.holds.get(card.id);
+  const notMerged = notMergedOf(card);
   return {
     id: card.id,
     type: card.type === "bug" ? "bug" : "story",
@@ -88,6 +90,7 @@ function storyRow(
     mergeable: marks.mergeable.has(card.id),
     merged: isMerged(card),
     ...(held === undefined ? {} : { held }),
+    ...(notMerged ? { notMerged: notMerged.reason } : {}),
   };
 }
 

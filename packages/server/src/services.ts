@@ -33,6 +33,7 @@ import { createLogWriter } from "./log-writer.ts";
 import { createStoryHold } from "./story-hold.ts";
 import { readAppAutoMerge, readAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
 import { createAutoMerge } from "./auto-merge.ts";
+import { recordNotMerged } from "./not-merged-record.ts";
 import { createRepoGit } from "./repo-git.ts";
 import { createClaudeReader } from "./claude-reader.ts";
 import { createCodexReader } from "./codex-reader.ts";
@@ -163,6 +164,7 @@ export function createServices({
     enabled: readAutoMerge(dataDir),
     merge: merges.merge,
     chats,
+    record: (dir, id, tried, reason) => recordNotMerged({ scan: watches.scan, lane, now }, dir, id, tried, reason),
     log,
   });
   const abandons = createStoryAbandon({

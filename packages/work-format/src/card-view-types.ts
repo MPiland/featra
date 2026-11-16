@@ -90,6 +90,8 @@ export interface CardView {
   merged?: true;
   /** Whether a story is held back from auto-merge, where Hold applies (STORY-61); absent where it doesn't. */
   held?: boolean;
+  /** Why a story didn't merge on its own, while that stands (STORY-60); absent otherwise. */
+  notMerged?: string;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -235,6 +237,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
     ...(typeof raw.held === "boolean" ? { held: raw.held } : {}),
+    ...(typeof raw.notMerged === "string" && raw.notMerged ? { notMerged: raw.notMerged } : {}),
   };
 }
 

@@ -78,6 +78,22 @@ type Attempt =
   | { kind: "merged"; into: string; remote: GithubRemote | null }
   | { kind: "conflict"; into: string; files: string[] };
 
+/** What about the story, at the commit it is at, refused its merge (STORY-60). */
+export type StoryRefusalKind = "conflict" | "conflictUnknown" | "dirty" | "github" | "prClosed" | "noPr";
+
+/**
+ * A merge refused for the story's own reason at its commit: a conflict, work left uncommitted, or its PR (none, closed,
+ * or GitHub refusing it). Auto-merge records these and tells the Dev Lead; any other refusal is a race or a passing
+ * failure, which it looks at again later.
+ */
+export class StoryRefusal extends ApiError {
+  readonly kind: StoryRefusalKind;
+  constructor(message: string, kind: StoryRefusalKind) {
+    super(message);
+    this.kind = kind;
+  }
+}
+
 /** Whether story `id`'s session is running or waiting to run a turn, which Merge refuses (`MERGE_MESSAGES.working`). */
 export function sessionBusy(chats: Pick<ChatManager, "storySession" | "list">, dir: string, id: string): boolean {
   const session = chats.storySession(dir, id);
@@ -118,7 +134,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     if (!into || !tip) throw new ApiError(MERGE_MESSAGES.noFeature(id));
     if (sessionBusy(chats, dir, id)) throw new ApiError(MERGE_MESSAGES.working(id));
     const dirty = await git.uncommitted(found.root, path);
-    if (dirty.length > 0) throw new ApiError(MERGE_MESSAGES.dirty(id, dirty));
+    if (dirty.length > 0) throw new StoryRefusal(MERGE_MESSAGES.dirty(id, dirty), "dirty");
     return { card, config, top, path, into, tip };
   }
 
@@ -151,13 +167,13 @@ export function createStoryMerge(deps: StoryMergeDeps) {
   /** The story's PR merged on GitHub, at the commit its branch is at and its CI checked. */
   async function mergeOnGithub(dir: string, id: string, options: MergeOptions): Promise<Attempt> {
     const r = await ready(dir, id, options);
-    if (!r.card.pr) throw new ApiError(MERGE_MESSAGES.noPr(id));
+    if (!r.card.pr) throw new StoryRefusal(MERGE_MESSAGES.noPr(id), "noPr");
     const remote = await githubRemote(dir, deps.gitCommand);
     if (!remote) throw new ApiError(GITHUB_COPY.noRemote);
     const pr = await readPrAt(dir, r.card.pr, deps);
     if (!pr) throw new ApiError(`${MERGE_MESSAGES.failed}.`);
     if (pr.status.state === "merged") return { kind: "merged", into: r.into, remote };
-    if (pr.status.state === "closed") throw new ApiError(MERGE_MESSAGES.prClosed(id));
+    if (pr.status.state === "closed") throw new StoryRefusal(MERGE_MESSAGES.prClosed(id), "prClosed");
     if (pr.head !== r.tip) throw new ApiError(MERGE_MESSAGES.stale(id));
     if (checksWhere(r.config, await settings.github(dir)) === "local") {
       if (!checkedTip(dir, id, r)) throw new ApiError(MERGE_MESSAGES.stale(id));
@@ -170,9 +186,10 @@ export function createStoryMerge(deps: StoryMergeDeps) {
         ? { conflict: true as const }
         : await mergePr(dir, pr.url, r.tip, deps);
     if (outcome === null) return { kind: "merged", into: r.into, remote };
-    if ("error" in outcome) throw new ApiError(outcome.error);
+    if ("error" in outcome)
+      throw outcome.refused ? new StoryRefusal(outcome.error, "github") : new ApiError(outcome.error);
     const files = await conflictsOnGithub(r.top, remote.name, r.into, r.tip);
-    if (files.length === 0) throw new ApiError(MERGE_MESSAGES.conflictUnknown(id));
+    if (files.length === 0) throw new StoryRefusal(MERGE_MESSAGES.conflictUnknown(id), "conflictUnknown");
     return { kind: "conflict", into: r.into, files };
   }
 
@@ -203,7 +220,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
       log(`${id}'s session couldn't be told its merge conflicted: ${err instanceof Error ? err.message : String(err)}`);
       await lane.exclusive(record);
     }
-    throw new ApiError(MERGE_MESSAGES.conflict(id, files, stage));
+    throw new StoryRefusal(MERGE_MESSAGES.conflict(id, files, stage), "conflict");
   }
 
   /** Runs `work` for story `id` unless a merge or an abandon of it already runs. */
