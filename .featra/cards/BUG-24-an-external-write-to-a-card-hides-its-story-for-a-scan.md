@@ -2,7 +2,7 @@
 id: BUG-24
 type: bug
 title: An external write to a card hides its story for a scan
-status: Acceptance
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-16T01:22:23Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-16T01:22:23Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description

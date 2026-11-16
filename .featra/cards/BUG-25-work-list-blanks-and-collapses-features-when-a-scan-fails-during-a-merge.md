@@ -2,7 +2,7 @@
 id: BUG-25
 type: bug
 title: Work list blanks and collapses features when a scan fails during a merge
-status: Acceptance
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev-lead
+  - at: 2026-11-16T01:22:23Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-16T01:22:23Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
