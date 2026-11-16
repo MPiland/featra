@@ -5,6 +5,7 @@
 import { awaitingAcceptance } from "./acceptance.ts";
 import { isMerged } from "./history.ts";
 import { mergeRefusal } from "./merge.ts";
+import { notMergedOf } from "./auto-merge.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { evidenceState } from "./evidence.ts";
 import { acceptedFeature, featureAcceptRefusal } from "./feature-end.ts";
@@ -61,6 +62,7 @@ function storyRow(
   mergeable: ReadonlySet<string>,
 ): StoryRow {
   const tone = stageTone(card.status, config);
+  const notMerged = notMergedOf(card);
   return {
     id: card.id,
     type: card.type === "bug" ? "bug" : "story",
@@ -79,6 +81,7 @@ function storyRow(
     awaiting: editable.has(card.id) && awaitingAcceptance(card, config),
     mergeable: mergeable.has(card.id),
     merged: isMerged(card),
+    ...(notMerged ? { notMerged: notMerged.reason } : {}),
   };
 }
 

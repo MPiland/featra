@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { MERGE_COPY } from "@featra/work-format/merge-copy";
 import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
 import { InlineText } from "../controls/InlineText.tsx";
@@ -122,6 +123,11 @@ export function CardPane({
             )}
           </div>
           <Evidence evidence={view.evidence} />
+          {view.notMerged && (
+            <p className="meta" role="status">
+              {MERGE_COPY.notMerged(view.notMerged)}
+            </p>
+          )}
           <p className="meta">{view.readOnly ?? CARD_COPY.owner(view.owner)}</p>
           {view.draftChat && !readOnly && (
             <div className="draft-actions">
