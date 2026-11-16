@@ -2528,3 +2528,26 @@ default turned on, are resolved by review fixes 1 and 3 below; the bullets say w
    stories no longer picked are forgotten.
 5. **Auto-merge skips stories whose feature is not active** (Cancelled, Done, or merged to main). Manual Merge is
    unchanged; whether it should refuse a story under a Cancelled feature is on the roadmap.
+
+## 2026-11-16 — STORY-60 build choices (story agent)
+
+- **The refusal is on the card.** A new history field, `not-merged` (`HISTORY_FIELDS`), by `system`: from is the
+  commit tried, to is the reason. Recording it on the card is what makes "not retried until the story changes" survive
+  a restart, and what the card and session read to say why. Written in the card lane at the owner (`recordNotMerged`),
+  never on a merged card.
+- **What "the story changes" means.** The refusal stands until the checks settle on another commit (a new `checked:`
+  event) or the story merges (`notMergedOf`). A move between stages doesn't clear it, which keeps STORY-59's rule
+  that a move to Acceptance doesn't retry. Auto-merge skips a story whose standing refusal is for its current head.
+- **Conflicts are recorded too.** AC3 names refusals that aren't conflicts, but a conflict also gets the record, so
+  AC4's "card shows why" holds for it. It goes back to In Progress either way, and its fix makes a new commit.
+- **Races aren't refusals.** `MERGE_MESSAGES.working` and `merging` (the session started a turn, or a Merge runs) are
+  passed over: no notice, no record, and the try is dropped so the story is looked at again (STORY-59 ruling 1).
+- **One path for any failure.** Whatever `merge()` throws goes to the Dev Lead as outcome `not merged`, with the
+  summary "<feature branch>, on its own. <reason>", matching the merged notice. A failure reading the setting is only
+  logged, as before.
+- **Where it shows.** The card view and the Work row carry `notMerged`; the card pane and the story's session show
+  "Didn't merge on its own. <reason>" (`MERGE_COPY.notMerged`) as a status line, next to Merge, which stays offered.
+- **Tests.** Auto-merge's server test world moved to `auto-merge-world.ts`, shared with `auto-merge-fails.test.ts`. The
+  e2e setup (GitHub stand-in, a story proven in review) moved to `e2e/proven-story.ts`, shared by the STORY-59 and
+  STORY-60 journeys.
+- **ADR 0034 amended:** an automatic merge that fails.

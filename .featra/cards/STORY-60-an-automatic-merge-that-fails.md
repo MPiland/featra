@@ -2,7 +2,7 @@
 id: STORY-60
 type: story
 title: An automatic merge that fails
-status: New
+status: In Progress
 parent: FEAT-8
 order: 2
 origin: planned
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-16T17:10:47Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:story-60
 ---
 
 ## Description
@@ -28,18 +33,18 @@ As a builder, when a story can't merge on its own, I see why on the story, and t
 
 ## Acceptance criteria
 
-- [ ] On a conflict nothing merges; the story returns to In Progress and its session gets the conflicting files, as with Merge
-- [ ] The Dev Lead that started the story gets a "not merged" notice with the reason, for a conflict or any other refusal
-- [ ] A refusal that isn't a conflict, such as branch protection, leaves the story where it is with the reason on the card, and isn't retried until the story changes
-- [ ] The story's chat and card show that the automatic merge didn't happen and why
+- [x] On a conflict nothing merges; the story returns to In Progress and its session gets the conflicting files, as with Merge (test: packages/server/test/auto-merge-fails.test.ts::STORY-60 AC1: on a conflict nothing merges, and the story goes back with its files > leaves the feature branch, moves the story to In Progress and sends its session the files, as Merge does)
+- [x] The Dev Lead that started the story gets a "not merged" notice with the reason, for a conflict or any other refusal (test: packages/server/test/auto-merge-fails.test.ts::STORY-60 AC2: the Dev Lead that started the story hears it didn't merge, and why > gets a not merged notice with the conflict; packages/server/test/auto-merge-fails.test.ts::STORY-60 AC2: the Dev Lead that started the story hears it didn't merge, and why > gets a not merged notice with GitHub's refusal; packages/server/test/auto-merge-fails.test.ts::STORY-60 AC2: the Dev Lead that started the story hears it didn't merge, and why > gets a not merged notice for work left uncommitted, which Merge refuses; packages/server/test/auto-merge-fails.test.ts::STORY-60 AC2: the Dev Lead that started the story hears it didn't merge, and why > isn't told, and nothing is recorded, when the story's session starts a turn as its merge begins; packages/work-format/test/not-merged.test.ts::STORY-60: the not-merged record > is told to the Dev Lead with the feature branch, as the merged notice is)
+- [x] A refusal that isn't a conflict, such as branch protection, leaves the story where it is with the reason on the card, and isn't retried until the story changes (test: packages/server/test/auto-merge-fails.test.ts::STORY-60 AC3: a refusal that isn't a conflict leaves the story, with the reason on its card, untried until it changes > keeps the story in review and records why on its card, by system, at the commit tried; packages/server/test/auto-merge-fails.test.ts::STORY-60 AC3: a refusal that isn't a conflict leaves the story, with the reason on its card, untried until it changes > isn't tried again on rescans, a recheck, a chat change or a restart; packages/server/test/auto-merge-fails.test.ts::STORY-60 AC3: a refusal that isn't a conflict leaves the story, with the reason on its card, untried until it changes > is tried again after a restart once its checks settle on a new commit, and merges; packages/work-format/test/not-merged.test.ts::STORY-60: the not-merged record > is a history event by system, from the commit tried, to why; packages/work-format/test/not-merged.test.ts::STORY-60: the not-merged record > stands when the story moves between stages, and when its checks settle again on the commit tried; packages/work-format/test/not-merged.test.ts::STORY-60: the not-merged record > goes when its checks settle on another commit, or it merges; packages/work-format/test/not-merged.test.ts::STORY-60: the not-merged record > is the latest one when a story fails to merge on its own again; apps/desktop/e2e/auto-merge-fails.spec.ts::A story that can't merge on its own says why on its card and in its session)
+- [x] The story's chat and card show that the automatic merge didn't happen and why (test: packages/server/test/auto-merge-fails.test.ts::STORY-60 AC4: the card says the automatic merge didn't happen and why > records a conflict on the card, after the story's move back; packages/work-format/test/not-merged.test.ts::STORY-60 AC4: the card pane and the Work row carry why > is in the card's view, through the socket, while it stands; packages/work-format/test/not-merged.test.ts::STORY-60 AC4: the card pane and the Work row carry why > is on the story's row, through the socket, which its session reads; packages/work-format/test/not-merged.test.ts::STORY-60 AC4: the card pane and the Work row carry why > reads as one short line; packages/client/test/components/not-merged.test.tsx::STORY-60 AC4: the card and the session say the merge on its own didn't happen, and why > shows why in the story's card pane, and keeps Merge for the user; packages/client/test/components/not-merged.test.tsx::STORY-60 AC4: the card and the session say the merge on its own didn't happen, and why > shows why in the story's session; packages/client/test/components/not-merged.test.tsx::STORY-60 AC4: the card and the session say the merge on its own didn't happen, and why > stops showing it once the story's checks settle on another commit; apps/desktop/e2e/auto-merge-fails.spec.ts::A story that can't merge on its own says why on its card and in its session)
 
 ## Tasks
 
-- [ ] Server: the auto-merge observer handles a conflict through the existing conflict path and records any other refusal once per story head
-- [ ] Server: a "not merged" notice to the Dev Lead, with the reason
-- [ ] Client: the reason shown on the card and in the story's chat
-- [ ] Unit and integration tests for each criterion; Playwright journey; tests linked on the criteria
-- [ ] Decisions recorded for the Dev Lead; move to In Review
+- [x] Server: the auto-merge observer handles a conflict through the existing conflict path and records any other refusal once per story head
+- [x] Server: a "not merged" notice to the Dev Lead, with the reason
+- [x] Client: the reason shown on the card and in the story's chat
+- [x] Unit and integration tests for each criterion; Playwright journey; tests linked on the criteria
+- [x] Decisions recorded for the Dev Lead; move to In Review
 
 ## Notes
 

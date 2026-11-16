@@ -5,6 +5,7 @@
 import { awaitingAcceptance } from "./acceptance.ts";
 import { isMerged } from "./history.ts";
 import { mergeRefusal } from "./merge.ts";
+import { notMergedOf } from "./auto-merge.ts";
 import { abandonRefusal } from "./abandon.ts";
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
@@ -71,6 +72,7 @@ export function buildCardView(
   const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   const readOnly = readOnlyReason(owned, checkedOut, ctx.config.baseBranch);
   const featureEnd = featureEndOf(card, ctx.cards, ctx.config, merge);
+  const notMerged = card.type === "story" ? notMergedOf(card) : null;
   return {
     id: card.id,
     type: card.type,
@@ -95,6 +97,7 @@ export function buildCardView(
     ...(mergeRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { mergeable: true as const } : {}),
     ...(abandonRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { abandonable: true as const } : {}),
     ...(isMerged(card) && card.type === "story" ? { merged: true as const } : {}),
+    ...(notMerged ? { notMerged: notMerged.reason } : {}),
     ...(featureEnd ? { featureEnd } : {}),
     ...(draftChat === null
       ? {}

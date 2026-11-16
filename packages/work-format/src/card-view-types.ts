@@ -88,6 +88,8 @@ export interface CardView {
   featureEnd?: CardFeatureEnd;
   /** True on a story merged into its feature (STORY-12); absent otherwise. */
   merged?: true;
+  /** Why a story didn't merge on its own, while that stands (STORY-60); absent otherwise. */
+  notMerged?: string;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -226,6 +228,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(raw.mergeable === true ? { mergeable: true as const } : {}),
     ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
+    ...(typeof raw.notMerged === "string" && raw.notMerged ? { notMerged: raw.notMerged } : {}),
   };
 }
 

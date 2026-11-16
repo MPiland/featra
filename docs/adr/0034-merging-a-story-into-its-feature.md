@@ -18,9 +18,16 @@ on its own unless auto-merge is on. The card is owned by its worktree while the 
   would take, merges on its own through the same merge, by `system`, without Accept. Each project's stories are looked
   at when it opens, whenever a scan changes which could merge, when a chat changes, and when the app's settings are
   saved. A story whose session is running or waiting is passed over until it is idle. Stories of one feature merge one
-  at a time. A story is tried once for each head and checked commit: a merge that fails is logged and waits until one
-  of them changes. The Dev Lead that started the story is told it merged. With the setting off, nothing merges on its
-  own. Merge by hand is unchanged.
+  at a time. A story is tried once for each head and checked commit. The Dev Lead that started the story is told it
+  merged. With the setting off, nothing merges on its own. Merge by hand is unchanged.
+- **An automatic merge that fails.** (Amended 2026-11-16, STORY-60.) It fails the way Merge does: on a conflict
+  nothing merges, the story goes back to its first active stage and its session gets the files. Any failure, conflict
+  or not, is told to the Dev Lead as a `not merged` notice with the reason, and recorded on the card as a `not-merged`
+  history event by `system` (from: the commit tried, to: the reason). It stands until the checks settle on another
+  commit (a new `checked:`) or the story merges; a move between stages doesn't clear it. While it stands the card pane
+  and the story's session show it, and the story isn't tried again at that commit, after a restart too. A refusal that
+  isn't the story's (its session started a turn, or a Merge of it is running) is passed over: nothing is told or
+  recorded, and the story is looked at again.
 - **Merge, by hand.** Merge is offered in the story's card pane, Work row and session when it is Verified, from
   review on (or Done), with a live worktree, and not merged yet. The Dev Lead can only ask with `request_merge`: an
   approval card in its chat and the Inbox, with Merge and Decline. The call answers once the user is asked. How it ends

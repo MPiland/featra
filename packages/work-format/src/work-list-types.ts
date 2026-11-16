@@ -58,6 +58,8 @@ export interface StoryRow {
   mergeable: boolean;
   /** Merged into its feature (STORY-12): its session is history, with no Stop or Resume. */
   merged: boolean;
+  /** Why it didn't merge on its own, while that stands (STORY-60): its session says so. Left out otherwise. */
+  notMerged?: string;
 }
 
 export interface FeatureRow {
@@ -171,6 +173,7 @@ const story = (r: Record<string, unknown>): StoryRow => ({
   awaiting: r.awaiting === true,
   mergeable: r.mergeable === true,
   merged: r.merged === true,
+  ...(typeof r.notMerged === "string" && r.notMerged ? { notMerged: r.notMerged } : {}),
 });
 
 const isTime = (v: unknown): v is string => typeof v === "string" && Number.isFinite(Date.parse(v));

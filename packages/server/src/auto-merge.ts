@@ -9,9 +9,22 @@
  * idle), and when the app's settings are saved (`recheck`). A story whose session is running or waiting is passed over
  * until it is idle, as Merge would refuse it. Stories of one feature merge one at a time, in a line of their own, never
  * inside the card lane (the merge takes it itself). A story is tried once for each commit and checked commit it is at:
- * a merge that fails is logged and isn't tried again until one of them changes (STORY-60 handles the rest).
+ * a merge that fails is logged and isn't tried again until one of them changes.
+ *
+ * A merge that fails (STORY-60) does what Merge does: on a conflict nothing merges, the story goes back to its first
+ * active stage and its session gets the files. Any failure, conflict or not, is told to the Dev Lead as a "not merged"
+ * notice and recorded on the card with its commit (`not-merged`), which its card and session show, so the story isn't
+ * tried again at that commit, even after a restart, until its checks settle on another.
  */
-import { autoMergedSummary, errorMessage, evidenceState, mergesOnItsOwn } from "@featra/work-format";
+import {
+  autoMergedSummary,
+  errorMessage,
+  evidenceState,
+  MERGE_MESSAGES,
+  mergesOnItsOwn,
+  notMergedOf,
+  notMergedSummary,
+} from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import { ownedIn } from "./card-actions.ts";
 import type { ChatManager } from "./chat-manager.ts";
@@ -31,6 +44,8 @@ export interface AutoMergeDeps {
   enabled: (dir: string) => Promise<boolean>;
   merge: StoryMerge["merge"];
   chats: Pick<ChatManager, "storySession" | "list" | "notify" | "watchList">;
+  /** Records on story id's card that it didn't merge on its own at head, and why (`recordNotMerged`). */
+  record: (dir: string, id: string, head: string, reason: string) => Promise<void>;
   log: (message: string) => void;
 }
 
@@ -42,6 +57,8 @@ interface Candidate {
   head: string | null;
   /** The commit its checks last settled on, as its card records it. */
   checked: string | null;
+  /** The commit its card says it didn't merge on its own at, while that stands (STORY-60). */
+  refused: string | null;
 }
 
 /** What auto-merge follows of a project: the stories that could merge, and the project's own setting, which a change to
@@ -64,7 +81,8 @@ export function readyOf(scan: Scan | null): Ready {
     const head = scan.collected.heads.get(locationKey(found.owned.owner)) ?? null;
     const feature = cards.find((c) => c.card.id === card.parent)?.card;
     if (!mergesOnItsOwn(found.owned, config, found.root !== null, true, { head, feature })) return [];
-    return [{ id: card.id, into, head, checked: evidenceState(card).checkedHead }];
+    const refused = notMergedOf(card)?.head ?? null;
+    return [{ id: card.id, into, head, checked: evidenceState(card).checkedHead, refused }];
   });
   return { own: config.autoMerge, stories };
 }
@@ -82,7 +100,11 @@ interface Watched {
   stopped: boolean;
 }
 
-export function createAutoMerge({ observe, allowed, enabled, merge, chats, log }: AutoMergeDeps) {
+/** A refusal that isn't the story's: its session started a turn, or a Merge of it runs. It is looked at again later. */
+const passedOver = (id: string, reason: string) =>
+  reason === MERGE_MESSAGES.working(id) || reason === MERGE_MESSAGES.merging(id);
+
+export function createAutoMerge({ observe, allowed, enabled, merge, chats, record, log }: AutoMergeDeps) {
   /** The latest try of each story, by `keyOf(dir, id)`. */
   const tried = new Map<string, Try>();
   /** The tries queued or running, kept while their project is removed, so one added back doesn't try them twice. */
@@ -104,6 +126,22 @@ export function createAutoMerge({ observe, allowed, enabled, merge, chats, log }
     return chats.list(dir).find((c) => c.id === session)?.story?.parent ?? null;
   };
 
+  /** A merge of `story` that failed: told to the Dev Lead `lead` and recorded on the card, unless it wasn't the story's. */
+  async function refused(dir: string, story: Candidate, lead: string | null, reason: string, mine: Try) {
+    const key = keyOf(dir, story.id);
+    if (passedOver(story.id, reason)) {
+      if (tried.get(key) === mine) tried.delete(key);
+      return;
+    }
+    log(`${story.id} didn't merge on its own: ${reason}`);
+    const summary = notMergedSummary(story.into, reason);
+    if (lead) tellLead(chats, log, lead, { story: story.id, outcome: "not merged", summary });
+    if (story.head === null) return;
+    await record(dir, story.id, story.head, reason).catch((err: unknown) =>
+      log(`${story.id}'s card couldn't record that it didn't merge on its own: ${errorMessage(err)}`),
+    );
+  }
+
   async function attempt(dir: string, story: Candidate, mine: Try) {
     const key = keyOf(dir, story.id);
     const latest = () => !closed && allowed.has(dir) && tried.get(key) === mine;
@@ -117,9 +155,10 @@ export function createAutoMerge({ observe, allowed, enabled, merge, chats, log }
         return;
       }
       const lead = leadOf(dir, story.id);
-      const { remains } = await merge(dir, story.id);
-      const notice = { story: story.id, outcome: "merged" as const, summary: autoMergedSummary(story.into, remains) };
-      if (lead) tellLead(chats, log, lead, notice);
+      const merged = await merge(dir, story.id).catch((err: unknown) => errorMessage(err));
+      if (typeof merged === "string") return await refused(dir, story, lead, merged, mine);
+      const summary = autoMergedSummary(story.into, merged.remains);
+      if (lead) tellLead(chats, log, lead, { story: story.id, outcome: "merged", summary });
     } catch (err) {
       log(`${story.id} didn't merge on its own: ${errorMessage(err)}`);
     } finally {
@@ -155,7 +194,8 @@ export function createAutoMerge({ observe, allowed, enabled, merge, chats, log }
     for (const story of ready.stories) {
       const key = keyOf(dir, story.id);
       const at = `${story.head ?? ""}|${story.checked ?? ""}`;
-      if (tried.get(key)?.at === at) continue;
+      // Tried at these commits already, here or (before a restart) as its card records it.
+      if (tried.get(key)?.at === at || (story.head !== null && story.refused === story.head)) continue;
       // Merge refuses a story whose session is working: it is looked at again when the session is idle.
       if (sessionBusy(chats, dir, story.id)) continue;
       const waiting = pending.get(key);
