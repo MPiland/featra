@@ -2477,3 +2477,9 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - A Hold toggle on a story keeps it from merging on its own. Merge still works on a held story.
 - Dev-lead calls: stories under one feature merge one at a time; a story is checked when its evidence changes and once when the project opens; ADR 0034 ("only the user merges") is amended in STORY-59.
 - Stories: STORY-59 Merge a proven story on its own; STORY-60 An automatic merge that fails; STORY-61 Hold a story back from auto-merge. STORY-60 and STORY-61 depend on STORY-59.
+
+## 2026-11-16 — Design review of screenshots (user and dev-lead)
+
+- The user asked that UI be checked for standard design and clean layout, not only copy and tests.
+- Product: STORY-25 gains a criterion. Before a story moves to Acceptance, the reviewing agent checks its screenshots for layout and design and sends any findings to the story's session. Capture still needs no extra install (Electron's built-in Chromium) and spends no agent tokens; the review is agent work.
+- Our own build: every story that adds or changes UI gets a visual review of CI screenshots before the user's Accept, alongside the code review.

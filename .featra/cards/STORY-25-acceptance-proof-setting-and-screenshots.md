@@ -32,6 +32,7 @@ As a builder, I choose once how I want to check stories before accepting them, a
 - [ ] Featra captures screenshots with Electron's built-in Chromium; no browser download or extra dependency
 - [ ] Screenshots produced by the project's own tests are attached to the matching criteria when present
 - [ ] Capturing screenshots spends no agent tokens
+- [ ] Before a story moves to Acceptance, the reviewing agent checks its screenshots for layout and design and sends any findings to the story's session
 
 ## Tasks
 
