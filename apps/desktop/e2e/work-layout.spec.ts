@@ -77,6 +77,9 @@ test("At 1280×800 the Work list and a story's card fit their rows, with fewer c
     const meta = row.locator(".story-meta");
     await expect(meta.getByRole("link", { name: "#1", exact: true })).toBeVisible();
     await expect(meta.getByRole("button", { name: `Hold ${id}` })).toBeVisible();
+    // The feature's progress joins its name cell, so the wide name column isn't an empty slab.
+    const featureName = work.locator(".fl").filter({ has: row }).locator(".frow:not(.hdr) > .fn").first();
+    await expect(featureName.locator(".fn-progress .prog")).toBeVisible();
 
     // AC1, AC3, AC4: no cell wraps or clips, and every row ends inside the list.
     expect(await listProblems(page)).toEqual([]);
@@ -171,6 +174,7 @@ test("At 1280×800 the Work list and a story's card fit their rows, with fewer c
     ]);
     await expect(row.locator(".story-meta").getByRole("link", { name: "#1", exact: true })).toHaveCount(0);
     await expect(row.getByRole("link", { name: "#1", exact: true })).toBeVisible();
+    await expect(featureName.locator(".fn-progress")).toHaveCount(0);
     expect(await listProblems(page)).toEqual([]);
     await uxShot(page, "story-62-work-pane-closed");
   } finally {

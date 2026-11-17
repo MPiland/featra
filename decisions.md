@@ -2688,3 +2688,15 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   hide an action. At 1280×800 it stays on one line. The Progress cell is a flex box so its bar (down to 24 px) gives
   way to the label, and its track grew from 168 to 184 px: the second CI run showed "0 of 2 stories done" in Linux's
   wider font needs 172 px with the bar at its old 40 px minimum, and longer counts need more.
+- **Polish before merge (PR #67).** Three items from review at 1280×800:
+  - _The name column with the pane open._ The list is about 605 px wide there. A story's busiest line (agent and
+    model, Session, Merge, Hold, the PR) needs about 350 px of the name column, so a 184 px Progress (Criteria) column
+    can't fit without wrapping that line, and capping the name column would only move the empty space. Instead, while
+    the Progress column is hidden, a feature's progress joins the end of its name cell (up to 220 px, the bar giving
+    way first), as a story's PR joins its line of marks. Stories have no such move: their line already fills the cell.
+  - _Didn't merge on its own._ It is a warning, not an error: the warn colour, a warning icon, a 10% warn wash and a
+    2 px warn rule on its left edge. One component, so the card pane and the session look the same. Its old colour
+    lost to the pane's grey `.meta` rule; it no longer carries `meta`.
+  - _One action button._ Story rows' chips (Session, Merge, Hold, Start, Accept) and the card's buttons are one
+    family: a light face (`--menu`) with a hairline border, 20 px in rows and lines of text, 28 px in a card's action
+    rows. Hold on keeps the accent's pressed state. A primary button (Approve, Start a feature) keeps its fill.

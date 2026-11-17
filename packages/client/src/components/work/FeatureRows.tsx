@@ -122,6 +122,14 @@ export function Feature({ feature }: { feature: FeatureRow }) {
   const title = feature.id === null ? WORK_COPY.noFeature : feature.title;
   const showing = feature.id !== null && progress === feature.id;
   const columns = useWorkColumns();
+  const progressBar = (
+    <Progress
+      label={feature.progress.label}
+      segments={feature.bar}
+      total={feature.progress.total}
+      breakdown={feature.breakdown}
+    />
+  );
   return (
     <>
       <div className={open ? "frow open" : "frow"} role="row" data-card={feature.id ?? undefined}>
@@ -174,6 +182,9 @@ export function Feature({ feature }: { feature: FeatureRow }) {
             </button>
           )}
           <StaleMark id={feature.id} />
+          {/* With the Progress column hidden (the pane open, or a narrow list), the progress joins the name cell at its
+              end, as a story's PR joins its line of marks, so the row's room still says something (STORY-62). */}
+          {!columns.includes("progress") && <span className="fn-progress">{progressBar}</span>}
         </span>
         {shownCells(
           [
@@ -182,12 +193,7 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               <Status tone={feature.tone} label={featureStatusLabel(feature.status)} />
             </span>,
             <span key="progress" role="cell">
-              <Progress
-                label={feature.progress.label}
-                segments={feature.bar}
-                total={feature.progress.total}
-                breakdown={feature.breakdown}
-              />
+              {progressBar}
             </span>,
             <span key="tasks" role="cell">
               {ticks(feature.tasks)}

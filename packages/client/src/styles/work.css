@@ -301,6 +301,26 @@
   min-width: 24px;
 }
 
+/* The Progress column hidden (STORY-62): the feature's progress at the end of its name cell, so the wide name column
+   still says something. It takes up to 220 px of the room the title leaves; its bar shrinks first. */
+.frow .fn > .fn-progress {
+  display: flex;
+  flex: 0 1 220px;
+  margin-left: auto;
+  padding-left: 16px;
+  font-weight: 400;
+}
+
+/* It never shrinks below its label and the bar's 24 px: the title gives way (ellipsis) instead, so nothing clips. */
+.frow .fn > .fn-progress > .prog {
+  flex: 1 1 auto;
+  min-width: auto;
+}
+
+.frow .fn > .fn-progress .pbar {
+  min-width: 24px;
+}
+
 .prog .pl {
   flex: none;
   white-space: nowrap;

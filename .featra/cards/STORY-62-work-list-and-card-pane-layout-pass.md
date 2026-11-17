@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-62-layout
-pr: null
+pr: 67
 created: 2026-11-17T02:43:35Z
 history:
   - at: 2026-11-17T02:43:35Z

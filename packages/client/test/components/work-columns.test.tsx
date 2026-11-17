@@ -3,7 +3,7 @@
  * it closes; feature and story rows keep one grid, and a story's PR moves to its line of marks while its column is
  * hidden. Through the real App, over real work-format cards.
  */
-import { cleanup, screen, within } from "@testing-library/react";
+import { act, cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { PROJECT, renderApp } from "../harness.tsx";
 import { cardOf, PLAN } from "../work-fixtures.ts";
@@ -21,6 +21,7 @@ const cells = (id: string) => within(rowOf(id)).getAllByRole("cell");
 const grid = () => list().style.getPropertyValue("--work-grid");
 const meta = () => rowOf("STORY-2").querySelector<HTMLElement>(".story-meta");
 const prCell = () => cells("STORY-2")[4];
+const progressIn = (cell: Element) => cell.querySelector(".prog");
 /** The epic's feature columns, then a feature's story columns, all shown. */
 const ALL_HEADERS = ["Feature", "Status", "Progress", "Tasks", "Scope", "Story", "Stage", "Criteria", "Tasks", "PR"];
 
@@ -71,6 +72,72 @@ describe("the Work list's columns with the card pane (STORY-62 AC2)", () => {
       .getAllByRole("row")
       .filter((r) => r.classList.contains("prow"));
     for (const row of [...features, ...stories]) expect(row.children).toHaveLength(4);
+  });
+});
+
+/**
+ * The layout jsdom lacks, faked: ResizeObservers that report when observing and on `resize()`, and the Work list as
+ * wide as it is at 1280×800: `closed` px, or `open` px beside the card pane. Everything else measures 0, as in jsdom.
+ */
+function listWidthOf(closed: number, open: number) {
+  const observer = globalThis.ResizeObserver;
+  const clientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+  const watching = new Set<() => void>();
+  globalThis.ResizeObserver = class {
+    private readonly tell: () => void;
+    constructor(report: ResizeObserverCallback) {
+      this.tell = () => report([], this);
+    }
+    observe() {
+      watching.add(this.tell);
+      this.tell();
+    }
+    unobserve() {
+      watching.delete(this.tell);
+    }
+    disconnect() {
+      watching.delete(this.tell);
+    }
+  };
+  Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+    configurable: true,
+    get(this: HTMLElement) {
+      if (!this.classList.contains("work-list")) return 0;
+      return document.querySelector(".card-pane") ? open : closed;
+    },
+  });
+  return {
+    resize: () => act(() => watching.forEach((tell) => tell())),
+    restore: () => {
+      globalThis.ResizeObserver = observer;
+      if (clientWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", clientWidth);
+    },
+  };
+}
+
+describe("a feature's progress while its column is hidden (STORY-62)", () => {
+  it("joins the feature's name cell at the list's review width with the pane open, and goes back to its column after", async () => {
+    const layout = listWidthOf(1202, 605);
+    try {
+      const app = await openFeature();
+      expect(progressIn(cells("FEAT-2")[0] as HTMLElement)).toBeNull();
+      expect(progressIn(cells("FEAT-2")[2] as HTMLElement)).toBeTruthy();
+
+      await app.user.click(screen.getByRole("button", { name: "Open a folder" }));
+      const pane = await screen.findByRole("complementary", { name: "STORY-2 card" });
+      layout.resize();
+      expect(headers()).toEqual(["Feature", "Status", "Story", "Stage"]);
+      expect(cells("FEAT-2")).toHaveLength(2);
+      expect(progressIn(cells("FEAT-2")[0] as HTMLElement)).toBeTruthy();
+      expect(rowOf("FEAT-2").querySelectorAll(".prog")).toHaveLength(1);
+
+      await app.user.click(within(pane).getByRole("button", { name: "Close card" }));
+      layout.resize();
+      expect(progressIn(cells("FEAT-2")[0] as HTMLElement)).toBeNull();
+      expect(progressIn(cells("FEAT-2")[2] as HTMLElement)).toBeTruthy();
+    } finally {
+      layout.restore();
+    }
   });
 });
 
