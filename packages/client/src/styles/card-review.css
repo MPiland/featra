@@ -17,10 +17,15 @@
   margin-left: auto;
 }
 
-/* Hold turned on (STORY-61): filled, as a switch that is on, --bg text on --acc. */
+/* Hold turned on (STORY-61): a tinted pressed state, the accent's border and text on a light wash of it. */
 .review-draft[aria-pressed="true"] {
-  background: var(--acc);
-  color: var(--bg);
+  background: color-mix(in srgb, var(--acc) 12%, transparent);
+  color: var(--acc);
+}
+
+/* Why a story didn't merge on its own (STORY-60): a warning, not an error. */
+.not-merged {
+  color: var(--warn);
 }
 
 /* Send back… on a draft (STORY-50). */
@@ -64,7 +69,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .draft-actions > form.send-back,

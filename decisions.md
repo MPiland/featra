@@ -2627,3 +2627,24 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
     logs nothing).
   - `api.ts` and `services.ts` are under 300 lines: the project setup and roles methods moved to `api-project.ts` and
     `api-roles.ts`, `ServiceOptions` to `services-options.ts`, and the settings save to `settings-changes.ts`.
+
+## 2026-11-16 — FEAT-8 design review fixes
+
+- **Not-merged reason.** The server records GitHub's own reason, cleaned: `githubReason` (github-merge.ts) drops `gh`'s
+  failure mark and its "Pull request <repo>#<n> is not mergeable:" prefix. `StoryRefusal` carries that `reason`, which
+  auto-merge records and tells the Dev Lead. Merge by hand still says "Couldn't merge the PR: <reason>". The shown copy
+  stays `MERGE_COPY.notMerged`, "Didn't merge on its own. <reason>": GitHub's specific reason is kept, not mapped to
+  shorter words of our own, and the existing e2e and unit assertions on that copy stand unchanged.
+- **Not-merged line.** One `NotMerged` component and `.not-merged` class (`--warn`) in the card pane and the session.
+  In the session the reason comes first, then Merge, on the same left edge. No icon.
+- **Hold.** Pressed is a tint (accent at 12% via `color-mix`, accent border and text), not a solid fill. The "· Held"
+  mark is on the Work row only, as STORY-61 asks; no e2e asserted it in the pane.
+- **Work row.** A story's session, actions and marks sit in one `.story-meta` line that never wraps, spaced by one
+  8 px gap; chips inside an action container add no margin. The shared name column is `minmax(260px, 2.2fr)` for
+  feature and story rows alike.
+- **Merged state.** The card pane says "Merged into <feature branch>." (`mergedInto` on the card view, from the
+  card's `merged` history event). After Featra merges a PR on GitHub, story-merge asks the PR poller to read the
+  project's PRs again (`onGithubMerge`), so the PR chip shows Merged at once instead of "Open" until the next poll.
+  That was stale data: a regression test failed before the fix.
+- **Action rows.** `.draft-actions` and `.story-action` align items to the center, so chips sit level with full-size
+  buttons.

@@ -75,6 +75,7 @@ export function buildCardView(
   const featureEnd = featureEndOf(card, ctx.cards, ctx.config, merge);
   const held = holdOf(owned, ctx.config, readOnly === null);
   const notMerged = card.type === "story" ? notMergedOf(card) : null;
+  const mergedInto = card.history.findLast((e) => e.field === "merged")?.to ?? null;
   return {
     id: card.id,
     type: card.type,
@@ -99,6 +100,7 @@ export function buildCardView(
     ...(mergeRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { mergeable: true as const } : {}),
     ...(abandonRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { abandonable: true as const } : {}),
     ...(isMerged(card) && card.type === "story" ? { merged: true as const } : {}),
+    ...(mergedInto && card.type === "story" ? { mergedInto } : {}),
     ...(held === undefined ? {} : { held }),
     ...(notMerged ? { notMerged: notMerged.reason } : {}),
     ...(featureEnd ? { featureEnd } : {}),

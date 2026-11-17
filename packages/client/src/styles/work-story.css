@@ -3,7 +3,21 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  row-gap: 4px;
+  gap: 4px 8px;
+}
+
+/* A story row's session, actions and marks, as one line that never wraps (FEAT-8 design review). One gap spaces them. */
+.story-meta {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.story-meta > .story-agent,
+.story-meta > .story-action {
+  margin-left: 0;
 }
 
 .prow .pn .row-open {
@@ -28,11 +42,15 @@
   display: inline-flex;
   flex-wrap: wrap;
   gap: 8px;
-  align-items: flex-start;
+  align-items: center;
   margin-left: 8px;
 }
 
-.draft-actions > .story-action {
+/* The container's gap spaces a story's actions; a chip adds no margin of its own. */
+.draft-actions > .story-action,
+.draft-actions > .story-agent,
+.story-action > .review-draft,
+.story-agent > .review-draft {
   margin-left: 0;
 }
 

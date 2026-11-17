@@ -125,7 +125,8 @@
 .frow,
 .prow {
   display: grid;
-  grid-template-columns: 14px minmax(0, 2.2fr) 1.25fr 1.35fr 0.65fr 1.25fr;
+  /* The name column keeps room for a story's title and its one line of session, actions and marks. */
+  grid-template-columns: 14px minmax(260px, 2.2fr) 1.25fr 1.35fr 0.65fr 1.25fr;
   gap: 14px;
   align-items: center;
   padding: 10px 14px;

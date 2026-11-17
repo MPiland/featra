@@ -3,6 +3,7 @@ import { expect, test } from "@playwright/test";
 import { parseCard } from "@featra/work-format";
 import { git } from "./draft-project.ts";
 import { githubApp, provenStory } from "./proven-story.ts";
+import { uxShot } from "./ux-shot.ts";
 
 /**
  * STORY-60: an automatic merge that fails, in the world of proven-story.ts. The story goes to review (its PR opens),
@@ -20,6 +21,7 @@ test("A story that can't merge on its own says why on its card and in its sessio
     // AC3, AC4: GitHub refuses the merge. The story stays in review, untried again, and its card says why.
     const why = /Didn't merge on its own\. .*base branch policy prohibits the merge/;
     await expect(card.getByRole("status").filter({ hasText: why })).toBeVisible({ timeout: 30_000 });
+    await uxShot(page, "feat-8-merge-failed-card", card.getByRole("status").filter({ hasText: why }));
     await expect(card.getByRole("button", { name: "Status: In Review" })).toBeVisible();
     await expect(row).not.toContainText("Merged");
     expect((await gh.calls()).filter((c) => c.args.slice(0, 2).join(" ") === "pr merge")).toHaveLength(1);
@@ -31,6 +33,7 @@ test("A story that can't merge on its own says why on its card and in its sessio
     await row.getByRole("button", { name: `Open the session of ${id}` }).click();
     const session = page.getByRole("region", { name: "Developer" });
     await expect(session.getByRole("status").filter({ hasText: why })).toBeVisible();
+    await uxShot(page, "feat-8-merge-failed-session", session.getByRole("status").filter({ hasText: why }));
   } finally {
     await world.dispose();
   }

@@ -20,6 +20,8 @@ export const MERGE_COPY = {
   merging: "Merging…",
   decline: "Decline",
   merged: "Merged",
+  /** On a merged story's card (STORY-12): where it went. */
+  mergedInto: (branch: string) => `Merged into ${branch}.`,
   /** The toggle that holds a story back from auto-merge (STORY-61), and the mark on a held story's row. */
   hold: "Hold",
   holdOf: (id: string) => `Hold ${id}`,

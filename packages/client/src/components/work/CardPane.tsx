@@ -11,6 +11,7 @@ import { StoryPr } from "./StoryPr.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
 import { HoldStory } from "./HoldStory.tsx";
 import { MergeStory } from "./MergeStory.tsx";
+import { NotMerged } from "./NotMerged.tsx";
 import { AbandonStory } from "./AbandonStory.tsx";
 import { FeatureEnd } from "./FeatureEnd.tsx";
 import { StoryAgent } from "./story-agents.tsx";
@@ -124,11 +125,8 @@ export function CardPane({
             )}
           </div>
           <Evidence evidence={view.evidence} />
-          {view.notMerged && (
-            <p className="meta" role="status">
-              {MERGE_COPY.notMerged(view.notMerged)}
-            </p>
-          )}
+          {view.notMerged && <NotMerged reason={view.notMerged} />}
+          {view.mergedInto && <p className="meta">{MERGE_COPY.mergedInto(view.mergedInto)}</p>}
           <p className="meta">{view.readOnly ?? CARD_COPY.owner(view.owner)}</p>
           {view.draftChat && !readOnly && (
             <div className="draft-actions">

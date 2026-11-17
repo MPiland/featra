@@ -88,6 +88,8 @@ export interface CardView {
   featureEnd?: CardFeatureEnd;
   /** True on a story merged into its feature (STORY-12); absent otherwise. */
   merged?: true;
+  /** The feature branch a merged story went into (STORY-12), for its card's merged line; absent otherwise. */
+  mergedInto?: string;
   /** Whether a story is held back from auto-merge, where Hold applies (STORY-61); absent where it doesn't. */
   held?: boolean;
   /** Why a story didn't merge on its own, while that stands (STORY-60); absent otherwise. */
@@ -236,6 +238,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(raw.mergeable === true ? { mergeable: true as const } : {}),
     ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
+    ...(typeof raw.mergedInto === "string" && raw.mergedInto ? { mergedInto: raw.mergedInto } : {}),
     ...(typeof raw.held === "boolean" ? { held: raw.held } : {}),
     ...(typeof raw.notMerged === "string" && raw.notMerged ? { notMerged: raw.notMerged } : {}),
   };

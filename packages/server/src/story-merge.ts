@@ -58,6 +58,8 @@ export interface StoryMergeDeps extends GithubPrDeps {
   gitRun?: typeof runGit;
   /** The stories being merged or abandoned, which the server shares with Abandon (STORY-58). */
   ending?: StoryEnding;
+  /** Featra merged story `id`'s PR on GitHub: its PR state is read again soon, not at the next poll (FEAT-8 review). */
+  onGithubMerge?: (dir: string, id: string) => Promise<void>;
 }
 
 /** How a merge is asked for: `auto` is auto-merge's own try (STORY-59), which a held story refuses (STORY-61). */
@@ -88,9 +90,12 @@ export type StoryRefusalKind = "conflict" | "conflictUnknown" | "dirty" | "githu
  */
 export class StoryRefusal extends ApiError {
   readonly kind: StoryRefusalKind;
-  constructor(message: string, kind: StoryRefusalKind) {
+  /** Why, as the story's card records it: the message, or for GitHub only its own reason (`githubReason`). */
+  readonly reason: string;
+  constructor(message: string, kind: StoryRefusalKind, reason: string = message) {
     super(message);
     this.kind = kind;
+    this.reason = reason;
   }
 }
 
@@ -187,7 +192,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
         : await mergePr(dir, pr.url, r.tip, deps);
     if (outcome === null) return { kind: "merged", into: r.into, remote };
     if ("error" in outcome)
-      throw outcome.refused ? new StoryRefusal(outcome.error, "github") : new ApiError(outcome.error);
+      throw outcome.refused ? new StoryRefusal(outcome.error, "github", outcome.reason) : new ApiError(outcome.error);
     const files = await conflictsOnGithub(r.top, remote.name, r.into, r.tip);
     if (files.length === 0) throw new StoryRefusal(MERGE_MESSAGES.conflictUnknown(id), "conflictUnknown");
     return { kind: "conflict", into: r.into, files };
@@ -232,7 +237,12 @@ export function createStoryMerge(deps: StoryMergeDeps) {
       const github = (await settings.githubUse(dir)).usable;
       const attempt = github ? await mergeOnGithub(dir, id, options) : await mergeLocally(dir, id, options);
       if (attempt.kind === "conflict") return conflicted(dir, id, attempt.into, attempt.files);
-      return settle(dir, id, attempt.into, attempt.remote);
+      const result = await settle(dir, id, attempt.into, attempt.remote);
+      if (attempt.remote)
+        void deps
+          .onGithubMerge?.(dir, id)
+          .catch((err: unknown) => log(`${id}'s PR couldn't be read again: ${String(err)}`));
+      return result;
     });
 
   /** Story `id`'s PR was merged on GitHub outside Featra: it settles as a merge Featra made does. */

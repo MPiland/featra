@@ -24,22 +24,48 @@ export async function prMergeable(dir: string, url: string, deps: GithubPrDeps =
 const CONFLICT = /cannot be cleanly created|merge conflict/i;
 
 /**
+ * GitHub's own reason for refusing a merge, as one sentence: `gh`'s failure mark (`X`, `✗`) and its "Pull request
+ * <repo>#<n> is not mergeable:" prefix dropped, so "X Pull request acme/app#1 is not mergeable: the base branch policy
+ * prohibits the merge." is "The base branch policy prohibits the merge." Null when `gh` said nothing.
+ */
+export function githubReason(said: string): string | null {
+  const line = said
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .find(Boolean);
+  if (!line) return null;
+  const reason = line
+    .replace(/^(?:X|✗|×)\s+/u, "")
+    .replace(/^Pull request \S+ is not mergeable:\s*/i, "")
+    .trim();
+  if (!reason) return null;
+  const sentence = reason.charAt(0).toUpperCase() + reason.slice(1);
+  return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
+}
+
+/** A sentence as the end of another: its first word lowercased, unless that is a name such as GitHub. */
+const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s.charAt(0).toLowerCase() + s.slice(1) : s);
+
+/**
  * Merges the PR at `url` with a merge commit, at `head` only. Null once merged; else that it conflicts, or why not:
- * `refused` when GitHub answered and refused it (STORY-60), not when `gh` couldn't be asked.
+ * `refused` when GitHub answered and refused it (STORY-60), not when `gh` couldn't be asked, with GitHub's `reason`.
  */
 export async function mergePr(
   dir: string,
   url: string,
   head: string,
   deps: GithubPrDeps = {},
-): Promise<null | { conflict: true } | { error: string; refused: boolean }> {
+): Promise<null | { conflict: true } | { error: string; refused: boolean; reason?: string }> {
   const safe = githubPrUrl(url);
   if (!safe || !/^[0-9a-f]{7,64}$/.test(head)) return { error: "Couldn't merge the PR.", refused: false };
   const r = await runGh(dir, ["pr", "merge", safe, "--merge", "--match-head-commit", head], ghOptions(deps));
   if (!r) return { error: "Couldn't merge the PR.", refused: false };
   if (r.code === 0) return null;
   const said = r.stderr || r.stdout;
-  return CONFLICT.test(said) ? { conflict: true } : { error: because("Couldn't merge the PR", said), refused: true };
+  if (CONFLICT.test(said)) return { conflict: true };
+  const reason = githubReason(said);
+  if (!reason) return { error: "Couldn't merge the PR.", refused: true };
+  return { error: `Couldn't merge the PR: ${lowerFirst(reason)}`, refused: true, reason };
 }
 
 /**

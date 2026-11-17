@@ -194,4 +194,14 @@ describe("STORY-60 AC4: the card says the automatic merge didn't happen and why"
     expect(notMergedOf(card)?.reason).toBe(why);
     stopAll();
   });
+
+  it("records GitHub's own reason, without gh's failure mark or its PR prefix (design review)", async () => {
+    await refusedOnGithub();
+    const card = await w.read();
+    expect(lastNotMerged(card)?.to).toBe("The base branch policy prohibits the merge.");
+    expect(m.notices[0]?.notice.summary).toBe(
+      notMergedSummary(FEATURE_BRANCH, "The base branch policy prohibits the merge."),
+    );
+    stopAll();
+  });
 });

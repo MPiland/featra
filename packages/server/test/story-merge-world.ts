@@ -168,6 +168,7 @@ export function mergeWorld(): MergeWorld {
       checkedHead: (dir, id, stored) => (m.checked === undefined ? checks.settledHead(dir, id, stored) : m.checked),
       ghCommand: options.noGh ? "gh-that-is-not-installed" : w.gh.command,
       gitRun: (...args) => (m.gitRun ?? runGit)(...args),
+      onGithubMerge: (dir) => w.prs.refresh(dir),
     });
     m.requests = createMergeRequest({
       scan: w.watches.scan,

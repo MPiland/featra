@@ -38,6 +38,18 @@ with `electron-<n>.zip`, the app's trace (its actions, DOM snapshots and screens
 `trace.zip`, the test's own steps. Open one with `pnpm --filter @featra/desktop exec playwright show-trace <file>`.
 Passing tests keep no output.
 
+## Screens for design review
+
+Every story that adds or changes UI gets a visual design review of its rendered screens before the user's Accept
+(decisions.md, 2026-11-16). The story's e2e journey captures them: after the assertions that put a new or changed
+screen in the state to review, call `uxShot(page, "<feat>-<surface>-<state>", locator)` from `apps/desktop/e2e/ux-shot.ts`.
+It saves the whole window at its normal size to `apps/desktop/test-results/ux/<os>/<name>.png`, scrolling `locator`
+into view first. It asserts nothing and never fails a test, so add no assertions for it and don't move existing ones.
+Capture each state the story adds (off and on, before and after), and both the card pane and the Work list where the
+story changes them. Names must be unique across the suite.
+
+Each e2e job uploads that folder, pass or fail, as `ux-screens-windows` or `ux-screens-ubuntu` (kept 7 days).
+
 ## Soak runs
 
 `.github/workflows/soak.yml` repeats an e2e spec, or the whole unit suite, to catch intermittent failures. It stops at
