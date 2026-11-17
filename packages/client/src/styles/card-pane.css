@@ -145,8 +145,8 @@
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 16px 18px;
+  gap: 24px;
+  padding: 16px;
 }
 
 .card-body p {
@@ -156,7 +156,12 @@
 .card-head {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+}
+
+/* Its notices (who owns it, why it didn't merge): the pane's small text. */
+.card-head > p {
+  font-size: 12px;
 }
 
 .card-title {
@@ -164,10 +169,75 @@
   font-weight: 600;
 }
 
-.card-fields {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+/* A card's properties (STORY-62): a name column, and each value or its quiet dropdown on the same 28px row. */
+.card-props {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+}
+
+.card-prop-name {
+  font-size: 12px;
+  color: var(--tx3);
+}
+
+.card-prop-value,
+.card-props .dropdown {
+  justify-self: start;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Read-only, the value sits where a dropdown's text would. */
+.card-prop-value {
+  padding: 0 9px;
+  line-height: 28px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A card's actions (STORY-62): one size for every button on a row, 28px, whatever its kind. */
+.card-actions .btn,
+.card-actions .review-draft {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  margin-left: 0;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* Its chips read as the row's buttons: neutral, the accent kept for Hold while it is on. */
+.card-actions .review-draft {
+  border-color: var(--menu-line);
+  background: var(--row);
+  color: var(--tx);
+}
+
+.card-actions .review-draft:hover {
+  background: var(--row2);
+}
+
+.card-actions .review-draft[aria-pressed="true"] {
+  border-color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 12%, transparent);
+  color: var(--acc);
+}
+
+.card-actions .review-draft:disabled,
+.card-actions .review-draft[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* The story's session line: its agent and model, and the Session chip at the list's size. */
+.card-agent {
+  font-size: 12px;
 }
 
 .card-error,

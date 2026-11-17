@@ -8,7 +8,7 @@ import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
 import { awaitStoryWorktree } from "./story-worktree.ts";
-import { uxShot } from "./ux-shot.ts";
+import { atReviewSize, uxShot } from "./ux-shot.ts";
 
 /**
  * STORY-61: holding a story back from auto-merge. The real app, its real local server and real git; only the platform,
@@ -47,6 +47,7 @@ test("A held story doesn't merge on its own until Hold is turned off", async () 
       [PATH_KEY]: [gh.bin, bin.path].join(delimiter),
     });
     running = app;
+    await atReviewSize(app, page);
     const nav = page.getByRole("navigation", { name: "Featra" });
 
     const draft = await draftInNewChat(page, "FEAT-2");

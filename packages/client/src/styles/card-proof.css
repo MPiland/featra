@@ -30,7 +30,7 @@
 .ev {
   display: flex;
   flex-wrap: wrap;
-  gap: 14px;
+  gap: 4px 12px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -41,7 +41,8 @@
 .ev li {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
+  white-space: nowrap;
 }
 
 .ev .y {

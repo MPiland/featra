@@ -1,18 +1,56 @@
-/* A story row's agent, model and session link (STORY-9): they wrap under the title, which keeps its ellipsis. */
+/* A story's name cell (STORY-62): its title on one line, and under it, on the title's left edge, one line of its
+   session, actions and marks. Neither wraps; the title gives way first, with an ellipsis. */
 .prow .pn {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
-/* A story row's session, actions and marks, as one line that never wraps (FEAT-8 design review). One gap spaces them. */
+.pn-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.pn-title > :not(.row-open) {
+  flex: none;
+}
+
+/* One gap spaces the session, actions and marks; the line is the list's small text. */
 .story-meta {
-  display: inline-flex;
+  display: flex;
   flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 20px;
   white-space: nowrap;
+}
+
+.story-meta:empty {
+  display: none;
+}
+
+.story-meta > * {
+  flex: none;
+}
+
+/* When the line runs short, the agent and model give way first, so the actions and marks stay whole. */
+.story-meta > .story-agent {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.story-meta .story-action {
+  flex-wrap: nowrap;
 }
 
 .story-meta > .story-agent,
@@ -30,10 +68,6 @@
 
 .story-agent {
   margin-left: 8px;
-}
-
-.prow .pn .story-agent {
-  white-space: normal;
 }
 
 /* A story's actions (Accept and Send back, Merge, Hold, Abandon; a feature's ending): in its row, its card pane and the
