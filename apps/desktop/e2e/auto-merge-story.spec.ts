@@ -4,6 +4,7 @@ import { expect, test } from "@playwright/test";
 import { parseCard } from "@featra/work-format";
 import { git } from "./draft-project.ts";
 import { githubApp, provenStory } from "./proven-story.ts";
+import { uxShot } from "./ux-shot.ts";
 
 /**
  * STORY-59: a Verified and Proven story merges into its feature on its own, in the world of proven-story.ts.
@@ -25,12 +26,14 @@ test("A Verified and Proven story merges into its feature on its own", async () 
       .click();
     const review = page.getByRole("region", { name: "Progress and review" });
     await expect(review.getByRole("switch", { name: "Auto-merge stories" })).toHaveAttribute("aria-checked", "true");
+    await uxShot(page, "feat-8-settings-auto-merge-on", review);
 
     // AC1, AC3: the story goes to review, and CI's checks pass with a report that proves every criterion.
     const { row, id, folder, file, story, base } = await provenStory(world);
 
     // It merges on its own: no Merge, no Accept. The PR merges with a merge commit at the head CI checked.
     await expect(row).toContainText("Merged", { timeout: 30_000 });
+    await uxShot(page, "feat-8-work-merged-on-its-own", row);
     const merged = (await gh.calls()).find((c) => c.args.slice(0, 2).join(" ") === "pr merge");
     expect(merged?.args).toEqual([
       "pr",

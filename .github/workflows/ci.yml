@@ -56,6 +56,14 @@ jobs:
           path: apps/desktop/test-results
           retention-days: 14
           if-no-files-found: ignore
+      - name: Upload screens for design review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-screens-windows
+          path: apps/desktop/test-results/ux
+          retention-days: 7
+          if-no-files-found: ignore
 
   e2e-ubuntu:
     name: E2E (Ubuntu)
@@ -75,4 +83,12 @@ jobs:
           name: e2e-ubuntu-traces
           path: apps/desktop/test-results
           retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload screens for design review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-screens-ubuntu
+          path: apps/desktop/test-results/ux
+          retention-days: 7
           if-no-files-found: ignore

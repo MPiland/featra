@@ -8,6 +8,7 @@ import { launch, tempUserData } from "./app.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
 import { awaitStoryWorktree } from "./story-worktree.ts";
+import { uxShot } from "./ux-shot.ts";
 
 /**
  * STORY-61: holding a story back from auto-merge. The real app, its real local server and real git; only the platform,
@@ -77,12 +78,14 @@ test("A held story doesn't merge on its own until Hold is turned off", async () 
     // AC1, AC4: Hold on the story's row; the row says Held, and the card's history has the user's turn of it.
     const rowHold = row.getByRole("button", { name: `Hold ${id}` });
     await expect(rowHold).toHaveAttribute("aria-pressed", "false");
+    await uxShot(page, "feat-8-hold-off-row-and-card", row);
     await rowHold.click();
     await expect(rowHold).toHaveAttribute("aria-pressed", "true");
     await expect(row).toContainText("Held");
     await expect
       .poll(async () => parseCard(await readFile(file, "utf8")).history.findLast((e) => e.field === "held"))
       .toMatchObject({ to: "held", by: "user" });
+    await uxShot(page, "feat-8-hold-on-row-and-card", row);
 
     // AC2: CI passes for the PR's head and its report proves every criterion, and still it doesn't merge.
     await gh.change((s) => {
@@ -120,12 +123,14 @@ test("A held story doesn't merge on its own until Hold is turned off", async () 
     expect((await gh.calls()).some((c) => c.args.slice(0, 2).join(" ") === "pr merge")).toBe(false);
     await expect(row).not.toContainText("Merged");
     await expect(row.getByRole("button", { name: `Merge ${id}` })).toBeVisible();
+    await uxShot(page, "feat-8-hold-on-proven-not-merged", row);
 
     // AC3: Hold turned off in the card pane, the story merges on its own.
     const paneHold = card.getByRole("button", { name: `Hold ${id}` });
     await expect(paneHold).toHaveAttribute("aria-pressed", "true");
     await paneHold.click();
     await expect(row).toContainText("Merged", { timeout: 30_000 });
+    await uxShot(page, "feat-8-hold-off-merged-on-its-own", row);
     const merged = (await gh.calls()).find((c) => c.args.slice(0, 2).join(" ") === "pr merge");
     expect(merged?.args).toContain("--merge");
     const path = relative(folder, file).replace(/\\/g, "/");
