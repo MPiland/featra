@@ -3,7 +3,7 @@ import type { EpicRow } from "@featra/work-format/work-list";
 import { WORK_COPY } from "../../work-list.ts";
 import { ChevronRightIcon } from "../icons.tsx";
 import { Progress } from "./Bar.tsx";
-import { Feature } from "./FeatureRows.tsx";
+import { ColumnHeaders, Feature } from "./FeatureRows.tsx";
 import { StaleMark } from "./stale-mark.tsx";
 
 /** An epic's header, which folds its features away, and the features on one grid. */
@@ -31,14 +31,8 @@ export function Epic({ epic }: { epic: EpicRow }) {
       </div>
       {open && (
         <div className="fl" role="table" aria-label={title}>
-          <div className="frow hdr" role="row">
-            <span aria-hidden="true" />
-            {WORK_COPY.columns.map((c) => (
-              <span key={c} role="columnheader">
-                {c}
-              </span>
-            ))}
-          </div>
+          <ColumnHeaders names={WORK_COPY.columns} className="frow hdr" />
+
           {epic.features.map((f) => (
             <Feature key={f.id ?? "none"} feature={f} />
           ))}

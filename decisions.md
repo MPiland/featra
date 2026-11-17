@@ -2648,3 +2648,55 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   That was stale data: a regression test failed before the fix.
 - **Action rows.** `.draft-actions` and `.story-action` align items to the center, so chips sit level with full-size
   buttons.
+
+## 2026-11-16 — STORY-62 layout pass (dev-lead ruling: 1280×800, fewer columns with the pane open)
+
+- **Layout pass before Acceptance.** FEAT-8 gets a layout pass on the Work list and the card pane before it goes to
+  the user for Acceptance. (by: user)
+- **1280×800 is the size.** Everything must look right at a 1280×800 window. (by: user)
+- **Fewer columns with the pane open.** With the card pane open, the Work list shows fewer columns, dropping the less
+  important ones (Progress, Tasks, Scope), so nothing wraps or clips. The pane stays docked. Below 1280 wide nothing
+  wraps or clips either: more columns drop. (by: user)
+- **The column rule** (`packages/client/src/work-columns.ts`). Name and Status always show. With the pane open, Tasks
+  and Scope (a story's Tasks and PR) are hidden. Any column that doesn't fit the list's measured width is hidden too,
+  least important first: Tasks, then Scope, then Progress. Each column has a fixed track (Status 116, Progress 184,
+  Tasks 64, Scope 176 px), and the name column keeps 300 px before one drops. At 1280×800 that means every column
+  with the pane closed, and name and Status alone beside the open pane (the list is about 605 px wide there).
+- **One grid.** The list sets one `--work-grid` template from the columns shown, which every feature, story and
+  header row uses, so feature and story columns line up. The name column is `minmax(0, 1fr)`. No value wraps in its
+  cell; text that is still too long ends in an ellipsis, and the agent and model in a story's line give way first.
+- **A story's name cell.** Its title on one line, and under it, on the title's left edge, one 20 px line of its
+  session, actions and marks. While the PR column is hidden, the PR chip joins that line, so the row still shows it.
+- **Toolbar.** Under the List/Board switch, one row holds the filter chips and New bug at its end. Both are 24 px
+  tall. The chips never wrap: a list too narrow for them scrolls the chips. New bug's form opens on its own row below.
+- **Card pane.** Status and Parent are property rows: a name column, and a compact 28 px dropdown that shows only the
+  value. Its accessible name is still "Status: <value>", so existing tests stand. Read-only, the value sits where the
+  dropdown's text would. The evidence marks keep each mark whole (12 px gap). Every action button in a row is 28 px,
+  and the chips there look like the row's buttons: neutral, with Hold's accent tint kept while it is on. The session
+  line keeps its small Session chip. The body has 16 px padding and 24 px between sections; the head's items are
+  12 px apart, and its notices use the pane's 12 px text.
+- **Screens at 1280×800.** `atReviewSize` (`apps/desktop/e2e/ux-shot.ts`) sizes the window's content to 1280×800.
+  The journeys that take review screens call it right after launch (the auto-merge world in `proven-story.ts`, and
+  `hold-story.spec.ts`), as do the two journeys that read the Tasks and Scope cells (`update-card.spec.ts`,
+  `progress-breakdown.spec.ts`), since a smaller CI screen now drops those columns. `launch()` itself doesn't resize,
+  because the window-state and tray journeys depend on the window's own size and visibility. No existing assertion
+  changed.
+- **Narrower than the review size** (CI fix, first run). Only the agent and model's name in a story's line gives way;
+  its Session and Stop chips, the actions and the marks never shrink or clip, because a clipped control can't be
+  clicked (the first CI run caught Session covered by its own ellipsized box). In a list so narrow that the line still
+  doesn't fit after every column has dropped and the name has given way, the line wraps under itself rather than
+  hide an action. At 1280×800 it stays on one line. The Progress cell is a flex box so its bar (down to 24 px) gives
+  way to the label, and its track grew from 168 to 184 px: the second CI run showed "0 of 2 stories done" in Linux's
+  wider font needs 172 px with the bar at its old 40 px minimum, and longer counts need more.
+- **Polish before merge (PR #67).** Three items from review at 1280×800:
+  - _The name column with the pane open._ The list is about 605 px wide there. A story's busiest line (agent and
+    model, Session, Merge, Hold, the PR) needs about 350 px of the name column, so a 184 px Progress (Criteria) column
+    can't fit without wrapping that line, and capping the name column would only move the empty space. Instead, while
+    the Progress column is hidden, a feature's progress joins the end of its name cell (up to 220 px, the bar giving
+    way first), as a story's PR joins its line of marks. Stories have no such move: their line already fills the cell.
+  - _Didn't merge on its own._ It is a warning, not an error: the warn colour, a warning icon, a 10% warn wash and a
+    2 px warn rule on its left edge. One component, so the card pane and the session look the same. Its old colour
+    lost to the pane's grey `.meta` rule; it no longer carries `meta`.
+  - _One action button._ Story rows' chips (Session, Merge, Hold, Start, Accept) and the card's buttons are one
+    family: a light face (`--menu`) with a hairline border, 20 px in rows and lines of text, 28 px in a card's action
+    rows. Hold on keeps the accent's pressed state. A primary button (Approve, Start a feature) keeps its fill.

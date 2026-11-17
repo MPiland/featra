@@ -5,6 +5,7 @@ import { parseCard, serializeCard } from "@featra/work-format";
 import { checkRun, fakeGh, junitXml, type FakeGhState } from "../../../packages/server/test/fake-gh.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
+import { atReviewSize } from "./ux-shot.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
 import { awaitStoryWorktree } from "./story-worktree.ts";
@@ -57,6 +58,8 @@ export async function githubApp(state: Partial<FakeGhState> = {}) {
       [PATH_KEY]: [gh.bin, bin.path].join(delimiter),
     });
     app = launched.app;
+    // Its journeys take screens for design review, at the size they are reviewed at.
+    await atReviewSize(app, launched.page);
     return { app, page: launched.page, repo, remote, gh, dispose };
   } catch (err) {
     await dispose();

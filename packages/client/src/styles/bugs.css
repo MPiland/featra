@@ -9,6 +9,27 @@
   margin: 0;
 }
 
+/* In the list's toolbar, New bug is the chips' height, and its notice stays on the row. */
+.work-toolbar .new-bug-bar {
+  gap: 8px;
+}
+
+.work-toolbar .new-bug-bar .btn {
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.work-toolbar .new-bug-bar p {
+  order: -1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .new-bug {
   display: flex;
   flex-direction: column;

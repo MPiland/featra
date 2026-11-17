@@ -94,6 +94,13 @@ export const BugIcon = () => (
     <path d="M10 7a2 2 0 0 1 4 0M12 11v8M4 9l4 2M20 9l-4 2M4 15h4M20 15h-4M5 20l3-2M19 20l-3-2" />
   </Icon>
 );
+/** A warning (STORY-62): a triangle with an exclamation mark, beside a notice that needs a look. */
+export const WarningIcon = () => (
+  <Icon size={14} name="warning">
+    <path d="M12 4 21.5 20h-19z" />
+    <path d="M12 10v4.5M12 17.2v.3" />
+  </Icon>
+);
 /** A feature's progress (STORY-24): bars of stories done. */
 export const ProgressIcon = () => (
   <Icon>

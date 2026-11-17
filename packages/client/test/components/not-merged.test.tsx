@@ -80,6 +80,14 @@ describe("FEAT-8 design review: the not-merged line", () => {
     await waitFor(() => expect(shown(session)?.classList.contains("not-merged")).toBe(true));
   });
 
+  it("carries a warning icon in the card pane and the session (STORY-62)", async () => {
+    const app = await refused();
+    const pane = await openPane(app);
+    await waitFor(() => expect(shown(pane)?.querySelector('svg[data-icon="warning"]')).toBeTruthy());
+    const session = await openSession(app);
+    await waitFor(() => expect(shown(session)?.querySelector('svg[data-icon="warning"]')).toBeTruthy());
+  });
+
   it("comes before Merge in the session", async () => {
     const app = await refused();
     const session = await openSession(app);
