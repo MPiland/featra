@@ -101,7 +101,8 @@ export function StoryAgent({ id }: { id: string }) {
   if (!story.agent) return null;
   return (
     <span className="story-agent meta">
-      {[story.agent, story.model].filter(Boolean).join(" · ")}
+      {/* Only the name gives way when the row runs short; its Session and Stop stay whole and clickable. */}
+      <span className="story-agent-name">{[story.agent, story.model].filter(Boolean).join(" · ")}</span>
       {story.session !== null && agents.hasChat(story.session) && (
         <>
           {" · "}

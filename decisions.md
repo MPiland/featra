@@ -2681,3 +2681,9 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   `progress-breakdown.spec.ts`), since a smaller CI screen now drops those columns. `launch()` itself doesn't resize,
   because the window-state and tray journeys depend on the window's own size and visibility. No existing assertion
   changed.
+- **Narrower than the review size** (CI fix, first run). Only the agent and model's name in a story's line gives way;
+  its Session and Stop chips, the actions and the marks never shrink or clip, because a clipped control can't be
+  clicked (the first CI run caught Session covered by its own ellipsized box). In a list so narrow that the line still
+  doesn't fit after every column has dropped and the name has given way, the line wraps under itself rather than
+  hide an action. At 1280×800 it stays on one line. The Progress cell is a flex box so its bar gives way to the label
+  on Linux's wider font.

@@ -287,6 +287,16 @@
   max-width: 100%;
 }
 
+/* In its cell the bar gives way to the label, so a wider font (Linux) never pushes the label past the column. */
+.frow > [role="cell"]:has(> .prog) {
+  display: flex;
+  align-items: center;
+}
+
+.frow > [role="cell"] > .prog {
+  flex: 0 1 auto;
+}
+
 .prog .pl {
   flex: none;
   white-space: nowrap;

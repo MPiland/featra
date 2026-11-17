@@ -22,12 +22,13 @@
 /* One gap spaces the session, actions and marks; the line is the list's small text. */
 .story-meta {
   display: flex;
-  flex-wrap: nowrap;
+  /* One line wherever the row has room (1280 x 800 and up); in a row too narrow even after the agent's name gives way,
+     the line wraps rather than hiding an action. */
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
   font-size: 12px;
   line-height: 20px;
   white-space: nowrap;
@@ -41,8 +42,21 @@
   flex: none;
 }
 
-/* When the line runs short, the agent and model give way first, so the actions and marks stay whole. */
+/* When the line runs short, the agent and model's name gives way first; its Session and Stop, the actions and the
+   marks stay whole. */
 .story-meta > .story-agent {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.story-meta > .story-agent > * {
+  flex: none;
+}
+
+.story-meta > .story-agent > .story-agent-name {
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
