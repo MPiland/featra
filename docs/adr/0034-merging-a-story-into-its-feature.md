@@ -18,8 +18,14 @@ on its own unless auto-merge is on. The card is owned by its worktree while the 
   would take, merges on its own through the same merge, by `system`, without Accept. Each project's stories are looked
   at when it opens, whenever a scan changes which could merge, when a chat changes, and when the app's settings are
   saved. A story whose session is running or waiting is passed over until it is idle. Stories of one feature merge one
-  at a time. A story is tried once for each head, checked commit and feature tip. The Dev Lead that started the story is told it
-  merged. With the setting off, nothing merges on its own. Merge by hand is unchanged.
+  at a time. A story is tried once for each head, checked commit and feature tip. The Dev Lead that started the story
+  is told it merged. With the setting off, nothing merges on its own. Merge by hand is unchanged. (Amended 2026-11-16,
+  STORY-61.) A started story the user holds (**Hold**, a toggle on its card pane and Work row while auto-merge is on;
+  each turn is a `held` event in its history, by `user`) never merges on its own. Merge by hand still works on it. Let
+  go, it is among the stories auto-merge picks again, so a story already Verified and Proven merges. Auto-merge's try
+  reads Hold again after the merge's own scan (in the card lane, locally). A story held while the try waited is refused
+  there, as a race and not a `StoryRefusal`: it is logged, not recorded on the card or told. A settings save looks
+  again only at projects whose setting in effect changed.
 - **An automatic merge that fails.** (Amended 2026-11-16, STORY-60 and its review.) It fails the way Merge does: on a
   conflict nothing merges, the story goes back to its first active stage and its session gets the files. A merge's
   error carries a kind (`StoryRefusal`), never matched by its copy. Only a refusal that is the story's own at its

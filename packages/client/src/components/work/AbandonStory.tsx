@@ -86,7 +86,7 @@ export function AbandonStory({ id, abandonable, actions, onDiscarded }: AbandonS
 
   const lines = warning ? warningLines(warning) : null;
   return (
-    <span className="accept-story">
+    <span className="story-action">
       {warning === null && (abandonable || busy !== null) && (
         <button
           ref={button}

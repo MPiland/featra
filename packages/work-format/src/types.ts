@@ -22,6 +22,7 @@ export type HistoryField =
   | "report"
   | "pr"
   | "merged"
+  | "held"
   | "not-merged";
 export const HISTORY_FIELDS: readonly HistoryField[] = [
   "status",
@@ -35,6 +36,7 @@ export const HISTORY_FIELDS: readonly HistoryField[] = [
   "queued",
   "pr",
   "merged",
+  "held",
   "not-merged",
 ];
 

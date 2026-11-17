@@ -9,7 +9,8 @@
  * idle), and when the app's settings are saved (`recheck`). A story whose session is running or waiting is passed over
  * until it is idle, as Merge would refuse it. Stories of one feature merge one at a time, in a line of their own, never
  * inside the card lane (the merge takes it itself). A story is tried once for each commit, checked commit and feature
- * tip it is at.
+ * tip it is at. A held story is never picked, and one held while its try waits is refused inside the merge
+ * (STORY-61, `HeldRefusal`): a race, not a `StoryRefusal`, so it is only logged.
  *
  * A merge that fails (STORY-60) does what Merge does: on a conflict nothing merges, the story goes back to its first
  * active stage and its session gets the files. A refusal that is the story's own at its commit (`StoryRefusal`: a
@@ -72,8 +73,10 @@ interface Candidate {
 const refusedHere = ({ head, tip, refusal }: Candidate) =>
   head !== null && refusal?.head === head && (refusal.tip === undefined || refusal.tip === tip);
 
-/** What auto-merge follows of a project: the stories that could merge, and the project's own setting, which a change to
- * re-checks them. */
+/**
+ * What auto-merge follows of a project: the stories that could merge, and the setting in effect (the project's own
+ * `autoMerge`, else the app default, as the scan's config carries it), which a change to re-checks them.
+ */
 interface Ready {
   own: boolean;
   stories: Candidate[];
@@ -169,7 +172,9 @@ export function createAutoMerge({ observe, allowed, enabled, merge, chats, recor
         return;
       }
       const lead = leadOf(dir, story.id);
-      const merged = await merge(dir, story.id).catch((err: unknown) => ({ err }));
+      // As auto-merge's own try: a story held since it was picked is refused inside the merge (`HeldRefusal`), a
+      // race that `failed` only logs.
+      const merged = await merge(dir, story.id, { auto: true }).catch((err: unknown) => ({ err }));
       if ("err" in merged) return await failed(dir, story, lead, merged.err, mine);
       const summary = autoMergedSummary(story.into, merged.remains);
       if (lead) tellLead(chats, log, lead, { story: story.id, outcome: "merged", summary });

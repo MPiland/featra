@@ -15,6 +15,7 @@ import {
   conflictMessage,
   evidenceState,
   GITHUB_COPY,
+  isHeld,
   mergeCommitMessage,
   mergedStory,
   mergeRefusal,
@@ -57,6 +58,19 @@ export interface StoryMergeDeps extends GithubPrDeps {
   gitRun?: typeof runGit;
   /** The stories being merged or abandoned, which the server shares with Abandon (STORY-58). */
   ending?: StoryEnding;
+}
+
+/** How a merge is asked for: `auto` is auto-merge's own try (STORY-59), which a held story refuses (STORY-61). */
+export interface MergeOptions {
+  auto?: boolean;
+}
+
+/**
+ * Auto-merge's try of a story held since it was picked (STORY-61): a race, not the story's own failure, so it is
+ * neither recorded on the card nor told to the Dev Lead. Its `kind` says so to whoever sorts merge errors.
+ */
+export class HeldRefusal extends ApiError {
+  readonly kind = "held";
 }
 
 /** How an attempt ended: merged into `into` (through `remote` on GitHub), or stopped on the conflicting `files`. */
@@ -104,7 +118,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
   const { settle } = createMergeSettle({ scan: scanDir, now, lane, chats, git, write });
   const ending = deps.ending ?? createStoryEnding();
 
-  async function ready(dir: string, id: string): Promise<Ready> {
+  async function ready(dir: string, id: string, { auto = false }: MergeOptions): Promise<Ready> {
     const scan = await scanDir(dir);
     const found = ownedIn(scan, id);
     const config = scan?.collected.config;
@@ -112,6 +126,8 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     const refusal = mergeRefusal(found?.owned, id, config, found?.root != null);
     if (refusal !== null || !found?.root) throw new ApiError(refusal ?? MERGE_MESSAGES.readOnly);
     const { card, path } = found.owned;
+    // Held while auto-merge's try waited (in the lane, locally): read from this scan, so it never merges.
+    if (auto && isHeld(card)) throw new HeldRefusal(MERGE_MESSAGES.held(id));
     const into = featureBranchOf(scan, card);
     const top = scan.collected.paths.top;
     const tip = card.branch ? await git.commitOf(top, `refs/heads/${card.branch}`) : null;
@@ -127,9 +143,9 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     checkedHead(dir, id, evidenceState(r.card).checkedHead) === r.tip;
 
   /** The merge commit into the feature branch, made and published in the lane on the card as it is then. */
-  const mergeLocally = (dir: string, id: string): Promise<Attempt> =>
+  const mergeLocally = (dir: string, id: string, options: MergeOptions): Promise<Attempt> =>
     lane.exclusive(async () => {
-      const r = await ready(dir, id);
+      const r = await ready(dir, id, options);
       if (!checkedTip(dir, id, r)) throw new ApiError(MERGE_MESSAGES.stale(id));
       const old = await git.commitOf(r.top, `refs/heads/${r.into}`);
       if (!old) throw new ApiError(MERGE_MESSAGES.noFeature(id));
@@ -149,8 +165,8 @@ export function createStoryMerge(deps: StoryMergeDeps) {
   }
 
   /** The story's PR merged on GitHub, at the commit its branch is at and its CI checked. */
-  async function mergeOnGithub(dir: string, id: string): Promise<Attempt> {
-    const r = await ready(dir, id);
+  async function mergeOnGithub(dir: string, id: string, options: MergeOptions): Promise<Attempt> {
+    const r = await ready(dir, id, options);
     if (!r.card.pr) throw new StoryRefusal(MERGE_MESSAGES.noPr(id), "noPr");
     const remote = await githubRemote(dir, deps.gitCommand);
     if (!remote) throw new ApiError(GITHUB_COPY.noRemote);
@@ -211,10 +227,10 @@ export function createStoryMerge(deps: StoryMergeDeps) {
   const once = <T>(dir: string, id: string, work: () => Promise<T>): Promise<T> => ending.hold(dir, id, "merge", work);
 
   /** Merges story `id` into its feature: on GitHub when it is usable here, else with git. */
-  const merge = (dir: string, id: string): Promise<MergeResult> =>
+  const merge = (dir: string, id: string, options: MergeOptions = {}): Promise<MergeResult> =>
     once(dir, id, async () => {
       const github = (await settings.githubUse(dir)).usable;
-      const attempt = github ? await mergeOnGithub(dir, id) : await mergeLocally(dir, id);
+      const attempt = github ? await mergeOnGithub(dir, id, options) : await mergeLocally(dir, id, options);
       if (attempt.kind === "conflict") return conflicted(dir, id, attempt.into, attempt.files);
       return settle(dir, id, attempt.into, attempt.remote);
     });

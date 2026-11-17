@@ -8,6 +8,7 @@ import { checkedEvent, provenAt } from "./evidence.ts";
 import { appendHistory } from "./history.ts";
 import { mergeRefusal } from "./merge.ts";
 import type { OwnedCard } from "./owner-copies.ts";
+import { isHeld } from "./story-hold.ts";
 import type { Card, ProjectConfig } from "./types.ts";
 
 /** Where a story would merge from and into: the commit Merge would merge, and the story's feature card. */
@@ -18,7 +19,7 @@ export interface AutoMergeTarget {
 }
 
 /**
- * Whether story `owned` merges on its own now: auto-merge is `on`, Merge would take it (`writable` says whether its
+ * Whether story `owned` merges on its own now: auto-merge is `on`, it isn't held (STORY-61), Merge would take it (`writable` says whether its
  * owner copy is checked out), every criterion is proven at `target.head`, and its feature is active (not Cancelled or
  * Done). A card whose owner copy can't be read never does: the copy shown may be stale (BUG-24). The feature branch it
  * merges into, and whether that is merged to main, are the server's to check, as for Merge.
@@ -31,7 +32,8 @@ export function mergesOnItsOwn(
   target: AutoMergeTarget,
 ): boolean {
   if (!on || !owned || owned.ownerUnread || target.feature?.status !== "active") return false;
-  // STORY-61's Hold goes here: a held story never merges on its own.
+  // A held story never merges on its own (STORY-61); Merge by hand still takes it.
+  if (isHeld(owned.card)) return false;
   return mergeRefusal(owned, owned.card.id, config, writable) === null && provenAt(owned.card, target.head);
 }
 

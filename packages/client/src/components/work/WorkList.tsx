@@ -104,6 +104,7 @@ export function WorkList(props: {
         sendBack: (id, reason, addCriterion) => work.sendBackStory(project.dir, id, reason, addCriterion),
       },
       merge: (id) => work.mergeStory(project.dir, id),
+      hold: (id, held) => work.holdStory(project.dir, id, held),
       start: (id) => work.startStory(project.dir, id),
       open: onOpenChat,
     };

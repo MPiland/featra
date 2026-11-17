@@ -57,6 +57,7 @@ export * from "./story-start.ts";
 export * from "./card-report.ts";
 export * from "./story-notice.ts";
 export * from "./story-stop.ts";
+export * from "./story-hold.ts";
 export * from "./acceptance.ts";
 export * from "./merge.ts";
 export * from "./auto-merge.ts";
