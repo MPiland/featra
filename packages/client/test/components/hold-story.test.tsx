@@ -120,3 +120,14 @@ describe("STORY-61 AC4: a held story is easy to spot on its row", () => {
     await waitFor(() => expect(within(rowOf()).queryByText(`· ${MERGE_COPY.held}`, { exact: false })).toBeNull());
   });
 });
+
+describe("FEAT-8 design review: Held is the row's mark only", () => {
+  it("shows Hold pressed in the card pane with no Held mark there", async () => {
+    const app = await shown();
+    await app.user.click(hold(rowOf()) as HTMLElement);
+    await within(rowOf()).findByText(`· ${MERGE_COPY.held}`, { exact: false });
+    const pane = await openPane(app);
+    await waitFor(() => expect(pressed(pane)).toBe("true"));
+    expect(within(pane).queryByText(`· ${MERGE_COPY.held}`, { exact: false })).toBeNull();
+  });
+});

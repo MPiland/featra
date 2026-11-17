@@ -142,13 +142,13 @@ export function createAutoMerge({ observe, allowed, enabled, merge, chats, recor
    * any other refusal forgets the try, so the story is looked at again; anything else thrown is a bug, only logged.
    */
   async function failed(dir: string, story: Candidate, lead: string | null, err: unknown, mine: Try) {
-    const reason = errorMessage(err);
-    log(`${story.id} didn't merge on its own: ${reason}`);
+    log(`${story.id} didn't merge on its own: ${errorMessage(err)}`);
     if (!(err instanceof StoryRefusal)) {
       const key = keyOf(dir, story.id);
       if (err instanceof ApiError && tried.get(key) === mine) tried.delete(key);
       return;
     }
+    const reason = err.reason;
     const summary = notMergedSummary(story.into, reason);
     if (lead) tellLead(chats, log, lead, { story: story.id, outcome: "not merged", summary });
     if (story.head === null) return;

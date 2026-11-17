@@ -7,7 +7,7 @@ export type HoldAction = (id: string, held: boolean) => Promise<ReviewResult>;
 
 /**
  * Hold, a toggle that keeps a story from merging on its own (STORY-61), in its card pane and its Work row while
- * auto-merge is on (`held` is left out otherwise). A held story shows Held, so it is easy to spot. The user's own
+ * auto-merge is on (`held` is left out otherwise). A held story's Work row says Held, so it is easy to spot. The user's own
  * action, with no confirmation; a refusal shows in one sentence next to the toggle, which stays.
  */
 export function HoldStory({ id, held, hold }: { id: string; held: boolean | undefined; hold: HoldAction }) {
@@ -27,7 +27,6 @@ export function HoldStory({ id, held, hold }: { id: string; held: boolean | unde
           {MERGE_COPY.hold}
         </button>
       )}
-      {held && <span className="meta"> · {MERGE_COPY.held}</span>}
       {error && (
         <span className="card-error" role="alert">
           {error}

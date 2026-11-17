@@ -70,12 +70,16 @@ export function Story({ story }: { story: StoryRow }) {
           </button>
           {story.added && <span className="meta scope-added"> · {WORK_COPY.addedLater}</span>}
           <StaleMark id={story.id} />
-          <StoryAgent id={story.id} />
-          {story.awaiting && <AcceptStory id={story.id} actions={agents.acceptance} into={below} />}
-          <MergeStory id={story.id} mergeable={story.mergeable} merge={agents.merge} />
-          <HoldStory id={story.id} held={story.held} hold={agents.hold} />
-          {story.merged && <span className="meta"> · {MERGE_COPY.merged}</span>}
-          {story.reported && <span className="meta"> · {WORK_COPY.reported}</span>}
+          {/* Its session, actions and marks: one line that never wraps, under the title when the column is narrow. */}
+          <span className="story-meta">
+            <StoryAgent id={story.id} />
+            {story.awaiting && <AcceptStory id={story.id} actions={agents.acceptance} into={below} />}
+            <MergeStory id={story.id} mergeable={story.mergeable} merge={agents.merge} />
+            <HoldStory id={story.id} held={story.held} hold={agents.hold} />
+            {story.held && <span className="meta">· {MERGE_COPY.held}</span>}
+            {story.merged && <span className="meta">· {MERGE_COPY.merged}</span>}
+            {story.reported && <span className="meta">· {WORK_COPY.reported}</span>}
+          </span>
         </span>
         <span role="cell">
           <Status tone={story.tone} label={story.stage} />

@@ -156,6 +156,7 @@ export function createServices({
     gitCommand,
     ghCommand,
     ending,
+    onGithubMerge: (dir) => prs.refresh(dir),
   });
   // A Verified and Proven story merges on its own while the project's auto-merge is on (STORY-59).
   const autoMerges = createAutoMerge({

@@ -61,6 +61,14 @@ describe("a merge through the PR (AC2)", { timeout: 60_000 }, () => {
     expectSettled();
   });
 
+  it("shows the story's PR as merged once Featra merged it, without waiting for the next poll (design review)", async () => {
+    await m.start();
+    await m.verified();
+    expect(w.prs.prState(w.repo.main, "STORY-1")?.status?.state).toBe("open");
+    await m.merges.merge(w.repo.main, "STORY-1");
+    await w.settle();
+    expect(w.prs.prState(w.repo.main, "STORY-1")?.status?.state).toBe("merged");
+  });
   it("refuses a head GitHub doesn't have: a commit not pushed yet merges nothing", async () => {
     await m.start();
     await m.verified();
@@ -223,6 +231,16 @@ describe("GitHub refusing the merge for another reason (review fix)", { timeout:
     expect(isMerged(card)).toBe(false);
     expect(m.sent).toEqual([]);
     expect(m.treeExists()).toBe(true);
+  });
+
+  it("says GitHub's reason without gh's failure mark or its PR prefix (design review)", async () => {
+    await m.start({
+      gh: { mergeFails: "X Pull request acme/app#1 is not mergeable: the base branch policy prohibits the merge." },
+    });
+    await m.verified();
+    await expect(m.merges.merge(w.repo.main, "STORY-1")).rejects.toThrow(
+      /^Couldn't merge the PR: the base branch policy prohibits the merge\.$/,
+    );
   });
 
   it("is an error when GitHub says it conflicts but git finds no files: nothing moves", async () => {

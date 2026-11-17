@@ -69,3 +69,23 @@ describe("STORY-60 AC4: the card and the session say the merge on its own didn't
     await waitFor(() => expect(shown(pane)).toBeNull());
   });
 });
+
+describe("FEAT-8 design review: the not-merged line", () => {
+  it("is a warning line, shared by the card pane and the session", async () => {
+    const app = await refused();
+    const pane = await openPane(app);
+    await waitFor(() => expect(shown(pane)).toBeTruthy());
+    expect(shown(pane)?.classList.contains("not-merged")).toBe(true);
+    const session = await openSession(app);
+    await waitFor(() => expect(shown(session)?.classList.contains("not-merged")).toBe(true));
+  });
+
+  it("comes before Merge in the session", async () => {
+    const app = await refused();
+    const session = await openSession(app);
+    await waitFor(() => expect(shown(session)).toBeTruthy());
+    const button = within(session).getByRole("button", { name: "Merge STORY-5" });
+    const order = shown(session)!.compareDocumentPosition(button);
+    expect(order & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
