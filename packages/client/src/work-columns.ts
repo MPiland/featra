@@ -12,7 +12,7 @@ export const WORK_GRID = {
   caret: 14,
   gap: 14,
   status: 116,
-  progress: 168,
+  progress: 184,
   tasks: 64,
   scope: 176,
   /** What the name column keeps before a column is dropped: a story's title, and its line of session and actions. */

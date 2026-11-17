@@ -2659,7 +2659,7 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   wraps or clips either: more columns drop. (by: user)
 - **The column rule** (`packages/client/src/work-columns.ts`). Name and Status always show. With the pane open, Tasks
   and Scope (a story's Tasks and PR) are hidden. Any column that doesn't fit the list's measured width is hidden too,
-  least important first: Tasks, then Scope, then Progress. Each column has a fixed track (Status 116, Progress 168,
+  least important first: Tasks, then Scope, then Progress. Each column has a fixed track (Status 116, Progress 184,
   Tasks 64, Scope 176 px), and the name column keeps 300 px before one drops. At 1280×800 that means every column
   with the pane closed, and name and Status alone beside the open pane (the list is about 605 px wide there).
 - **One grid.** The list sets one `--work-grid` template from the columns shown, which every feature, story and
@@ -2685,5 +2685,6 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   its Session and Stop chips, the actions and the marks never shrink or clip, because a clipped control can't be
   clicked (the first CI run caught Session covered by its own ellipsized box). In a list so narrow that the line still
   doesn't fit after every column has dropped and the name has given way, the line wraps under itself rather than
-  hide an action. At 1280×800 it stays on one line. The Progress cell is a flex box so its bar gives way to the label
-  on Linux's wider font.
+  hide an action. At 1280×800 it stays on one line. The Progress cell is a flex box so its bar (down to 24 px) gives
+  way to the label, and its track grew from 168 to 184 px: the second CI run showed "0 of 2 stories done" in Linux's
+  wider font needs 172 px with the bar at its old 40 px minimum, and longer counts need more.

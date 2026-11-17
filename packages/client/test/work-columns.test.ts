@@ -52,9 +52,9 @@ describe("the Work list's columns", () => {
   });
 
   it("builds one template for feature and story rows: caret, name, Status, then the columns shown", () => {
-    expect(workGridTemplate(["progress", "tasks", "scope"])).toBe("14px minmax(0, 1fr) 116px 168px 64px 176px");
+    expect(workGridTemplate(["progress", "tasks", "scope"])).toBe("14px minmax(0, 1fr) 116px 184px 64px 176px");
     expect(workGridTemplate([])).toBe("14px minmax(0, 1fr) 116px");
-    expect(workGridTemplate(["progress", "scope"])).toBe("14px minmax(0, 1fr) 116px 168px 176px");
+    expect(workGridTemplate(["progress", "scope"])).toBe("14px minmax(0, 1fr) 116px 184px 176px");
   });
 
   it("keeps the name and Status of every row, and the cells of the columns shown, in their place", () => {

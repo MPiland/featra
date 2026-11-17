@@ -154,7 +154,7 @@
 .prow {
   display: grid;
   /* The columns shown (`work-columns.ts`), set on the list; the name column takes what the fixed columns leave. */
-  grid-template-columns: var(--work-grid, 14px minmax(0, 1fr) 116px 168px 64px 176px);
+  grid-template-columns: var(--work-grid, 14px minmax(0, 1fr) 116px 184px 64px 176px);
   gap: 14px;
   align-items: center;
   padding: 10px 14px;
@@ -295,6 +295,10 @@
 
 .frow > [role="cell"] > .prog {
   flex: 0 1 auto;
+}
+
+.frow > [role="cell"] > .prog .pbar {
+  min-width: 24px;
 }
 
 .prog .pl {

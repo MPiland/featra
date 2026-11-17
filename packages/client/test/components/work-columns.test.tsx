@@ -37,7 +37,7 @@ describe("the Work list's columns with the card pane (STORY-62 AC2)", () => {
     expect(headers()).toEqual(ALL_HEADERS);
     expect(cells("FEAT-2")).toHaveLength(5);
     expect(cells("STORY-2")).toHaveLength(5);
-    expect(grid()).toBe("14px minmax(0, 1fr) 116px 168px 64px 176px");
+    expect(grid()).toBe("14px minmax(0, 1fr) 116px 184px 64px 176px");
   });
 
   it("hides Tasks and Scope while the pane is open, and brings them back when it closes", async () => {
@@ -47,7 +47,7 @@ describe("the Work list's columns with the card pane (STORY-62 AC2)", () => {
     expect(headers()).toEqual(["Feature", "Status", "Progress", "Story", "Stage", "Criteria"]);
     expect(cells("FEAT-2")).toHaveLength(3);
     expect(cells("STORY-2")).toHaveLength(3);
-    expect(grid()).toBe("14px minmax(0, 1fr) 116px 168px");
+    expect(grid()).toBe("14px minmax(0, 1fr) 116px 184px");
 
     await app.user.click(within(pane).getByRole("button", { name: "Close card" }));
     expect(screen.queryByRole("complementary")).toBeNull();
