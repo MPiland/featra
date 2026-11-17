@@ -116,6 +116,11 @@
   margin-left: 0;
 }
 
+/* Why it didn't merge, then Merge under it: 8px apart, the scale's step between a notice and its action (STORY-62). */
+.chat-accept > .not-merged {
+  margin-bottom: 8px;
+}
+
 /* Send back's form, opened below its story's row and across it. */
 .prow-below:empty {
   display: none;
