@@ -2,7 +2,7 @@
 id: STORY-62
 type: story
 title: Work list and card pane layout pass
-status: In Progress
+status: Done
 parent: FEAT-8
 order: 4
 origin: added
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-62-layout
-pr: 67
+pr: "67"
 created: 2026-11-17T02:43:35Z
 history:
   - at: 2026-11-17T02:43:35Z
@@ -25,6 +25,16 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-17T13:56:11Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-17T13:56:11Z
+    field: status
+    from: In Progress
+    to: Done
+    by: user
 ---
 
 ## Description
