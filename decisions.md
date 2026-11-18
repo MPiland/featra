@@ -2869,4 +2869,11 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **macOS's temp folder is a link** (`/var` → `/private/var`). The stand-in `claude` now goes on the PATH by its real
   path, so the path the app reports is the one the test expects, as with Windows' 8.3 short names.
 - **The contrast check's icon guard** expects 3 icons on macOS, not 4: the traffic lights are native, not the page's.
-- No ADR: CI and the test harness only, within ADR 0009 and ADR 0013; `nameApp` is a small bug fix.
+- **Bug found: on macOS the Close button's Quit didn't quit.** `window-all-closed` skipped `app.quit()` on macOS
+  (its custom of staying open with no window), so with Quit chosen, closing the window left Featra in the Dock with
+  nothing to show. Close only reaches `window-all-closed` when it doesn't hide, that is when the user chose Quit, so
+  the lifecycle's `allWindowsClosed` now quits on every platform. A unit test proves it per platform; settings.spec's
+  AC6 journey proves it on the Mac job.
+- **The app menu's Quit can't be clicked from main on macOS.** `MenuItem.click()` leaves a native role to the OS and
+  does nothing, so mac.spec sends Quit's own selector (`terminate:`), as the menu bar does.
+- No ADR: CI and the test harness only, within ADR 0009 and ADR 0013; `nameApp` and the Quit fix are small bug fixes.

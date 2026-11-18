@@ -111,7 +111,9 @@ test.describe("macOS: the app menu, the menu bar and the Dock (STORY-63)", () =>
           ?.items.flatMap((m) => m.submenu?.items ?? [])
           .find((i) => i.role?.toLowerCase() === "quit");
         if (!quit) throw new Error("The app menu has no Quit item");
-        quit.click();
+        // macOS runs a role's item natively: the menu bar sends its selector, and `click()` leaves the role to the OS
+        // and does nothing. So send Quit's own selector, as the menu bar does, once this evaluate has returned.
+        setTimeout(() => Menu.sendActionToFirstResponder("terminate:"), 0);
       });
       expect(await exit).toBe(0);
     } finally {

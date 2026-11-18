@@ -167,6 +167,13 @@ if (!app.requestSingleInstanceLock()) {
       loggedQuit = true;
     });
 
+    // Only reached when close doesn't hide the window (the Close button is set to Quit).
+    app.on("window-all-closed", () => {
+      if (tray) destroyTray(tray);
+      tray = undefined;
+      lifecycle.allWindowsClosed();
+    });
+
     // A second launch (Start menu, shortcut) brings back the running app's window instead of starting another app.
     app.on("second-instance", () => {
       if (win && !win.isDestroyed()) lifecycle.reveal(win);
@@ -205,12 +212,5 @@ if (!app.requestSingleInstanceLock()) {
       projects.store.flush(),
       log.flush(),
     ]).finally(() => app.exit(0));
-  });
-
-  // Only reached when close-to-tray is off or the app is quitting.
-  app.on("window-all-closed", () => {
-    if (tray) destroyTray(tray);
-    tray = undefined;
-    if (process.platform !== "darwin") app.quit();
   });
 }
