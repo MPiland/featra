@@ -29,9 +29,11 @@ export async function tempDir(prefix: string) {
 /** A folder holding a stand-in `claude`, its path as `where` and `which` name it, and the PATH with it first. */
 export async function standInClaude() {
   const bin = await tempDir("featra-claude-");
-  await writeFile(join(bin.dir, CLAUDE), "");
-  await chmod(join(bin.dir, CLAUDE), 0o755);
-  // On Windows the temp folder can be an 8.3 short path.
-  const claude = realpathSync.native(join(bin.dir, CLAUDE));
-  return { ...bin, claude, path: [bin.dir, ...pathWithoutClaude()].join(delimiter) };
+  // The PATH names the folder by its real path, as the app is expected to report it: on Windows the temp folder can
+  // be an 8.3 short path, and on macOS it is under /var, a link to /private/var.
+  const dir = realpathSync.native(bin.dir);
+  await writeFile(join(dir, CLAUDE), "");
+  await chmod(join(dir, CLAUDE), 0o755);
+  const claude = join(dir, CLAUDE);
+  return { ...bin, claude, path: [dir, ...pathWithoutClaude()].join(delimiter) };
 }

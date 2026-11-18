@@ -12,9 +12,14 @@ const AA_LARGE_TEXT = 3;
 const AA_NON_TEXT = 3;
 const STATUS = ["--ok", "--warn", "--bad", "--acc", "--pur"];
 const SURFACES = ["--bg", "--side", "--row"];
+/**
+ * How many icons a view shows at least: the title bar's. On macOS the window controls are the native traffic lights,
+ * not the page's, so it renders Menu, Toggle sidebar and Back/Forward only (3 sampled on CI).
+ */
+const ICONS = process.platform === "darwin" ? 3 : 4;
 
 /** `min` guards against a vacuous pass: by default the view title, the placeholder text and the title bar icons. */
-async function failures(page: Page, min = { text: 2, icon: 4 }): Promise<string[]> {
+async function failures(page: Page, min = { text: 2, icon: ICONS }): Promise<string[]> {
   const out: string[] = [];
   const samples = await sampleRenderedText(page);
   expect(samples.filter((s) => s.kind === "text").length).toBeGreaterThanOrEqual(min.text);
@@ -67,11 +72,11 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
             .click();
           await expect(page.getByRole("heading", { name, level: 2 })).toBeVisible();
           if (scope === "Project") await expect(page.getByText(/^Overridden/)).toBeVisible();
-          problems.push(...(await failures(page, { text: 6, icon: 4 })));
+          problems.push(...(await failures(page, { text: 6, icon: ICONS })));
         }
         await page.getByRole("button", { name: /^Project: / }).click();
         await expect(page.getByRole("listbox", { name: "Project" })).toBeVisible();
-        problems.push(...(await failures(page, { text: 6, icon: 4 })));
+        problems.push(...(await failures(page, { text: 6, icon: ICONS })));
         await page.keyboard.press("Escape");
         await expect(page.getByRole("listbox")).toHaveCount(0);
         const menuItem = (name: string | RegExp) =>
@@ -80,7 +85,7 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           await page.getByRole("button", { name: "Menu" }).click();
           for (const name of path) await menuItem(name).hover();
           await expect(page.getByRole("menu")).toHaveCount(path.length + 1);
-          problems.push(...(await failures(page, { text: 6, icon: 4 })));
+          problems.push(...(await failures(page, { text: 6, icon: ICONS })));
           await page.keyboard.press("Escape");
           await page.keyboard.press("Escape");
           await page.keyboard.press("Escape");

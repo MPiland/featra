@@ -2863,4 +2863,10 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **e2e presses each platform's own shortcut**: `e2e/keys.ts` turns the menu's label (`shortcutLabel`, now exported
   as `@featra/client/shortcuts`) into Playwright keys, so ⌘N on macOS and Ctrl+N elsewhere, and a unit test proves
   every pressed shortcut is matched by the app's own `matchShortcut`.
+- **The CI Mac's screen is shorter than 800 px**, and macOS shrinks a window to fit its screen, so the layout journeys
+  couldn't size the window to 1280×800 (they got 1280×684). Under e2e only, the window is created with
+  `enableLargerThanScreen`, which fakes a big enough screen; the app itself keeps macOS's limit.
+- **macOS's temp folder is a link** (`/var` → `/private/var`). The stand-in `claude` now goes on the PATH by its real
+  path, so the path the app reports is the one the test expects, as with Windows' 8.3 short names.
+- **The contrast check's icon guard** expects 3 icons on macOS, not 4: the traffic lights are native, not the page's.
 - No ADR: CI and the test harness only, within ADR 0009 and ADR 0013; `nameApp` is a small bug fix.
