@@ -8,6 +8,10 @@ export const APP_NAME = "Featra";
  * then reads "About @featra/desktop" and "Quit @featra/desktop" (STORY-63). The userData folder must stay the one
  * named after the package, where existing profiles keep their projects and settings: it is read before the rename and
  * set again after, so it can't follow the new name. Must run before `ready`.
+ *
+ * Installed, the app's package is named Featra (packaging/stage.ts), so its userData folder is `Featra`, apart from a
+ * source run's `@featra/desktop` (STORY-64): an installed Featra and one run from source each keep their own projects
+ * and settings, and can run side by side.
  */
 export function nameApp(app: Pick<App, "getPath" | "setPath" | "setName">) {
   const userData = app.getPath("userData");

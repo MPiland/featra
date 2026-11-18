@@ -34,7 +34,16 @@ export async function tempProject(
 }
 
 /** Launches the built app (run `pnpm --filter @featra/desktop build` first; `test:e2e` does). */
-export async function launch(
+export const launch = (userDataDir: string, extraEnv: Record<string, string> = {}) =>
+  launchExecutable(electronPath as unknown as string, [appDir], userDataDir, extraEnv);
+
+/**
+ * Launches Featra from `executablePath`: Electron on the app folder, or an installed Featra (STORY-64), and waits for
+ * its window. The app's evidence is kept if the test fails.
+ */
+export async function launchExecutable(
+  executablePath: string,
+  args: string[],
   userDataDir: string,
   extraEnv: Record<string, string> = {},
 ): Promise<{ app: ElectronApplication; page: Page }> {
@@ -48,11 +57,7 @@ export async function launch(
   } as Record<string, string>;
   delete env.FEATRA_CLIENT_URL;
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({
-    executablePath: electronPath as unknown as string,
-    args: [appDir],
-    env,
-  });
+  const app = await electron.launch({ executablePath, args, env });
   traceUntilClosed(app, userDataDir);
   const page = await app.firstWindow();
   await page.getByRole("banner").waitFor();

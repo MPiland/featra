@@ -2930,3 +2930,39 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   `git-run-patient.test.ts` covers when git is tried again (a German lock message included), and an ignored story path
   proves the restore unstages what a failed add staged.
 - No ADR: a retry inside one module and state lifted one component up.
+
+## 2026-11-18 — STORY-64: installers from `pnpm package` (dev)
+
+- **Package layout.** `pnpm package` stages an app folder (`apps/desktop/out/app`): Vite's `dist/`, the client's
+  build in `client/`, the assets, and a `package.json` named `featra`, product name Featra, with no dependencies.
+  electron-builder 26 packages it as it is (`asar: false`, no rebuild, no install) into `apps/desktop/out/installers`.
+  No asar because the server and MCP run from `dist/` as their own processes and the SDK is imported from
+  `node_modules`; the archive would hold only the client. ADR 0040 amended.
+- **The Agent SDK is copied, not installed.** `packaging/modules.ts` copies it and its run-time needs (dependencies and
+  peers) from the workspace's installed packages, as Node resolves them, so the lockfile's versions ship with no
+  network install. Its optional dependencies are skipped: they are Claude Code's per-platform binaries (the Windows one
+  is 342 MB), and Featra runs the user's `claude`. Vite keeps the SDK external through the same list
+  (`packaging/runtime-packages.ts`).
+- **Installer names.** `Featra-<version>-x64-setup.exe`, `Featra-<version>-universal.dmg` and `.zip`,
+  `Featra-<version>-x64.AppImage` (`installerFiles` in `packaging/config.ts`, which the config's artifact names, the
+  smoke test and the CI uploads are checked against).
+- **Where the installed app keeps its data: a `Featra` folder** (`%APPDATA%\Featra`, `~/Library/Application
+  Support/Featra`, `~/.config/Featra`), from the staged package's product name. A source run keeps `@featra/desktop`
+  (STORY-63), so a tester can run both side by side without one changing the other's projects or settings. Moving data
+  between them is not offered.
+- **The login shell's PATH.** Installed on macOS and Linux only, main runs `$SHELL -ilc` (else the account's shell,
+  else zsh on macOS and sh on Linux) and reads the PATH it prints between markers, so profile noise doesn't matter. The
+  login PATH goes first, then the PATH the app started with. If the shell fails, prints no PATH or takes over 5 s, the
+  started PATH is kept with `/opt/homebrew/bin` (macOS), `/usr/local/bin` and `~/.local/bin` added. It runs before the
+  server starts, so the server and the agents inherit it. Windows apps get the user's PATH already. The log says which
+  happened.
+- **Smoke test, CI only.** `apps/desktop/e2e/installed` (Playwright, `pnpm test:installed`) installs as a tester would:
+  NSIS silently, then the Start menu shortcut's target; Featra.app copied out of the DMG; the AppImage copied and run
+  with `APPIMAGE_EXTRACT_AND_RUN=1`. It launches the installed executable, and checks project, server, chat with the
+  MCP, the bundled SDK reading a chat back, the login-shell PATH, name, data folder and icons, and on macOS both
+  architectures (Intel under Rosetta) and the ad-hoc signature. e2e's launcher takes the executable
+  (`launchExecutable`), so the smoke test uses the same evidence and fakes as the e2e suite.
+- **Package jobs** `Package (Windows|Ubuntu|macOS)` run on every PR, upload `installer-<platform>` and
+  `test-report-package-<platform>`, and are not required checks.
+- `electron-builder` pulls in `electron-winstaller` (Squirrel.Windows); its build script is denied in
+  `pnpm-workspace.yaml`, since Featra ships NSIS.

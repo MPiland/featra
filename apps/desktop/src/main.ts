@@ -5,7 +5,8 @@ import { applyDockIcon } from "./app-icon.ts";
 import { nameApp } from "./app-name.ts";
 import { allowedDirs, registerIpc } from "./ipc.ts";
 import { createLifecycle, onWslg } from "./lifecycle.ts";
-import { createLog } from "./log.ts";
+import { createLog, type Log } from "./log.ts";
+import { readLoginPath, readsLoginPath } from "./login-path.ts";
 import { createNotifier } from "./notifier.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
@@ -15,6 +16,7 @@ import { e2e, testHooks } from "./test-hooks.ts";
 import { createTray, destroyTray, trayAvailable } from "./tray.ts";
 import { createAppStateStore, createUiStateStore } from "./ui-state-store.ts";
 import { createWindow, windowBackground } from "./window.ts";
+import { clientIndex } from "./client-path.ts";
 
 /**
  * The app's lifecycle: one instance, its stores and log, the window, the tray and quitting. The window, the IPC the
@@ -25,6 +27,21 @@ nameApp(app);
 // Tests (and anyone running a second profile) point userData at their own folder. Must happen before `ready`.
 const userDataDir = process.env.FEATRA_USER_DATA_DIR;
 if (userDataDir) app.setPath("userData", userDataDir);
+
+/**
+ * Installed on macOS and Linux, takes the login shell's PATH, so the app, its server and the agents it starts find `git`,
+ * `gh` and `claude` when opened from Finder, the Dock or a desktop menu (STORY-64). Must finish before the server starts.
+ */
+async function useLoginPath(log: Log) {
+  if (!readsLoginPath(process.platform, app.isPackaged)) return;
+  const found = await readLoginPath({ platform: process.platform, env: process.env });
+  process.env.PATH = found.path;
+  log.info(
+    found.source === "login shell"
+      ? `PATH from the login shell (${found.shell})`
+      : `The login shell (${found.shell}) gave no PATH: ${found.reason}. Added the usual folders.`,
+  );
+}
 
 function showNotice(message: string) {
   if (e2e) testHooks.notices.push(message);
@@ -59,6 +76,7 @@ if (!app.requestSingleInstanceLock()) {
     log: (message) => log.info(message),
     dataDir: app.getPath("userData"),
   });
+  const client = clientIndex({ appPath: app.getAppPath(), packaged: app.isPackaged });
   let win: BrowserWindow | undefined;
   let tray: Tray | undefined;
 
@@ -71,6 +89,7 @@ if (!app.requestSingleInstanceLock()) {
       trayAvailable(),
       settingsStore.load(),
       findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR).then(projects.start),
+      useLoginPath(log),
     ]);
     const project = projects.current();
     void projects.snapshot().then((s) => server.setProjects(allowedDirs(s)));
@@ -181,12 +200,12 @@ if (!app.requestSingleInstanceLock()) {
     // macOS: clicking the Dock icon brings the hidden window back.
     app.on("activate", () => {
       if (win && !win.isDestroyed()) lifecycle.reveal(win);
-      else lifecycle.manage((win = createWindow()));
+      else lifecycle.manage((win = createWindow(client)));
     });
 
     // Apply a pinned theme before the window exists so its background matches from the first frame.
     nativeTheme.themeSource = appSettings.theme;
-    win = createWindow();
+    win = createWindow(client);
     win.on("hide", () => log.info("Window hidden"));
     win.on("show", () => log.info("Window shown"));
     lifecycle.manage(win);
