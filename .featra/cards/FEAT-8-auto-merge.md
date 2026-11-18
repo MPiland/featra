@@ -2,7 +2,7 @@
 id: FEAT-8
 type: feature
 title: Auto-merge
-status: active
+status: done
 parent: EPIC-2
 order: 8
 origin: planned
@@ -23,6 +23,16 @@ history:
     from: approved
     to: active
     by: dev-lead
+  - at: 2026-11-17T18:54:59Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-17T18:54:59Z
+    field: status
+    from: active
+    to: done
+    by: user
 ---
 
 ## Description
