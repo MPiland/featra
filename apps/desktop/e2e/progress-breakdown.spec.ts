@@ -4,6 +4,7 @@ import { expect, test, type ElectronApplication } from "@playwright/test";
 import { newCard, parseCard, serializeCard, setStatus } from "@featra/work-format";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
+import { atReviewSize } from "./ux-shot.ts";
 import { draftInNewChat } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
 
@@ -25,6 +26,8 @@ test("A started feature's bar shows its breakdown on focus, and a story added af
       [PATH_KEY]: bin.path,
     });
     running = app;
+    // The Work list shows only the columns that fit (STORY-62): this journey reads them at the size they all fit.
+    await atReviewSize(app, page);
     const draft = await draftInNewChat(page, "FEAT-2");
     await draft.getByRole("button", { name: "Approve", exact: true }).click();
     await expect.poll(() => git(repo.dir, "status", "--porcelain"), { timeout: 30_000 }).toBe("");

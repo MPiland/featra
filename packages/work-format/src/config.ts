@@ -34,7 +34,7 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   baseBranch: "main",
   worktrees: true,
   mcp: true,
-  autoMerge: false,
+  autoMerge: true,
   uat: false,
   knowledge: "propose",
   maxStoryAgents: 3,
@@ -217,6 +217,14 @@ export function knowledgePermission(
 /** The most story sessions a project runs at once (STORY-9): its own `maxStoryAgents`, else the app default, else 3. */
 export function maxStoryAgents(configText: string | null, appDefault: number | undefined): number {
   return ownSetting(configText, "maxStoryAgents") ?? appDefault ?? DEFAULT_CONFIG.maxStoryAgents;
+}
+
+/**
+ * Whether a story merges into its feature on its own once Verified and Proven (STORY-59): the project's own
+ * `autoMerge`, else the app-wide default, else on.
+ */
+export function autoMergeOn(configText: string | null, appDefault: boolean | undefined): boolean {
+  return ownSetting(configText, "autoMerge") ?? appDefault ?? DEFAULT_CONFIG.autoMerge;
 }
 
 /** A new project's config file: only the version, so every work setting follows the app-wide defaults. */

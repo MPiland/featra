@@ -2483,3 +2483,305 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - The user asked that UI be checked for standard design and clean layout, not only copy and tests.
 - Product: STORY-25 gains a criterion. Before a story moves to Acceptance, the reviewing agent checks its screenshots for layout and design and sends any findings to the story's session. Capture still needs no extra install (Electron's built-in Chromium) and spends no agent tokens; the review is agent work.
 - Our own build: every story that adds or changes UI gets a visual review of CI screenshots before the user's Accept, alongside the code review.
+
+## 2026-11-16 — STORY-59 build choices (story agent; confirmed by the Dev Lead)
+
+Confirmed by dev-lead in review. The two points the story agent left open, a story whose session is running and the app
+default turned on, are resolved by review fixes 1 and 3 below; the bullets say what is now built.
+
+- **The rule is pure.** `mergesOnItsOwn(owned, config, writable, on, { head, feature })` in `work-format/src/auto-merge.ts`:
+  the setting on, the owner copy readable (not `ownerUnread`, BUG-24), `mergeRefusal` null, every criterion proven at
+  `head` (`provenAt`), and the feature active. Proven implies Verified. STORY-61's Hold has a marked place in it and isn't built.
+- **The setting.** `autoMerge` defaults to true in `DEFAULT_CONFIG` and `DEFAULT_WORK_SETTINGS`. The server reads it as
+  `readMcpEnabled` does: the project's own key, else the app default from settings.json, else on (`readAutoMerge`,
+  `autoMergeOn`). It is read again just before each merge, so turning it off stops a story still waiting its turn. The
+  label is "Auto-merge stories", under Progress and review right after Require acceptance.
+- **When stories are looked at.** A server observer (`server/src/auto-merge.ts`) watches each allowed project with
+  `watches.observe` and a pick of the stories that would merge, each with its worktree HEAD and its card's checked
+  commit, plus the project's own `autoMerge`. It looks once when the project opens and again whenever that pick
+  changes. Changing the project's setting re-checks at once. Saving the app's settings re-checks every watched project
+  (fix 3), and a change to the project's chats re-checks it (fix 1).
+- **Tried once per commit.** A story is tried once for each `head|checked` pair. A story whose session is running or queued is passed over without
+  being recorded (fix 1). A merge that fails (uncommitted work, a GitHub refusal) is logged as "<id> didn't merge on its own: <reason>" and isn't tried again until
+  its head or checked commit changes. Telling the Dev Lead and retrying are STORY-60's. The record is dropped when the
+  project stops being watched, and for a story that reached its turn with the setting off.
+- **One at a time per feature, outside the lane.** Merges queue in a promise line per project and feature branch, and
+  call the same `merge()` Merge uses, which takes the card lane itself. Different features may merge at once, as manual
+  merges may.
+- **Merged by system.** The merge is Merge's own, so the card records `merged` by `system`, and nothing is accepted.
+- **The Dev Lead's notice.** The lead is read before the merge ends the story session (its row's `story.parent`). The
+  notice is outcome `merged` with the summary "<feature branch>, on its own." followed by anything the merge left
+  behind. `tellLead` is moved out of `merge-request.ts` so both paths send notices the same way.
+- **This repo's config.** `autoMerge: false` is gone from `.featra/config.yaml`. `uat` stays.
+- **ADR 0034 amended:** the user merges, or auto-merge when it's on.
+
+## 2026-11-16 — STORY-59 review rulings (dev-lead)
+
+1. **A working session doesn't use up a try.** Auto-merge passes over a story whose session is running or queued (the
+   check Merge makes, `sessionBusy`) without recording it, and looks again when that project's chat list changes, so
+   the story merges once its session is idle. An attempt that finds the session working when its turn comes is dropped
+   the same way.
+2. **Proof must be for the commit that merges.** Each proven event records the commit its test passed on
+   (`proven:<n>@<commit>`; local checks and CI reports both know it). Old events without a commit still parse and
+   count for the Proven mark, but not for auto-merge. `mergesOnItsOwn` requires every criterion proven at the story
+   branch's tip, the commit `merge()` merges. The Proven mark shown elsewhere keeps its meaning (any proof, of any
+   commit); only auto-merge reads the commit.
+3. **Turning the app default on starts merges.** The desktop tells the server when app settings are saved (host
+   message `settings`), and the server re-checks every watched project (`recheck`).
+4. **No duplicate tries.** An attempt runs only while it is still its story's latest try; a project removed and added
+   back adopts the tries still queued or running instead of queuing them again, and an older look at a project gives
+   way to a newer one. A rejection in a feature's line is logged, so it can't stall the merges after it. Tries of
+   stories no longer picked are forgotten.
+5. **Auto-merge skips stories whose feature is not active** (Cancelled, Done, or merged to main). Manual Merge is
+   unchanged; whether it should refuse a story under a Cancelled feature is on the roadmap.
+
+## 2026-11-16 — STORY-60 build choices (story agent; confirmed by the Dev Lead)
+
+- **The refusal is on the card.** A new history field, `not-merged` (`HISTORY_FIELDS`), by `system`: from is the
+  commit tried, to is the reason. Recording it on the card is what makes "not retried until the story changes" survive
+  a restart, and what the card and session read to say why. Written in the card lane at the owner (`recordNotMerged`),
+  never on a merged card.
+- **What "the story changes" means.** The refusal stands until the checks settle on another commit (a new `checked:`
+  event) or the story merges (`notMergedOf`). A move between stages doesn't clear it, which keeps STORY-59's rule
+  that a move to Acceptance doesn't retry. Auto-merge skips a story whose standing refusal is for its current head.
+- **Conflicts are recorded too.** AC3 names refusals that aren't conflicts, but a conflict also gets the record, so
+  AC4's "card shows why" holds for it. It goes back to In Progress either way. (Review ruling 4: a conflict also
+  names the feature tip.)
+- **Races aren't refusals.** `MERGE_MESSAGES.working` and `merging` (the session started a turn, or a Merge runs) are
+  passed over: no notice, no record, and the try is dropped so the story is looked at again (STORY-59 ruling 1).
+  (Superseded by review ruling 1: by error kind, not copy.)
+- **One path for any failure.** Whatever `merge()` throws goes to the Dev Lead as outcome `not merged`, with the
+  summary "<feature branch>, on its own. <reason>", matching the merged notice. A failure reading the setting is only
+  logged, as before. (Superseded by review ruling 1: only the story's own refusals.)
+- **Where it shows.** The card view and the Work row carry `notMerged`; the card pane and the story's session show
+  "Didn't merge on its own. <reason>" (`MERGE_COPY.notMerged`) as a status line, next to Merge, which stays offered.
+- **Tests.** Auto-merge's server test world moved to `auto-merge-world.ts`, shared with `auto-merge-fails.test.ts`. The
+  e2e setup (GitHub stand-in, a story proven in review) moved to `e2e/proven-story.ts`, shared by the STORY-59 and
+  STORY-60 journeys.
+- **ADR 0034 amended:** an automatic merge that fails.
+
+## 2026-11-16 — STORY-60 review rulings (dev-lead)
+
+1. **Only the story's own refusal is recorded and told.** A merge's error carries a kind (`StoryRefusal` with
+   `kind`), never matched by its copy. Conflict, conflictUnknown, dirty, GitHub refusing the merge (`mergePr`'s
+   `refused`), prClosed and noPr are the story's own at its commit: recorded and sent to the Dev Lead. Any other
+   `ApiError` (not ready after a move while queued, merged by hand meanwhile, `failed` or `stale` when gh or CI can't
+   be read, `targetBusy`, `merging`, `working`, a busy abandon) is treated like `working`: the try is forgotten and it
+   is logged, with nothing recorded or told. Anything else thrown is a bug and is only logged. The copy-string skip
+   list is gone.
+2. **No false notice for a story already merged.** Ruling 1 covers it: a Merge by hand that finishes while the
+   automatic one waits leaves `merged`, which isn't the story's refusal.
+3. **Both races are tested:** a turn starting as the merge begins, and a Merge by hand running.
+4. **A conflict names the feature tip.** Its record is `from: <head>@<feature tip>` (the tip as the scan read it).
+   It stands only while both are unchanged; when either moves, auto-merge tries once more. Auto-merge's try key now
+   includes the feature tip too.
+5. **The docs say what happens without a record.** Nothing is recorded when the head is unknown or the write fails;
+   that story is tried again after a restart. ADR 0034 says so, with the error-kind and conflict-tip rules.
+6. **Copy unchanged.** No hint about Merge by hand is added to the not merged line.
+
+## 2026-11-16 — STORY-61 build choices
+
+Confirmed by the Dev Lead in review (rulings below); updated where a ruling changed them.
+
+- **Held is history, not a field.** As Stopped is, Hold is the last `held` event in the card's history (`to: held`
+  holds, `from: held, to: null` lets go), by `user`. Every turn of the toggle is in the history (AC1) and the card
+  format gains no field. Turning it to the state it is already in writes nothing.
+- **When Hold applies.** To a started story (its card owned by its own worktree, as merging needs) that isn't merged
+  or Cancelled, in any stage, whose owner copy can be written, while the auto-merge setting in effect is on. Holding
+  early (before review) is allowed. A story not started yet can't merge on its own, so it gets no toggle: showing Hold
+  on every planned row was clutter (the Work list's column test caught it). Letting go is refused the same way, so the
+  toggle shows exactly when it works. With
+  auto-merge off the toggle and the Held mark are hidden: Hold means nothing then (AC1 "while auto-merge is on").
+  The history is kept, so a story held before the setting was turned off is still held when it's turned on again.
+- **The setting in effect reaches the scan.** The scanner reads the app default for `autoMerge` (`readAppAutoMerge`)
+  and parses the project's config over it, so the scan's `config.autoMerge` is the setting in effect (project value,
+  else app default, else on) for the Work list, the card view, Hold's refusal and auto-merge's pick. Saving app
+  settings rescans an open project only when its setting in effect changed, and auto-merge looks again once any did, so
+  the toggle appears or goes without a file change. Auto-merge's own check in a story's turn reads the same setting in
+  effect (`readAutoMerge`).
+- **The observer is unchanged.** `mergesOnItsOwn` returns false for a held story, so it drops out of auto-merge's pick
+  and its try is forgotten. Let go, the write rescans and it is picked again: a story already Verified and Proven
+  merges (AC3). A story held while an attempt is already in `merge()` is refused inside it, after the merge's own scan
+  (in the card lane, locally): see the review rulings below.
+- **Merge by hand ignores Hold** (AC2); `mergeRefusal` doesn't read it.
+- **The toggle.** "Hold", a button with `aria-pressed`, beside Merge in the card pane and the Work row, filled when
+  on, with "· Held" after it on a held story (AC4). No confirmation, like Stop; a refusal shows in one sentence
+  beside it. Server method `story.hold { dir, id, held }`, written to the owner copy in the card lane.
+
+## 2026-11-16 — STORY-61 review rulings (dev-lead)
+
+- Build choices confirmed, except the merge already in flight.
+- **A story held while its auto-merge waits never merges.** Auto-merge calls `merge(dir, id, { auto: true })`. That
+  try refuses a held story after the merge's own scan: inside the card lane locally, so a Hold queued ahead of it
+  wins. Merge by hand and `request_merge` pass no option and still ignore Hold. On GitHub the scan comes before the PR
+  merge, outside the lane, so a Hold landing during GitHub's own calls isn't seen. That window is left, as holding the
+  lane through network calls would stall every card write.
+- **The refusal is a race, not the story's failure.** It throws `HeldRefusal` (an `ApiError` with `kind: "held"`): it
+  is logged, not recorded on the card, and the Dev Lead isn't told. STORY-60's review fix gives merge errors a kind,
+  and records and tells only the story's own refusals. `held` is outside that set: merged with STORY-60, `HeldRefusal`
+  stays a plain `ApiError`, not a `StoryRefusal`, so auto-merge forgets the try and logs it, with no record and no
+  notice (Dev Lead, on STORY-60's merge).
+- **Tests.** A regression test holds the story while its merge waits on the lane behind an exclusive job. It failed
+  before the fix: the held story merged. A second test lets a story go after a failed try at the same commits, and it
+  merges.
+- **Nits.**
+  - A settings save rescans and re-checks only projects whose setting in effect changed.
+  - The scan reads only the app default and parses the project's config over it, not a second time.
+  - Hold's refusal for a story past its first stages whose card isn't in a worktree says "has no worktree".
+  - The story-action class is shared and neutral (`story-action`, was `accept-story`).
+  - The e2e's fixed 5 s wait stays: there is no deterministic signal (a held story is never picked, so auto-merge
+    logs nothing).
+  - `api.ts` and `services.ts` are under 300 lines: the project setup and roles methods moved to `api-project.ts` and
+    `api-roles.ts`, `ServiceOptions` to `services-options.ts`, and the settings save to `settings-changes.ts`.
+
+## 2026-11-16 — FEAT-8 design review fixes
+
+- **Not-merged reason.** The server records GitHub's own reason, cleaned: `githubReason` (github-merge.ts) drops `gh`'s
+  failure mark and its "Pull request <repo>#<n> is not mergeable:" prefix. `StoryRefusal` carries that `reason`, which
+  auto-merge records and tells the Dev Lead. Merge by hand still says "Couldn't merge the PR: <reason>". The shown copy
+  stays `MERGE_COPY.notMerged`, "Didn't merge on its own. <reason>": GitHub's specific reason is kept, not mapped to
+  shorter words of our own, and the existing e2e and unit assertions on that copy stand unchanged.
+- **Not-merged line.** One `NotMerged` component and `.not-merged` class (`--warn`) in the card pane and the session.
+  In the session the reason comes first, then Merge, on the same left edge. No icon.
+- **Hold.** Pressed is a tint (accent at 12% via `color-mix`, accent border and text), not a solid fill. The "· Held"
+  mark is on the Work row only, as STORY-61 asks; no e2e asserted it in the pane.
+- **Work row.** A story's session, actions and marks sit in one `.story-meta` line that never wraps, spaced by one
+  8 px gap; chips inside an action container add no margin. The shared name column is `minmax(260px, 2.2fr)` for
+  feature and story rows alike.
+- **Merged state.** The card pane says "Merged into <feature branch>." (`mergedInto` on the card view, from the
+  card's `merged` history event). After Featra merges a PR on GitHub, story-merge asks the PR poller to read the
+  project's PRs again (`onGithubMerge`), so the PR chip shows Merged at once instead of "Open" until the next poll.
+  That was stale data: a regression test failed before the fix.
+- **Action rows.** `.draft-actions` and `.story-action` align items to the center, so chips sit level with full-size
+  buttons.
+
+## 2026-11-16 — STORY-62 layout pass (dev-lead ruling: 1280×800, fewer columns with the pane open)
+
+- **Layout pass before Acceptance.** FEAT-8 gets a layout pass on the Work list and the card pane before it goes to
+  the user for Acceptance. (by: user)
+- **1280×800 is the size.** Everything must look right at a 1280×800 window. (by: user)
+- **Fewer columns with the pane open.** With the card pane open, the Work list shows fewer columns, dropping the less
+  important ones (Progress, Tasks, Scope), so nothing wraps or clips. The pane stays docked. Below 1280 wide nothing
+  wraps or clips either: more columns drop. (by: user)
+- **The column rule** (`packages/client/src/work-columns.ts`). Name and Status always show. With the pane open, Tasks
+  and Scope (a story's Tasks and PR) are hidden. Any column that doesn't fit the list's measured width is hidden too,
+  least important first: Tasks, then Scope, then Progress. Each column has a fixed track (Status 116, Progress 184,
+  Tasks 64, Scope 176 px), and the name column keeps 300 px before one drops. At 1280×800 that means every column
+  with the pane closed, and name and Status alone beside the open pane (the list is about 605 px wide there).
+- **One grid.** The list sets one `--work-grid` template from the columns shown, which every feature, story and
+  header row uses, so feature and story columns line up. The name column is `minmax(0, 1fr)`. No value wraps in its
+  cell; text that is still too long ends in an ellipsis, and the agent and model in a story's line give way first.
+- **A story's name cell.** Its title on one line, and under it, on the title's left edge, one 20 px line of its
+  session, actions and marks. While the PR column is hidden, the PR chip joins that line, so the row still shows it.
+- **Toolbar.** Under the List/Board switch, one row holds the filter chips and New bug at its end. Both are 24 px
+  tall. The chips never wrap: a list too narrow for them scrolls the chips. New bug's form opens on its own row below.
+- **Card pane.** Status and Parent are property rows: a name column, and a compact 28 px dropdown that shows only the
+  value. Its accessible name is still "Status: <value>", so existing tests stand. Read-only, the value sits where the
+  dropdown's text would. The evidence marks keep each mark whole (12 px gap). Every action button in a row is 28 px,
+  and the chips there look like the row's buttons: neutral, with Hold's accent tint kept while it is on. The session
+  line keeps its small Session chip. The body has 16 px padding and 24 px between sections; the head's items are
+  12 px apart, and its notices use the pane's 12 px text.
+- **Screens at 1280×800.** `atReviewSize` (`apps/desktop/e2e/ux-shot.ts`) sizes the window's content to 1280×800.
+  The journeys that take review screens call it right after launch (the auto-merge world in `proven-story.ts`, and
+  `hold-story.spec.ts`), as do the two journeys that read the Tasks and Scope cells (`update-card.spec.ts`,
+  `progress-breakdown.spec.ts`), since a smaller CI screen now drops those columns. `launch()` itself doesn't resize,
+  because the window-state and tray journeys depend on the window's own size and visibility. No existing assertion
+  changed.
+- **Narrower than the review size** (CI fix, first run). Only the agent and model's name in a story's line gives way;
+  its Session and Stop chips, the actions and the marks never shrink or clip, because a clipped control can't be
+  clicked (the first CI run caught Session covered by its own ellipsized box). In a list so narrow that the line still
+  doesn't fit after every column has dropped and the name has given way, the line wraps under itself rather than
+  hide an action. At 1280×800 it stays on one line. The Progress cell is a flex box so its bar (down to 24 px) gives
+  way to the label, and its track grew from 168 to 184 px: the second CI run showed "0 of 2 stories done" in Linux's
+  wider font needs 172 px with the bar at its old 40 px minimum, and longer counts need more.
+- **Polish before merge (PR #67).** Three items from review at 1280×800:
+  - _The name column with the pane open._ The list is about 605 px wide there. A story's busiest line (agent and
+    model, Session, Merge, Hold, the PR) needs about 350 px of the name column, so a 184 px Progress (Criteria) column
+    can't fit without wrapping that line, and capping the name column would only move the empty space. Instead, while
+    the Progress column is hidden, a feature's progress joins the end of its name cell (up to 220 px, the bar giving
+    way first), as a story's PR joins its line of marks. Stories have no such move: their line already fills the cell.
+  - _Didn't merge on its own._ It is a warning, not an error: the warn colour, a warning icon, a 10% warn wash and a
+    2 px warn rule on its left edge. One component, so the card pane and the session look the same. Its old colour
+    lost to the pane's grey `.meta` rule; it no longer carries `meta`.
+  - _One action button._ Story rows' chips (Session, Merge, Hold, Start, Accept) and the card's buttons are one
+    family: a light face (`--menu`) with a hairline border, 20 px in rows and lines of text, 28 px in a card's action
+    rows. Hold on keeps the accent's pressed state. A primary button (Approve, Start a feature) keeps its fill.
+
+## 2026-11-17 — BUG-28 fix
+
+- **Measured first.** The server suite, 3 workers, on this PC under its usual load (about 150 to 400 MB of memory
+  free, up to 60k page faults a second): 13 of 1089 tests failed in 1334 s, a different set from the user's four
+  failed commits. One test alone ("is noticed by the PR poller") is about 100 git and `gh` starts, 12 s of serial
+  process time and no sleeps. Under load single git calls took 34 to 77 s (`symbolic-ref` 77 s, `push` 50 s), all
+  processes at once: the PC stalls, not one call.
+- **Cause 1: fixed deadlines in the tests.** `until` (5 s), `next` (2 s), `GIT_ASKED_MS` and `FIRST_ANSWER_MS`
+  (20 s), literal 5 to 60 s deadlines, 10 s poll loops, and per-describe time limits of 30 and 60 s were all shorter
+  than one stall. Fix: the wait helpers wait on the condition with no deadline of their own; a deadline stays only
+  where a criterion promises a time (STORY-3's 1 s push) or a quiet check waits to see nothing happen. The client's
+  Testing Library waits (`waitFor`, `findBy*`) gave up after a fixed 1 s; its setup file now gives them the hang guard.
+- **The hang guard.** `tooling/hang-guard.ts` sets one time limit for every test, hook, `expect.poll` and Testing
+  Library wait, read from `FEATRA_HANG_GUARD_MS` there and nowhere else. Code that needs the number reads it with
+  vitest's `inject("hangGuardMs")`, which the same settings provide (the server's `TEST_PROCESS_LIMIT_MS`, the
+  client's setup file), since the packages' tsconfigs can't import from `tooling/`. Each project's config spreads it
+  into `test`, since vitest gives projects neither the root config's limits nor `--hookTimeout` from the command
+  line (tried: hooks still stopped at the default 10 s). It replaces `--testTimeout=30000` in `test:unit`, the
+  server's `hookTimeout`, the mcp `testTimeout` and about 90 per-test overrides.
+  - 120 s by default, so a focused run reports a red or hung test soon (review: 900 s everywhere made a TDD run wait
+    15 minutes).
+  - 900 s from the pre-commit hook, for a loaded PC. Evidence: one git call took 77 s and the slowest test, which only
+    starts git and `gh`, took 341 s in the stress runs below; 900 s is over twice that.
+  - 300 s in CI. The Gate job's own limit went from 15 to 30 minutes: at 15 it equalled a 900 s guard, so a hang would
+    have killed the job with no test named and no JUnit report uploaded.
+  - An unreadable value throws rather than falling back. `hang-guard.test.ts` checks the default, the settings, that
+    every project spreads them, and that CI's value sits well inside the Gate's limit.
+- **Cause 2: the product's 15 s `gh` limit fired on the fake.** Under load the fake `gh` (cmd.exe and node) started
+  late, `runGh` killed it, and the product took the "GitHub can't be read" path: "STORY-1 has no PR" in place of the
+  conflict the test was about. `createServices` and the GitHub deps take `ghTimeoutMs` (15 s by default, unchanged
+  for the app); the tests pass `FAKE_GH_TIMEOUT_MS = 0`, no limit. Regression test (`story-prs-gh-limit.test.ts`):
+  a 500 ms limit kills a fake that takes 3 s, and with no limit the same fake is read. It proves the limit reaches
+  the PR reads without the 15.5 s sleep the first version took, and was red with the limit not passed through. The
+  check commands the checks and feature-end tests start had a fixed 30 s kill too; they now get the hang guard.
+  The wait scan now also fails on any test call that reaches `gh` without a limit (review: `check-settings`,
+  `ci-report`, `gh-run` and `story-prs-open` still had the 15 s kill; the scan was red on them first).
+- **Cause 3: a card-only commit ran the whole gate.** The hook runs `pnpm check:content` (format check and the
+  work-format tests, which validate every card in the repo) when every change, staged, unstaged or untracked, is
+  under `.featra/` or is Markdown at the root or in `docs/`. Markdown in a package runs the whole gate. ADR 0014
+  amended. From the review:
+  - Renames are read as a delete and an add (`--no-renames`), so `git mv` of code into `.featra/` runs the whole gate;
+    before, git listed only the new path.
+  - Paths are read unquoted (`core.quotePath=false`), so a card or doc with an accent in its name isn't taken for
+    code.
+  - An untracked file counts only if a test or build could load it: by type (ts, tsx, js, mjs, cjs, mts, cts, json,
+    yaml, yml, css, html) or by being in `packages/`, `apps/` or `tooling/`. A screenshot left at the root no longer
+    forces the whole gate.
+  - Hook tests cover each of these and a deleted code file. They were red with the old hook, except the delete, which
+    already ran the whole gate.
+- **Guard.** `tooling/test/wait-scan.ts` reads each unit test's code (strings and comments blanked) and finds:
+  - a deadline on `until`, `next`, `eventually`, `waitFor` or `vi.waitFor`/`waitUntil`, as a number, `5 * 1000`,
+    `1e4` or a named constant;
+  - a `timeout:` option on any line, so a multi-line `expect.poll`, `waitFor` or `findBy*` options object counts;
+  - a `Date.now() + N` deadline and a per-test or per-hook limit;
+  - a sleep, including `setTimeout(() => r(), N)`, followed by a check after blank or comment lines;
+  - a call that reaches `gh` with the product's limit.
+
+  Each allowed wait is pinned to its exact line and how many times that line appears, with its reason. A stale entry
+  fails. `test-waits.test.ts` tests both what the scan finds and what it passes (`until(() => rows.slice(0, 100))`,
+  a test name with "(AC6, AC7)" in it).
+
+- **Kept.** The tooling `run()` helper keeps its 120 s kill: `spawnSync` blocks the event loop, so vitest's own
+  limit can't end a hung child. The Electron e2e suite (CI only) keeps its waits. The mcp package keeps its own
+  three-line `until`: its tsconfig keeps its files inside the package, so it can't import the server's. The three
+  `eventually` copies in the story-stop tests are gone: the server's `until` takes an async condition.
+- **Stress result.** The same server suite, 3 workers, three runs back to back under the same load: 0 of 1089
+  failed in 2860 s, 1 of 1089 in 3618 s (`gh-run.test.ts`, the 15 s kill above, fixed after), 0 of 1089 in 2015 s.
+  Before: 13 failed in 1334 s. The runs are slower because no test now ends early on a deadline; the slowest test took
+  341 s, all git and `gh` starts. Fewer starts per test is on the roadmap.
+  After the review fixes, under the same load with the hook's 900 s guard: the server suite, 0 of 1090 failed in
+  1756 s (slowest test 155 s); the client suite, 0 of 661 failed in 122 s.
+
+## 2026-11-17 — Installers (user)
+
+- Featra ships installers for Windows, macOS and Linux, published to GitHub Releases. Today it runs only from source (`pnpm start`).
+- The first release is unsigned. Testers click through one warning: SmartScreen on Windows, right-click then Open on macOS. Signing and notarization go on the "Before public release" list.
+- This is the next feature after FEAT-8. macOS joins CI first, because Featra has never run there. Then the packaging and the release workflow.
+- Features have no stored Acceptance status. Whether a feature is waiting on the user's Accept is computed (roadmap: an "Awaiting your Accept" mark on the Work row and in the Inbox).

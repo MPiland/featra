@@ -23,8 +23,7 @@ let secondChat = "";
 const queuedIds = async () => (await w.sessions()).filter((c) => c.queued).map((c) => c.story?.id);
 /** A reply is admitted a moment after it is sent (the limit is read first), so the queue shows it soon after. */
 const queuedBecomes = async (ids: string[]) => {
-  const end = Date.now() + 10_000;
-  while (JSON.stringify(await queuedIds()) !== JSON.stringify(ids) && Date.now() < end) {
+  while (JSON.stringify(await queuedIds()) !== JSON.stringify(ids)) {
     await new Promise((r) => setTimeout(r, 20));
   }
   expect(await queuedIds()).toEqual(ids);

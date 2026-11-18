@@ -13,6 +13,7 @@ import { detectGithub } from "../src/github-detect.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { cardRepo, type CardRepo } from "./card-repo.ts";
+import { FAKE_GH_TIMEOUT_MS } from "./fake-gh.ts";
 
 const win = process.platform === "win32";
 let repo: CardRepo;
@@ -64,27 +65,36 @@ describe("GitHub detection (AC1)", () => {
   it("finds a GitHub remote, workflows and a public repo through gh", async () => {
     await onGithub();
     await fakeGh('{"visibility":"PUBLIC"}');
-    expect(await detectGithub(repo.main)).toEqual({ remote: true, workflows: true, public: true });
+    expect(await detectGithub(repo.main, { ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toEqual({
+      remote: true,
+      workflows: true,
+      public: true,
+    });
     expect(await ghCalls()).toEqual(["repo view --json visibility"]);
   });
 
   it("finds a private repo", async () => {
     await onGithub();
     await fakeGh('{"visibility":"PRIVATE"}');
-    expect(await detectGithub(repo.main)).toMatchObject({ public: false });
+    expect(await detectGithub(repo.main, { ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toMatchObject({ public: false });
   });
 
   it("reads visibility as unknown when gh fails (signed out) or answers nonsense", async () => {
     await onGithub();
     await fakeGh("not signed in", 1);
-    expect(await detectGithub(repo.main)).toMatchObject({ remote: true, public: null });
+    expect(await detectGithub(repo.main, { ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toMatchObject({
+      remote: true,
+      public: null,
+    });
     await fakeGh("{}");
-    expect(await detectGithub(repo.main)).toMatchObject({ public: null });
+    expect(await detectGithub(repo.main, { ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toMatchObject({ public: null });
   });
 
   it("reads visibility as unknown when there is no gh", async () => {
     await onGithub();
-    expect(await detectGithub(repo.main, { ghCommand: "gh-that-is-not-installed" })).toMatchObject({ public: null });
+    expect(
+      await detectGithub(repo.main, { ghCommand: "gh-that-is-not-installed", ghTimeoutMs: FAKE_GH_TIMEOUT_MS }),
+    ).toMatchObject({ public: null });
   });
 
   it("runs a gh whose path has a space in it, and refuses one with a quote in it", async () => {
@@ -93,18 +103,29 @@ describe("GitHub detection (AC1)", () => {
     const spaced = join(bin, "with space");
     await mkdir(spaced);
     await writeFile(join(spaced, "gh.cmd"), '@echo off\r\necho {"visibility":"PUBLIC"}\r\n');
-    expect(await detectGithub(repo.main, { ghCommand: join(spaced, "gh.cmd") })).toMatchObject({ public: true });
-    expect(await detectGithub(repo.main, { ghCommand: 'gh" & echo x & "' })).toMatchObject({ public: null });
+    expect(
+      await detectGithub(repo.main, { ghCommand: join(spaced, "gh.cmd"), ghTimeoutMs: FAKE_GH_TIMEOUT_MS }),
+    ).toMatchObject({ public: true });
+    expect(
+      await detectGithub(repo.main, { ghCommand: 'gh" & echo x & "', ghTimeoutMs: FAKE_GH_TIMEOUT_MS }),
+    ).toMatchObject({ public: null });
   });
 
   it("has no remote or no workflows without asking gh anything it doesn't need", async () => {
     await fakeGh('{"visibility":"PUBLIC"}');
-    expect(await detectGithub(repo.main)).toEqual({ remote: false, workflows: false, public: null });
+    expect(await detectGithub(repo.main, { ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toEqual({
+      remote: false,
+      workflows: false,
+      public: null,
+    });
     expect(await ghCalls()).toEqual([]);
     repo.git(repo.main, "remote", "add", "origin", "git@gitlab.com:acme/app.git");
-    expect(await detectGithub(repo.main)).toMatchObject({ remote: false });
+    expect(await detectGithub(repo.main, { ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toMatchObject({ remote: false });
     repo.git(repo.main, "remote", "set-url", "origin", "git@github.com:acme/app.git");
-    expect(await detectGithub(repo.main)).toMatchObject({ remote: true, workflows: false });
+    expect(await detectGithub(repo.main, { ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toMatchObject({
+      remote: true,
+      workflows: false,
+    });
   });
 });
 
@@ -148,6 +169,7 @@ describe("Project settings' Checks section (AC1, AC2)", () => {
       scan: scanner.scan,
       now: () => new Date(),
       ghCommand: "gh-that-is-not-installed",
+      ghTimeoutMs: FAKE_GH_TIMEOUT_MS,
     });
     expect(await none.load(repo.main)).toMatchObject({ where: "local", reason: CHECKS_COPY.unknown });
     expect(CHECKS_COPY.unknown).toBe("Couldn't tell if it's public on GitHub, so checks run on this computer.");

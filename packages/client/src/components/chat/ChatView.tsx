@@ -10,6 +10,7 @@ import { Transcript } from "./Transcript.tsx";
 import type { AcceptActions } from "../../card-pane.ts";
 import { AcceptStory } from "../work/AcceptStory.tsx";
 import { MergeStory, type MergeAction } from "../work/MergeStory.tsx";
+import { NotMerged } from "../work/NotMerged.tsx";
 import { StoryStop, type StopActions, type StopState } from "../work/StoryStop.tsx";
 
 /** The chat the user opened: its id and the role it started from. */
@@ -41,6 +42,8 @@ export interface ChatViewProps {
     /** The story is Verified and can merge: Merge is offered beside Accept (STORY-12). */
     mergeable: boolean;
     merge: MergeAction;
+    /** Why the story didn't merge on its own, while that stands (STORY-60); null otherwise. */
+    notMerged: string | null;
   };
 }
 
@@ -119,6 +122,7 @@ export function ChatView({ chats, chat, dir, onStarted, headerExtra, story }: Ch
       {chat.story && story && (
         <div className="chat-accept">
           {story.awaiting && <AcceptStory id={chat.story} actions={story.acceptance} />}
+          {story.notMerged && <NotMerged reason={story.notMerged} />}
           <MergeStory id={chat.story} mergeable={story.mergeable} merge={story.merge} />
         </div>
       )}

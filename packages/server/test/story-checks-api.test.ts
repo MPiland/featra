@@ -24,7 +24,7 @@ const confirmCommand = () => w.window.ask("checks.set", { dir: w.dir, patch: { c
 
 const load = async () => (await w.window.ask("checks.load", { dir: w.dir })).result as ChecksView;
 
-describe("the Dev Lead proposes a check command (AC2)", { timeout: 30_000 }, () => {
+describe("the Dev Lead proposes a check command (AC2)", () => {
   it("puts it in Project settings and applies nothing until the user confirms it", async () => {
     const lead = await w.devLead();
     const answered = await lead.agent.ask("checks.propose", {
@@ -75,7 +75,7 @@ describe("the Dev Lead proposes a check command (AC2)", { timeout: 30_000 }, () 
   });
 });
 
-describe("a story reaching review (AC3, AC4)", { timeout: 60_000 }, () => {
+describe("a story reaching review (AC3, AC4)", () => {
   it("shows the config's check command as changed until the user confirms it, through checks.set", async () => {
     expect((await load()).unconfirmed).toEqual(["command"]);
     const set = await confirmCommand();
@@ -109,7 +109,7 @@ describe("a story reaching review (AC3, AC4)", { timeout: 60_000 }, () => {
         .filter((f) => f.event === "card.view" && f.watch === watchId(watch))
         .map((f) => f.data as CardView)
         .at(-1)?.checks;
-    await w.until(() => heard()?.last !== null && heard()?.last !== undefined, 30_000);
+    await w.until(() => heard()?.last !== null && heard()?.last !== undefined);
     const checks = heard() as CardChecks;
     expect(checks.last?.passed).toBe(false);
     expect(checks.last?.output).toContain("1234567");

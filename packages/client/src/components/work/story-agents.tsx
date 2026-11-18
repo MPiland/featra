@@ -3,6 +3,7 @@ import { canResume, isStartable } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
 import type { AcceptActions, StartStoryResult } from "../../card-pane.ts";
 import { WORK_COPY } from "../../work-list.ts";
+import type { HoldAction } from "./HoldStory.tsx";
 import type { MergeAction } from "./MergeStory.tsx";
 import { StoryStop, type StopActions } from "./StoryStop.tsx";
 import { useAction } from "./useAction.ts";
@@ -26,6 +27,8 @@ export interface StoryAgents {
   acceptance: AcceptActions;
   /** Merge on a Verified story (STORY-12). */
   merge: MergeAction;
+  /** Hold on a story while auto-merge is on (STORY-61). */
+  hold: HoldAction;
 }
 
 const NONE: StoryAgents = {
@@ -39,6 +42,7 @@ const NONE: StoryAgents = {
   stops: { stop: async () => ({ ok: true }), resume: async () => ({ ok: true }) },
   acceptance: { accept: async () => ({ ok: true }), sendBack: async () => ({ ok: true, recorded: true }) },
   merge: async () => ({ ok: true, remains: [] }),
+  hold: async () => ({ ok: true }),
 };
 
 export const StoryAgentsContext = createContext<StoryAgents>(NONE);
@@ -97,7 +101,8 @@ export function StoryAgent({ id }: { id: string }) {
   if (!story.agent) return null;
   return (
     <span className="story-agent meta">
-      {[story.agent, story.model].filter(Boolean).join(" · ")}
+      {/* Only the name gives way when the row runs short; its Session and Stop stay whole and clickable. */}
+      <span className="story-agent-name">{[story.agent, story.model].filter(Boolean).join(" · ")}</span>
       {story.session !== null && agents.hasChat(story.session) && (
         <>
           {" · "}

@@ -148,3 +148,14 @@ describe("AC3: the Dev Lead's request_merge card", () => {
     expect(second.app.calls).toContain("chat.approve:chat-1:merge-1:deny");
   });
 });
+
+describe("FEAT-8 design review: a merged story's card", () => {
+  it("says which feature branch it merged into", async () => {
+    const app = await reviewed();
+    const pane = await openPane(app);
+    await app.user.click(await within(pane).findByRole("button", { name: "Merge STORY-5" }));
+    const into = story(app).history.findLast((e) => e.field === "merged")?.to ?? "";
+    expect(into).not.toBe("");
+    await within(pane).findByText(MERGE_COPY.mergedInto(into));
+  });
+});

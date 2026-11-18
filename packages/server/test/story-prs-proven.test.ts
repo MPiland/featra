@@ -61,7 +61,7 @@ const run = (id: number, sha: string, artifacts: FakeRun["artifacts"], status?: 
   ...(status ? { status } : {}),
 });
 
-describe("the test report setting (AC1)", { timeout: 60_000 }, () => {
+describe("the test report setting (AC1)", () => {
   it("is off until the artifact is set: checks finishing read no report, then do once it is set", async () => {
     const a = await inReview("checksWhere: ci\n");
     await ciAt(
@@ -92,7 +92,7 @@ describe("the test report setting (AC1)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("reading the report when checks finish (AC2)", { timeout: 60_000 }, () => {
+describe("reading the report when checks finish (AC2)", () => {
   it("marks Proven, by system, each criterion whose linked test passed, merging every job's report", async () => {
     const a = await inReview();
     await ciAt(a, [checkRun(null)], [run(11, a, {}, "in_progress")]);
@@ -111,8 +111,8 @@ describe("reading the report when checks finish (AC2)", { timeout: 60_000 }, () 
     const card = await w.read();
     expect(evidenceState(card).provenAcs).toEqual([1, 2]);
     expect(card.history.filter((e) => e.field === "evidence" && e.to?.startsWith("proven"))).toEqual([
-      expect.objectContaining({ to: "proven:1", by: "system" }),
-      expect.objectContaining({ to: "proven:2", by: "system" }),
+      expect.objectContaining({ to: `proven:1@${a}`, by: "system" }),
+      expect.objectContaining({ to: `proven:2@${a}`, by: "system" }),
     ]);
   });
 
@@ -177,7 +177,7 @@ describe("reading the report when checks finish (AC2)", { timeout: 60_000 }, () 
   });
 });
 
-describe("criteria the report didn't prove (AC3)", { timeout: 60_000 }, () => {
+describe("criteria the report didn't prove (AC3)", () => {
   it("stay unproven, and the card says which failed, which are missing, and why", async () => {
     const a = await inReview();
     await ciAt(

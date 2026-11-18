@@ -11,7 +11,10 @@ export interface SocketFrame<D = unknown> {
 
 export interface FrameSocket<D> {
   send: (f: object) => void;
-  /** The first frame `match` takes, now or within `ms`; it is taken off `frames`. */
+  /**
+   * The first frame `match` takes; it is taken off `frames`. With `ms`, only one that comes within it, for a criterion
+   * that promises a time. Without, it waits as long as the run's hang guard allows (BUG-28).
+   */
   next: (match: (f: SocketFrame<D>) => boolean, ms?: number) => Promise<SocketFrame<D>>;
   frames: SocketFrame<D>[];
   close: () => void;
@@ -31,7 +34,7 @@ export function openFrames<D>(url: string): Promise<FrameSocket<D>> {
       resolve({
         frames,
         send: (f) => ws.send(JSON.stringify(f)),
-        next: (match, ms = 2000) =>
+        next: (match, ms) =>
           new Promise((done, fail) => {
             const check = () => {
               const i = frames.findIndex(match);
@@ -40,10 +43,13 @@ export function openFrames<D>(url: string): Promise<FrameSocket<D>> {
               clearTimeout(timer);
               done(frames.splice(i, 1)[0] as SocketFrame<D>);
             };
-            const timer = setTimeout(() => {
-              waiting.delete(check);
-              fail(new Error(`No matching frame in ${ms} ms`));
-            }, ms);
+            const timer =
+              ms === undefined
+                ? undefined
+                : setTimeout(() => {
+                    waiting.delete(check);
+                    fail(new Error(`No matching frame in ${ms} ms`));
+                  }, ms);
             waiting.add(check);
             check();
           }),

@@ -21,7 +21,7 @@ describe("a story session spawning", () => {
     const runs = w.claude.runs.length;
 
     agent.socket.send({ id: 1, method: "story.spawn", params: { story: "STORY-6" } });
-    const answered = await agent.socket.next((f) => f.id === 1, 20_000);
+    const answered = await agent.socket.next((f) => f.id === 1);
     expect(answered.ok).toBe(false);
     expect(JSON.stringify(answered.error)).toContain(AGENT_MESSAGES.sessionSpawn);
 

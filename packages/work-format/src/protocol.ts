@@ -110,6 +110,11 @@ export interface ServerMethods {
    */
   "story.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
   /**
+   * Holds a story back from auto-merge, or lets it go (STORY-61): a `held` event in its history, by the user. Merge by
+   * hand still works on a held story. Refused while auto-merge is off, and for a story merged, cancelled or read-only.
+   */
+  "story.hold": { params: { dir: string; id: string; held: boolean }; result: null };
+  /**
    * What abandoning a story would lose (STORY-58): its uncommitted files, commits no remote has, the open PR it closes,
    * and the branch it removes. Refused with why when it can't be abandoned.
    */

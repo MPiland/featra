@@ -5,6 +5,7 @@
 import { awaitingAcceptance } from "./acceptance.ts";
 import { isMerged } from "./history.ts";
 import { mergeRefusal } from "./merge.ts";
+import { notMergedOf } from "./auto-merge.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { evidenceState } from "./evidence.ts";
 import { acceptedFeature, featureAcceptRefusal } from "./feature-end.ts";
@@ -12,6 +13,7 @@ import { parseId } from "./ids.ts";
 import { locationLabel, type OwnerLocation } from "./ownership.ts";
 import type { OwnedCard, Resolution } from "./owner-copies.ts";
 import { burnUp, epicProgress, featureProgress, itemsOf, progressLabel, scopeSummary } from "./rollup.ts";
+import { holdOf } from "./story-hold.ts";
 import { stoppedIn } from "./story-stop.ts";
 import { featureTone, segments, stageBreakdown, stageTone, statusBreakdown } from "./work-tones.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
@@ -48,6 +50,12 @@ function byOrder(a: Card, b: Card): number {
 
 const labelled = ({ done, total, label }: ProgressCount): ProgressCount => ({ done, total, label });
 
+/** What a row offers from its owner copy: Merge (STORY-12), and Hold with whether it is held (STORY-61). */
+interface RowMarks {
+  mergeable: ReadonlySet<string>;
+  holds: ReadonlyMap<string, boolean>;
+}
+
 const ticked = (items: readonly { done: boolean }[]) => ({
   done: items.filter((i) => i.done).length,
   total: items.length,
@@ -58,9 +66,11 @@ function storyRow(
   added: ReadonlySet<string>,
   config: ProjectConfig,
   editable: ReadonlySet<string>,
-  mergeable: ReadonlySet<string>,
+  marks: RowMarks,
 ): StoryRow {
   const tone = stageTone(card.status, config);
+  const held = marks.holds.get(card.id);
+  const notMerged = notMergedOf(card);
   return {
     id: card.id,
     type: card.type === "bug" ? "bug" : "story",
@@ -77,8 +87,10 @@ function storyRow(
     ...(evidenceState(card).reported ? { reported: true as const } : {}),
     stopped: stoppedIn(card, tone),
     awaiting: editable.has(card.id) && awaitingAcceptance(card, config),
-    mergeable: mergeable.has(card.id),
+    mergeable: marks.mergeable.has(card.id),
     merged: isMerged(card),
+    ...(held === undefined ? {} : { held }),
+    ...(notMerged ? { notMerged: notMerged.reason } : {}),
   };
 }
 
@@ -92,12 +104,12 @@ function featureRow(
   cards: readonly Card[],
   config: ProjectConfig,
   editable: ReadonlySet<string>,
-  mergeable: ReadonlySet<string>,
+  marks: RowMarks,
   branch: string | null = null,
 ): FeatureRow {
   const scope = feature ? scopeSummary(feature.id, cards, config) : null;
   const added = new Set(scope?.added.map((a) => a.id));
-  const rows = stories.toSorted(byOrder).map((s) => storyRow(s, added, config, editable, mergeable));
+  const rows = stories.toSorted(byOrder).map((s) => storyRow(s, added, config, editable, marks));
   const counted = feature ? itemsOf(feature.id, cards) : stories.filter((s) => s.status !== CANCELLED);
   const tones = counted.map((s) => stageTone(s.status, config));
   const done = tones.filter((t) => t === "done").length;
@@ -161,9 +173,17 @@ export function buildWorkList(
   canEdit: (owned: OwnedCard) => boolean = () => true,
 ): WorkList {
   const editable = new Set(resolution.cards.filter(canEdit).map((o) => o.card.id));
-  const mergeable = new Set(
-    resolution.cards.filter((o) => mergeRefusal(o, o.card.id, config, canEdit(o)) === null).map((o) => o.card.id),
-  );
+  const marks: RowMarks = {
+    mergeable: new Set(
+      resolution.cards.filter((o) => mergeRefusal(o, o.card.id, config, canEdit(o)) === null).map((o) => o.card.id),
+    ),
+    holds: new Map(
+      resolution.cards.flatMap((o) => {
+        const held = holdOf(o, config, canEdit(o));
+        return held === undefined ? [] : [[o.card.id, held] as const];
+      }),
+    ),
+  };
   const cards = resolution.cards.map((c) => c.card);
   // A started feature's branch: where its card is owned until it merges to main (ADR 0002).
   const branches = new Map(
@@ -181,7 +201,7 @@ export function buildWorkList(
       cards,
       config,
       editable,
-      mergeable,
+      marks,
       branches.get(f.id) ?? null,
     );
 
@@ -204,8 +224,8 @@ export function buildWorkList(
   const bugs = featureless
     .filter((s) => s.type === "bug")
     .toSorted(byOrder)
-    .map((b) => storyRow(b, new Set(), config, editable, mergeable));
-  if (orphans.length) loose.push(featureRow(null, orphans, cards, config, editable, mergeable));
+    .map((b) => storyRow(b, new Set(), config, editable, marks));
+  if (orphans.length) loose.push(featureRow(null, orphans, cards, config, editable, marks));
   if (loose.length) {
     const counted = loose.filter((f) => f.id !== null && f.status !== "cancelled");
     const tones = counted.map((f) => f.tone);

@@ -101,6 +101,9 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Stopped** — a story whose agent the user stopped: a mark on its Work row and its session, derived from the last
   `stopped` event in the card's history. Stop ends the running turn and keeps the story's stage and worktree; **Resume**
   goes on in the same session and clears the mark. A stopped session doesn't count toward the running-sessions cap.
+- **Held** — a started story the user holds back from auto-merge with **Hold**, a toggle on its card pane and Work row shown
+  while auto-merge is on. Derived from the last `held` event in the card's history. A held story never merges on its
+  own; Merge by hand still works. Turning Hold off lets a Verified and Proven story merge on its own.
 - **Story session view** — a story's session is read-only: the live transcript (with the agent's thinking, where the
   provider shows it) and no composer.
 - **Subagent** — an agent a session spawns for itself (Claude's Agent tool). It shows as a read-only chat nested under

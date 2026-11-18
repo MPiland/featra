@@ -130,6 +130,7 @@ if (first === "--version") {
   out(found.map(view));
 } else if (first === "pr" && second === "view") {
   if (state.viewDelayMs) sleep(state.viewDelayMs);
+  if (state.viewFails) fail(state.viewFails);
   const pr = state.prs.find((p) => p.url === args[2]);
   if (!pr) fail("GraphQL: Could not resolve to a PullRequest");
   if ((flag("--json") ?? "").split(",").includes("mergeable")) {

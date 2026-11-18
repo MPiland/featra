@@ -57,7 +57,7 @@ const rows = async () => {
   return { list, features: list.epics.flatMap((e) => e.features) };
 };
 
-describe("proposing a place (AC2)", { timeout: 60_000 }, () => {
+describe("proposing a place (AC2)", () => {
   it.each([
     ["a story still being worked → a task on it", "STORY-1", "task:STORY-1"],
     ["the feature in progress → a bug under it", "FEAT-1", "feature:FEAT-1"],
@@ -76,7 +76,7 @@ describe("proposing a place (AC2)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("filing (AC2, AC3)", { timeout: 60_000 }, () => {
+describe("filing (AC2, AC3)", () => {
   it("commits a bug under the feature in progress on its branch, touching no checkout, as added scope", async () => {
     await start();
     // The feature went in progress at Start (its scope baseline, ADR 0038); the bug comes later.
@@ -142,7 +142,7 @@ describe("filing (AC2, AC3)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("a Done feature stays Done (AC4)", { timeout: 60_000 }, () => {
+describe("a Done feature stays Done (AC4)", () => {
   it("is never offered, is refused by key, and is left as it was when a bug is blamed on it", async () => {
     await start();
     const before = await w.repo.read(w.repo.main, "FEAT-0");

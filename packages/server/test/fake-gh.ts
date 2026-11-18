@@ -9,6 +9,14 @@ import { fileURLToPath } from "node:url";
 
 export const FAKE_GH_SCRIPT = fileURLToPath(new URL("fake-gh.cjs", import.meta.url));
 
+/**
+ * The time limit the tests give `gh`: none (Node's `timeout: 0`). The product gives up on a `gh` after 15 s, as on a
+ * hung network. On a busy PC a process start alone stalled for 15 to 77 s, so the product gave up on the fake mid-test
+ * and took the "GitHub can't be read" path instead of the one the test was about (BUG-28). A hung fake still fails
+ * the test, at the test's own time limit.
+ */
+export const FAKE_GH_TIMEOUT_MS = 0;
+
 export interface FakePr {
   number: number;
   url: string;
@@ -44,6 +52,8 @@ export interface FakeGhState {
   whileCreating?: { file: string; text: string };
   /** How long `gh pr view` takes to answer. */
   viewDelayMs?: number;
+  /** When set, `gh pr view` fails with this message, as when GitHub can't be reached (STORY-60). */
+  viewFails?: string;
   /** How long `gh pr view` takes to start, before the call is recorded (BUG-21). */
   viewStartDelayMs?: number;
   /** The repo's workflow runs (STORY-57). */

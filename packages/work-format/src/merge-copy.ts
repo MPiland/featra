@@ -20,8 +20,16 @@ export const MERGE_COPY = {
   merging: "Merging…",
   decline: "Decline",
   merged: "Merged",
+  /** On a merged story's card (STORY-12): where it went. */
+  mergedInto: (branch: string) => `Merged into ${branch}.`,
+  /** The toggle that holds a story back from auto-merge (STORY-61), and the mark on a held story's row. */
+  hold: "Hold",
+  holdOf: (id: string) => `Hold ${id}`,
+  held: "Held",
   /** The request card's question. */
   ask: (story: string, into: string) => `Merge ${story} into ${into}?`,
   /** The request card's line about who asks. */
   asked: "The Dev Lead asks to merge this story.",
+  /** On the card and in the session of a story that didn't merge on its own (STORY-60). */
+  notMerged: (reason: string) => `Didn't merge on its own. ${reason}`,
 } as const;

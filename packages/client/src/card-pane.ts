@@ -53,6 +53,8 @@ export interface CardBridge {
   createPr: (dir: string, id: string) => Promise<ReviewResult>;
   /** Merges a Verified story into its feature branch with a merge commit (STORY-12). */
   mergeStory: (dir: string, id: string) => Promise<MergeResult>;
+  /** Holds a story back from auto-merge (`held`), or lets it go; recorded in its history (STORY-61). */
+  holdStory: (dir: string, id: string, held: boolean) => Promise<ReviewResult>;
   /** What abandoning a story would lose, which the user confirms (STORY-58); or why it can't be abandoned. */
   abandonCheck: (dir: string, id: string) => Promise<AbandonCheck>;
   /** Abandons a story as confirmed with the warning's `token`: its card kept as Cancelled (`keep`), or deleted. */
@@ -228,6 +230,7 @@ export function serverCards(server: ServerClient): CardBridge {
     resumeStory: (dir, id) => review(server.call("story.resume", { dir, id })),
     createPr: (dir, id) => review(server.call("story.createPr", { dir, id })),
     mergeStory: (dir, id) => ended(server.call("story.merge", { dir, id })),
+    holdStory: (dir, id, held) => review(server.call("story.hold", { dir, id, held })),
     abandonCheck: (dir, id) =>
       server.call("story.abandonCheck", { dir, id }).then(
         (r): AbandonCheck => {
@@ -263,6 +266,7 @@ export function noCards(error: string): CardBridge {
     startStory: async () => ({ ok: false, error }),
     rerunChecks: async () => ({ ok: false, error }),
     mergeStory: async () => ({ ok: false, error }),
+    holdStory: async () => ({ ok: false, error }),
     abandonCheck: async () => ({ ok: false, error }),
     abandonStory: async () => ({ ok: false, error }),
     stopStory: async () => ({ ok: false, error }),

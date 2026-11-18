@@ -15,7 +15,7 @@ beforeAll(async () => {
 });
 afterAll(() => w.close());
 
-describe("AC1: a story taken off the queue", { timeout: 30_000 }, () => {
+describe("AC1: a story taken off the queue", () => {
   it("tells the Dev Lead it was stopped before it started", async () => {
     const lead = await idleLead(w);
     const first = await w.spawnAs(lead, "STORY-5");
@@ -23,7 +23,7 @@ describe("AC1: a story taken off the queue", { timeout: 30_000 }, () => {
 
     const id = 4711;
     lead.agent.socket.send({ id, method: "story.spawn", params: { story: "STORY-6" } });
-    const answered = await lead.agent.socket.next((f) => f.id === id, 20_000);
+    const answered = await lead.agent.socket.next((f) => f.id === id);
     expect(answered).toMatchObject({ ok: true, result: { queued: true } });
 
     // Queued, it has no turn to message: the Dev Lead is told when it can be.

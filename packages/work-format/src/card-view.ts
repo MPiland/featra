@@ -5,6 +5,7 @@
 import { awaitingAcceptance } from "./acceptance.ts";
 import { isMerged } from "./history.ts";
 import { mergeRefusal } from "./merge.ts";
+import { notMergedOf } from "./auto-merge.ts";
 import { abandonRefusal } from "./abandon.ts";
 import { parentChoices, statusChoices, type CardEditContext } from "./card-edit.ts";
 import type { AcProof, CardView } from "./card-view-types.ts";
@@ -17,6 +18,7 @@ import type { FeatureMergeState } from "./feature-end-copy.ts";
 import { featureEndOf } from "./feature-end.ts";
 import { locationLabel, sameLocation } from "./ownership.ts";
 import type { OwnedCard } from "./owner-copies.ts";
+import { holdOf } from "./story-hold.ts";
 import { CANCELLED, type Card } from "./types.ts";
 
 /**
@@ -71,6 +73,9 @@ export function buildCardView(
   const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   const readOnly = readOnlyReason(owned, checkedOut, ctx.config.baseBranch);
   const featureEnd = featureEndOf(card, ctx.cards, ctx.config, merge);
+  const held = holdOf(owned, ctx.config, readOnly === null);
+  const notMerged = card.type === "story" ? notMergedOf(card) : null;
+  const mergedInto = card.history.findLast((e) => e.field === "merged")?.to ?? null;
   return {
     id: card.id,
     type: card.type,
@@ -95,6 +100,9 @@ export function buildCardView(
     ...(mergeRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { mergeable: true as const } : {}),
     ...(abandonRefusal(owned, card.id, ctx.config, readOnly === null) === null ? { abandonable: true as const } : {}),
     ...(isMerged(card) && card.type === "story" ? { merged: true as const } : {}),
+    ...(mergedInto && card.type === "story" ? { mergedInto } : {}),
+    ...(held === undefined ? {} : { held }),
+    ...(notMerged ? { notMerged: notMerged.reason } : {}),
     ...(featureEnd ? { featureEnd } : {}),
     ...(draftChat === null
       ? {}

@@ -8,7 +8,7 @@ import { createScanner } from "../src/work-scan.ts";
 import { createWorkWatches, type ScanPick, type WatchFolder } from "../src/work-watch.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 import { stagedScanner } from "./staged-scanner.ts";
-import { GIT_ASKED_MS, until } from "./until.ts";
+import { until } from "./until.ts";
 
 /**
  * A watch looks once more, after the settle delay, at a scan caught mid-change before anyone hears it (BUG-24 AC2,
@@ -72,7 +72,7 @@ describe("a card a writer has just emptied (BUG-24 AC2)", () => {
       expect(titles(list)).toEqual(["STORY-1"]);
       staged.stage("STORY-1", () => repo.write(repo.main, { ...story, title: "Saved" }));
       await writeFile(repo.file(repo.main, "STORY-1"), "");
-      await until(() => heard.some((l) => titles(l)[0] === "Saved"), GIT_ASKED_MS);
+      await until(() => heard.some((l) => titles(l)[0] === "Saved"));
       expect(staged.done()).toBe(true);
       expect(heard.map((l) => [titles(l), l.problems])).toEqual([[["Saved"], []]]);
     } finally {
@@ -121,7 +121,7 @@ describe("a scan that fails (BUG-25 AC1)", () => {
     try {
       failures = 1;
       repo.git(repo.main, "branch", "feature/8");
-      await until(() => heard.some((v) => v.branches.includes("feature/8")), GIT_ASKED_MS);
+      await until(() => heard.some((v) => v.branches.includes("feature/8")));
       expect(failures).toBe(0);
       expect(heard.map((v) => v.problems)).toEqual(heard.map(() => []));
       expect(heard.map((v) => v.stories)).toEqual(heard.map(() => ["STORY-1"]));
@@ -139,7 +139,7 @@ describe("a scan that fails (BUG-25 AC1)", () => {
     try {
       failures = 2;
       repo.git(repo.main, "branch", "feature/9");
-      await until(() => heard.length > 0, GIT_ASKED_MS);
+      await until(() => heard.length > 0);
       expect(heard[0]).toEqual({
         branches: expect.not.arrayContaining(["feature/9"]),
         stories: ["STORY-1"],
@@ -148,7 +148,7 @@ describe("a scan that fails (BUG-25 AC1)", () => {
       });
       // Its file watchers were kept: the next change to git is still heard, and the problem goes.
       repo.git(repo.main, "branch", "feature/10");
-      await until(() => heard.some((v) => v.branches.includes("feature/10")), GIT_ASKED_MS);
+      await until(() => heard.some((v) => v.branches.includes("feature/10")));
       expect(heard.at(-1)).toEqual({
         branches: expect.arrayContaining(["feature/9", "feature/10"]),
         stories: ["STORY-1"],

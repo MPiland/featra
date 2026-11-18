@@ -8,7 +8,7 @@
     "start": "pnpm --filter @featra/desktop start",
     "dev:client": "pnpm --filter @featra/client dev",
     "test": "pnpm run test:unit && pnpm run test:e2e",
-    "test:unit": "vitest run --testTimeout=30000",
+    "test:unit": "vitest run",
     "test:e2e": "pnpm --filter @featra/desktop test:e2e",
     "test:e2e:wsl": "node tooling/e2e/wsl.ts",
     "test:watch": "vitest",
@@ -17,6 +17,7 @@
     "format": "oxfmt",
     "format:check": "oxfmt --check",
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:unit",
+    "check:content": "pnpm format:check && pnpm test:unit --project @featra/work-format",
     "prepare": "node tooling/install-hooks.ts"
   },
   "devDependencies": {

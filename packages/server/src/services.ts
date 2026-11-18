@@ -1,5 +1,4 @@
 import { createAgentBridge, type AgentBridge } from "./agent-bridge.ts";
-import type { AllowedProjects } from "./allowed-projects.ts";
 import { createApi, type Api } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
 import { createCardReport } from "./card-report.ts";
@@ -8,11 +7,11 @@ import { createCheckSettings } from "./check-settings.ts";
 import { createStoryChecks } from "./story-checks.ts";
 import { createFeatureEnd } from "./feature-end.ts";
 import { createStoryPrs } from "./story-prs.ts";
-import { systemTimers, type Timers } from "./inbox.ts";
+import { systemTimers } from "./inbox.ts";
 import { createChatManager } from "./chat-manager.ts";
-import { fileChatStore, memoryChatStore, type ChatStore } from "./chat-store.ts";
+import { fileChatStore, memoryChatStore } from "./chat-store.ts";
 import { locateClaude } from "./claude-locate.ts";
-import { createClaudeProvider, type ClaudeDeps } from "./claude-provider.ts";
+import { createClaudeProvider } from "./claude-provider.ts";
 import { loadAgentQuery } from "./claude-sdk.ts";
 import { createDraftActions } from "./draft-actions.ts";
 import { createDraftReview } from "./draft-review.ts";
@@ -30,51 +29,23 @@ import { createBugRequest } from "./bug-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
-import { createLogWriter, type LogWriterDeps } from "./log-writer.ts";
-import { readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
-import { createRepoGit, type RepoGit } from "./repo-git.ts";
+import { createLogWriter } from "./log-writer.ts";
+import { createStoryHold } from "./story-hold.ts";
+import { readAppAutoMerge, readAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
+import { createAutoMerge } from "./auto-merge.ts";
+import { recordNotMerged } from "./not-merged-record.ts";
+import { createRepoGit } from "./repo-git.ts";
 import { createClaudeReader } from "./claude-reader.ts";
 import { createCodexReader } from "./codex-reader.ts";
 import { createRoleRegistry } from "./role-registry.ts";
-import { nodeRoleFs, type RoleFs } from "./role-fs.ts";
+import { nodeRoleFs } from "./role-fs.ts";
 import { createRoleWatches } from "./role-watch.ts";
-import { createWorkWatches, type WatchFolder } from "./work-watch.ts";
+import { createWorkWatches } from "./work-watch.ts";
 import { createScanner } from "./work-scan.ts";
+import type { ServiceOptions } from "./services-options.ts";
+import { createSettingsChanges } from "./settings-changes.ts";
 
-export interface ServiceOptions {
-  allowed: AllowedProjects;
-  log: (message: string) => void;
-  /** The clock history events are stamped with. */
-  now?: () => Date;
-  /** The git to run; the one on the PATH by default. */
-  gitCommand?: string;
-  /** The repository reads and restores; the real ones through `gitCommand` by default. */
-  repoGit?: RepoGit;
-  /** How the Claude adapter loads the Agent SDK and finds `claude`; the real ones by default. */
-  claude?: ClaudeDeps;
-  /** The app's data folder, where chats are saved (`chats.json`, STORY-44); without it they last until exit. */
-  dataDir?: string;
-  /** Where chats are kept, in place of `chats.json` in `dataDir`: tests give a slow or failing store. */
-  chatStore?: ChatStore;
-  /** The disk the roles and the providers' settings are read from; none by default (no home), so a test never reads the real one: `main.ts` gives it this machine's. */
-  roleFs?: RoleFs;
-  /** How the role watches open folders, in place of `fs.watch`: tests count the watchers still open. */
-  roleWatchFolder?: WatchFolder;
-  /** The Featra MCP's script (`dist/mcp.cjs`); without it no agent gets the MCP (STORY-47). */
-  mcpEntry?: string;
-  /** The runtime that runs the MCP script: this process's by default. */
-  mcpExecPath?: string;
-  /** How entries agents log are written and dated: the real disk and clock by default. */
-  logs?: LogWriterDeps;
-  /** How long Stop waits for a provider to end the turn it interrupts; ten seconds by default. */
-  interruptMs?: number;
-  /** The GitHub CLI to ask whether a repo is public; the one on the PATH by default (STORY-56). */
-  ghCommand?: string;
-  /** How long a check command may run before it is killed (STORY-56). */
-  checkTimeoutMs?: number;
-  /** The timers PR reads wait on (STORY-11); the real ones by default. */
-  prTimers?: Timers;
-}
+export type { ServiceOptions };
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
 export function createServices({
@@ -93,15 +64,20 @@ export function createServices({
   logs,
   interruptMs,
   ghCommand,
+  ghTimeoutMs,
   checkTimeoutMs,
   prTimers = systemTimers(),
 }: ServiceOptions): {
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
   agents: AgentBridge;
+  /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
+  settingsChanged: () => void;
   close: () => Promise<void>;
 } {
-  const scanner = createScanner(repoGit);
+  // A scan's config carries the auto-merge setting in effect, the app default included, for Hold (STORY-61).
+  const appAutoMerge = readAppAutoMerge(dataDir);
+  const scanner = createScanner(repoGit, { appAutoMerge });
   const watches = createWorkWatches(scanner, log);
   // One lane for every card write: a draft that allocates IDs and a card edit never interleave (ADR 0002).
   const lane = createCardLane();
@@ -114,7 +90,7 @@ export function createServices({
     prState: (dir, id) => prs.prState(dir, id) ?? features.prState(dir, id),
     merge: (dir, id) => features.mergeState(dir, id),
   });
-  const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand });
+  const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand, ghTimeoutMs });
   const checks = createStoryChecks({
     scan: watches.scan,
     observe: watches.observe,
@@ -136,6 +112,7 @@ export function createServices({
     log,
     gitCommand,
     ghCommand,
+    ghTimeoutMs,
     onMerged: (dir, id) => merges.merged(dir, id),
   });
   const roles = createRoleRegistry({
@@ -168,6 +145,7 @@ export function createServices({
     busy,
     ...(interruptMs ? { interruptMs } : {}),
   });
+  const holds = createStoryHold({ scan: watches.scan, now, lane });
   const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats, busy });
   const merges = createStoryMerge({
     scan: watches.scan,
@@ -179,7 +157,19 @@ export function createServices({
     checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
     gitCommand,
     ghCommand,
+    ghTimeoutMs,
     ending,
+    onGithubMerge: (dir) => prs.refresh(dir),
+  });
+  // A Verified and Proven story merges on its own while the project's auto-merge is on (STORY-59).
+  const autoMerges = createAutoMerge({
+    observe: watches.observe,
+    allowed,
+    enabled: readAutoMerge(dataDir),
+    merge: merges.merge,
+    chats,
+    record: (dir, id, tried, reason) => recordNotMerged({ scan: watches.scan, lane, now }, dir, id, tried, reason),
+    log,
   });
   const abandons = createStoryAbandon({
     scan: watches.scan,
@@ -189,6 +179,7 @@ export function createServices({
     chats,
     gitCommand,
     ghCommand,
+    ghTimeoutMs,
     ending,
   });
   const features = createFeatureEnd({
@@ -203,6 +194,7 @@ export function createServices({
     log,
     gitCommand,
     ghCommand,
+    ghTimeoutMs,
     checkTimeoutMs,
   });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
@@ -250,6 +242,7 @@ export function createServices({
     acceptance,
     merges,
     abandons,
+    holds,
     features,
     bugs,
     busy,
@@ -261,17 +254,29 @@ export function createServices({
     roleWatches,
     agents,
   });
+  // Saved settings that change a project's auto-merge setting in effect rescan it and re-check auto-merge (STORY-61).
+  const settingsChanges = createSettingsChanges({
+    appAutoMerge,
+    dirs: () => allowed.dirs(),
+    scan: watches.scan,
+    recheck: () => autoMerges.recheck(),
+    log,
+  });
   return {
     api,
     agents,
+    settingsChanged: settingsChanges.saved,
     async close() {
       stopClosing();
       checks.close();
       prs.close();
       features.close();
+      autoMerges.close();
       // A project watch still starting finishes against open watches, then stops itself.
       await prs.idle();
       await features.idle();
+      await autoMerges.idle();
+      await settingsChanges.idle();
       chats.close();
       await chats.flush();
       watches.close();

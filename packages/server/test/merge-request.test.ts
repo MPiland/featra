@@ -21,7 +21,7 @@ async function notices(n: number) {
   return m.notices;
 }
 
-describe("request_merge (AC3)", { timeout: 60_000 }, () => {
+describe("request_merge (AC3)", () => {
   it("puts an approval card in front of the user in the Dev Lead's chat, and approving merges", async () => {
     await m.start({ remote: false });
     await m.verified();
@@ -75,7 +75,7 @@ describe("request_merge (AC3)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("an ask whose Dev Lead chat ends (review fix)", { timeout: 60_000 }, () => {
+describe("an ask whose Dev Lead chat ends (review fix)", () => {
   afterEach(closeChats);
 
   it("ends unanswered, so the next ask isn't refused as waiting, and merges nothing", async () => {

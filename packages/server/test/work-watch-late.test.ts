@@ -6,7 +6,7 @@ import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { createWorkWatches } from "../src/work-watch.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
-import { GIT_ASKED_MS, until } from "./until.ts";
+import { until } from "./until.ts";
 
 /**
  * An edit that lands after a watch's first scan read the files but before its file watchers start is heard by no
@@ -51,7 +51,7 @@ describe("a watch's first scan", () => {
     const { list, stop } = await watches.watch(repo.main, (l) => heard.push(l));
     try {
       expect(titles(list)).toEqual(["STORY-1"]);
-      await until(() => heard.some((l) => titles(l)[0] === "Edited in the gap"), GIT_ASKED_MS);
+      await until(() => heard.some((l) => titles(l)[0] === "Edited in the gap"));
     } finally {
       stop();
       watches.close();
@@ -82,7 +82,7 @@ describe("a watch's first scan", () => {
     try {
       expect(made).toBe(true);
       expect(features(list)).toEqual(["FEAT-1"]);
-      await until(() => heard.some((l) => features(l).includes("FEAT-2")), GIT_ASKED_MS);
+      await until(() => heard.some((l) => features(l).includes("FEAT-2")));
     } finally {
       stop();
       watches.close();

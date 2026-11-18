@@ -35,15 +35,43 @@
   color: var(--tx2);
 }
 
-/* Filter chips. */
-.wfilter {
+/* The list's toolbar (STORY-62): the filter chips, and New bug at the end of the same row. */
+.work-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.work-toolbar > .new-bug-bar {
+  margin-left: auto;
+  min-width: 0;
+}
+
+/* Its form opens on a row of its own, below the chips. */
+.work-toolbar > .new-bug {
+  flex-basis: 100%;
+}
+
+/* Filter chips: one row, each 24px tall. */
+.wfilter {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 4px;
+  min-width: 0;
+  /* A list too narrow for them all scrolls the chips, not the page. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  /* Room for a chip's focus ring inside the scroller, taken back outside it. */
+  margin: -4px;
+  padding: 4px;
 }
 
 .fchip {
-  padding: 4px 10px;
+  flex: none;
+  height: 24px;
+  padding: 0 10px;
+  white-space: nowrap;
   border: 0;
   border-radius: 999px;
   background: var(--row);
@@ -125,11 +153,34 @@
 .frow,
 .prow {
   display: grid;
-  grid-template-columns: 14px minmax(0, 2.2fr) 1.25fr 1.35fr 0.65fr 1.25fr;
+  /* The columns shown (`work-columns.ts`), set on the list; the name column takes what the fixed columns leave. */
+  grid-template-columns: var(--work-grid, 14px minmax(0, 1fr) 116px 184px 64px 176px);
   gap: 14px;
   align-items: center;
   padding: 10px 14px;
   border-top: 1px solid var(--line);
+}
+
+/* A value never wraps in its cell; text that is still too long ends in an ellipsis. */
+.frow > [role="cell"],
+.prow > [role="cell"],
+.frow > [role="columnheader"],
+.prow > [role="columnheader"] {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.frow > [role="columnheader"],
+.prow > [role="columnheader"],
+.frow > [role="cell"]:not(.fn, :has(.prog, .st)),
+.prow > [role="cell"]:not(.pn, :has(.st)) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.frow > [role="cell"],
+.prow > [role="cell"]:not(.pn) {
+  font-variant-numeric: tabular-nums;
 }
 
 .frow.hdr {
@@ -157,9 +208,14 @@
   font-weight: 500;
 }
 
-/* The toggle starts in the caret column, so the title lines up with the story titles. */
+/* The toggle starts in the caret column, so the title lines up with the story titles. Only the title gives way. */
 .frow .fn .row-toggle {
+  min-width: 0;
   margin-left: -28px;
+}
+
+.frow .fn > :not(.row-toggle) {
+  flex: none;
 }
 
 .kidsbox {
@@ -179,6 +235,14 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+  vertical-align: middle;
+}
+
+.st-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dot {
@@ -219,7 +283,46 @@
   min-width: 0;
 }
 
+.prog {
+  max-width: 100%;
+}
+
+/* In its cell the bar gives way to the label, so a wider font (Linux) never pushes the label past the column. */
+.frow > [role="cell"]:has(> .prog) {
+  display: flex;
+  align-items: center;
+}
+
+.frow > [role="cell"] > .prog {
+  flex: 0 1 auto;
+}
+
+.frow > [role="cell"] > .prog .pbar {
+  min-width: 24px;
+}
+
+/* The Progress column hidden (STORY-62): the feature's progress at the end of its name cell, so the wide name column
+   still says something. It takes up to 220 px of the room the title leaves; its bar shrinks first. */
+.frow .fn > .fn-progress {
+  display: flex;
+  flex: 0 1 220px;
+  margin-left: auto;
+  padding-left: 16px;
+  font-weight: 400;
+}
+
+/* It never shrinks below its label and the bar's 24 px: the title gives way (ellipsis) instead, so nothing clips. */
+.frow .fn > .fn-progress > .prog {
+  flex: 1 1 auto;
+  min-width: auto;
+}
+
+.frow .fn > .fn-progress .pbar {
+  min-width: 24px;
+}
+
 .prog .pl {
+  flex: none;
   white-space: nowrap;
 }
 

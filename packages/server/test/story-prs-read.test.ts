@@ -29,7 +29,7 @@ async function after(ms: number) {
   await w.settle();
 }
 
-describe("the PR's state and checks (AC3)", { timeout: 60_000 }, () => {
+describe("the PR's state and checks (AC3)", () => {
   it("reach the card and the story's Work row once read", async () => {
     await w.start({ status: "In Review", gh: open14([checkRun("FAILURE")]) });
     await w.move("In Review", { pr: URL });
@@ -57,7 +57,7 @@ describe("the PR's state and checks (AC3)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("reading PRs again (AC4)", { timeout: 60_000 }, () => {
+describe("reading PRs again (AC4)", () => {
   it("reads at start, then every N minutes from the project's setting", async () => {
     await w.start({ yaml: "prRefreshMinutes: 5\n", status: "In Review", gh: open14() });
     await w.move("In Review", { pr: URL });
@@ -160,7 +160,7 @@ describe("reading PRs again (AC4)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("CI evidence (AC5)", { timeout: 60_000 }, () => {
+describe("CI evidence (AC5)", () => {
   it("passing checks mark the story Verified and a failing check removes it, by system", async () => {
     await w.start({ yaml: "checksWhere: ci\n", status: "In Review", gh: open14([checkRun(null)]) });
     await w.move("In Review", { pr: URL });
@@ -265,7 +265,7 @@ describe("CI evidence (AC5)", { timeout: 60_000 }, () => {
     await w.settle();
     const before = await reads();
     const reading = w.prs.refresh(w.repo.main);
-    await expect.poll(reads, { timeout: 10_000 }).toBeGreaterThan(before);
+    await expect.poll(reads).toBeGreaterThan(before);
     w.allowed.set([]);
     await reading;
     await w.settle();

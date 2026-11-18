@@ -1,7 +1,5 @@
 // The local server's card side, as a fake: cards held in memory, edited with work-format's own rules.
 import {
-  abandonedStory,
-  abandonRefusal,
   acceptanceRefusal,
   acceptedStory,
   applyCardEdit,
@@ -39,6 +37,7 @@ import {
 } from "@featra/work-format";
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
 import { featureEndFakes, type FeatureActions } from "./card-server-features.ts";
+import { storyEndFakes, type StoryEndActions } from "./card-server-story-end.ts";
 
 /** The card actions a test can set the server's answer to; each left out, the fake does what the server does. */
 export type ReviewAnswers = Partial<
@@ -55,8 +54,7 @@ export type ReviewAnswers = Partial<
     | "rerunChecks"
     | "createPr"
     | "mergeStory"
-    | "abandonCheck"
-    | "abandonStory"
+    | StoryEndActions
     | FeatureActions
   >
 >;
@@ -307,26 +305,15 @@ export function fakeCardServer(
       return { ok: true, remains: [] };
     },
     ...featureEndFakes({ cardsIn: (dir) => cardSets.get(dir) ?? [], changed, calls, review, at: EDIT_AT }),
-    // Abandoning is the server's to prove (the session, git, gh): the fake refuses with work-format's rule and, unless
-    // a test sets the answer, warns of nothing but the card, then keeps it as Cancelled or deletes it.
-    abandonCheck: async (dir, id) => {
-      calls.push(`abandonCheck:${dir}:${id}`);
-      if (review.abandonCheck) return review.abandonCheck(dir, id);
-      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const why = abandonRefusal(card && owned(card), id, DEFAULT_CONFIG, true);
-      if (why !== null) return { ok: false, error: why };
-      return { ok: true, warning: { files: [], unpushed: [], pr: null, branch: null, remotes: [], token: "t" } };
-    },
-    abandonStory: async (dir, id, keep, token) => {
-      calls.push(`abandonStory:${dir}:${id}:${keep}:${token}`);
-      if (review.abandonStory) return review.abandonStory(dir, id, keep, token);
-      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const why = abandonRefusal(card && owned(card), id, DEFAULT_CONFIG, true);
-      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      if (keep) changed(dir, abandonedStory(card, "user", EDIT_AT));
-      else removed(dir, [id]);
-      return { ok: true, remains: [] };
-    },
+    ...storyEndFakes({
+      cardsIn: (dir) => cardSets.get(dir) ?? [],
+      changed,
+      removed,
+      calls,
+      review,
+      at: EDIT_AT,
+      owned,
+    }),
     reject: async (dir, id) => {
       calls.push(`reject:${dir}:${id}`);
       if (review.reject) return review.reject(dir, id);

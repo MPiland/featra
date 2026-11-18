@@ -9,30 +9,36 @@ import { describe, expect, it } from "vitest";
 import { GITHUB_COPY, serializeCard } from "@featra/work-format";
 import { detectGithubUse } from "../src/github-detect.ts";
 import { PR_REFUSALS } from "../src/story-prs.ts";
+import { FAKE_GH_TIMEOUT_MS } from "./fake-gh.ts";
 import { FEATURE_BRANCH, prWorld, STORY_BRANCH, storyCard } from "./story-prs-world.ts";
 
 const w = prWorld();
 const prOf = () => w.prs.prState(w.repo.main, "STORY-1");
 
-describe("GitHub usable or local mode (AC1)", { timeout: 60_000 }, () => {
+describe("GitHub usable or local mode (AC1)", () => {
   it("is usable with a GitHub remote and a signed-in gh", async () => {
     await w.start();
-    expect(await detectGithubUse(w.repo.main, { ghCommand: w.gh.command })).toEqual({ usable: true, missing: null });
+    expect(await detectGithubUse(w.repo.main, { ghCommand: w.gh.command, ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toEqual({
+      usable: true,
+      missing: null,
+    });
     expect((await w.settings.load(w.repo.main)).github).toEqual({ usable: true, missing: null });
   });
 
   it("says in one line what is missing: the remote, gh, or its sign-in", async () => {
     await w.start({ remote: false, gh: { signedIn: false } });
-    expect(await detectGithubUse(w.repo.main, { ghCommand: w.gh.command })).toEqual({
+    expect(await detectGithubUse(w.repo.main, { ghCommand: w.gh.command, ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toEqual({
       usable: false,
       missing: GITHUB_COPY.noRemote,
     });
     w.repo.git(w.repo.main, "remote", "add", "origin", w.remote);
-    expect(await detectGithubUse(w.repo.main, { ghCommand: "gh-that-is-not-installed" })).toEqual({
+    expect(
+      await detectGithubUse(w.repo.main, { ghCommand: "gh-that-is-not-installed", ghTimeoutMs: FAKE_GH_TIMEOUT_MS }),
+    ).toEqual({
       usable: false,
       missing: GITHUB_COPY.noGh,
     });
-    expect(await detectGithubUse(w.repo.main, { ghCommand: w.gh.command })).toEqual({
+    expect(await detectGithubUse(w.repo.main, { ghCommand: w.gh.command, ghTimeoutMs: FAKE_GH_TIMEOUT_MS })).toEqual({
       usable: false,
       missing: GITHUB_COPY.signedOut,
     });
@@ -52,7 +58,7 @@ describe("GitHub usable or local mode (AC1)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("a story moving into review (AC2)", { timeout: 60_000 }, () => {
+describe("a story moving into review (AC2)", () => {
   it("pushes its branch and opens its PR against the feature branch, recorded by system", async () => {
     await w.start();
     expect(prOf()).toBeUndefined();

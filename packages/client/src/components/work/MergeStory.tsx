@@ -21,7 +21,7 @@ export function MergeStory({ id, mergeable, merge }: { id: string; mergeable: bo
     return result;
   };
   return (
-    <span className="accept-story">
+    <span className="story-action">
       {(mergeable || busy) && (
         <button
           type="button"

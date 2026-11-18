@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { MERGE_COPY } from "@featra/work-format/merge-copy";
 import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
 import { InlineText } from "../controls/InlineText.tsx";
@@ -8,7 +9,9 @@ import { StartFeature } from "./StartFeature.tsx";
 import { StoryChecks } from "./StoryChecks.tsx";
 import { StoryPr } from "./StoryPr.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
+import { HoldStory } from "./HoldStory.tsx";
 import { MergeStory } from "./MergeStory.tsx";
+import { NotMerged } from "./NotMerged.tsx";
 import { AbandonStory } from "./AbandonStory.tsx";
 import { FeatureEnd } from "./FeatureEnd.tsx";
 import { StoryAgent } from "./story-agents.tsx";
@@ -99,13 +102,16 @@ export function CardPane({
             nowLabel={CARD_COPY.now}
             onSave={(to, from) => save({ field: "title", from, to }, (v) => v.title)}
           />
-          <div className="card-fields">
+          {/* Its properties, one row each: the name in a label column, the value (or its control) beside it. */}
+          <div className="card-props">
+            <span className="card-prop-name" aria-hidden={!readOnly}>
+              {CARD_COPY.status}
+            </span>
             {readOnly ? (
-              <span>
-                {CARD_COPY.status}: {status}
-              </span>
+              <span className="card-prop-value">{status}</span>
             ) : (
               <Dropdown
+                compact
                 name={CARD_COPY.status}
                 value={view.status}
                 options={view.statusOptions.map((o) => ({ value: toChoice(o.value), label: o.label }))}
@@ -113,18 +119,26 @@ export function CardPane({
               />
             )}
             {view.parentOptions.length > 0 && !readOnly && (
-              <Dropdown
-                name={CARD_COPY.parent}
-                value={toChoice(view.parent)}
-                options={view.parentOptions.map((o) => ({ value: toChoice(o.value), label: o.label }))}
-                onChange={(to) => void move({ field: "parent", from: view.parent, to: fromChoice(to) })}
-              />
+              <>
+                <span className="card-prop-name" aria-hidden="true">
+                  {CARD_COPY.parent}
+                </span>
+                <Dropdown
+                  compact
+                  name={CARD_COPY.parent}
+                  value={toChoice(view.parent)}
+                  options={view.parentOptions.map((o) => ({ value: toChoice(o.value), label: o.label }))}
+                  onChange={(to) => void move({ field: "parent", from: view.parent, to: fromChoice(to) })}
+                />
+              </>
             )}
           </div>
           <Evidence evidence={view.evidence} />
+          {view.notMerged && <NotMerged reason={view.notMerged} />}
+          {view.mergedInto && <p className="meta">{MERGE_COPY.mergedInto(view.mergedInto)}</p>}
           <p className="meta">{view.readOnly ?? CARD_COPY.owner(view.owner)}</p>
           {view.draftChat && !readOnly && (
-            <div className="draft-actions">
+            <div className="draft-actions card-actions">
               <SendBack
                 key={id}
                 unavailable={hasChat(view.draftChat) ? null : CARD_COPY.sendBackGone}
@@ -141,12 +155,12 @@ export function CardPane({
             </div>
           )}
           {view.type === "story" && (
-            <div className="draft-actions">
+            <div className="draft-actions card-agent">
               <StoryAgent id={id} />
             </div>
           )}
           {view.awaiting && !readOnly && (
-            <div className="draft-actions">
+            <div className="draft-actions card-actions">
               <AcceptStory
                 key={`accept-${id}`}
                 id={id}
@@ -158,12 +172,18 @@ export function CardPane({
             </div>
           )}
           {view.type === "story" && (!readOnly || view.abandonable === true) && (
-            <div className="draft-actions">
+            <div className="draft-actions card-actions">
               <MergeStory
                 key={`merge-${id}`}
                 id={id}
                 mergeable={view.mergeable === true}
                 merge={(story) => work.mergeStory(dir, story)}
+              />
+              <HoldStory
+                key={`hold-${id}`}
+                id={id}
+                held={view.held}
+                hold={(story, held) => work.holdStory(dir, story, held)}
               />
               <AbandonStory
                 key={`abandon-${id}`}
@@ -178,7 +198,7 @@ export function CardPane({
             </div>
           )}
           {view.type === "feature" && (
-            <div className="draft-actions">
+            <div className="draft-actions card-actions">
               <FeatureEnd
                 key={`end-${id}`}
                 id={id}
@@ -188,7 +208,7 @@ export function CardPane({
             </div>
           )}
           {view.startable && (
-            <div className="draft-actions">
+            <div className="draft-actions card-actions">
               <StartFeature
                 key={`start-${id}`}
                 onStart={() => work.start(dir, id)}

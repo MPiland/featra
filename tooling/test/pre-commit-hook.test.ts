@@ -27,13 +27,16 @@ const bin = join(root, "bin");
 const calls = join(root, "pnpm-calls.txt");
 const gatePath = join(root, "pnpm-path.txt");
 const workersPath = join(root, "pnpm-workers.txt");
+const guardPath = join(root, "pnpm-guard.txt");
 
 /**
  * The environment without git's own variables. Run from the pre-commit hook, the gate inherits GIT_DIR, GIT_INDEX_FILE
  * and the like, which would point every git call here at the repository being committed instead of the temp one.
  */
 const outsideGit = Object.fromEntries(
-  Object.entries(process.env).filter(([name]) => !name.startsWith("GIT_") && name !== "VITEST_MAX_WORKERS"),
+  Object.entries(process.env).filter(
+    ([name]) => !name.startsWith("GIT_") && name !== "VITEST_MAX_WORKERS" && name !== "FEATRA_HANG_GUARD_MS",
+  ),
 );
 /** Windows spells it `Path`; setting a second `PATH` beside it leaves which one wins to chance. */
 const pathKey = Object.keys(outsideGit).find((name) => name.toUpperCase() === "PATH") ?? "PATH";
@@ -47,6 +50,7 @@ function env(pnpmExit: number, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv
     FAKE_PNPM_CALLS: calls,
     FAKE_PNPM_PATH: gatePath,
     FAKE_PNPM_WORKERS: workersPath,
+    FAKE_PNPM_GUARD: guardPath,
     GIT_CEILING_DIRECTORIES: root,
   };
 }
@@ -57,16 +61,17 @@ const git = (cwd: string, ...args: string[]) =>
 function commit(cwd: string, file: string, pnpmExit: number, extra: NodeJS.ProcessEnv = {}) {
   writeFileSync(join(cwd, file), `${file}\n`);
   git(cwd, "add", file);
+  return commitStaged(cwd, `add ${file}`, pnpmExit, extra);
+}
+
+/** Commits what is staged, through the hook. */
+function commitStaged(cwd: string, message: string, pnpmExit: number, extra: NodeJS.ProcessEnv = {}) {
   rmSync(calls, { force: true });
-  const result = spawnSync("git", ["commit", "-m", `add ${file}`], {
-    cwd,
-    env: env(pnpmExit, extra),
-    encoding: "utf8",
-  });
+  const result = spawnSync("git", ["commit", "-m", message], { cwd, env: env(pnpmExit, extra), encoding: "utf8" });
   return {
     status: result.status,
     gateArgs: existsSync(calls) ? readFileSync(calls, "utf8").trim() : null,
-    committed: git(cwd, "log", "--format=%s").split("\n").includes(`add ${file}`),
+    committed: git(cwd, "log", "--format=%s").split("\n").includes(message),
   };
 }
 
@@ -75,7 +80,7 @@ beforeAll(() => {
   // Git runs hooks with its own sh (Git Bash on Windows), so a sh script named `pnpm` is found first on PATH.
   writeFileSync(
     join(bin, "pnpm"),
-    '#!/bin/sh\necho "$@" >> "$FAKE_PNPM_CALLS"\nprintf %s "$PATH" > "$FAKE_PNPM_PATH"\nprintf %s "$VITEST_MAX_WORKERS" > "$FAKE_PNPM_WORKERS"\nexit "$FAKE_PNPM_EXIT"\n',
+    '#!/bin/sh\necho "$@" >> "$FAKE_PNPM_CALLS"\nprintf %s "$PATH" > "$FAKE_PNPM_PATH"\nprintf %s "$VITEST_MAX_WORKERS" > "$FAKE_PNPM_WORKERS"\nprintf %s "$FEATRA_HANG_GUARD_MS" > "$FAKE_PNPM_GUARD"\nexit "$FAKE_PNPM_EXIT"\n',
   );
   chmodSync(join(bin, "pnpm"), 0o755);
   mkdirSync(join(repo, ".githooks"), { recursive: true });
@@ -135,6 +140,88 @@ describe("AC5: a git pre-commit hook runs `pnpm check` in every worktree", () =>
     expect(readFileSync(workersPath, "utf8")).toBe("3");
     commit(repo, "workers-more.txt", 0, { VITEST_MAX_WORKERS: "6" });
     expect(readFileSync(workersPath, "utf8")).toBe("6");
+  });
+
+  it("a commit of only cards and Markdown runs the content gate, which still blocks on failure (BUG-28)", () => {
+    mkdirSync(join(repo, ".featra", "cards"), { recursive: true });
+    expect(commit(repo, ".featra/cards/BUG-1-card.md", 0)).toEqual({
+      status: 0,
+      gateArgs: "check:content",
+      committed: true,
+    });
+    expect(commit(repo, "notes.md", 0)).toEqual({ status: 0, gateArgs: "check:content", committed: true });
+    const blocked = commit(repo, ".featra/cards/BUG-2-card.md", 1);
+    expect(blocked.status).not.toBe(0);
+    expect(blocked.gateArgs).toBe("check:content");
+    expect(blocked.committed).toBe(false);
+    git(repo, "reset", "--quiet");
+    rmSync(join(repo, ".featra", "cards", "BUG-2-card.md"));
+  });
+
+  it("a card commit runs the whole gate when code changed too: staged, unstaged or untracked (BUG-28)", () => {
+    writeFileSync(join(repo, "code.ts"), "export {};\n");
+    git(repo, "add", "code.ts");
+    expect(commit(repo, ".featra/cards/BUG-3-card.md", 0).gateArgs).toBe("check");
+    writeFileSync(join(repo, "code.ts"), "export const a = 1;\n");
+    expect(commit(repo, ".featra/cards/BUG-4-card.md", 0).gateArgs).toBe("check");
+    git(repo, "checkout", "--", "code.ts");
+    writeFileSync(join(repo, "untracked.ts"), "export {};\n");
+    expect(commit(repo, ".featra/cards/BUG-5-card.md", 0).gateArgs).toBe("check");
+    rmSync(join(repo, "untracked.ts"));
+  });
+
+  it("Markdown in a package is code's to test: committing it runs the whole gate (BUG-28)", () => {
+    mkdirSync(join(repo, "packages", "server"), { recursive: true });
+    expect(commit(repo, "packages/server/prompt.md", 0).gateArgs).toBe("check");
+    mkdirSync(join(repo, "docs", "adr"), { recursive: true });
+    expect(commit(repo, "docs/adr/0001-note.md", 0).gateArgs).toBe("check:content");
+  });
+
+  it("the gate gets a 900 s hang guard unless the environment says otherwise (BUG-28)", () => {
+    commit(repo, "guard.txt", 0);
+    expect(readFileSync(guardPath, "utf8")).toBe("900000");
+    commit(repo, "guard-less.txt", 0, { FEATRA_HANG_GUARD_MS: "60000" });
+    expect(readFileSync(guardPath, "utf8")).toBe("60000");
+  });
+
+  it("code renamed into `.featra/` is still code: the whole gate runs (BUG-28)", () => {
+    writeFileSync(join(repo, "moved.ts"), "export const moved = 1;\n");
+    git(repo, "add", "moved.ts");
+    git(repo, "commit", "--quiet", "-m", "moved code");
+    git(repo, "mv", "moved.ts", ".featra/cards/BUG-7-moved.md");
+    expect(commitStaged(repo, "rename code to a card", 0).gateArgs).toBe("check");
+  });
+
+  it("deleting code runs the whole gate (BUG-28)", () => {
+    writeFileSync(join(repo, "gone.ts"), "export const gone = 1;\n");
+    git(repo, "add", "gone.ts");
+    git(repo, "commit", "--quiet", "-m", "gone code");
+    git(repo, "rm", "--quiet", "gone.ts");
+    expect(commit(repo, ".featra/cards/BUG-8-card.md", 0).gateArgs).toBe("check");
+  });
+
+  it("reads a path with a space or an accent whole (BUG-28)", () => {
+    expect(commit(repo, ".featra/cards/BUG-9 a card.md", 0).gateArgs).toBe("check:content");
+    expect(commit(repo, "docs/café.md", 0).gateArgs).toBe("check:content");
+    mkdirSync(join(repo, "src dir"));
+    expect(commit(repo, "src dir/a b.ts", 0).gateArgs).toBe("check");
+  });
+
+  it("counts an untracked file only if a test or build could load it (BUG-28)", () => {
+    writeFileSync(join(repo, "mockup.png"), "png");
+    expect(commit(repo, ".featra/cards/BUG-10-card.md", 0).gateArgs).toBe("check:content");
+    for (const [file, n] of [
+      ["data.json", 11],
+      ["styles.css", 12],
+      ["packages/server/notes.txt", 13],
+      ["tooling/shot.png", 14],
+    ] as const) {
+      mkdirSync(join(repo, file, ".."), { recursive: true });
+      writeFileSync(join(repo, file), "x");
+      expect(commit(repo, `.featra/cards/BUG-${n}-card.md`, 0).gateArgs, file).toBe("check");
+      rmSync(join(repo, file));
+    }
+    rmSync(join(repo, "mockup.png"));
   });
 
   it("outside a git checkout the installer does nothing and succeeds", () => {
