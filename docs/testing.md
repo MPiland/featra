@@ -32,11 +32,51 @@ Don't run `pnpm test:e2e` on a Windows desktop someone is using.
 Branch protection on main requires all three checks, plus the user's Accept. The check names are the job names.
 Renaming a job means updating branch protection with it.
 
-When an e2e job fails, its Playwright output (traces, screenshots) is uploaded as an artifact named
-`e2e-windows-traces` or `e2e-ubuntu-traces`. Download it from the run's summary page. Each failed test has a folder
-with `electron-<n>.zip`, the app's trace (its actions, DOM snapshots and screenshots, one per launch), and
-`trace.zip`, the test's own steps. Open one with `pnpm --filter @featra/desktop exec playwright show-trace <file>`.
-Passing tests keep no output.
+## When a test fails
+
+**An e2e test.** Its line in the job's log is followed by where it stopped (BUG-30):
+
+```text
+Where "opens the Work list" stopped (timedOut):
+  Step: Click
+  At: apps/desktop/e2e/work-list.spec.ts:42: await page.getByRole("button", { name: "Cards and the feature list" }).click();
+  Still running after 57.3 s when the test ended
+  Kept:
+    apps/desktop/test-results/work-list-opens-the-Work-list/electron-1-window-1.png
+    apps/desktop/test-results/work-list-opens-the-Work-list/electron-1.zip
+```
+
+`Step` is the action or assertion it was waiting in, or the last one that failed; `At` is that line of the spec, which
+names the locator. A test that failed instead of timing out also prints the step's error.
+
+The job uploads the failed tests' output as an artifact named `e2e-windows-traces` or `e2e-ubuntu-traces`. Download it
+from the run's summary page, or with `gh run download <run id> -R MPiland/featra -n e2e-windows-traces`. Each failed
+test has a folder with:
+
+- `electron-<n>-window-<w>.png`: each window of the app's `n`th launch, as it was when the test stopped.
+- `electron-<n>.zip`: that launch's trace: its actions, a DOM snapshot of each and a screencast.
+- `trace.zip`: the test's own steps.
+
+Open a trace with `pnpm --filter @featra/desktop exec playwright show-trace <file>`, or drop it on
+<https://trace.playwright.dev>. Pick an action to see the DOM snapshot before and after it. Open a `.png` in any image
+viewer. Passing tests keep no output.
+
+Every spec imports `test` and `expect` from `apps/desktop/e2e/fixtures.ts`, not `@playwright/test`. Its evidence
+fixture closes the apps a test left running, so a test that times out still keeps the screenshots and the trace
+(`apps/desktop/e2e/evidence.ts`).
+
+**A unit test the hang guard stopped.** Vitest reports `Test timed out in <n>ms` and, as a second error, what the test
+was still waiting for, how long, and the test line that asked:
+
+```text
+The test ended while still waiting for:
+- expect.poll(() => store.saved).toBe(true) (for 30 s)
+    at packages/server/test/store.test.ts:57: await expect.poll(() => store.saved).toBe(true);
+```
+
+Waits are noted by `until` and `waitingFor` in `tooling/waits.ts`, `expect.poll`, the WebSocket test client's `next`,
+and Testing Library's waits and user-event actions. A new kind of wait should go through `waitingFor`. The report is
+added after each test, so a wait in a `beforeEach` or `beforeAll` hook that the hang guard stops gets none.
 
 ## Screens for design review
 

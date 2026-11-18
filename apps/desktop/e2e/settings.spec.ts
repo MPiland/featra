@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "./fixtures.ts";
 import { closeFromOs, exited, launch, tempProject, tempUserData, trayExists, windowVisible } from "./app.ts";
 
 /**

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
+import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
 import { clickTray, closeFromOs, exited, launch, notices, shownInFolder, tempUserData, windowVisible } from "./app.ts";
 
 /**

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
 import { contrast, luminance, parseCssColor, resolve, sampleRenderedText, tokenColours } from "./contrast.ts";
 

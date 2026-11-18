@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures.ts";
 import { BUILT_IN_ROLES, denyMessage } from "@featra/work-format";
 import { FAKE_SDK, PATH_KEY, pathWithoutClaude, standInClaude } from "./agent.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";

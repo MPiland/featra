@@ -11,6 +11,9 @@
  * Each project's config spreads `HANG_GUARD` into `test`: vitest gives projects neither the root config's limits nor
  * `--hookTimeout` from the command line. Test code reads the limit with `inject("hangGuardMs")`.
  */
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
 export const HANG_GUARD_ENV = "FEATRA_HANG_GUARD_MS";
 export const DEFAULT_HANG_GUARD_MS = 120_000;
 
@@ -40,4 +43,7 @@ export function hangGuard(ms: number) {
   };
 }
 
-export const HANG_GUARD = hangGuard(hangGuardMs());
+/** The setup file that names what a stopped test was waiting for (BUG-30). A project with its own lists it first. */
+export const WAIT_REPORT_SETUP = join(dirname(fileURLToPath(import.meta.url)), "wait-report-setup.ts");
+
+export const HANG_GUARD = { ...hangGuard(hangGuardMs()), setupFiles: [WAIT_REPORT_SETUP] };

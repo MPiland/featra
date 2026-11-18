@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures.ts";
 import { githubApp, provenStory } from "./proven-story.ts";
 import { REVIEW_SIZE, uxShot } from "./ux-shot.ts";
 

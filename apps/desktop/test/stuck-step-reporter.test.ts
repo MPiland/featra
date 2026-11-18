@@ -1,0 +1,213 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { stripVTControlCharacters } from "node:util";
+import { describe, expect, it } from "vitest";
+import { run, REPO } from "../../../tooling/test/run.ts";
+import { EVIDENCE } from "../e2e/evidence.ts";
+import { codeAt, keptIn, printed, type Step, stoppedStep, whereItStopped } from "../e2e/stuck-step-reporter.ts";
+
+// BUG-30: the CI log of a failed or timed-out e2e test names the step it stopped in and the locator it waited for.
+
+const SPEC = join(REPO, "apps", "desktop", "e2e", "work-list.spec.ts");
+const START = new Date(1_000_000);
+
+function step(title: string, more: Partial<Step> = {}, parent?: Step): Step {
+  const titles = [...(parent?.titlePath() ?? []), title];
+  return { title, category: "pw:api", duration: 0, startTime: START, parent, titlePath: () => titles, ...more };
+}
+
+const noNotes = { annotations: [] };
+const timedOut = { status: "timedOut", errors: [{ message: "Test timeout of 60000ms exceeded." }] };
+
+/** Runs `body` with a temporary spec file holding `lines`, as the code a step's location points into. */
+async function withSpec(lines: string[], body: (spec: string) => void | Promise<void>): Promise<void> {
+  const dir = await mkdtemp(join(tmpdir(), "stuck-step-"));
+  try {
+    const spec = join(dir, "chain.spec.ts");
+    await writeFile(spec, lines.join("\n"));
+    await body(spec);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+describe("a timed-out e2e test names the step and the locator it was waiting on (BUG-30)", () => {
+  it("prints where each failed test stopped, in a real Playwright run with the e2e suite's reporters", () => {
+    const { output } = run(
+      "pnpm --filter @featra/desktop exec playwright test -c test/stuck-fixture/playwright.config.ts --timeout=2000",
+      { env: { ...process.env, NO_COLOR: "1", FORCE_COLOR: "0" } },
+    );
+    const text = stripVTControlCharacters(output);
+    const file = String.raw`apps/desktop/test/stuck-fixture/stuck\.stuck\.ts`;
+
+    expect(text).toMatch(
+      new RegExp(
+        String.raw`Where "hangs in a step" stopped \(timedOut\):\s+Step: open the Work list\s+` +
+          String.raw`At: ${file}:7: await test\.step\("open the Work list"[^\n]*\s+Still running after \d+\.\d s when the test ended`,
+      ),
+    );
+    expect(text).toMatch(
+      new RegExp(
+        String.raw`Where "hangs in a poll" stopped \(\w+\):\s+Step: [^\n]*poll[^\n]*\s+` +
+          String.raw`At: ${file}:13: await expect\.poll\(\(\) => ready\.done\)\.toBe\(true\);`,
+      ),
+    );
+    expect(text).toMatch(
+      new RegExp(
+        String.raw`Where "fails in a step" stopped \(failed\):\s+Step: [^\n]*\s+(?:Inside: [^\n]*\s+)?` +
+          String.raw`At: ${file}:18: expect\(ready\.done, "the title is shown"\)\.toBe\(true\);\s+Failed after \d+\.\d s\s+` +
+          String.raw`Its error:\s+[^\n]*the title is shown`,
+      ),
+    );
+    expect(text).not.toMatch(/Where "passes" stopped/);
+    // The fixture's teardown steps run after every test, and fail after one: never the step a test stopped in.
+    expect(text).toMatch(
+      new RegExp(
+        String.raw`Where "fails in a step, and its teardown fails too" stopped \(failed\):\s+Step: [^\n]*\s+(?:Inside: [^\n]*\s+)?` +
+          String.raw`At: ${file}:28: expect\(ready\.done, "the list is shown"\)\.toBe\(true\);`,
+      ),
+    );
+    expect(text).not.toMatch(/Step: (?:tidy up after the test|close what it left running)/);
+    // A step whose failure the test caught is not where it stopped.
+    expect(text).toMatch(
+      /Where "catches a failed step, then fails outside any step" stopped \(failed\):\s+In no step: in the test's own code/,
+    );
+  });
+
+  it("names the action a test was still waiting in, with its locator as written at its code line", async () => {
+    // Playwright titles an action's step by the action alone ("Click", seen in the BUG-30 probe run); the code names it.
+    await withSpec(
+      [
+        'test("opens the list", async () => {',
+        '  await page.getByRole("button", { name: "Not in the app" }).click();',
+        "});",
+      ],
+      (spec) => {
+        const body = step("open the Work list", { category: "test.step", location: { file: spec, line: 2 } });
+        const click = step("Click", { location: { file: spec, line: 2 } }, body);
+        const done = step("Wait for load state", { location: { file: spec, line: 2 } }, body);
+        const stopped = stoppedStep([body, done, click], new Set([done]), timedOut);
+        expect(stopped).toBe(click);
+
+        const lines = whereItStopped(
+          { title: "opens the list", ...noNotes },
+          { status: "timedOut", ...noNotes },
+          { step: stopped, finished: false, ended: START.getTime() + 60_000 },
+          dirname(spec),
+        );
+        expect(lines).toEqual([
+          'Where "opens the list" stopped (timedOut):',
+          "  Step: Click",
+          "  Inside: open the Work list",
+          String.raw`  At: chain.spec.ts:2: await page.getByRole("button", { name: "Not in the app" }).click();`,
+          "  Still running after 60.0 s when the test ended",
+        ]);
+      },
+    );
+  });
+
+  it("prints a formatted chain whole, so the locator above its `.click()` line is named", async () => {
+    await withSpec(
+      [
+        'test("t", async () => {',
+        '  await page.getByRole("banner").waitFor();',
+        "  const stuck = page",
+        '    .getByRole("button", { name: "Not in the app" })',
+        "    .click()",
+        "    .catch((e: unknown) => e);",
+        "  await expect(",
+        '    page.getByText("Saved"),',
+        "  ).toBeVisible();",
+        "});",
+      ],
+      (spec) => {
+        expect(codeAt(spec, 5)).toBe('const stuck = page.getByRole("button", { name: "Not in the app" }).click()');
+        expect(codeAt(spec, 9)).toBe('await expect(page.getByText("Saved"),).toBeVisible();');
+        expect(codeAt(spec, 2)).toBe('await page.getByRole("banner").waitFor();');
+      },
+    );
+  });
+
+  it("prints a failed step's error as plain text, without the colour codes Playwright puts in its call log", () => {
+    // As the BUG-30 probe run (44338894157) printed it, with the codes as text.
+    const message = [
+      "TimeoutError: locator.click: Timeout 30000ms exceeded.",
+      "Call log:",
+      "\u001B[2m  - waiting for getByRole('button', { name: 'Not in the app' })\u001B[22m",
+    ].join("\n");
+    const click = step("Click", { location: { file: SPEC, line: 1 }, duration: 30_000, error: { message } });
+    const lines = whereItStopped(
+      { title: "t", ...noNotes },
+      { status: "failed", ...noNotes },
+      { step: click, finished: true, ended: 0 },
+      REPO,
+    );
+    expect(lines.slice(-5)).toEqual([
+      "  Failed after 30.0 s",
+      "  Its error:",
+      "    TimeoutError: locator.click: Timeout 30000ms exceeded.",
+      "    Call log:",
+      "      - waiting for getByRole('button', { name: 'Not in the app' })",
+    ]);
+  });
+
+  it("never blames the harness's hooks and fixtures that run after the test stopped", () => {
+    const action = step("Click", { location: { file: SPEC, line: 1 } });
+    const fixture = step('Fixture "appEvidence"', { category: "fixture" });
+    const inFixture = step("Close", { location: { file: SPEC, line: 1 } }, fixture);
+    const hook = step("After Hooks", { category: "hook" });
+    expect(stoppedStep([action, fixture, inFixture, hook], new Set(), timedOut)).toBe(action);
+  });
+
+  it("falls back to the last step that failed, and to the step around one with no code line", () => {
+    const failed = step('Expect "toBeVisible"', { location: { file: SPEC, line: 1 }, error: { message: "no" } });
+    const passed = step('Expect "toHaveText"', { location: { file: SPEC, line: 1 } });
+    const failedWithIt = { status: "failed", errors: [{ message: "no" }] };
+    expect(stoppedStep([failed, passed], new Set([failed, passed]), failedWithIt)).toBe(failed);
+
+    const poll = step('Expect "poll toBe"', { category: "expect", location: { file: SPEC, line: 1 } });
+    const tryOf = step('Expect "toBe"', { category: "expect" }, poll);
+    expect(stoppedStep([poll, tryOf], new Set([tryOf]), timedOut)).toBe(poll);
+  });
+
+  it("never names a step whose failure the test caught, unless a timeout may have dropped the step's error", () => {
+    const caught = step('Expect "toBeVisible"', { location: { file: SPEC, line: 1 }, error: { message: "no\nmore" } });
+    const failedElsewhere = { status: "failed", errors: [{ message: "Error: the list never came" }] };
+    expect(stoppedStep([caught], new Set([caught]), failedElsewhere)).toBeUndefined();
+    // Matched by its first line, colour codes aside: the test's copy of an error can carry a different stack.
+    const failedWithIt = { status: "failed", errors: [{ message: "\u001B[31mno\u001B[39m\nat x.ts:1" }] };
+    expect(stoppedStep([caught], new Set([caught]), failedWithIt)).toBe(caught);
+    // On Windows the probe's click timed out, then the test's cleanup ran out its time: only the timeout was reported.
+    expect(stoppedStep([caught], new Set([caught]), timedOut)).toBe(caught);
+  });
+
+  it("names the screenshot and trace kept for the test, once each, and a test that stopped outside any step", () => {
+    const shot = join(REPO, "apps", "desktop", "test-results", "x", "electron-1-window-1.png");
+    const trace = join(REPO, "apps", "desktop", "test-results", "x", "electron-1.zip");
+    const kept = [
+      { type: EVIDENCE, description: shot },
+      { type: EVIDENCE, description: trace },
+    ];
+    const lines = whereItStopped(
+      { title: "t", annotations: [{ type: "issue", description: "BUG-30" }, ...kept] },
+      { status: "failed", annotations: kept },
+      { step: undefined, finished: false, ended: 0 },
+      REPO,
+    );
+    expect(lines).toEqual([
+      'Where "t" stopped (failed):',
+      "  In no step: in the test's own code, before or between steps.",
+      "  Kept:",
+      "    apps/desktop/test-results/x/electron-1-window-1.png",
+      "    apps/desktop/test-results/x/electron-1.zip",
+    ]);
+    // As a reader of the log finds them, under the list reporter's line, the run's own lines around them.
+    const log = `  ✘  1 t (1.0s)\n${printed(lines)}  ✓  2 u (1.0s)\n`;
+    expect(keptIn(log)).toEqual([
+      "apps/desktop/test-results/x/electron-1-window-1.png",
+      "apps/desktop/test-results/x/electron-1.zip",
+    ]);
+    expect(keptIn(log.replaceAll("\n", "\r\n"))).toHaveLength(2);
+  });
+});

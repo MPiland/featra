@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
@@ -9,9 +10,10 @@ export default defineConfig({
   // Refuse to start beside leftover harness processes or on a desktop the focus tests can't use; fail if any outlive the run.
   globalSetup: "./global-setup.ts",
   globalTeardown: "./global-teardown.ts",
-  reporter: [["list"]],
+  // The list, plus where each failed test stopped and the files kept for it, with paths from the repo root (BUG-30).
+  reporter: [["list"], ["./stuck-step-reporter.ts", { root: fileURLToPath(new URL("../../..", import.meta.url)) }]],
   outputDir: "../test-results",
-  // Keeps a failed test's output (traces from app.ts's launch(), screenshots) and drops a passing test's.
+  // Keeps a failed test's output (traces and window screenshots from app.ts, the runner's trace) and drops a passing test's.
   preserveOutput: "failures-only",
   use: { trace: "retain-on-failure" },
 });

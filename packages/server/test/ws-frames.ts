@@ -1,3 +1,5 @@
+import { codeOf, waitingFor } from "@featra/tooling/waits";
+
 /** A socket for the server tests that keeps every frame, so a test can wait for the one it wants. */
 export interface SocketFrame<D = unknown> {
   id?: number;
@@ -35,24 +37,27 @@ export function openFrames<D>(url: string): Promise<FrameSocket<D>> {
         frames,
         send: (f) => ws.send(JSON.stringify(f)),
         next: (match, ms) =>
-          new Promise((done, fail) => {
-            const check = () => {
-              const i = frames.findIndex(match);
-              if (i < 0) return;
-              waiting.delete(check);
-              clearTimeout(timer);
-              done(frames.splice(i, 1)[0] as SocketFrame<D>);
-            };
-            const timer =
-              ms === undefined
-                ? undefined
-                : setTimeout(() => {
-                    waiting.delete(check);
-                    fail(new Error(`No matching frame in ${ms} ms`));
-                  }, ms);
-            waiting.add(check);
-            check();
-          }),
+          waitingFor(
+            `a frame matching ${codeOf(match)}`,
+            new Promise((done, fail) => {
+              const check = () => {
+                const i = frames.findIndex(match);
+                if (i < 0) return;
+                waiting.delete(check);
+                clearTimeout(timer);
+                done(frames.splice(i, 1)[0] as SocketFrame<D>);
+              };
+              const timer =
+                ms === undefined
+                  ? undefined
+                  : setTimeout(() => {
+                      waiting.delete(check);
+                      fail(new Error(`No matching frame in ${ms} ms`));
+                    }, ms);
+              waiting.add(check);
+              check();
+            }),
+          ),
         close: () => ws.close(),
       }),
     );
