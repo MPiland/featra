@@ -5,7 +5,7 @@ import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
 import { run, REPO } from "../../../tooling/test/run.ts";
 import { EVIDENCE } from "../e2e/evidence.ts";
-import { codeAt, type Step, stoppedStep, whereItStopped } from "../e2e/stuck-step-reporter.ts";
+import { codeAt, keptIn, printed, type Step, stoppedStep, whereItStopped } from "../e2e/stuck-step-reporter.ts";
 
 // BUG-30: the CI log of a failed or timed-out e2e test names the step it stopped in and the locator it waited for.
 
@@ -202,5 +202,12 @@ describe("a timed-out e2e test names the step and the locator it was waiting on 
       "    apps/desktop/test-results/x/electron-1-window-1.png",
       "    apps/desktop/test-results/x/electron-1.zip",
     ]);
+    // As a reader of the log finds them, under the list reporter's line, the run's own lines around them.
+    const log = `  ✘  1 t (1.0s)\n${printed(lines)}  ✓  2 u (1.0s)\n`;
+    expect(keptIn(log)).toEqual([
+      "apps/desktop/test-results/x/electron-1-window-1.png",
+      "apps/desktop/test-results/x/electron-1.zip",
+    ]);
+    expect(keptIn(log.replaceAll("\n", "\r\n"))).toHaveLength(2);
   });
 });

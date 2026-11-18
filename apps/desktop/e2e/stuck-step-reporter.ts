@@ -130,6 +130,24 @@ export function whereItStopped(
   return lines;
 }
 
+/** The lines as the reporter prints them, under the list reporter's line for the test. */
+export const printed = (lines: readonly string[]) => `${lines.map((l) => `      ${l}`).join("\n")}\n`;
+
+const indent = (line: string) => line.length - line.trimStart().length;
+
+/** The files a printed report names under `Kept:`: the lines indented below it. */
+export function keptIn(output: string): string[] {
+  const lines = output.split(/\r?\n/);
+  const at = lines.findIndex((l) => l.trim() === "Kept:");
+  if (at === -1) return [];
+  const files: string[] = [];
+  for (const line of lines.slice(at + 1)) {
+    if (line.trim() === "" || indent(line) <= indent(lines[at] ?? "")) break;
+    files.push(line.trim());
+  }
+  return files;
+}
+
 export default class StuckStepReporter implements Reporter {
   private readonly begun = new Map<TestResult, TestStep[]>();
   private readonly ended = new Map<TestResult, Set<Step>>();
@@ -164,7 +182,7 @@ export default class StuckStepReporter implements Reporter {
       ended: result.startTime.getTime() + result.duration,
     };
     const lines = whereItStopped(test, result, stopped, this.root);
-    process.stdout.write(`${lines.map((l) => `      ${l}`).join("\n")}\n`);
+    process.stdout.write(printed(lines));
   }
 
   printsToStdio(): boolean {

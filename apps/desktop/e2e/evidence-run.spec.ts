@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { REPO, run } from "../../../tooling/test/run.ts";
 import { expect, test } from "./fixtures.ts";
+import { keptIn } from "./stuck-step-reporter.ts";
 
 /**
  * BUG-30, end to end: an e2e test that times out on a locator the app never shows, run by Playwright with the suite's
@@ -25,12 +26,8 @@ test("BUG-30: a test that times out on a missing locator prints where it stopped
   expect(text).toMatch(
     /Where "waits on a button the app never shows" stopped \(timedOut\):\s+Step: Click\s+(?:Inside: [^\n]*\s+)?At: \S*missing-locator\.stuck\.ts:\d+: await page\.getByRole\("button", \{ name: "BUG-30: not in the app" \}\)\.click\(\);/,
   );
-  const kept =
-    /\n {2}Kept:\n((?: {4}\S[^\n]*(?:\n|$))+)/
-      .exec(text)?.[1]
-      ?.trim()
-      .split(/\s*\n\s*/) ?? [];
-  expect(kept).toEqual([
+  const kept = keptIn(text);
+  expect(kept, text).toEqual([
     expect.stringMatching(/electron-\d+-window-1\.png$/),
     expect.stringMatching(/electron-\d+\.zip$/),
   ]);
