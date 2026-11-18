@@ -2,7 +2,7 @@
 id: FEAT-19
 type: feature
 title: Installers
-status: approved
+status: active
 parent: EPIC-4
 order: 19
 origin: planned
@@ -18,6 +18,11 @@ history:
     from: draft
     to: approved
     by: user
+  - at: 2026-11-18T18:28:14Z
+    field: status
+    from: approved
+    to: active
+    by: dev-lead
 ---
 
 ## Description
