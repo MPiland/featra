@@ -30,6 +30,7 @@ test("BUG-30: a test that times out on a missing locator prints where it stopped
   expect(kept, text).toEqual([
     expect.stringMatching(/electron-\d+-window-1\.png$/),
     expect.stringMatching(/electron-\d+\.zip$/),
+    expect.stringMatching(/electron-\d+-logs[\\/]main\.log$/),
   ]);
   expect(kept.filter((file) => !existsSync(resolve(REPO, file)))).toEqual([]);
 });

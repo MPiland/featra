@@ -235,7 +235,7 @@ export function createServices({
     copies,
     cards,
     drafts,
-    review: createDraftReview({ scan: watches.scan, now, lane, gitCommand }),
+    review: createDraftReview({ scan: watches.scan, now, lane, gitCommand, log }),
     starts,
     spawns,
     stops,

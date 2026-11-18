@@ -52,6 +52,7 @@ Where "opens the Work list" stopped (timedOut):
   Kept:
     apps/desktop/test-results/work-list-opens-the-Work-list/electron-1-window-1.png
     apps/desktop/test-results/work-list-opens-the-Work-list/electron-1.zip
+    apps/desktop/test-results/work-list-opens-the-Work-list/electron-1-logs/main.log
 ```
 
 `Step` is the action or assertion it was waiting in, or the last one that failed; `At` is that line of the spec, which
@@ -63,6 +64,8 @@ The job uploads the failed tests' output as an artifact named `e2e-windows-trace
 
 - `electron-<n>-window-<w>.png`: each window of the app's `n`th launch, as it was when the test stopped.
 - `electron-<n>.zip`: that launch's trace: its actions, a DOM snapshot of each and a screencast.
+- `electron-<n>-logs/main.log`: that launch's log, copied from its profile's `logs` folder (BUG-31): the main process's
+  lines and the server's, such as a git command an action ran that failed.
 - `trace.zip`: the test's own steps.
 
 Open a trace with `pnpm --filter @featra/desktop exec playwright show-trace <file>`, or drop it on
@@ -70,8 +73,8 @@ Open a trace with `pnpm --filter @featra/desktop exec playwright show-trace <fil
 viewer. Passing tests keep no output.
 
 Every spec imports `test` and `expect` from `apps/desktop/e2e/fixtures.ts`, not `@playwright/test`. Its evidence
-fixture closes the apps a test left running, so a test that times out still keeps the screenshots and the trace
-(`apps/desktop/e2e/evidence.ts`).
+fixture closes the apps a test left running, so a test that times out still keeps the screenshots, the trace and the
+log (`apps/desktop/e2e/evidence.ts`).
 
 **A unit test the hang guard stopped.** Vitest reports `Test timed out in <n>ms` and, as a second error, what the test
 was still waiting for, how long, and the test line that asked:

@@ -6,7 +6,8 @@
  * draft's own card files, with a pathspec-limited commit, so whatever else the user has staged or edited is never swept
  * in; it never pushes and the repo's hooks run. It is all or nothing: if anything fails the card files go back byte for
  * byte and the index entries of those paths as they were. Reject deletes the draft's files, and only when git tracks
- * none of them.
+ * none of them. Each git command waits out another git process that holds a lock it needs, such as a `git status`
+ * beside it, and an approve that fails anyway is written to the app's log (BUG-31).
  */
 import { existsSync } from "node:fs";
 import { readFile, rm, writeFile } from "node:fs/promises";
@@ -28,7 +29,7 @@ import { ApiError } from "./api-error.ts";
 import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { locationKey } from "./collect.ts";
-import { failed, runGit, type Run } from "./git-run.ts";
+import { failed, LOCK_WAITS, lockedOut, runGitPatiently, type Run } from "./git-run.ts";
 import type { Scan } from "./work-scan.ts";
 
 export const REVIEW_MESSAGES = {
@@ -45,6 +46,7 @@ export const REVIEW_MESSAGES = {
     `${id} can't be deleted: git tracks ${paths.join(", ")}. Remove them with git instead.`,
   changed: (id: string) => `${id} changed while it was being approved. Try again.`,
   commit: (id: string, why: string) => `Couldn't approve ${id}; nothing was changed. ${why}`,
+  busy: (id: string) => `Couldn't approve ${id}; nothing was changed. Git is busy. Try again in a moment.`,
   commitAndRestore: (id: string, why: string, restore: string) =>
     `Couldn't approve ${id}, and putting things back failed too, so check git status. ${why} ${restore}`,
 } as const;
@@ -68,6 +70,10 @@ export interface DraftReviewDeps {
   gitCommand?: string;
   /** How the approved feature reaches disk. Default: atomically. */
   write?: (file: string, text: string) => Promise<void>;
+  /** The app's log: an approve that fails, not one refused, is written there (BUG-31). */
+  log?: (message: string) => void;
+  /** The waits between tries while another git holds the index lock (default `LOCK_WAITS`). */
+  lockWaits?: readonly number[];
 }
 
 export interface ApproveResult {
@@ -88,6 +94,15 @@ interface Held {
   bytes: Buffer;
 }
 
+/** A git command that failed, with what it printed: whether another git held its lock decides what the user is told. */
+class GitFailure extends Error {
+  readonly run: Run;
+  constructor(what: string, run: Run) {
+    super(failed(what, run).message);
+    this.run = run;
+  }
+}
+
 /** Throws if any held file is no longer exactly as it was read: someone edited it, so nothing is written over it. */
 async function unchanged(files: readonly Held[], id: string): Promise<void> {
   const current = await Promise.all(files.map((f) => readFile(f.file).catch(() => null)));
@@ -100,11 +115,13 @@ export function createDraftReview({
   lane = createCardLane(),
   gitCommand = "git",
   write = writeAtomic,
+  log = () => {},
+  lockWaits = LOCK_WAITS,
 }: DraftReviewDeps) {
-  const git = (root: string, args: string[]) => runGit(gitCommand, root, args);
+  const git = (root: string, args: string[]) => runGitPatiently(gitCommand, root, args, lockWaits);
   const must = async (root: string, args: string[]): Promise<Run> => {
     const r = await git(root, args);
-    if (r.code !== 0) throw failed(`git ${args[0] ?? ""}`, r);
+    if (r.code !== 0) throw new GitFailure(`git ${args[0] ?? ""}`, r);
     return r;
   };
 
@@ -181,8 +198,8 @@ export function createDraftReview({
   }
 
   /**
-   * Puts the files back exactly as held and the index entries of `paths` as `before` recorded them. Tries both and
-   * throws, saying which failed, so the caller can be honest about what is left.
+   * Puts the files back exactly as held and the index entries of `paths` as `before` recorded them; no `paths`, the
+   * index is left alone. Tries both and throws, saying which failed, so the caller can be honest about what is left.
    */
   async function restore(root: string, files: readonly Held[], paths: readonly string[], before: readonly string[]) {
     const problems: string[] = [];
@@ -191,16 +208,18 @@ export function createDraftReview({
     } catch (err) {
       problems.push(`Restoring the card files failed: ${errorMessage(err)}`);
     }
-    try {
-      await must(root, ["reset", "-q", "--", ...paths]);
-      for (const entry of before) {
-        const [info = "", path] = entry.split("\t");
-        const [mode, sha, stage] = info.split(" ");
-        if (stage !== "0" || !mode || !sha || !path) continue;
-        await must(root, ["update-index", "--add", "--cacheinfo", `${mode},${sha},${path}`]);
+    if (paths.length) {
+      try {
+        await must(root, ["reset", "-q", "--", ...paths]);
+        for (const entry of before) {
+          const [info = "", path] = entry.split("\t");
+          const [mode, sha, stage] = info.split(" ");
+          if (stage !== "0" || !mode || !sha || !path) continue;
+          await must(root, ["update-index", "--add", "--cacheinfo", `${mode},${sha},${path}`]);
+        }
+      } catch (err) {
+        problems.push(`Restoring the index failed: ${errorMessage(err)}`);
       }
-    } catch (err) {
-      problems.push(`Restoring the index failed: ${errorMessage(err)}`);
     }
     if (problems.length) throw new Error(problems.join(" "));
   }
@@ -230,19 +249,30 @@ export function createDraftReview({
     );
     await unchanged(files, id);
     const before = await indexEntries(root, commit);
+    // Whether the index may hold some of the draft: `git add` can stage some paths and then fail (on an ignored one),
+    // so only an add another git kept out of the index leaves it as it was (BUG-31).
+    let staged = false;
     try {
       await write(held(plan.feature).file, serializeCard(plan.feature));
       await Promise.all(drop.map((f) => rm(f.file, { force: true })));
-      await must(root, ["add", "-A", "--", ...commit]);
+      const added = await git(root, ["add", "-A", "--", ...commit]);
+      staged = !lockedOut(added);
+      if (added.code !== 0) throw new GitFailure("git add", added);
       await must(root, ["commit", "-m", approvalMessage(plan.feature), "--", ...commit]);
     } catch (err) {
       const why = err instanceof Error ? err.message : errorMessage(err);
+      let message: string = REVIEW_MESSAGES.commit(id, why);
+      let restored = true;
       try {
-        await restore(root, files, commit, before);
+        await restore(root, files, staged ? commit : [], before);
       } catch (again) {
-        throw new ApiError(REVIEW_MESSAGES.commitAndRestore(id, why, errorMessage(again)));
+        restored = false;
+        message = REVIEW_MESSAGES.commitAndRestore(id, why, errorMessage(again));
       }
-      throw new ApiError(REVIEW_MESSAGES.commit(id, why));
+      // The log keeps git's own words; the pane says it in one line when git was only busy.
+      log(`Approve ${id} failed: ${message}`);
+      const busy = restored && err instanceof GitFailure && lockedOut(err.run);
+      throw new ApiError(busy ? REVIEW_MESSAGES.busy(id) : message);
     }
     await scanDir(dir);
     return { commit: (await must(root, ["rev-parse", "--short", "HEAD"])).stdout.trim() };

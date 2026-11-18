@@ -1,13 +1,14 @@
 import { type ChildProcess, execFileSync } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { test, type ElectronApplication, type TestInfo } from "@playwright/test";
 
 /**
  * What a failed e2e test keeps of each app it launched (BUG-30): a screenshot of each window and the app's own trace,
- * with its actions, DOM snapshots and screencast. Playwright's `trace` option only records browser contexts, not an
- * Electron app, so the app is traced here, from launch until it closes. Both are saved to the test's output folder as
- * `electron-<n>-window-<w>.png` and `electron-<n>.zip`; `preserveOutput: "failures-only"` drops them for a test that
+ * with its actions, DOM snapshots and screencast, and its log (BUG-31). Playwright's `trace` option only records browser
+ * contexts, not an Electron app, so the app is traced here, from launch until it closes. They are saved to the test's
+ * output folder as `electron-<n>-window-<w>.png`, `electron-<n>.zip` and `electron-<n>-logs/`;
+ * `preserveOutput: "failures-only"` drops them for a test that
  * passes. A test that fails or times out before it closes its app gets them too: the evidence fixture (`fixtures.ts`)
  * closes what it left running, after the test, when Playwright gives fixture teardown its own time.
  */
@@ -48,8 +49,26 @@ function name(info: TestInfo, path: string): void {
   info.annotations.push({ type: EVIDENCE, description: path });
 }
 
-/** Starts tracing a launched app; its `close` saves the evidence first. */
-export function traceUntilClosed(app: ElectronApplication): void {
+/**
+ * Copies the app's log folder (`<userData>/logs`, BUG-31) into the test's output as `electron-<n>-logs/`: the main
+ * process's and the server's lines, such as a git command that failed. Nothing is kept when there is no log yet.
+ */
+async function keepLogs(info: TestInfo, userData: string, n: number): Promise<void> {
+  const from = join(userData, "logs");
+  const names = await readdir(from).catch(() => [] as string[]);
+  for (const file of names) {
+    // Read first, so a log that can't be read leaves no empty folder behind.
+    const bytes = await readFile(join(from, file)).catch(() => null);
+    if (!bytes) continue;
+    const to = info.outputPath(`electron-${n}-logs`, file);
+    await mkdir(dirname(to), { recursive: true });
+    await writeFile(to, bytes);
+    name(info, to);
+  }
+}
+
+/** Starts tracing a launched app on the profile in `userData`; its `close` saves the evidence first. */
+export function traceUntilClosed(app: ElectronApplication, userData: string): void {
   const context = app.context();
   const started = context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   let saved: Promise<void> | undefined;
@@ -58,6 +77,7 @@ export function traceUntilClosed(app: ElectronApplication): void {
       app,
       started.then(() => context),
       afterTest,
+      userData,
     ));
   openApps.set(app, () => keep(true));
   app.once("close", () => openApps.delete(app));
@@ -69,11 +89,12 @@ export function traceUntilClosed(app: ElectronApplication): void {
   };
 }
 
-/** Saves a screenshot of each shown window, then the trace, and names them on the test for the reporter. */
+/** Saves a screenshot of each shown window, then the trace and the log, and names them on the test for the reporter. */
 async function keepEvidence(
   app: ElectronApplication,
   tracing: Promise<ReturnType<ElectronApplication["context"]>>,
   afterTest: boolean,
+  userData: string,
 ): Promise<void> {
   const info = test.info();
   launches += 1;
@@ -98,6 +119,7 @@ async function keepEvidence(
       () => name(info, trace),
       () => undefined,
     );
+  await keepLogs(info, userData, n);
 }
 
 /** Ends a process and, on Windows, the processes it started (Electron's GPU, renderer and utility processes). */
