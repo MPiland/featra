@@ -1,8 +1,10 @@
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
 import { run, REPO } from "../../../tooling/test/run.ts";
-import { EVIDENCE, type Step, stoppedStep, whereItStopped } from "../e2e/stuck-step-reporter.ts";
+import { codeAt, EVIDENCE, type Step, stoppedStep, whereItStopped } from "../e2e/stuck-step-reporter.ts";
 
 // BUG-30: the CI log of a failed or timed-out e2e test names the step it stopped in and the locator it waited for.
 
@@ -69,6 +71,33 @@ describe("a timed-out e2e test names the step and the locator it was waiting on 
     expect(lines[2]).toBe("  Inside: open the Work list");
     expect(lines[3]).toMatch(/^ {2}At: apps\/desktop\/e2e\/work-list\.spec\.ts:1: \S/);
     expect(lines[4]).toBe("  Still running after 60.0 s when the test ended");
+  });
+
+  it("prints a formatted chain whole, so the locator above its `.click()` line is named", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "stuck-step-"));
+    try {
+      const spec = join(dir, "chain.spec.ts");
+      await writeFile(
+        spec,
+        [
+          'test("t", async () => {',
+          '  await page.getByRole("banner").waitFor();',
+          "  const stuck = page",
+          '    .getByRole("button", { name: "Not in the app" })',
+          "    .click()",
+          "    .catch((e: unknown) => e);",
+          "  await expect(",
+          '    page.getByText("Saved"),',
+          "  ).toBeVisible();",
+          "});",
+        ].join("\n"),
+      );
+      expect(codeAt(spec, 5)).toBe('const stuck = page.getByRole("button", { name: "Not in the app" }).click()');
+      expect(codeAt(spec, 9)).toBe('await expect(page.getByText("Saved"),).toBeVisible();');
+      expect(codeAt(spec, 2)).toBe('await page.getByRole("banner").waitFor();');
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("never blames the harness's hooks and fixtures that run after the test stopped", () => {

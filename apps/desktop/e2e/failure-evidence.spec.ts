@@ -20,9 +20,11 @@ test("BUG-30: a test stopped while the app waits keeps a screenshot of its windo
       .click()
       .catch((e: unknown) => e);
     await page.getByRole("banner").waitFor();
+    // Playwright forgets the app's process once it closes, so watch for its exit first, as other specs do.
+    const gone = exited(app);
 
     await closeLeftRunning();
-    await exited(app);
+    await gone;
     expect(await stuck).toBeInstanceOf(Error);
 
     const kept = test.info().annotations.flatMap((a) => (a.type === EVIDENCE && a.description ? [a.description] : []));

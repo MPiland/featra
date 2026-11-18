@@ -45,12 +45,28 @@ export function stoppedStep(begun: readonly Step[], ended: ReadonlySet<Step>): S
   return step;
 }
 
-function codeAt(file: string, line: number): string {
+const STATEMENT_LINES = 8;
+const count = (text: string, char: string) => text.split(char).length - 1;
+
+/**
+ * The code a step's line belongs to, on one line. A formatted chain puts `.click()` on a line of its own, below the
+ * locator it acts on, so lines are joined back while the line starts a chain link (`.`, `)`) or its brackets are open.
+ */
+export function codeAt(file: string, line: number): string {
+  let lines: string[];
   try {
-    return readFileSync(file, "utf8").split(/\r?\n/)[line - 1]?.trim() ?? "";
+    lines = readFileSync(file, "utf8").split(/\r?\n/);
   } catch {
     return "";
   }
+  let start = line - 1;
+  let code = lines[start]?.trim() ?? "";
+  const continues = () => /^[.)\]]/.test(code) || count(code, "(") < count(code, ")");
+  while (start > 0 && line - start < STATEMENT_LINES && continues()) {
+    start -= 1;
+    code = `${lines[start]?.trim() ?? ""}${code}`;
+  }
+  return code;
 }
 
 const seconds = (ms: number) => `${(ms / 1000).toFixed(1)} s`;
