@@ -45,8 +45,17 @@ export interface GitOptions {
   input?: string;
 }
 
-/** What git says when another git process holds a lock it needs, such as the index's (BUG-31). */
-export const LOCKED = /Unable to create '[^']*\.lock': File exists/;
+/** A lock file named in quotes, as git's "Unable to create '….lock'" does in every language it speaks. */
+const LOCK_NAMED = /\.lock['’"”»]/;
+
+/**
+ * Whether git stopped because another git process holds a lock it needs, such as the index's (BUG-31): its fatal exit
+ * (128) with a lock file named on the first line. Matched without words, since git's messages are translated; only the
+ * first line, so a hook whose own git was locked out (a commit's pre-commit) doesn't count, and isn't run again.
+ */
+export function lockedOut(r: Run): boolean {
+  return r.code === 128 && LOCK_NAMED.test(r.stderr.split("\n", 1)[0] ?? "");
+}
 
 /** The waits before each new try while another git holds a lock: about 3 s in all (BUG-31). */
 export const LOCK_WAITS: readonly number[] = [50, 100, 200, 400, 800, 1600];
@@ -55,19 +64,20 @@ export const LOCK_WAITS: readonly number[] = [50, 100, 200, 400, 800, 1600];
  * Runs `git <args>` like `runGit`, and while it fails because another git process holds a lock it needs, tries again
  * after each of `waits`. Any git that refreshes the index, `git status` in an editor or a terminal included, holds
  * `index.lock` for a moment, and git refuses at once rather than wait for it (BUG-31). A git that fails that way has
- * changed nothing, so trying again is safe.
+ * changed nothing, so trying again is safe. `run` is how git is run (tests give a fake git).
  */
 export async function runGitPatiently(
   command: string,
   dir: string,
   args: string[],
   waits: readonly number[] = LOCK_WAITS,
+  run: (command: string, dir: string, args: string[]) => Promise<Run> = runGit,
 ): Promise<Run> {
-  let r = await runGit(command, dir, args);
+  let r = await run(command, dir, args);
   for (const ms of waits) {
-    if (r.code === 0 || !LOCKED.test(r.stderr)) return r;
+    if (!lockedOut(r)) return r;
     await new Promise((resolve) => setTimeout(resolve, ms));
-    r = await runGit(command, dir, args);
+    r = await run(command, dir, args);
   }
   return r;
 }

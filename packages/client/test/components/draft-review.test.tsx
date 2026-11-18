@@ -5,42 +5,11 @@
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, planDraft, type Card } from "@featra/work-format";
-import type { ReviewResult } from "../../src/card-pane.ts";
 import { PROJECT, renderApp } from "../harness.tsx";
 import { cardOf } from "../work-fixtures.ts";
+import { BUILT, button, chatWithDraft, drafted, FEATURE, gone, type Host } from "./draft-fixture.ts";
 
 afterEach(cleanup);
-
-const BUILT = [cardOf({ id: "FEAT-1", type: "feature", status: "done", title: "Built" })];
-const FEATURE = "FEAT-2";
-
-function drafted(chat: string): Card[] {
-  const planned = planDraft(
-    {
-      feature: { title: "Shaping", description: "Talk a feature through." },
-      stories: [
-        { id: null, title: "Draft it", story: "As a builder, I draft.", criteria: ["It shows"], tasks: ["Build"] },
-        { id: null, title: "Review it", story: "As a builder, I review.", criteria: ["It opens"], tasks: ["Wire"] },
-      ],
-    },
-    { cards: BUILT, config: DEFAULT_CONFIG, chat, at: "2026-11-10T09:00:00Z" },
-  );
-  if (!planned.ok) throw new Error(planned.error);
-  return planned.value.writes.map((w) => w.card);
-}
-
-type Host = Parameters<typeof renderApp>[0];
-
-/** A Dev Lead chat (chat-1) that has drafted FEAT-2, open with its pane. */
-async function chatWithDraft(host: Host = {}, more: Card[] = []) {
-  const app = renderApp({ ...host, cards: { [PROJECT.dir]: [...BUILT, ...drafted("chat-1"), ...more] } });
-  await app.chats.bridge.start(PROJECT.dir, "dev-lead");
-  await screen.findByRole("region", { name: "Work list" });
-  app.chats.retitle("chat-1", "Shaping", "draft");
-  await app.user.click(screen.getByRole("button", { name: `Review draft ${FEATURE}` }));
-  return { app, pane: await screen.findByRole("complementary", { name: `${FEATURE} card` }) };
-}
 
 /** The draft with no chat: Review draft opens it in Work's own pane. */
 async function workPane(host: Host = {}) {
@@ -49,10 +18,6 @@ async function workPane(host: Host = {}) {
   await app.user.click(screen.getByRole("button", { name: `Review draft ${FEATURE}` }));
   return { app, pane: await screen.findByRole("complementary", { name: `${FEATURE} card` }) };
 }
-
-const button = (pane: HTMLElement, name: string) => within(pane).getByRole<HTMLButtonElement>("button", { name });
-const gone = (pane: HTMLElement, ...names: string[]) =>
-  names.forEach((name) => expect(within(pane).queryByRole("button", { name })).toBeNull());
 
 describe("where Approve and Reject are offered", () => {
   it("sit next to Send back in the chat's draft pane, with exactly these names", async () => {
@@ -154,44 +119,6 @@ describe("AC1 and AC3: Approve", () => {
     await app.user.click(button(pane, "Approve"));
     expect(app.calls.filter((c) => c.startsWith("approve:"))).toHaveLength(1);
     gate.open();
-  });
-});
-
-const FAILED = "Couldn't approve FEAT-2; nothing was changed. git add failed: fatal: Unable to create 'index.lock'.";
-
-/** A chat with the draft whose Approve the test answers; the server's card pushes are the test's to make. */
-async function approving() {
-  const answer = { give: (_r: ReviewResult) => {} };
-  const answered = new Promise<ReviewResult>((resolve) => {
-    answer.give = resolve;
-  });
-  const made = await chatWithDraft({ review: { approve: () => answered } });
-  const draft = made.app.cardsIn(PROJECT.dir).find((c) => c.id === FEATURE) as Card;
-  await made.app.user.click(await within(made.pane).findByRole("button", { name: "Approve" }));
-  // The server writes the approved feature before it commits, so the pane sees a card that isn't a draft.
-  made.app.pushCard(PROJECT.dir, { ...draft, status: "approved" });
-  await waitFor(() => gone(made.pane, "Approve", "Reject"));
-  return { ...made, draft, answer };
-}
-
-describe("an approve the card changes under while it runs (BUG-31)", () => {
-  it("keeps both buttons off while it still runs after the draft comes back, then shows the failure", async () => {
-    const { app, pane, draft, answer } = await approving();
-    // The commit failed and the server put the draft back.
-    app.pushCard(PROJECT.dir, draft);
-    await within(pane).findByRole("button", { name: "Approve" });
-    expect(button(pane, "Approve").disabled).toBe(true);
-    expect(button(pane, "Reject").disabled).toBe(true);
-    answer.give({ ok: false, error: FAILED });
-    expect((await within(pane).findByRole("alert")).textContent).toBe(FAILED);
-    expect(button(pane, "Approve").disabled).toBe(false);
-    expect(button(pane, "Reject").disabled).toBe(false);
-  });
-
-  it("shows the failure in the pane even when the card is still not a draft when it comes", async () => {
-    const { pane, answer } = await approving();
-    answer.give({ ok: false, error: FAILED });
-    expect((await within(pane).findByRole("alert")).textContent).toBe(FAILED);
   });
 });
 

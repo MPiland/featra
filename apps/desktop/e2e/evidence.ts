@@ -1,5 +1,5 @@
 import { type ChildProcess, execFileSync } from "node:child_process";
-import { copyFile, mkdir, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { test, type ElectronApplication, type TestInfo } from "@playwright/test";
 
@@ -57,15 +57,13 @@ async function keepLogs(info: TestInfo, userData: string, n: number): Promise<vo
   const from = join(userData, "logs");
   const names = await readdir(from).catch(() => [] as string[]);
   for (const file of names) {
+    // Read first, so a log that can't be read leaves no empty folder behind.
+    const bytes = await readFile(join(from, file)).catch(() => null);
+    if (!bytes) continue;
     const to = info.outputPath(`electron-${n}-logs`, file);
     await mkdir(dirname(to), { recursive: true });
-    if (
-      await copyFile(join(from, file), to).then(
-        () => true,
-        () => false,
-      )
-    )
-      name(info, to);
+    await writeFile(to, bytes);
+    name(info, to);
   }
 }
 

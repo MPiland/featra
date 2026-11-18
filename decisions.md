@@ -2847,13 +2847,21 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **The cause, client side.** Approve writes the approved feature before it commits, so the card watch pushes a card
   that is not a draft and CardPane unmounts DraftReview. The restore puts the draft back and DraftReview mounts again,
   fresh: not busy, no error. The failure was lost, so the click "did nothing".
-- **Fix.** Approve's git commands wait for a held index lock (`runGitPatiently` in `git-run.ts`: up to six tries,
-  50 ms to 1.6 s apart, only on that error) and the restore resets the index only if something was staged. A failed
-  approve is logged to the app log. CardPane now holds Approve's and Reject's busy state and error (`useAction`), so
-  they outlive the buttons, and shows the error outside the draft-only block.
+- **Fix.** Approve's git commands wait for a held lock (`runGitPatiently` in `git-run.ts`: up to six tries, 50 ms to
+  1.6 s apart). A held lock is git's exit 128 with a quoted `.lock` file on stderr's first line, matched without words
+  because git's messages are translated, and only the first line so a hook's own lock error doesn't rerun the hooks.
+  The restore leaves the index alone only when `git add` was locked out: an add that fails on an ignored path has
+  staged the rest. A failed approve is logged to the app log with git's own words; when git was only busy, the pane
+  says so in one line. CardPane now holds Approve's and Reject's busy state and error (`useAction`), so they outlive
+  the buttons, shows the error outside the draft-only block, puts focus on Reject or the error, and clears it on an
+  edit or Send back.
+- **Known limit.** Closing or switching cards while Approve runs drops its result on the client (the pane holding it
+  is gone); the server still finishes the approve and logs a failure.
 - **Diagnosis next time.** The e2e fixture keeps each launch's `logs/main.log` beside BUG-30's screenshot and trace
   (`electron-<n>-logs/`), and docs/testing.md says so.
 - **Proof.** `draft-review-locked.test.ts` holds the real index lock while real Approve runs: it commits once the lock
-  is freed, and fails with git's words, restored and logged, when it isn't. `draft-review.test.tsx` pushes the
-  not-a-draft card and the draft back while Approve runs. All four failed before the fix.
+  is freed, and fails with git's words, restored and logged, when it isn't. `draft-review-race.test.tsx` pushes the
+  not-a-draft card and the draft back while Approve runs. All four failed before the fix. After review:
+  `git-run-patient.test.ts` covers when git is tried again (a German lock message included), and an ignored story path
+  proves the restore unstages what a failed add staged.
 - No ADR: a retry inside one module and state lifted one component up.

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MERGE_COPY } from "@featra/work-format/merge-copy";
 import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
@@ -70,9 +70,16 @@ export function CardPane({
   const [error, setError] = useState<string | null>(null);
   // A draft's Approve and Reject, held here so they outlive their buttons (BUG-31).
   const review = useAction();
+  const reviewAlert = useRef<HTMLParagraphElement>(null);
   const { view, setView } = card;
+  // A failure that comes when the buttons are gone (the card isn't a draft just now) takes focus itself.
+  useEffect(() => {
+    if (review.error && !pane.current?.contains(document.activeElement)) reviewAlert.current?.focus();
+  }, [review.error]);
 
   const send = async (edit: CardEdit) => {
+    // An edit moves on from a failed Approve or Reject: its message goes.
+    review.clear();
     const r = await work.updateCard(dir, id, edit);
     if (r.view) setView(r.view);
     return r;
@@ -145,7 +152,10 @@ export function CardPane({
               <SendBack
                 key={id}
                 unavailable={hasChat(view.draftChat) ? null : CARD_COPY.sendBackGone}
-                onSend={(reason) => work.sendBack(dir, id, reason)}
+                onSend={(reason) => {
+                  review.clear();
+                  return work.sendBack(dir, id, reason);
+                }}
               />
               <DraftReview
                 key={`review-${id}`}
@@ -160,7 +170,7 @@ export function CardPane({
           )}
           {/* Outside the draft's actions: it shows even when the card stopped being a draft while Approve ran (BUG-31). */}
           {review.error && (
-            <p className="card-error" role="alert">
+            <p ref={reviewAlert} className="card-error" role="alert" tabIndex={-1}>
               {review.error}
             </p>
           )}
