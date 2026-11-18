@@ -2,7 +2,7 @@
 id: BUG-30
 type: bug
 title: A failed test doesn't say where it stuck or show the screen
-status: In Review
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: dev
+  - at: 2026-11-18T17:51:46Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-18T17:51:46Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
