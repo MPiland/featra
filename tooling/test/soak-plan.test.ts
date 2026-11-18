@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { soakFromBranch, soakFromInputs } from "../ci/soak-plan.ts";
+import { SOAK_RUNNERS, soakFromBranch, soakFromInputs } from "../ci/soak-plan.ts";
+import { workflow, workflowJob } from "./run.ts";
 
 describe("soak plan", () => {
   it("reads platform, specs and run count from a soak/** branch name", () => {
@@ -25,10 +26,34 @@ describe("soak plan", () => {
     expect(soakFromBranch("soak/windows/unit/50")).toEqual({ suite: "unit", platform: "windows", specs: [], runs: 50 });
   });
 
+  it("soaks on macOS, on the Apple silicon runner the macOS e2e job uses (STORY-63)", () => {
+    expect(soakFromBranch("soak/macos/tray/5")).toEqual({
+      suite: "e2e",
+      platform: "macos",
+      specs: ["tray.spec.ts"],
+      runs: 5,
+    });
+    expect(soakFromInputs("", "macos", "20", "unit")).toEqual({
+      suite: "unit",
+      platform: "macos",
+      specs: [],
+      runs: 20,
+    });
+    const soak = workflow("soak.yml");
+    expect(soak).toMatch(/^ {8}options: \[windows, ubuntu, macos\]$/m);
+    expect(soak).toMatch(/^ {6}runner: \$\{\{ steps\.plan\.outputs\.runner \}\}$/m);
+    expect(workflowJob("soak.yml", "soak")).toMatch(/^ {4}runs-on: \$\{\{ needs\.plan\.outputs\.runner \}\}$/m);
+    for (const [platform, runner] of Object.entries(SOAK_RUNNERS)) {
+      expect(workflowJob("ci.yml", `e2e-${platform}`), platform).toMatch(
+        new RegExp(String.raw`^ {4}runs-on: ${runner}$`, "m"),
+      );
+    }
+  });
+
   it("rejects branch names that don't follow soak/<platform>/<specs>/<runs>", () => {
     expect(() => soakFromBranch("soak/windows/tray")).toThrow(/soak\/<platform>\/<specs>\/<runs>/);
     expect(() => soakFromBranch("feature/windows/tray/5")).toThrow(/soak\/<platform>/);
-    expect(() => soakFromBranch("soak/macos/tray/5")).toThrow(/windows or ubuntu/);
+    expect(() => soakFromBranch("soak/freebsd/tray/5")).toThrow(/windows, ubuntu or macos/);
     expect(() => soakFromBranch("soak/windows/tray/0")).toThrow(/positive whole number/);
     expect(() => soakFromBranch("soak/windows/tray/ten")).toThrow(/positive whole number/);
     expect(() => soakFromBranch("soak/windows/$(id)/5")).toThrow(/spec names/);

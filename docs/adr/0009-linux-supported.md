@@ -21,6 +21,7 @@ WSLg and xvfb. Where Linux desktops differ, the app detects what the desktop sup
 
 ## Consequences
 
-- Every story's Definition of Done includes a Linux e2e run.
+- Every story's Definition of Done includes a Linux e2e run, and since STORY-63 a macOS one: CI runs the e2e suite on
+  Windows, Ubuntu and an Apple silicon Mac on every pull request.
 - Platform differences sit behind small detection functions (for example `hasTrayHost`) that are tested directly.
 - Tests that depend on the window manager assert what was requested, plus the outcome where the window manager supports it.

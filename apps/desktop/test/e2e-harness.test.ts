@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { REPO } from "../../../tooling/test/run.ts";
+import { REPO, workflowJob } from "../../../tooling/test/run.ts";
 import { describeDesktop, desktopBlocker, parseDesktopState } from "../e2e/foreground.ts";
 import { isHarnessProcess } from "../e2e/leftovers.ts";
 
@@ -96,11 +96,9 @@ describe("e2e harness: what a failed test leaves behind (BUG-30)", () => {
     expect(unkept).toEqual([]);
   });
 
-  it("uploads the failed tests' files from both e2e jobs in CI", () => {
-    const ci = readFileSync(join(REPO, ".github", "workflows", "ci.yml"), "utf8").replaceAll("\r\n", "\n");
-    for (const job of ["e2e-windows", "e2e-ubuntu"]) {
-      const body = ci.split(new RegExp(String.raw`^  ${job}:$`, "m"))[1]?.split(/^ {2}\S/m)[0] ?? "";
-      expect(body, job).toMatch(
+  it("uploads the failed tests' files from every e2e job in CI", () => {
+    for (const job of ["e2e-windows", "e2e-ubuntu", "e2e-macos"]) {
+      expect(workflowJob("ci.yml", job), job).toMatch(
         /- name: Upload screenshots and traces of failed tests\n\s+if: failure\(\) \|\| cancelled\(\)\n\s+uses: actions\/upload-artifact@v4\n\s+with:\n\s+name: e2e-\w+-traces\n\s+path: apps\/desktop\/test-results\n/,
       );
     }
@@ -112,6 +110,7 @@ describe("e2e harness: what a failed test leaves behind (BUG-30)", () => {
     for (const named of [
       "e2e-windows-traces",
       "e2e-ubuntu-traces",
+      "e2e-macos-traces",
       "electron-<n>-window-<w>.png",
       "electron-<n>.zip",
       "trace.zip",

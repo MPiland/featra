@@ -13,14 +13,14 @@ happen locally in WSL under Xvfb.
 | `pnpm check`                    | Format, lint, typecheck and unit tests      | Anywhere; the pre-commit hook runs it |
 | `pnpm test:e2e:wsl [args]`      | The e2e suite on Linux under Xvfb + Openbox | WSL (Ubuntu), from Windows            |
 | `tooling/e2e/xvfb.sh <command>` | Any command on a private Xvfb display       | Linux: CI, WSL, a Linux machine       |
-| CI workflow (every PR)          | Gate, Windows e2e, Ubuntu e2e               | GitHub Actions                        |
+| CI workflow (every PR)          | Gate, Windows, Ubuntu and macOS e2e         | GitHub Actions                        |
 | Soak workflow (on demand)       | One spec repeated until it fails            | GitHub Actions                        |
 
 Don't run `pnpm test:e2e` on a Windows desktop someone is using.
 
 ## CI on every pull request
 
-`.github/workflows/ci.yml` runs three jobs on every pull request and on each push to main:
+`.github/workflows/ci.yml` runs four jobs on every pull request and on each push to main:
 
 - **Gate**: `pnpm check` on Ubuntu.
 - **E2E (Windows)**: `pnpm test:e2e` on GitHub's Windows runner, including the foreground tests (tray, window state,
@@ -28,8 +28,16 @@ Don't run `pnpm test:e2e` on a Windows desktop someone is using.
 - **E2E (Ubuntu)**: `pnpm test:e2e` under `tooling/e2e/xvfb.sh`, so it runs on Xvfb with Openbox as the window
   manager. Openbox maximises, minimises and tracks the active window, so no test skips for lack of a window manager.
   The script refuses to start if the window manager doesn't advertise those.
+- **E2E (macOS)**: `pnpm test:e2e` on GitHub's Apple silicon macOS runner (`macos-15`). The platform tests there assert
+  macOS's own behaviour: the app menu, no menu bar icon, and closing the last window keeps Featra in the Dock until the
+  Dock icon shows it again (STORY-63).
 
-Branch protection on main requires all three checks, plus the user's Accept. The check names are the job names.
+Each e2e job also writes a JUnit report and uploads it as `test-report-e2e-windows`, `test-report-e2e-ubuntu` or
+`test-report-e2e-macos`, beside the Gate's `test-report-unit`. Featra reads every `test-report-*` artifact of a run
+together to prove criteria, and a test that failed on any platform isn't proven (ADR 0033).
+
+Branch protection on main requires Gate, E2E (Windows) and E2E (Ubuntu), plus the user's Accept. Add **E2E (macOS)**
+to main's required checks once it passes on main (decisions.md, 2026-11-18). The check names are the job names.
 Renaming a job means updating branch protection with it.
 
 ## When a test fails
@@ -49,7 +57,8 @@ Where "opens the Work list" stopped (timedOut):
 `Step` is the action or assertion it was waiting in, or the last one that failed; `At` is that line of the spec, which
 names the locator. A test that failed instead of timing out also prints the step's error.
 
-The job uploads the failed tests' output as an artifact named `e2e-windows-traces` or `e2e-ubuntu-traces`. Download it
+The job uploads the failed tests' output as an artifact named `e2e-windows-traces`, `e2e-ubuntu-traces` or
+`e2e-macos-traces`. Download it
 from the run's summary page, or with `gh run download <run id> -R MPiland/featra -n e2e-windows-traces`. Each failed
 test has a folder with:
 
@@ -88,7 +97,8 @@ into view first. It asserts nothing and never fails a test, so add no assertions
 Capture each state the story adds (off and on, before and after), and both the card pane and the Work list where the
 story changes them. Names must be unique across the suite.
 
-Each e2e job uploads that folder, pass or fail, as `ux-screens-windows` or `ux-screens-ubuntu` (kept 7 days).
+Each e2e job uploads that folder, pass or fail, as `ux-screens-windows`, `ux-screens-ubuntu` or `ux-screens-macos`
+(kept 7 days).
 
 ## Soak runs
 
@@ -106,7 +116,7 @@ git push origin HEAD:refs/heads/soak/windows/tray/150
 git push origin HEAD:refs/heads/soak/windows/unit/50
 ```
 
-- `<platform>`: `windows` or `ubuntu`.
+- `<platform>`: `windows`, `ubuntu` or `macos`. Each runs on its e2e job's runner; `macos` is Apple silicon.
 - `<specs>`: spec names without `.spec.ts`, joined by `+` (`tray+menu`), `all` for the whole e2e suite, or `unit` for
   the whole unit suite.
 - `<runs>`: how many times each test runs (Playwright's `--repeat-each`), or how many full unit runs in a row.

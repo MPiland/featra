@@ -2,7 +2,7 @@
 id: STORY-63
 type: story
 title: Featra runs and is tested on macOS
-status: New
+status: In Progress
 parent: FEAT-19
 order: 1
 origin: planned
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-63-macos-ci
 pr: null
 created: 2026-11-18T12:00:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: dev-lead
+  - at: 2026-11-18T18:33:03Z
+    field: status
+    from: New
+    to: In Progress
+    by: dev
 ---
 
 ## Description

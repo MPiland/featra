@@ -27,6 +27,9 @@ Early development. See the [M1 backlog](.featra/) (Featra tracks its own work in
 
 Requires Node 24+ and pnpm.
 
+Featra runs on Windows, macOS and Linux, and CI runs its end-to-end tests on all three on every pull request
+([docs/testing.md](docs/testing.md)).
+
 ```bash
 pnpm install
 pnpm start        # build the client and desktop app, then launch Featra

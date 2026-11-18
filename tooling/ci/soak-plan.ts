@@ -7,19 +7,23 @@ import { fileURLToPath } from "node:url";
  */
 export interface SoakPlan {
   suite: "e2e" | "unit";
-  platform: "windows" | "ubuntu";
+  platform: SoakPlatform;
   specs: string[];
   runs: number;
 }
+
+/** Each platform's runner: the same image as its e2e job in ci.yml. macOS is Apple silicon (STORY-63). */
+export const SOAK_RUNNERS = { windows: "windows-2025", ubuntu: "ubuntu-24.04", macos: "macos-15" } as const;
+export type SoakPlatform = keyof typeof SOAK_RUNNERS;
+
+const isPlatform = (p: string): p is SoakPlatform => Object.hasOwn(SOAK_RUNNERS, p);
 
 const SPEC = /^[A-Za-z0-9._-]+$/;
 
 function plan(suite: string, platform: string, specs: string[], runs: string): SoakPlan {
   if (suite !== "e2e" && suite !== "unit") throw new Error(`suite must be e2e or unit, not "${suite}"`);
   if (suite === "unit" && specs.length > 0) throw new Error("the unit suite takes no specs; it always runs whole");
-  if (platform !== "windows" && platform !== "ubuntu") {
-    throw new Error(`platform must be windows or ubuntu, not "${platform}"`);
-  }
+  if (!isPlatform(platform)) throw new Error(`platform must be windows, ubuntu or macos, not "${platform}"`);
   if (!/^[1-9][0-9]*$/.test(runs)) throw new Error(`runs must be a positive whole number, not "${runs}"`);
   const bad = specs.find((s) => !SPEC.test(s));
   if (bad !== undefined) throw new Error(`spec names may use letters, digits, ".", "_" and "-" only, not "${bad}"`);
@@ -56,6 +60,7 @@ function main(): void {
   const lines = [
     `suite=${soak.suite}`,
     `platform=${soak.platform}`,
+    `runner=${SOAK_RUNNERS[soak.platform]}`,
     `specs=${soak.specs.join(" ")}`,
     `runs=${soak.runs}`,
   ];
