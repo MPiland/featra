@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { IPC } from "@featra/client/bridge";
 import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
 import { applyDockIcon } from "./app-icon.ts";
+import { nameApp } from "./app-name.ts";
 import { allowedDirs, registerIpc } from "./ipc.ts";
 import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog } from "./log.ts";
@@ -20,6 +21,7 @@ import { createWindow, windowBackground } from "./window.ts";
  * page calls, the native menu and the tray each live in their own module.
  */
 
+nameApp(app);
 // Tests (and anyone running a second profile) point userData at their own folder. Must happen before `ready`.
 const userDataDir = process.env.FEATRA_USER_DATA_DIR;
 if (userDataDir) app.setPath("userData", userDataDir);

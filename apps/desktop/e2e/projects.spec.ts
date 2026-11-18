@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { expect, test, type Page } from "./fixtures.ts";
 import { folderDialogs, launch, queueFolderPicks, tempProject, tempUserData } from "./app.ts";
+import { labelOf, pressShortcut } from "./keys.ts";
 
 /**
  * STORY-19: switch, create and open projects, in the real app. Only the platform is faked: the userData and project
@@ -63,7 +64,7 @@ test.describe("STORY-19: switch, create and open projects", () => {
 
       // AC2, AC4: Open Folder… from the keyboard adds an existing folder and switches to it.
       await queueFolderPicks(app, other.dir);
-      await page.keyboard.press("Control+O");
+      await pressShortcut(page, "openFolder");
       await expect(switcher(page)).toHaveAccessibleName(`Switch project: ${otherName}`);
       await expect(titleProject(page)).toHaveText(`· ${otherName}`);
       await expect(workProject(page)).toHaveAttribute("data-project", other.dir);
@@ -74,9 +75,9 @@ test.describe("STORY-19: switch, create and open projects", () => {
       expect(await menuLabels(projectMenu(page))).toEqual([
         firstName,
         otherName,
-        "New Project…Ctrl+Shift+N",
-        "Open Folder…Ctrl+O",
-        "Project Settings…Ctrl+Shift+,",
+        `New Project…${labelOf("newProject")}`,
+        `Open Folder…${labelOf("openFolder")}`,
+        `Project Settings…${labelOf("projectSettings")}`,
       ]);
       await expect(projectMenu(page).getByRole("menuitemradio", { name: otherName })).toHaveAttribute(
         "aria-checked",
@@ -96,10 +97,10 @@ test.describe("STORY-19: switch, create and open projects", () => {
       await page.getByRole("menuitem", { name: "File", exact: true }).hover();
       const file = page.getByRole("menu").nth(1);
       expect((await menuLabels(file)).slice(1, 5)).toEqual([
-        "New Project…Ctrl+Shift+N",
-        "Open Folder…Ctrl+O",
-        "Project Settings…Ctrl+Shift+,",
-        "Settings…Ctrl+,",
+        `New Project…${labelOf("newProject")}`,
+        `Open Folder…${labelOf("openFolder")}`,
+        `Project Settings…${labelOf("projectSettings")}`,
+        `Settings…${labelOf("settings")}`,
       ]);
       await page.keyboard.press("Escape");
       await page.keyboard.press("Escape");

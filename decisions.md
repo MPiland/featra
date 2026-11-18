@@ -2836,3 +2836,31 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - macOS first launch: the docs say System Settings, Privacy & Security, then Open Anyway. The app is ad-hoc signed so Apple silicon runs it.
 - The packaged app reads the login shell's PATH at startup, so it finds `git`, `gh` and `claude` when opened from Finder or a desktop menu.
 - Stories: STORY-63 Featra runs and is tested on macOS; STORY-64 Install Featra from an installer; STORY-65 Download Featra from a release. Each depends on the one before it.
+
+## 2026-11-18 — STORY-63: Featra on macOS (dev)
+
+- **E2E (macOS)** runs the whole e2e suite on `macos-15` (Apple silicon) on every PR and push to main, with the same
+  setup and uploads as Windows and Ubuntu: `test-report-e2e-macos`, `e2e-macos-traces` and `ux-screens-macos`.
+- **Each e2e job uploads its own JUnit report** (`FEATRA_JUNIT` → `test-report/e2e-<os>.xml`, artifact
+  `test-report-e2e-<os>`). The default `testReportArtifact` changes from `test-report-unit` to `test-report-*`, so a
+  test that fails on one platform keeps its criterion from being Proven. Changed expectations: `card.test.ts`'s
+  default config, and `soak-plan.test.ts`'s rejected platform (`macos` is now valid, so `freebsd` stands in).
+- **The harness test is renamed** "uploads the failed tests' files from every e2e job in CI" and covers all three
+  jobs; BUG-30's criterion link follows the new name.
+- **Bug found: the app was named `@featra/desktop`.** Run from source, Electron names the app after the package, so
+  the macOS app menu read "About @featra/desktop" and "Quit @featra/desktop". `nameApp` (`app-name.ts`) names it
+  Featra before `ready` on every platform and keeps the userData folder where it was, so existing profiles
+  (`%APPDATA%\@featra\desktop`) aren't lost. Where the installed app keeps its data is STORY-64's call. The bold
+  title in the menu bar of a source run comes from Electron's own bundle and still says Electron; the installer
+  names the bundle.
+- **The Dock in tests.** Playwright can't click the Dock or the traffic lights, so `clickDock` emits Electron's
+  `activate` event in main, which Featra's own handler takes, and the red traffic light is `BrowserWindow.close()`
+  (`closeFromOs`). Whether Featra is really frontmost is read with `lsappinfo`, which needs no Accessibility grant.
+- **macOS has no tray icon and no "still running" notice**: a closed app staying in the Dock is the norm. tray.spec's
+  tray-only tests skip on macOS and say so; `mac.spec.ts` covers the app menu, the absent tray icon, closing to the
+  Dock and reopening from it, and Quit. The tests shared with the tray (close, second launch, Exit) run on macOS
+  through `clickCloseButton`, `showFromTrayOrDock` and `CLOSE_NOTICES`.
+- **e2e presses each platform's own shortcut**: `e2e/keys.ts` turns the menu's label (`shortcutLabel`, now exported
+  as `@featra/client/shortcuts`) into Playwright keys, so ⌘N on macOS and Ctrl+N elsewhere, and a unit test proves
+  every pressed shortcut is matched by the app's own `matchShortcut`.
+- No ADR: CI and the test harness only, within ADR 0009 and ADR 0013; `nameApp` is a small bug fix.

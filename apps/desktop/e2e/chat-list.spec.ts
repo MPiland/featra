@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
+import { pressShortcut } from "./keys.ts";
 
 /**
  * STORY-21: the sidebar's chat list in the real app with its real local server. Only the platform and the agent are
@@ -33,7 +34,7 @@ test("New Chat from the keyboard and the File menu, the list grouped by provider
     await expect(chats(page).getByRole("group", { name: "Claude Code" })).toBeVisible();
 
     // AC4 and AC1: Ctrl+N opens New chat; the chat is a row of its own, named by its first message.
-    await page.keyboard.press("Control+N");
+    await pressShortcut(page, "newChat");
     await pick(page, "Developer");
     await expect(row(page, "Developer")).toHaveAttribute("aria-current", "page");
     const composer = page.getByRole("textbox", { name: "Message" });

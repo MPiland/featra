@@ -196,6 +196,17 @@ export async function foregroundWindow(): Promise<bigint | undefined> {
 }
 
 /**
+ * macOS only: the process id of the frontmost app, the one whose menu bar shows and which gets the keyboard
+ * (`lsappinfo`, which needs no Accessibility permission). Undefined when it can't say.
+ */
+export function macFrontmostPid(): number | undefined {
+  const asn = execFileSync("lsappinfo", ["front"], { encoding: "utf8" }).trim();
+  const out = execFileSync("lsappinfo", ["info", "-only", "pid", asn], { encoding: "utf8" });
+  const pid = /"pid"\s*=\s*(\d+)/i.exec(out)?.[1];
+  return pid === undefined ? undefined : Number(pid);
+}
+
+/**
  * WSLg only: the Windows foreground window, which is what the user sees in front. The X server's active window can
  * be Featra's while Windows shows another app, or shows Featra's window minimised (BUG-4).
  */

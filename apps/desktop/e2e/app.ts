@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import electronPath from "electron";
-import { foregroundWindow, grantForeground, windowsForegroundWindow, wslg } from "./foreground.ts";
+import { foregroundWindow, grantForeground, macFrontmostPid, windowsForegroundWindow, wslg } from "./foreground.ts";
 import { traceUntilClosed } from "./evidence.ts";
 
 // No trailing separator: on Windows a trailing backslash escapes the closing quote of the argument.
@@ -87,6 +87,8 @@ export const windowFocused = (app: ElectronApplication) =>
  * not minimised (BUG-4). There it is msrdc.exe's window titled "<title> (<distro>)".
  */
 export async function windowInForeground(app: ElectronApplication): Promise<boolean> {
+  // macOS: Featra is the frontmost app and its window is the key window.
+  if (process.platform === "darwin") return macFrontmostPid() === (await mainPid(app)) && windowFocused(app);
   if (!windowManagerSupports("_NET_ACTIVE_WINDOW")) return windowFocused(app);
   const win = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows()[0];
@@ -137,6 +139,30 @@ export async function clickTray(app: ElectronApplication) {
     (globalThis as MainGlobal).featraTest.tray!.emit("click");
   });
 }
+/**
+ * What a click on Featra's Dock icon does on macOS: the OS activates the app, and Electron emits `activate` on it with
+ * whether any window is visible. Playwright can't click the Dock, so the test emits that event, and Featra's own
+ * handler (main.ts) runs as it would.
+ */
+export const clickDock = (app: ElectronApplication) =>
+  app.evaluate(({ app: electronApp, BrowserWindow }) => {
+    const visible = BrowserWindow.getAllWindows().some((w) => w.isVisible());
+    electronApp.emit("activate", { preventDefault: () => undefined }, visible);
+  });
+/** How the user brings back the hidden window: the tray icon, or the Dock icon on macOS, which has no tray. */
+export const showFromTrayOrDock = (app: ElectronApplication) =>
+  process.platform === "darwin" ? clickDock(app) : clickTray(app);
+/**
+ * The window's close button: the title bar's own on Windows and Linux; on macOS the red traffic light, which is
+ * native, so Playwright can't click it. It calls the same `BrowserWindow.close()` as `closeFromOs`.
+ */
+export async function clickCloseButton(app: ElectronApplication, page: Page) {
+  if (process.platform === "darwin") await closeFromOs(app);
+  else await page.getByRole("banner").getByRole("button", { name: "Close window" }).click();
+}
+/** The notice the first close to the tray shows. macOS shows none: a closed app staying in the Dock is the norm there. */
+export const CLOSE_NOTICES: readonly string[] =
+  process.platform === "darwin" ? [] : ["Featra is still running in the system tray"];
 export const trayMenuLabels = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.trayMenu!.items.map((i) => i.label));
 /**

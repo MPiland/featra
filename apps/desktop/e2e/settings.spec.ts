@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "./fixtures.ts";
 import { closeFromOs, exited, launch, tempProject, tempUserData, trayExists, windowVisible } from "./app.ts";
+import { labelOf, pressShortcut } from "./keys.ts";
 
 /**
  * STORY-20: Settings, in the real app. Only the platform is faked: the userData and project folders are temporary,
@@ -11,6 +12,9 @@ const settingsFile = (dir: string) => join(dir, "settings.json");
 const readSettings = async (dir: string) => JSON.parse(await readFile(settingsFile(dir), "utf8"));
 const dataTheme = (page: Page) => page.evaluate(() => document.documentElement.dataset.theme ?? "system");
 const pages = (page: Page) => page.getByRole("navigation", { name: "Settings pages" });
+/** macOS keeps a closed app in the Dock and shows no tray icon; the others keep it in the tray. */
+const mac = process.platform === "darwin";
+const KEEP_RUNNING = mac ? "Minimize to Dock" : "Minimize to tray";
 
 /** Presses Tab until `target` has focus: how a keyboard user reaches it. */
 async function tabTo(page: Page, target: Locator, max = 40) {
@@ -36,7 +40,7 @@ test.describe("STORY-20: Settings", () => {
     const profile = await tempUserData();
     try {
       let { app, page } = await launch(profile.dir);
-      await page.keyboard.press("Control+,");
+      await pressShortcut(page, "settings");
       await expect(pages(page)).toBeVisible();
       await expect(page.getByRole("heading", { name: "General", level: 2 })).toBeVisible();
       expect(await dataTheme(page)).toBe("system");
@@ -70,17 +74,18 @@ test.describe("STORY-20: Settings", () => {
     const profile = await tempUserData();
     try {
       const { app, page } = await launch(profile.dir);
-      await page.keyboard.press("Control+,");
+      await pressShortcut(page, "settings");
       const close = page.getByRole("radiogroup", { name: "Close button" });
-      await expect(close.getByRole("radio", { name: "Minimize to tray" })).toBeChecked();
-      expect(await trayExists(app)).toBe(true);
+      await expect(close.getByRole("radio", { name: KEEP_RUNNING })).toBeChecked();
+      expect(await trayExists(app)).toBe(!mac);
 
       await close.getByRole("radio", { name: "Quit" }).check();
       await expect.poll(() => trayExists(app)).toBe(false);
       await expect.poll(async () => (await readSettings(profile.dir)).closeButton).toBe("quit");
 
-      await close.getByRole("radio", { name: "Minimize to tray" }).check();
-      await expect.poll(() => trayExists(app)).toBe(true);
+      await close.getByRole("radio", { name: KEEP_RUNNING }).check();
+      await expect.poll(async () => (await readSettings(profile.dir)).closeButton).toBe("tray");
+      await expect.poll(() => trayExists(app)).toBe(!mac);
       await closeFromOs(app);
       await expect.poll(() => windowVisible(app)).toBe(false);
       await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.show());
@@ -100,7 +105,7 @@ test.describe("STORY-20: Settings", () => {
     const profile = await tempUserData();
     try {
       const { app, page } = await launch(profile.dir, { FEATRA_E2E_TRAY: "absent" });
-      await page.keyboard.press("Control+,");
+      await pressShortcut(page, "settings");
       const close = page.getByRole("radiogroup", { name: "Close button" });
       await expect(close.getByRole("radio", { name: "Quit" })).toBeChecked();
       await expect(close.getByRole("radio", { name: "Quit" })).toBeDisabled();
@@ -118,7 +123,7 @@ test.describe("STORY-20: Settings", () => {
     const project = await tempProject(before);
     try {
       const { app, page } = await launch(profile.dir, { FEATRA_PROJECT_DIR: project.dir });
-      await page.keyboard.press("Control+,");
+      await pressShortcut(page, "settings");
       await pages(page).getByRole("list", { name: "Project" }).getByRole("button", { name: "Workflow" }).click();
       const name = project.dir.split(/[\\/]/).at(-1)!;
       const picker = page.getByRole("button", { name: `Project: ${name}`, exact: true });
@@ -155,10 +160,10 @@ test.describe("STORY-20: Settings", () => {
     const profile = await tempUserData();
     try {
       const { app, page } = await launch(profile.dir);
-      await page.keyboard.press("Control+/");
+      await pressShortcut(page, "keyboardShortcuts");
       await expect(page.getByRole("heading", { name: "Keyboard shortcuts", level: 2 })).toBeVisible();
       const file = page.getByRole("table", { name: "File" });
-      await expect(file.getByRole("row", { name: /^Settings Ctrl\+,$/ })).toBeVisible();
+      await expect(file.getByRole("row", { name: `Settings ${labelOf("settings")}`, exact: true })).toBeVisible();
       await expect(page.getByRole("table", { name: "View" })).toBeVisible();
 
       const search = page.getByRole("searchbox", { name: "Search shortcuts" });

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "./fixtures.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
 import { contrast, luminance, parseCssColor, resolve, sampleRenderedText, tokenColours } from "./contrast.ts";
+import { pressShortcut } from "./keys.ts";
 
 /**
  * AC4: the window follows the OS theme and meets WCAG AA. The OS theme is faked with prefers-color-scheme
@@ -99,7 +100,7 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           await page.keyboard.press("Escape");
           await expect(dialog).toHaveCount(0);
         }
-        await page.keyboard.press("Control+B");
+        await pressShortcut(page, "toggleSidebar");
         problems.push(...(await failures(page)));
         expect(problems).toEqual([]);
 
