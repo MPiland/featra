@@ -48,7 +48,7 @@ As a tester, I download Featra for my platform from the project's Releases page,
 
 ## Notes
 
-The first real release (v0.1.0) is cut by the user once this story is Done: tagging publishes, so it is their call. The story's proof is a pre-release from a test tag, deleted after if the user wants.
+The first real release (v0.1.0) is cut by the user once this story is Done: tagging publishes, so it is their call. The story's proof includes a pre-release from a test tag. Publishing it is public, so the story agent asks for the user's OK before pushing that tag; it can be deleted after if the user wants.
 
 ## Depends on
 

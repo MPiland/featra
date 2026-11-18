@@ -47,7 +47,7 @@ As a builder on a Mac, I run Featra from source and it works like it does on Win
 
 ## Notes
 
-Featra has never run on macOS (decisions.md, 2026-11-17), so expect real failures here: paths, the menu bar, window state, tray probes and process tree kills. Each one found is a task in this story, or a bug if it's in merged work outside it. Making the check required is a branch protection change the user makes.
+Featra has never run on macOS (decisions.md, 2026-11-17), so expect real failures here: paths, the menu bar, window state, tray probes and process tree kills. Each one found is a task in this story, or a bug if it's in merged work outside it. Branch protection: once the job passes on main, the user adds "E2E (macOS)" to main's required checks (decisions.md, 2026-11-18). It's a repository setting, so the story agent asks for it and doesn't change it.
 
 ## Depends on
 

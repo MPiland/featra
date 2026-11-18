@@ -38,12 +38,12 @@ As a tester, I install Featra from an installer for my platform and it opens and
 
 ## Tasks
 
-- [ ] Packaging: electron-builder (pending the feature's open question 2) with a staged app folder: the Vite `dist/` output, the client, assets and the Agent SDK outside the archive so it can spawn its files
+- [ ] Packaging: electron-builder (ADR 0040) with a staged app folder: the Vite `dist/` output, the client, assets and the Agent SDK outside the archive so it can spawn its files
 - [ ] Desktop: the login shell's PATH read at startup on macOS and Linux, with a unit-tested fallback when the shell doesn't answer
 - [ ] CI: `package-windows`, `package-macos` and `package-ubuntu` jobs; the smoke test launches the installed app's executable, not `electron .`
 - [ ] A fake `claude` on the PATH for the smoke test's chat, as the e2e suite uses
 - [ ] Unit and integration tests for each criterion; smoke journey on each platform; tests linked on the criteria
-- [ ] Decisions recorded for the Dev Lead; an ADR for the packager and package layout; move to In Review
+- [ ] Decisions recorded for the Dev Lead; ADR 0040 amended if the package layout differs; move to In Review
 
 ## Notes
 

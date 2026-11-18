@@ -2786,6 +2786,8 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
 - This is the next feature after FEAT-8. macOS joins CI first, because Featra has never run there. Then the packaging and the release workflow.
 - Features have no stored Acceptance status. Whether a feature is waiting on the user's Accept is computed (roadmap: an "Awaiting your Accept" mark on the Work row and in the Inbox).
 
+Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app on macOS 15 and later. Testers open it from System Settings, Privacy & Security, then Open Anyway (see the 2026-11-18 installers shaping entry).
+
 ## 2026-11-18 — BUG-30 fix
 
 - **The problem.** A timed-out e2e test printed only "Test timeout of 60000ms exceeded". The app's trace was saved by
@@ -2822,3 +2824,15 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   spec that timed out on a missing locator; it was reverted (see the PR). `e2e/evidence-run.spec.ts` now runs such a
   test for real in every e2e run, through the suite's fixtures and reporter, and checks the files it kept.
 - No ADR: this changes the test harness only, within ADR 0013's rules.
+
+## 2026-11-18 — Installers shaping (user)
+
+- A new epic, EPIC-4 Distribution, holds FEAT-19 Installers.
+- Packager: electron-builder, packaging the existing Vite build from a staged app folder (ADR 0040).
+- Formats: Windows x64 NSIS per-user installer, macOS universal DMG plus zip, Linux x64 AppImage. deb, rpm and arm64 go on the roadmap.
+- Versions: SemVer from 0.1.0. 0.x releases are pre-releases.
+- Release: pushing a `vX.Y.Z` tag publishes the release once every platform's smoke test passes. A manual run is a dry run that publishes nothing.
+- CI: package jobs run on every PR and upload their installers, but aren't required at first. "E2E (macOS)" becomes a required check; the user sets it in branch protection.
+- macOS first launch: the docs say System Settings, Privacy & Security, then Open Anyway. The app is ad-hoc signed so Apple silicon runs it.
+- The packaged app reads the login shell's PATH at startup, so it finds `git`, `gh` and `claude` when opened from Finder or a desktop menu.
+- Stories: STORY-63 Featra runs and is tested on macOS; STORY-64 Install Featra from an installer; STORY-65 Download Featra from a release. Each depends on the one before it.
