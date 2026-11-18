@@ -96,5 +96,5 @@ describe("the MCP bundle", () => {
       child.kill();
       await server.close();
     }
-  }, 120_000);
+  });
 });

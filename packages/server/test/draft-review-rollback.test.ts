@@ -37,7 +37,7 @@ describe("a failed approve puts everything back", () => {
     f.hook("exit 0");
     await f.review.approve(f.repo.main, feature);
     expect((await f.read(feature)).status).toBe("approved");
-  }, 60_000);
+  });
 
   it("keeps a path the user had already staged staged, as it was, after a failed commit", async () => {
     const feature = await f.draft();

@@ -36,7 +36,7 @@ describe("the card's agent and role", () => {
     const lead = await w.devLead();
     const before = w.claude.runs.length;
     lead.agent.socket.send({ id: 1, method: "story.spawn", params: { story: "STORY-5" } });
-    expect(await lead.agent.socket.next((f) => f.id === 1, 20_000)).toMatchObject({ ok: true });
+    expect(await lead.agent.socket.next((f) => f.id === 1)).toMatchObject({ ok: true });
     await w.until(() => (w.claude.runs[before]?.heard.length ?? 0) === 1);
     expect(await w.card("STORY-5", folder("STORY-5-spawn-five"))).toMatchObject({ agent: "claude", role: "developer" });
   });
@@ -122,7 +122,7 @@ describe("an owner's copy that can't be read", () => {
 });
 
 describe("a project closed while the worktree is made", () => {
-  it("leaves no worktree, branch or In Progress card without a session", { timeout: 120_000 }, async () => {
+  it("leaves no worktree, branch or In Progress card without a session", async () => {
     // A commit hook runs this suite with `-c core.hooksPath` in the environment, which would hide the repository's own hook.
     const hooksPath = process.env.GIT_CONFIG_PARAMETERS;
     delete process.env.GIT_CONFIG_PARAMETERS;
@@ -138,12 +138,12 @@ describe("a project closed while the worktree is made", () => {
       await chmod(hook, 0o755);
 
       const reply = start("STORY-32");
-      await w.until(() => existsSync(marks.started), 60_000);
+      await w.until(() => existsSync(marks.started));
       w.allowed.set([]);
       await writeFile(marks.release, "go");
       expect(await reply).toMatchObject({ ok: false });
 
-      await w.until(() => !existsSync(folder("STORY-32-closed-midway")), 20_000);
+      await w.until(() => !existsSync(folder("STORY-32-closed-midway")));
       expect(branches().some((b) => b.startsWith("featra/story-32"))).toBe(false);
       expect((await w.card("STORY-32")).status).toBe("New");
       expect(w.claude.runs.every((r) => !r.heard.some((h) => h.includes("STORY-32")))).toBe(true);

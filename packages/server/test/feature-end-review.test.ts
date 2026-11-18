@@ -61,7 +61,7 @@ async function mergedOnGithub() {
   });
 }
 
-describe("the branch moving between the checks and the merge (review B1)", { timeout: 60_000 }, () => {
+describe("the branch moving between the checks and the merge (review B1)", () => {
   it("is refused without GitHub, and main is untouched", async () => {
     await mergeable(false);
     const base = w.tip("main");
@@ -84,7 +84,7 @@ describe("the branch moving between the checks and the merge (review B1)", { tim
   });
 });
 
-describe("a PR merged on GitHub outside Featra (review B2)", { timeout: 60_000 }, () => {
+describe("a PR merged on GitHub outside Featra (review B2)", () => {
   it("settles once, says main is ahead of GitHub, and later reads commit nothing more", async () => {
     await w.start(ci);
     await accept();
@@ -119,7 +119,7 @@ describe("a PR merged on GitHub outside Featra (review B2)", { timeout: 60_000 }
   });
 });
 
-describe("main's checkout (review Should-fix 2)", { timeout: 60_000 }, () => {
+describe("main's checkout (review Should-fix 2)", () => {
   it("merges with Featra's own uncommitted edit to a card main owns", async () => {
     await w.repo.write(dir(), card("STORY-9", "story", null, "New"));
     w.repo.commit(dir(), "a card main owns");
@@ -142,7 +142,7 @@ describe("main's checkout (review Should-fix 2)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("the Dev Lead's notice (review Should-fix 4)", { timeout: 60_000 }, () => {
+describe("the Dev Lead's notice (review Should-fix 4)", () => {
   it("counts as told only once it is posted, so a failed post is tried again", async () => {
     await w.start({ remote: false });
     await accept();
@@ -169,7 +169,7 @@ describe("the Dev Lead's notice (review Should-fix 4)", { timeout: 60_000 }, () 
   });
 });
 
-describe("what a failure leaves (review Should-fix 5)", { timeout: 60_000 }, () => {
+describe("what a failure leaves (review Should-fix 5)", () => {
   it("lets Accept be tried again after its PR opened and its card write failed, adopting that PR", async () => {
     // While GitHub opens the PR, the feature branch can't be read, so Accept's card write fails.
     await w.start(ci);

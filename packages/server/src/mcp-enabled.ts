@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
+  autoMergeOn,
   CONFIG_FILE,
   isKnowledgePermission,
   isRecord,
@@ -57,6 +58,28 @@ export function readKnowledge(dataDir: string | undefined): (dir: string) => Pro
     const { config, settings } = await settingsText(dataDir, dir);
     const fallback = appDefault(settings, "knowledge");
     return knowledgePermission(config, isKnowledgePermission(fallback) ? fallback : undefined);
+  };
+}
+
+/**
+ * Whether a project's Verified and Proven stories merge on their own (STORY-59): its `autoMerge`, else the app default,
+ * else on. Read before each check, so a change in Settings applies to the next one.
+ */
+export function readAutoMerge(dataDir: string | undefined): (dir: string) => Promise<boolean> {
+  const fallback = readAppAutoMerge(dataDir);
+  return async (dir) => autoMergeOver(dir, await fallback());
+}
+
+/** Project `dir`'s auto-merge setting: its own `autoMerge`, else the app default `fallback`, else on. */
+export async function autoMergeOver(dir: string, fallback: boolean | undefined): Promise<boolean> {
+  return autoMergeOn((await settingsText(undefined, dir)).config, fallback);
+}
+
+/** The app default for `autoMerge` alone (Settings > Workflow), undefined when the app's settings set none. */
+export function readAppAutoMerge(dataDir: string | undefined): () => Promise<boolean | undefined> {
+  return async () => {
+    const value = appDefault(dataDir ? await textOf(join(dataDir, "settings.json")) : null, "autoMerge");
+    return typeof value === "boolean" ? value : undefined;
   };
 }
 

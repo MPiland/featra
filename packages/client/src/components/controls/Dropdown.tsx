@@ -9,13 +9,18 @@ export interface DropdownProps {
   value: string;
   options: readonly ChoiceDef<string>[];
   onChange: (value: string) => void;
+  /**
+   * A property's value beside its own label (the card pane, STORY-62): the button shows only the chosen label, quietly,
+   * and keeps "Name: label" as its name.
+   */
+  compact?: boolean;
 }
 
 /**
  * The app's own dropdown: a button that opens a list box. Enter, Space or the arrows open it; the arrows, Home and
  * End move; Enter or Space chooses; Escape closes. Focus comes back to the button.
  */
-export function Dropdown({ name, value, options, onChange }: DropdownProps) {
+export function Dropdown({ name, value, options, onChange, compact = false }: DropdownProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -76,18 +81,23 @@ export function Dropdown({ name, value, options, onChange }: DropdownProps) {
   };
 
   return (
-    <div className="dropdown" ref={wrap}>
+    <div className={compact ? "dropdown compact" : "dropdown"} ref={wrap}>
       <button
         ref={button}
         type="button"
         className="dropdown-button"
+        aria-label={compact ? `${name}: ${options[selected]?.label ?? ""}` : undefined}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-controls={open ? `${id}-list` : undefined}
         onClick={() => (open ? close() : show())}
         onKeyDown={onButtonKey}
       >
-        {name}: {options[selected]?.label}
+        {compact ? (
+          <span className="dropdown-value">{options[selected]?.label}</span>
+        ) : (
+          `${name}: ${options[selected]?.label ?? ""}`
+        )}
         <ChevronDownIcon />
       </button>
       {open && (

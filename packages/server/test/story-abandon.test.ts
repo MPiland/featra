@@ -27,7 +27,7 @@ async function featureRow() {
   return (await a.scan())?.list.epics.flatMap((e) => e.features).find((f) => f.id === "FEAT-1");
 }
 
-describe("the warning (AC1)", { timeout: 60_000 }, () => {
+describe("the warning (AC1)", () => {
   it("names uncommitted files, commits only on this branch, the PR it closes, the branch and the remote", async () => {
     await a.start();
     await m.verified();
@@ -70,7 +70,7 @@ describe("the warning (AC1)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("abandoning with GitHub usable (AC2, AC3)", { timeout: 60_000 }, () => {
+describe("abandoning with GitHub usable (AC2, AC3)", () => {
   it("keeps the card as Cancelled on the feature branch, closes the PR, removes the worktree and branches", async () => {
     await a.start();
     await m.verified();
@@ -137,7 +137,7 @@ describe("abandoning with GitHub usable (AC2, AC3)", { timeout: 60_000 }, () => 
   });
 });
 
-describe("discarding the card (AC2)", { timeout: 60_000 }, () => {
+describe("discarding the card (AC2)", () => {
   it("deletes it on the feature branch and from the index; main's older copy doesn't bring it back", async () => {
     await a.start({ remote: false });
     await a.scratch("notes.txt");
@@ -165,7 +165,7 @@ async function story2() {
   await a.scan();
 }
 
-describe("a story with no worktree (AC2)", { timeout: 60_000 }, () => {
+describe("a story with no worktree (AC2)", () => {
   it("is kept as Cancelled where its owner has it, with nothing else to remove", async () => {
     await a.start({ remote: false });
     await story2();
@@ -186,7 +186,7 @@ describe("a story with no worktree (AC2)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("one ending at a time (AC3)", { timeout: 60_000 }, () => {
+describe("one ending at a time (AC3)", () => {
   it("refuses the session's messages and a second Abandon while one runs", async () => {
     await a.start({ remote: false });
     const { token } = await a.check();

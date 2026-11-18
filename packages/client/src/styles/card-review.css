@@ -1,20 +1,64 @@
 /* Review actions on a draft card: Send back, Approve and Reject (STORY-50, STORY-51). */
 
+/* The app's action button (STORY-62): one quiet family, a light face with a hairline border, compact (20px) in rows and
+   lines of text, regular (28px) in a card's action rows. Hold on keeps the accent's pressed state. */
 .review-draft {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
   margin-left: 8px;
-  padding: 1px 8px;
-  border: 1px solid var(--acc);
-  border-radius: 4px;
-  background: none;
-  color: var(--acc);
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--tx) 18%, transparent);
+  border-radius: 5px;
+  background: var(--menu);
+  color: var(--tx);
   font: inherit;
   font-size: 11px;
-  line-height: 16px;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.review-draft:hover:not(:disabled, [aria-disabled="true"], [aria-pressed="true"]) {
+  background: var(--menu-hover);
+}
+
+.review-draft:disabled,
+.review-draft[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .chat-head .review-draft {
   margin-left: auto;
+}
+
+/* Hold turned on (STORY-61): a tinted pressed state, the accent's border and text on a light wash of it. */
+.review-draft[aria-pressed="true"] {
+  border-color: var(--acc);
+  background: color-mix(in srgb, var(--acc) 12%, var(--menu));
+  color: var(--acc);
+}
+
+/* Why a story didn't merge on its own (STORY-60): a warning, not an error. It reads as a problem without alarm
+   (STORY-62): the warn colour, its icon, a light warn wash and a rule down its left edge. */
+.not-merged {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 2px solid var(--warn);
+  border-radius: 0 4px 4px 0;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+  color: var(--warn);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.not-merged > .i {
+  flex: none;
+  margin-top: 2px;
 }
 
 /* Send back… on a draft (STORY-50). */
@@ -58,7 +102,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .draft-actions > form.send-back,

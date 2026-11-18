@@ -4,6 +4,7 @@
  */
 import {
   buildWorkList,
+  DEFAULT_CONFIG,
   EMPTY_WORK_LIST,
   idFromFileName,
   orphans,
@@ -57,7 +58,16 @@ async function deletedAtOwner(git: RepoGit, state: GitState, owned: OwnedCard, s
   return gone;
 }
 
-export function createScanner(git: RepoGit): Scanner {
+export interface ScannerOptions {
+  /**
+   * The app's default for `autoMerge` (`readAppAutoMerge`), undefined when it sets none. A project's config that leaves
+   * the key out takes it, so a scan's config carries the setting in effect and Hold shows only while auto-merge is on
+   * (STORY-61). Left out, Featra's own default applies.
+   */
+  appAutoMerge?: () => Promise<boolean | undefined>;
+}
+
+export function createScanner(git: RepoGit, { appAutoMerge }: ScannerOptions = {}): Scanner {
   const deletions = new WeakMap<GitState, Map<string, boolean>>();
   /** The copies resolved, leaving out the cards their owner deleted. */
   const resolve = async (collected: Collected): Promise<Resolution> => {
@@ -83,7 +93,9 @@ export function createScanner(git: RepoGit): Scanner {
 
   const inFlight = new Set<Promise<Scan | null>>();
   const scanNow = async (dir: string, reuse?: GitState): Promise<Scan | null> => {
-    const collected = await collect(dir, { git, index: indexOf }, reuse);
+    const fallback = await appAutoMerge?.();
+    const defaults = fallback === undefined ? DEFAULT_CONFIG : { ...DEFAULT_CONFIG, autoMerge: fallback };
+    const collected = await collect(dir, { git, index: indexOf, defaults }, reuse);
     if (!collected) return null;
     const resolution = await resolve(collected);
     const { config } = collected;

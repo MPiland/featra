@@ -92,7 +92,7 @@ beforeAll(async () => {
   if (!spec) throw new Error("The bridge offered no MCP.");
   lead = new Client({ name: "agent", version: "0.0.0" });
   await lead.connect(new StdioClientTransport({ ...spec, stderr: "pipe" }));
-}, 60_000);
+});
 
 afterAll(async () => {
   await lead.close();

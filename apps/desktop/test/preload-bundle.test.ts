@@ -23,5 +23,5 @@ describe("the preload bundle", () => {
     const code = readFileSync(join(out, "preload.cjs"), "utf8");
     const required = [...new Set([...code.matchAll(/\brequire\(\s*["']([^"']+)["']\s*\)/g)].map((m) => m[1]))];
     expect(required).toEqual(["electron"]);
-  }, 60_000);
+  });
 });

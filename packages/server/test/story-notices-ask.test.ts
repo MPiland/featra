@@ -34,7 +34,7 @@ const COLOUR: Question = {
 const ASK = "AskUserQuestion";
 const ofType = (events: ChatEvent[], type: ChatEvent["type"]) => events.filter((e) => e.type === type);
 
-describe("AC2: a story's question", { timeout: 30_000 }, () => {
+describe("AC2: a story's question", () => {
   it("goes to the Dev Lead as a notice once its turn ends, and the session is told so, not the user asked", async () => {
     const lead = await idleLead(w);
     const child = await w.spawnAs(lead, "STORY-5");

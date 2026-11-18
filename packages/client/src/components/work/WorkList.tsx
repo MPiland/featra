@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ChatSummary } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
 import type { ProjectRef } from "../../projects.ts";
@@ -14,7 +14,9 @@ import {
 import type { WorkLayout } from "../../work-layout.ts";
 import { SegmentedControl } from "../controls/SegmentedControl.tsx";
 import { SelectedCard } from "./card-selection.tsx";
-import type { ChosenWidth } from "./PaneHandle.tsx";
+import { useMeasuredWidth, type ChosenWidth } from "./PaneHandle.tsx";
+import { workColumns, workGridTemplate } from "../../work-columns.ts";
+import { WorkColumnsContext } from "./work-columns-context.tsx";
 import { SidePane, type Docked } from "./SidePane.tsx";
 import { Epic } from "./Epic.tsx";
 import { NewBug } from "./NewBug.tsx";
@@ -79,6 +81,10 @@ export function WorkList(props: {
   const layoutName = useId();
   const listRef = useRef<HTMLElement>(null);
   const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
+  // The list's columns (STORY-62): fewer with the pane open, and only those that fit, so no cell wraps or clips.
+  const listWidth = useMeasuredWidth(listRef);
+  const columns = useMemo(() => workColumns(listWidth, docked !== null), [listWidth, docked]);
+  const grid: CSSProperties & Record<"--work-grid", string> = { "--work-grid": workGridTemplate(columns) };
   const reviewDraft = useCallback(
     (chat: string, feature: string) => (hasChat(chat) ? onReviewDraft(chat) : select(feature)),
     [hasChat, onReviewDraft, select],
@@ -104,6 +110,7 @@ export function WorkList(props: {
         sendBack: (id, reason, addCriterion) => work.sendBackStory(project.dir, id, reason, addCriterion),
       },
       merge: (id) => work.mergeStory(project.dir, id),
+      hold: (id, held) => work.holdStory(project.dir, id, held),
       start: (id) => work.startStory(project.dir, id),
       open: onOpenChat,
     };
@@ -130,26 +137,14 @@ export function WorkList(props: {
   const list = update?.list;
   const epics = list ? filterEpics(list.epics, filter) : [];
   const counts = filterCounts(list?.epics ?? []);
+  const hasWork = list !== undefined && (list.epics.length > 0 || (list.bugs?.length ?? 0) > 0);
   let body;
   if (!list) body = <p className="meta">{WORK_COPY.loading}</p>;
-  else if (!list.epics.length && !list.bugs?.length) body = <p className="meta">{WORK_COPY.empty}</p>;
+  else if (!hasWork) body = <p className="meta">{WORK_COPY.empty}</p>;
   else if (layout === "board") body = <StageBoard list={list} chats={chats} />;
   else {
     body = (
       <>
-        <div className="wfilter" role="group" aria-label={WORK_COPY.filters}>
-          {LIST_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              className={filter === f.id ? "fchip on" : "fchip"}
-              aria-pressed={filter === f.id}
-              onClick={() => setFilter(f.id)}
-            >
-              {f.label} · {counts[f.id]}
-            </button>
-          ))}
-        </div>
         {epics.length === 0 && <p className="meta">{WORK_COPY.noMatch}</p>}
         <StaleCards value={new Set(list.stale.map((s) => s.cardId))}>
           <ReviewDraft.Provider value={reviewDraft}>
@@ -171,6 +166,8 @@ export function WorkList(props: {
       <section
         ref={listRef}
         className={layout === "board" ? "work-list on-board" : "work-list"}
+        style={grid}
+        data-columns={columns.join(" ")}
         aria-label={WORK_COPY.region}
         data-view="work"
         data-project={project.dir}
@@ -208,8 +205,30 @@ export function WorkList(props: {
             onDiscard={(key) => work.discardCopy(project.dir, key)}
           />
         )}
-        {list && <NewBug bugs={work} dir={project.dir} list={list} />}
-        <SelectedCard.Provider value={selection}>{body}</SelectedCard.Provider>
+        {list && (
+          // The list's toolbar: its filters, and New bug at the end of the same row.
+          <div className="work-toolbar">
+            {hasWork && layout === "list" && (
+              <div className="wfilter" role="group" aria-label={WORK_COPY.filters}>
+                {LIST_FILTERS.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    className={filter === f.id ? "fchip on" : "fchip"}
+                    aria-pressed={filter === f.id}
+                    onClick={() => setFilter(f.id)}
+                  >
+                    {f.label} · {counts[f.id]}
+                  </button>
+                ))}
+              </div>
+            )}
+            <NewBug bugs={work} dir={project.dir} list={list} />
+          </div>
+        )}
+        <SelectedCard.Provider value={selection}>
+          <WorkColumnsContext.Provider value={columns}>{body}</WorkColumnsContext.Provider>
+        </SelectedCard.Provider>
       </section>
       {docked && (
         <StoryAgentsContext.Provider value={storyAgents}>

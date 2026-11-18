@@ -109,11 +109,9 @@ const refused = async (client: Client, args: Record<string, unknown>) => {
   return text(r);
 };
 const idle = async (id: string) => {
-  const end = Date.now() + 10_000;
   for (;;) {
     const listed = (await call("chat.list", { dir: project })) as { chats: { id: string; running?: boolean }[] };
     if (listed.chats.find((c) => c.id === id)?.running === false) return;
-    if (Date.now() > end) throw new Error("The session did not go idle.");
     await new Promise((r) => setTimeout(r, 20));
   }
 };
@@ -163,7 +161,7 @@ beforeAll(async () => {
   nine = listed.chats.find((c) => c.story?.id === "STORY-9")?.id ?? "";
   if (nine === "") throw new Error("No story session for STORY-9.");
   await idle(nine);
-}, 60_000);
+});
 
 afterAll(async () => {
   await Promise.all(clients.map((c) => c.close()));

@@ -33,7 +33,7 @@ async function askedThenLeadEnds(story: string, id: string) {
   return { lead, child, pending };
 }
 
-describe("a mirrored approval and the Dev Lead's turn", { timeout: 30_000 }, () => {
+describe("a mirrored approval and the Dev Lead's turn", () => {
   it("stays pending and answerable after the lead's turn ends, and is answered from the lead's chat", async () => {
     const { lead, pending } = await askedThenLeadEnds("STORY-9", "m1");
     expect(status(lead.events(), "m1")).toBe("pending");

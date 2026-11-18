@@ -5,7 +5,7 @@ import { createWorkWatches } from "../src/work-watch.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 import { countedGit } from "./counted-git.ts";
-import { GIT_ASKED_MS, until } from "./until.ts";
+import { until } from "./until.ts";
 
 /** The shared per-folder watch (ADR 0016), on a real repository, the real git and the real file watcher. */
 // Every call the scans make to git.
@@ -39,9 +39,9 @@ function hearing() {
       lists.push(list);
       wake?.();
     },
-    next: (ms: number) =>
+    next: (ms?: number) =>
       new Promise<WorkList>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error(`No list in ${ms} ms`)), ms);
+        const timer = ms === undefined ? undefined : setTimeout(() => reject(new Error(`No list in ${ms} ms`)), ms);
         wake = () => {
           const list = lists.shift();
           if (!list) return;
@@ -91,7 +91,7 @@ describe("work watches", () => {
     try {
       // The watchers the first scan started make the watch look once more and ask git again (BUG-24 review): an
       // edit is from disk alone once that look is done.
-      await until(() => scansDone >= before + 2, GIT_ASKED_MS);
+      await until(() => scansDone >= before + 2);
       gitCalls.length = 0;
       await repo.write(repo.main, card("STORY-1", "story", "FEAT-1", "Ready", { title: "Edited on disk" }));
       expect(titles(await heard.next(1000))).toEqual(["Edited on disk"]);
@@ -117,7 +117,7 @@ describe("work watches", () => {
       expect(features(list)).toEqual(["FEAT-1"]);
       repo.git(repo.main, "branch", "feature/2", tip);
       // A full git rescan, which STORY-3's 1 s for card edits doesn't cover: no criterion times it (BUG-12).
-      expect(features(await heard.next(GIT_ASKED_MS)).toSorted()).toEqual(["FEAT-1", "FEAT-2"]);
+      expect(features(await heard.next()).toSorted()).toEqual(["FEAT-1", "FEAT-2"]);
     } finally {
       stop();
     }
@@ -137,7 +137,7 @@ describe("work watches", () => {
       for (const path of paths) {
         gitCalls.length = 0;
         repo.git(repo.main, "worktree", "remove", "--force", path);
-        await until(() => gitCalls.includes("worktrees"), GIT_ASKED_MS);
+        await until(() => gitCalls.includes("worktrees"));
       }
     } finally {
       stop();

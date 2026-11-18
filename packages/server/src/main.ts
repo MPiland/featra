@@ -48,6 +48,9 @@ process.on("message", (raw) => {
       allowed.set(message.dirs);
       send({ type: "projects-ack", seq: message.seq });
       return;
+    case "settings":
+      services.settingsChanged();
+      return;
     default:
       message satisfies never;
   }

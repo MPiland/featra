@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { HANG_GUARD } from "../../tooling/hang-guard.ts";
 
 /**
  * Bundles Electron main (`vite build`), preload (`vite build --mode preload`), the local server
@@ -42,6 +43,7 @@ export default defineConfig(({ mode }) => {
       ],
     },
     test: {
+      ...HANG_GUARD,
       include: ["test/**/*.test.ts"],
     },
   };

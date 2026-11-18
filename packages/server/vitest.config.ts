@@ -1,8 +1,4 @@
 import { defineConfig } from "vitest/config";
+import { HANG_GUARD } from "../../tooling/hang-guard.ts";
 
-export default defineConfig({
-  test: {
-    // Setup builds real git repositories: dozens of git starts, up to about 1 s each under the full run (BUG-6).
-    hookTimeout: 30000,
-  },
-});
+export default defineConfig({ test: { ...HANG_GUARD } });

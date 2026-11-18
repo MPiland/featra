@@ -22,7 +22,7 @@ const passing = async () =>
     for (const pr of s.prs) pr.checks = [checkRun("SUCCESS")];
   });
 
-describe("the feature's PR (AC2)", { timeout: 60_000 }, () => {
+describe("the feature's PR (AC2)", () => {
   it("opens to main as Accept pushes the feature branch, when feature PRs open automatically", async () => {
     await w.start(ci);
     await w.features.accept(dir(), ID);
@@ -56,7 +56,7 @@ describe("the feature's PR (AC2)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("Merge to main through the PR (AC3, AC5)", { timeout: 60_000 }, () => {
+describe("Merge to main through the PR (AC3, AC5)", () => {
   it("waits for CI at the branch's commit, then merges the PR with a merge commit and makes the feature Done", async () => {
     await w.start(ci);
     await w.features.accept(dir(), ID);

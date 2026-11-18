@@ -19,7 +19,7 @@ const stop = (id: string) => w.window.ask("story.stop", { dir: w.repo.main, id }
 const hasEnd = (events: ChatEvent[], outcome: string) =>
   events.some((e) => e.type === "turn-end" && e.outcome === outcome);
 
-describe("AC1: a notice in the Dev Lead's chat", { timeout: 30_000 }, () => {
+describe("AC1: a notice in the Dev Lead's chat", () => {
   it("says the story's turn ended, with the last of what it said, as one message the Dev Lead's agent hears", async () => {
     const lead = await idleLead(w);
     const child = await w.spawnAs(lead, "STORY-5");
@@ -97,7 +97,7 @@ describe("AC1: a notice in the Dev Lead's chat", { timeout: 30_000 }, () => {
   });
 });
 
-describe("AC4: notices that arrive while the Dev Lead is busy", { timeout: 30_000 }, () => {
+describe("AC4: notices that arrive while the Dev Lead is busy", () => {
   it("wait, and go in one message when its turn ends, not one turn each", async () => {
     // The lead's first turn is still running.
     const lead = await w.runningLead();

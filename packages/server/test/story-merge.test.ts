@@ -16,7 +16,7 @@ const local = () => m.start({ remote: false });
 /** STORY-1 as the feature branch's commit has it. */
 const onFeature = () => parseCard(w.repo.show(w.repo.main, FEATURE_BRANCH, "STORY-1"));
 
-describe("a local merge (AC2)", { timeout: 60_000 }, () => {
+describe("a local merge (AC2)", () => {
   it("makes a merge commit of the story's branch into its feature, with the card merged by system", async () => {
     await local();
     await m.verified();
@@ -55,7 +55,7 @@ describe("a local merge (AC2)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("after the merge (AC5)", { timeout: 60_000 }, () => {
+describe("after the merge (AC5)", () => {
   it("removes the worktree and the story's branch, retires its session, and the feature branch owns the card", async () => {
     await local();
     await m.verified();
@@ -77,7 +77,7 @@ describe("after the merge (AC5)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("a conflict (AC4)", { timeout: 60_000 }, () => {
+describe("a conflict (AC4)", () => {
   it("merges nothing, sends the session the files, then puts the story back in In Progress by system", async () => {
     await local();
     await m.onFeature("work.txt", "feature's\n");
@@ -110,7 +110,7 @@ describe("a conflict (AC4)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("refusals (design rules)", { timeout: 60_000 }, () => {
+describe("refusals (design rules)", () => {
   it("never loses uncommitted work: a dirty worktree is refused, naming the files, and nothing changes", async () => {
     await local();
     await m.verified();

@@ -65,7 +65,8 @@ export function createCiProven(deps: CiProvenDeps) {
     const found = await readCiReports(dir, pr.head, { artifact, files: config.testReportFiles }, deps);
     if (!found || found.kind === "running" || heads.get(key) !== known) return dropped;
     const { acs, proof } = ciProof(card, found.reports.flat(), found.note);
-    if (!(await deps.record(dir, card.id, { passed: null, acs }))) return dropped;
+    // Proof is recorded with the commit the report ran on (STORY-59): auto-merge merges only what is proven at its tip.
+    if (!(await deps.record(dir, card.id, { passed: null, acs, head: pr.head }))) return dropped;
     known.read = true;
     known.proof = proof;
     return true;

@@ -42,7 +42,7 @@ async function poll() {
   await w.settle();
 }
 
-describe("a merge through the PR (AC2)", { timeout: 60_000 }, () => {
+describe("a merge through the PR (AC2)", () => {
   it("merges the PR with a merge commit at the head it checked, then settles the story", async () => {
     await m.start();
     await m.verified();
@@ -61,6 +61,14 @@ describe("a merge through the PR (AC2)", { timeout: 60_000 }, () => {
     expectSettled();
   });
 
+  it("shows the story's PR as merged once Featra merged it, without waiting for the next poll (design review)", async () => {
+    await m.start();
+    await m.verified();
+    expect(w.prs.prState(w.repo.main, "STORY-1")?.status?.state).toBe("open");
+    await m.merges.merge(w.repo.main, "STORY-1");
+    await w.settle();
+    expect(w.prs.prState(w.repo.main, "STORY-1")?.status?.state).toBe("merged");
+  });
   it("refuses a head GitHub doesn't have: a commit not pushed yet merges nothing", async () => {
     await m.start();
     await m.verified();
@@ -77,7 +85,7 @@ describe("a merge through the PR (AC2)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("a PR merged on GitHub outside Featra (AC2)", { timeout: 60_000 }, () => {
+describe("a PR merged on GitHub outside Featra (AC2)", () => {
   it("is noticed by the PR poller and settles the same way", async () => {
     await m.start();
     await m.verified();
@@ -120,7 +128,7 @@ function mergeOutside() {
   return merge;
 }
 
-describe("the head GitHub merges, with checks on CI (review fix)", { timeout: 60_000 }, () => {
+describe("the head GitHub merges, with checks on CI (review fix)", () => {
   it("refuses a commit pushed since CI passed, before the poller reads it, then merges once CI passes it", async () => {
     await m.start({ yaml: "checksWhere: ci\n" });
     await m.verified();
@@ -143,7 +151,7 @@ describe("the head GitHub merges, with checks on CI (review fix)", { timeout: 60
   });
 });
 
-describe("the card's commit on the feature branch (review fixes)", { timeout: 60_000 }, () => {
+describe("the card's commit on the feature branch (review fixes)", () => {
   it("has the card's uncommitted edits", async () => {
     await m.start();
     await m.verified();
@@ -191,7 +199,7 @@ describe("the card's commit on the feature branch (review fixes)", { timeout: 60
   });
 });
 
-describe("a conflict on GitHub (AC4)", { timeout: 60_000 }, () => {
+describe("a conflict on GitHub (AC4)", () => {
   it("merges nothing, tells the session the files, and puts the story back in In Progress", async () => {
     await m.start();
     await m.onFeature("work.txt", "feature's\n");
@@ -212,7 +220,7 @@ describe("a conflict on GitHub (AC4)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("GitHub refusing the merge for another reason (review fix)", { timeout: 60_000 }, () => {
+describe("GitHub refusing the merge for another reason (review fix)", () => {
   it("is an error, not a conflict: the story stays where it is and its session is told nothing", async () => {
     const why = "X Pull request acme/app#1 is not mergeable: the base branch policy prohibits the merge.";
     await m.start({ gh: { mergeFails: why } });
@@ -223,6 +231,16 @@ describe("GitHub refusing the merge for another reason (review fix)", { timeout:
     expect(isMerged(card)).toBe(false);
     expect(m.sent).toEqual([]);
     expect(m.treeExists()).toBe(true);
+  });
+
+  it("says GitHub's reason without gh's failure mark or its PR prefix (design review)", async () => {
+    await m.start({
+      gh: { mergeFails: "X Pull request acme/app#1 is not mergeable: the base branch policy prohibits the merge." },
+    });
+    await m.verified();
+    await expect(m.merges.merge(w.repo.main, "STORY-1")).rejects.toThrow(
+      /^Couldn't merge the PR: the base branch policy prohibits the merge\.$/,
+    );
   });
 
   it("is an error when GitHub says it conflicts but git finds no files: nothing moves", async () => {
@@ -238,7 +256,7 @@ describe("GitHub refusing the merge for another reason (review fix)", { timeout:
   });
 });
 
-describe("a local feature branch git can't count (review fix)", { timeout: 60_000 }, () => {
+describe("a local feature branch git can't count (review fix)", () => {
   it("merges without guessing how far ahead it is", async () => {
     await m.start();
     await m.verified();

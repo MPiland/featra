@@ -14,6 +14,7 @@ import { createStoryAbandon, type StoryAbandon } from "../src/story-abandon.ts";
 import { createStoryEnding, type StoryEnding } from "../src/story-ending.ts";
 import type { Scan } from "../src/work-scan.ts";
 import { cardPath } from "./card-repo.ts";
+import { FAKE_GH_TIMEOUT_MS } from "./fake-gh.ts";
 import type { PrStartOptions } from "./story-prs-world.ts";
 import { FEATURE_BRANCH, mergeWorld, SESSION, STORY_BRANCH, type MergeWorld } from "./story-merge-world.ts";
 
@@ -73,6 +74,7 @@ export function abandonWorld(): AbandonWorld {
       },
       ending: a.ending,
       ghCommand: options.noGh ? "gh-that-is-not-installed" : w.gh.command,
+      ghTimeoutMs: FAKE_GH_TIMEOUT_MS,
       gitRun: (...args) => (m.gitRun ?? runGit)(...args),
     });
   };

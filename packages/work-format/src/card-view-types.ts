@@ -88,6 +88,12 @@ export interface CardView {
   featureEnd?: CardFeatureEnd;
   /** True on a story merged into its feature (STORY-12); absent otherwise. */
   merged?: true;
+  /** The feature branch a merged story went into (STORY-12), for its card's merged line; absent otherwise. */
+  mergedInto?: string;
+  /** Whether a story is held back from auto-merge, where Hold applies (STORY-61); absent where it doesn't. */
+  held?: boolean;
+  /** Why a story didn't merge on its own, while that stands (STORY-60); absent otherwise. */
+  notMerged?: string;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -145,6 +151,12 @@ export function parseCardEdit(raw: unknown): CardEdit | null {
 export function cardParams(params: unknown): { dir: string; id: string } | null {
   if (!isRecord(params) || typeof params.dir !== "string" || !params.dir) return null;
   return typeof params.id === "string" && params.id ? { dir: params.dir, id: params.id } : null;
+}
+
+/** The `{ dir, id, held }` params of `story.hold`, or null. */
+export function holdParams(params: unknown): { dir: string; id: string; held: boolean } | null {
+  const p = cardParams(params);
+  return p && isRecord(params) && typeof params.held === "boolean" ? { ...p, held: params.held } : null;
 }
 
 /** The `{ dir, id, edit }` params of `card.update`, or null. */
@@ -226,6 +238,9 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(raw.mergeable === true ? { mergeable: true as const } : {}),
     ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
+    ...(typeof raw.mergedInto === "string" && raw.mergedInto ? { mergedInto: raw.mergedInto } : {}),
+    ...(typeof raw.held === "boolean" ? { held: raw.held } : {}),
+    ...(typeof raw.notMerged === "string" && raw.notMerged ? { notMerged: raw.notMerged } : {}),
   };
 }
 

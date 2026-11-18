@@ -7,11 +7,39 @@ Date: 2026-11-12 · Status: proposed
 A story is built in its own worktree and branch (ADR 0025), checked locally or in CI (ADR 0031), and has a PR when
 GitHub is usable (ADR 0032). Its work then has to reach the feature branch. Accept gates Done, not the merge: a story can
 be Verified and merged before the user accepts it. A merge must never lose work, never rewrite history, and never happen
-on its own. The card is owned by its worktree while the worktree exists (ADR 0002), so the merge also moves ownership.
+on its own unless auto-merge is on. The card is owned by its worktree while the worktree exists (ADR 0002), so the merge also moves ownership.
 
 ## Decision
 
-- **Only the user merges.** Merge is offered in the story's card pane, Work row and session when it is Verified, from
+- **The user merges, or auto-merge when it's on.** (Amended 2026-11-16, STORY-59.) With the Workflow setting
+  `autoMerge` on (the project's own value, else the app default, else on), a story that is Verified, with every
+  criterion proven at the commit Merge would merge (`proven:<n>@<commit>`; proof recorded without a commit doesn't
+  count), under an active feature (not Cancelled, Done or merged to main), whose owner copy can be read and that Merge
+  would take, merges on its own through the same merge, by `system`, without Accept. Each project's stories are looked
+  at when it opens, whenever a scan changes which could merge, when a chat changes, and when the app's settings are
+  saved. A story whose session is running or waiting is passed over until it is idle. Stories of one feature merge one
+  at a time. A story is tried once for each head, checked commit and feature tip. The Dev Lead that started the story
+  is told it merged. With the setting off, nothing merges on its own. Merge by hand is unchanged. (Amended 2026-11-16,
+  STORY-61.) A started story the user holds (**Hold**, a toggle on its card pane and Work row while auto-merge is on;
+  each turn is a `held` event in its history, by `user`) never merges on its own. Merge by hand still works on it. Let
+  go, it is among the stories auto-merge picks again, so a story already Verified and Proven merges. Auto-merge's try
+  reads Hold again after the merge's own scan (in the card lane, locally). A story held while the try waited is refused
+  there, as a race and not a `StoryRefusal`: it is logged, not recorded on the card or told. A settings save looks
+  again only at projects whose setting in effect changed.
+- **An automatic merge that fails.** (Amended 2026-11-16, STORY-60 and its review.) It fails the way Merge does: on a
+  conflict nothing merges, the story goes back to its first active stage and its session gets the files. A merge's
+  error carries a kind (`StoryRefusal`), never matched by its copy. Only a refusal that is the story's own at its
+  commit counts: a conflict (or one GitHub can't name the files of), work left uncommitted, no PR, a closed PR, or
+  GitHub refusing the merge. That is told to the Dev Lead as a `not merged` notice with the reason, and recorded on
+  the card as a `not-merged` history event by `system` (from: the commit tried, and for a conflict `@` the feature
+  branch's tip; to: the reason). It stands until the checks settle on another commit (a new `checked:`) or the story
+  merges, and a conflict only while the feature branch's tip also stays where it was; a move between stages doesn't
+  clear it. While it stands the card pane and the story's session show it, and the story isn't tried again there,
+  after a restart too. Nothing is recorded when the story's commit is unknown or the write fails: it is then tried
+  again after a restart. Any other refusal (a race with its session or a Merge by hand, a story moved or merged
+  meanwhile, GitHub or CI that can't be read, the feature branch moving) is logged; nothing is told or recorded, and
+  the story is looked at again. An error that isn't a refusal is a bug, and is only logged.
+- **Merge, by hand.** Merge is offered in the story's card pane, Work row and session when it is Verified, from
   review on (or Done), with a live worktree, and not merged yet. The Dev Lead can only ask with `request_merge`: an
   approval card in its chat and the Inbox, with Merge and Decline. The call answers once the user is asked. How it ends
   (declined, merged, or not merged and why) reaches the Dev Lead as a notice. A story session can't ask.

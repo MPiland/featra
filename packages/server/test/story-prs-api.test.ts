@@ -11,7 +11,7 @@ import { createAllowedProjects } from "../src/allowed-projects.ts";
 import type { Connection } from "../src/api.ts";
 import { createServices } from "../src/services.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
-import { fakeGh, type FakeGh } from "./fake-gh.ts";
+import { FAKE_GH_TIMEOUT_MS, fakeGh, type FakeGh } from "./fake-gh.ts";
 import { manualClock, MINUTE } from "./manual-clock.ts";
 import { FEATURE_BRANCH, STORY_BRANCH, storyCard } from "./story-prs-world.ts";
 import { until } from "./until.ts";
@@ -56,7 +56,14 @@ beforeEach(async () => {
   clock = manualClock(Date.parse("2026-11-12T10:00:00Z"));
   const allowed = createAllowedProjects();
   allowed.set([repo.main]);
-  services = createServices({ allowed, log: () => {}, now: clock.now, ghCommand: gh.command, prTimers: clock.timers });
+  services = createServices({
+    allowed,
+    log: () => {},
+    now: clock.now,
+    ghCommand: gh.command,
+    ghTimeoutMs: FAKE_GH_TIMEOUT_MS,
+    prTimers: clock.timers,
+  });
   pushed.length = 0;
 });
 afterEach(async () => {
@@ -65,7 +72,7 @@ afterEach(async () => {
   await repo.dispose();
 });
 
-describe("Project settings (AC1, AC2, AC4)", { timeout: 60_000 }, () => {
+describe("Project settings (AC1, AC2, AC4)", () => {
   it("say GitHub is usable and change the PR settings in the project's config", async () => {
     const shown = (await ask("checks.load", { dir: repo.main })) as ChecksView;
     expect(shown).toMatchObject({ github: { usable: true, missing: null }, openStoryPrs: false, prRefreshMinutes: 2 });
@@ -87,7 +94,7 @@ describe("Project settings (AC1, AC2, AC4)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("Create PR and the PR chip's data (AC2, AC3, AC4)", { timeout: 60_000 }, () => {
+describe("Create PR and the PR chip's data (AC2, AC3, AC4)", () => {
   it("offers Create PR on card.watch, opens the PR, and the card and Work row carry its state", async () => {
     const view = (await ask("card.watch", { dir: repo.main, id: "STORY-1" })) as CardView;
     const rows = (await ask("work.watch", { dir: repo.main })) as WorkList;
@@ -95,9 +102,9 @@ describe("Create PR and the PR chip's data (AC2, AC3, AC4)", { timeout: 60_000 }
     await until(() => cardView()?.prState?.create === true || view.prState?.create === true);
     expect(await ask("story.createPr", { dir: repo.main, id: "STORY-1" })).toBeNull();
     const url = "https://github.com/acme/app/pull/1";
-    await until(() => cardView()?.prState?.status?.state === "open", 10_000);
+    await until(() => cardView()?.prState?.status?.state === "open");
     expect(cardView()).toMatchObject({ pr: url, prState: { create: false, opening: false } });
-    await until(() => story()?.prStatus?.state === "open", 10_000);
+    await until(() => story()?.prStatus?.state === "open");
     expect(story()).toMatchObject({ pr: url, prStatus: { state: "open", checks: "none" } });
   });
 
@@ -116,7 +123,7 @@ describe("Create PR and the PR chip's data (AC2, AC3, AC4)", { timeout: 60_000 }
     // Both pollers have read once and wait for their next read: the story PRs' and the features'. Any timer alone may be
     // the features', set before the story's first read is made (BUG-21).
     const settled = () => story()?.prStatus?.state === "open" && clock.timersSet() === 2;
-    await until(settled, 10_000);
+    await until(settled);
     const before = await reads();
     // The first read, when watching starts, is counted before the refresh (BUG-21).
     expect(before).toBe(1);
@@ -126,11 +133,11 @@ describe("Create PR and the PR chip's data (AC2, AC3, AC4)", { timeout: 60_000 }
     });
     expect(await ask("prs.refresh", {})).toBeNull();
     clock.advance(1_000);
-    await expect.poll(reads, { timeout: 10_000 }).toBe(before + 1);
+    await expect.poll(reads).toBe(before + 1);
     // The reads have finished once both next ones are scheduled; the interval counts from there.
-    await until(() => clock.timersSet() === 2, 10_000);
+    await until(() => clock.timersSet() === 2);
     clock.advance(2 * MINUTE);
-    await expect.poll(reads, { timeout: 10_000 }).toBe(before + 2);
+    await expect.poll(reads).toBe(before + 2);
   });
 
   it("refuses Create PR for a folder that isn't open and without an id", async () => {

@@ -2,7 +2,7 @@ import { useId } from "react";
 import { BUG_COPY } from "@featra/work-format/bug-copy";
 import type { StoryRow } from "@featra/work-format/work-list";
 import { WORK_COPY } from "../../work-list.ts";
-import { Story } from "./FeatureRows.tsx";
+import { ColumnHeaders, Story } from "./FeatureRows.tsx";
 
 /**
  * The project bug list (STORY-13): bugs under no feature, on the story columns, after the epics. A bug filed on a
@@ -19,14 +19,8 @@ export function ProjectBugs({ bugs }: { bugs: readonly StoryRow[] }) {
         <p className="meta">{BUG_COPY.noProjectBugs}</p>
       ) : (
         <div className="fl" role="table" aria-label={BUG_COPY.projectBugs}>
-          <div className="prow phdr" role="row">
-            <span aria-hidden="true" />
-            {WORK_COPY.storyColumns.map((c) => (
-              <span key={c} role="columnheader">
-                {c}
-              </span>
-            ))}
-          </div>
+          <ColumnHeaders names={WORK_COPY.storyColumns} className="prow phdr" />
+
           {bugs.map((b) => (
             <Story key={b.id} story={b} />
           ))}

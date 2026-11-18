@@ -1,6 +1,7 @@
 /**
- * Merging a story into its feature (STORY-12, ADR 0034). The user's Merge, or the Dev Lead's `request_merge` once the
- * user approves it; never on its own. Merge needs Verified for the commit the story's branch is at, not Accept.
+ * Merging a story into its feature (STORY-12, ADR 0034). The user's Merge, the Dev Lead's `request_merge` once the
+ * user approves it, or auto-merge when it is on (STORY-59, auto-merge.ts). Merge needs Verified for the commit the
+ * story's branch is at, not Accept.
  *
  * With GitHub usable it merges the story's PR (`gh pr merge --merge --match-head-commit`); else it makes the merge
  * commit into the feature branch with git (merge-git.ts). Either way it is a merge commit: never squash, rebase or
@@ -14,6 +15,7 @@ import {
   conflictMessage,
   evidenceState,
   GITHUB_COPY,
+  isHeld,
   mergeCommitMessage,
   mergedStory,
   mergeRefusal,
@@ -56,12 +58,53 @@ export interface StoryMergeDeps extends GithubPrDeps {
   gitRun?: typeof runGit;
   /** The stories being merged or abandoned, which the server shares with Abandon (STORY-58). */
   ending?: StoryEnding;
+  /** Featra merged story `id`'s PR on GitHub: its PR state is read again soon, not at the next poll (FEAT-8 review). */
+  onGithubMerge?: (dir: string, id: string) => Promise<void>;
+}
+
+/** How a merge is asked for: `auto` is auto-merge's own try (STORY-59), which a held story refuses (STORY-61). */
+export interface MergeOptions {
+  auto?: boolean;
+}
+
+/**
+ * Auto-merge's try of a story held since it was picked (STORY-61): a race, not the story's own failure, so it is
+ * neither recorded on the card nor told to the Dev Lead. Its `kind` says so to whoever sorts merge errors.
+ */
+export class HeldRefusal extends ApiError {
+  readonly kind = "held";
 }
 
 /** How an attempt ended: merged into `into` (through `remote` on GitHub), or stopped on the conflicting `files`. */
 type Attempt =
   | { kind: "merged"; into: string; remote: GithubRemote | null }
   | { kind: "conflict"; into: string; files: string[] };
+
+/** What about the story, at the commit it is at, refused its merge (STORY-60). */
+export type StoryRefusalKind = "conflict" | "conflictUnknown" | "dirty" | "github" | "prClosed" | "noPr";
+
+/**
+ * A merge refused for the story's own reason at its commit: a conflict, work left uncommitted, or its PR (none, closed,
+ * or GitHub refusing it). Auto-merge records these and tells the Dev Lead; any other refusal is a race or a passing
+ * failure, which it looks at again later.
+ */
+export class StoryRefusal extends ApiError {
+  readonly kind: StoryRefusalKind;
+  /** Why, as the story's card records it: the message, or for GitHub only its own reason (`githubReason`). */
+  readonly reason: string;
+  constructor(message: string, kind: StoryRefusalKind, reason: string = message) {
+    super(message);
+    this.kind = kind;
+    this.reason = reason;
+  }
+}
+
+/** Whether story `id`'s session is running or waiting to run a turn, which Merge refuses (`MERGE_MESSAGES.working`). */
+export function sessionBusy(chats: Pick<ChatManager, "storySession" | "list">, dir: string, id: string): boolean {
+  const session = chats.storySession(dir, id);
+  const row = session === null ? undefined : chats.list(dir).find((c) => c.id === session);
+  return !!(row?.running || row?.queued);
+}
 
 /** The story, read fresh, with everything a merge of it needs; throws why it can't merge. */
 interface Ready {
@@ -80,7 +123,7 @@ export function createStoryMerge(deps: StoryMergeDeps) {
   const { settle } = createMergeSettle({ scan: scanDir, now, lane, chats, git, write });
   const ending = deps.ending ?? createStoryEnding();
 
-  async function ready(dir: string, id: string): Promise<Ready> {
+  async function ready(dir: string, id: string, { auto = false }: MergeOptions): Promise<Ready> {
     const scan = await scanDir(dir);
     const found = ownedIn(scan, id);
     const config = scan?.collected.config;
@@ -88,15 +131,15 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     const refusal = mergeRefusal(found?.owned, id, config, found?.root != null);
     if (refusal !== null || !found?.root) throw new ApiError(refusal ?? MERGE_MESSAGES.readOnly);
     const { card, path } = found.owned;
+    // Held while auto-merge's try waited (in the lane, locally): read from this scan, so it never merges.
+    if (auto && isHeld(card)) throw new HeldRefusal(MERGE_MESSAGES.held(id));
     const into = featureBranchOf(scan, card);
     const top = scan.collected.paths.top;
     const tip = card.branch ? await git.commitOf(top, `refs/heads/${card.branch}`) : null;
     if (!into || !tip) throw new ApiError(MERGE_MESSAGES.noFeature(id));
-    const session = chats.storySession(dir, id);
-    const row = session === null ? undefined : chats.list(dir).find((c) => c.id === session);
-    if (row?.running || row?.queued) throw new ApiError(MERGE_MESSAGES.working(id));
+    if (sessionBusy(chats, dir, id)) throw new ApiError(MERGE_MESSAGES.working(id));
     const dirty = await git.uncommitted(found.root, path);
-    if (dirty.length > 0) throw new ApiError(MERGE_MESSAGES.dirty(id, dirty));
+    if (dirty.length > 0) throw new StoryRefusal(MERGE_MESSAGES.dirty(id, dirty), "dirty");
     return { card, config, top, path, into, tip };
   }
 
@@ -105,9 +148,9 @@ export function createStoryMerge(deps: StoryMergeDeps) {
     checkedHead(dir, id, evidenceState(r.card).checkedHead) === r.tip;
 
   /** The merge commit into the feature branch, made and published in the lane on the card as it is then. */
-  const mergeLocally = (dir: string, id: string): Promise<Attempt> =>
+  const mergeLocally = (dir: string, id: string, options: MergeOptions): Promise<Attempt> =>
     lane.exclusive(async () => {
-      const r = await ready(dir, id);
+      const r = await ready(dir, id, options);
       if (!checkedTip(dir, id, r)) throw new ApiError(MERGE_MESSAGES.stale(id));
       const old = await git.commitOf(r.top, `refs/heads/${r.into}`);
       if (!old) throw new ApiError(MERGE_MESSAGES.noFeature(id));
@@ -127,15 +170,15 @@ export function createStoryMerge(deps: StoryMergeDeps) {
   }
 
   /** The story's PR merged on GitHub, at the commit its branch is at and its CI checked. */
-  async function mergeOnGithub(dir: string, id: string): Promise<Attempt> {
-    const r = await ready(dir, id);
-    if (!r.card.pr) throw new ApiError(MERGE_MESSAGES.noPr(id));
+  async function mergeOnGithub(dir: string, id: string, options: MergeOptions): Promise<Attempt> {
+    const r = await ready(dir, id, options);
+    if (!r.card.pr) throw new StoryRefusal(MERGE_MESSAGES.noPr(id), "noPr");
     const remote = await githubRemote(dir, deps.gitCommand);
     if (!remote) throw new ApiError(GITHUB_COPY.noRemote);
     const pr = await readPrAt(dir, r.card.pr, deps);
     if (!pr) throw new ApiError(`${MERGE_MESSAGES.failed}.`);
     if (pr.status.state === "merged") return { kind: "merged", into: r.into, remote };
-    if (pr.status.state === "closed") throw new ApiError(MERGE_MESSAGES.prClosed(id));
+    if (pr.status.state === "closed") throw new StoryRefusal(MERGE_MESSAGES.prClosed(id), "prClosed");
     if (pr.head !== r.tip) throw new ApiError(MERGE_MESSAGES.stale(id));
     if (checksWhere(r.config, await settings.github(dir)) === "local") {
       if (!checkedTip(dir, id, r)) throw new ApiError(MERGE_MESSAGES.stale(id));
@@ -148,9 +191,10 @@ export function createStoryMerge(deps: StoryMergeDeps) {
         ? { conflict: true as const }
         : await mergePr(dir, pr.url, r.tip, deps);
     if (outcome === null) return { kind: "merged", into: r.into, remote };
-    if ("error" in outcome) throw new ApiError(outcome.error);
+    if ("error" in outcome)
+      throw outcome.refused ? new StoryRefusal(outcome.error, "github", outcome.reason) : new ApiError(outcome.error);
     const files = await conflictsOnGithub(r.top, remote.name, r.into, r.tip);
-    if (files.length === 0) throw new ApiError(MERGE_MESSAGES.conflictUnknown(id));
+    if (files.length === 0) throw new StoryRefusal(MERGE_MESSAGES.conflictUnknown(id), "conflictUnknown");
     return { kind: "conflict", into: r.into, files };
   }
 
@@ -181,19 +225,24 @@ export function createStoryMerge(deps: StoryMergeDeps) {
       log(`${id}'s session couldn't be told its merge conflicted: ${err instanceof Error ? err.message : String(err)}`);
       await lane.exclusive(record);
     }
-    throw new ApiError(MERGE_MESSAGES.conflict(id, files, stage));
+    throw new StoryRefusal(MERGE_MESSAGES.conflict(id, files, stage), "conflict");
   }
 
   /** Runs `work` for story `id` unless a merge or an abandon of it already runs. */
   const once = <T>(dir: string, id: string, work: () => Promise<T>): Promise<T> => ending.hold(dir, id, "merge", work);
 
   /** Merges story `id` into its feature: on GitHub when it is usable here, else with git. */
-  const merge = (dir: string, id: string): Promise<MergeResult> =>
+  const merge = (dir: string, id: string, options: MergeOptions = {}): Promise<MergeResult> =>
     once(dir, id, async () => {
       const github = (await settings.githubUse(dir)).usable;
-      const attempt = github ? await mergeOnGithub(dir, id) : await mergeLocally(dir, id);
+      const attempt = github ? await mergeOnGithub(dir, id, options) : await mergeLocally(dir, id, options);
       if (attempt.kind === "conflict") return conflicted(dir, id, attempt.into, attempt.files);
-      return settle(dir, id, attempt.into, attempt.remote);
+      const result = await settle(dir, id, attempt.into, attempt.remote);
+      if (attempt.remote)
+        void deps
+          .onGithubMerge?.(dir, id)
+          .catch((err: unknown) => log(`${id}'s PR couldn't be read again: ${String(err)}`));
+      return result;
     });
 
   /** Story `id`'s PR was merged on GitHub outside Featra: it settles as a merge Featra made does. */

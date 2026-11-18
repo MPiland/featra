@@ -15,7 +15,7 @@ const five = () => join(w.repo.main, ".claude", "worktrees", "STORY-5-spawn-five
 async function ask(agent: Client, method: string, params: Record<string, unknown>) {
   const id = Math.floor(Math.random() * 1e9);
   agent.socket.send({ id, method, params });
-  return agent.socket.next((f) => f.id === id, 20_000);
+  return agent.socket.next((f) => f.id === id);
 }
 
 beforeAll(async () => {
@@ -23,7 +23,7 @@ beforeAll(async () => {
   lead = await w.agentOf(w.drafter);
   const own = await w.spawnAs({ agent: lead }, "STORY-5");
   session = await w.agentOf(own.chat);
-}, 60_000);
+});
 afterAll(() => w.close());
 
 describe("what a story session logs", () => {

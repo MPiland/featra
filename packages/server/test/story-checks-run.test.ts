@@ -8,7 +8,7 @@ import { CHECKS_COPY, evidenceState, recordAcceptance, type CardChecks } from "@
 import { ApiError } from "../src/api-error.ts";
 import { cardViewIn } from "../src/card-actions.ts";
 import { storyCard, checksWorld } from "./story-checks-world.ts";
-import { GIT_ASKED_MS, until } from "./until.ts";
+import { until } from "./until.ts";
 
 const configWith = (command: string) => `version: 1\nchecksWhere: local\ncheckCommand: ${command}\n`;
 
@@ -67,7 +67,7 @@ describe("a story reaching review (AC3, AC4)", () => {
     await w.toReview();
     await writeFile(w.inTree("verdict.txt"), "committed\n");
     w.repo.commit(w.tree, "break it");
-    await until(() => w.state()?.last?.passed === false, GIT_ASKED_MS);
+    await until(() => w.state()?.last?.passed === false);
     await w.checks.idle();
     expect(evidenceState(await w.read()).verified).toBe(false);
   });
@@ -183,7 +183,7 @@ describe("what a failing run leaves behind", () => {
     expect(w.state()).toBeDefined();
     await w.repo.write(w.tree, storyCard("In Progress"));
     await w.watches.scan(w.repo.main);
-    await until(() => w.state() === undefined, GIT_ASKED_MS);
+    await until(() => w.state() === undefined);
   });
 
   it("keeps a story's checks, and does not run them again, while its card is briefly unreadable (BUG-24 AC3)", async () => {

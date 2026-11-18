@@ -108,6 +108,10 @@ epics in `.featra/cards/`.
 - Hide the one-scan flash ("isn't in its owner", "Can't read", or the pre-Start status) for a worktree that Start is still making.
 - Decide whether the branch-name fallback in branchStateOf should wait until the worktree has a card file, so a bare git worktree add outside Featra doesn't take ownership.
 - Fast, non-Electron tests for shared e2e helpers.
+- Fewer git and `gh` starts per server test (fixture repositories copied, not built with git each time; one fake `gh`
+  process), so the unit run on a busy PC takes minutes. Under load, BUG-28 measured the server suite at 45 minutes or
+  more, nearly all of it process starts.
+- Manual Merge of a story under a Cancelled feature: decide whether to refuse it (auto-merge already skips it).
 
 ## Before public release
 
