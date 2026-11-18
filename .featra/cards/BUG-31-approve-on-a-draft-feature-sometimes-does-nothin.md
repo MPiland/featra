@@ -2,7 +2,7 @@
 id: BUG-31
 type: bug
 title: Approve on a draft feature sometimes does nothing
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-31-approve-noop
-pr: null
+pr: https://github.com/MPiland/featra/pull/73
 created: 2026-11-18T20:39:26Z
 history:
   - at: 2026-11-18T20:39:26Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: dev
+  - at: 2026-11-18T21:16:42Z
+    field: status
+    from: In Progress
+    to: In Review
     by: dev
 ---
 
