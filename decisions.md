@@ -2879,7 +2879,7 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **settings.spec's project override read the file too soon.** The page shows an override at once and writes it after
   (ProjectPage's `set`), so the test's single read raced the write. It failed on Ubuntu at 1569d64 and on Windows at
   c993c0c, so it is not macOS's; the same check now waits for the file.
-- **Bug found: a settings save could be lost on Windows.** The JSON stores (`settings.json`, `ui-state.json`, saved
+- **Bug found: a settings save could be lost on Windows (BUG-33).** The JSON stores (`settings.json`, `ui-state.json`, saved
   chats) save through a temp file and a rename, and Windows refuses that rename with EPERM while another program reads
   the file. Nothing tried again, so Settings showed "Minimize to tray" while the file kept "quit" (E2E (Windows) at
   432a5ea, settings.spec's AC6 polling the file). `createJsonStore` now retries a busy rename with BUG-16's
@@ -2889,5 +2889,15 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **Open finding, not from this story: Approve on a draft once did nothing.** On the macOS job at 1569d64,
   auto-merge-fails.spec's first step clicked Approve; the trace shows the buttons busy, then enabled again, with no
   error shown, the card still Draft and its files uncommitted. The two other specs that use the same helper passed in
-  that job, and it passed on the next run. Without the app's log the cause isn't known; it goes to the Dev Lead.
+  that job, and it passed on the next run. Without the app's log the cause isn't known. The user filed it as BUG-31
+  (Approve on a draft feature sometimes does nothing), with BUG-32 (Settings shows a value that wasn't saved) for the
+  unshown save failure above.
+- **macOS focus checks start with Finder in front.** `busyUserInFront` did nothing on macOS, and a hidden Featra stays
+  the active app, so `windowInForeground` passed without Featra coming forward. It now puts Finder in front first (`open -a`,
+  no Automation permission). A Dock click or opening the app again makes macOS activate Featra before Featra hears of it;
+  the harness fakes that activation, as it fakes Windows' foreground grant, and Featra's handler must show and focus
+  the window.
+- **The userData folder is proved in the real app.** app-name.spec launches without a test folder, with the home faked
+  (CFFIXED_USER_HOME on macOS, XDG_CONFIG_HOME on Linux), and checks the profile is in `@featra/desktop`. Skipped on
+  Windows, where Electron reads AppData from the shell, not the environment, so it can't be faked.
 - No ADR: CI and the test harness only, within ADR 0009 and ADR 0013; `nameApp` and the Quit fix are small bug fixes.

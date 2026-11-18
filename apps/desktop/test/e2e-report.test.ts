@@ -64,7 +64,14 @@ afterEach(async () => {
 async function e2eRun(platform: string): Promise<string> {
   const file = join(out, `e2e-${platform}.xml`);
   const r = run("pnpm --filter @featra/desktop exec playwright test -c test/report-fixture/playwright.config.ts", {
-    env: { ...process.env, FEATRA_JUNIT: file, FIXTURE_OS: platform, NO_COLOR: "1", FORCE_COLOR: "0" },
+    env: {
+      ...process.env,
+      FEATRA_JUNIT: file,
+      FIXTURE_OUTPUT: join(out, `results-${platform}`),
+      FIXTURE_OS: platform,
+      NO_COLOR: "1",
+      FORCE_COLOR: "0",
+    },
   });
   expect(r.status, r.output).toBe(platform === "macos" ? 1 : 0);
   return readFile(file, "utf8");

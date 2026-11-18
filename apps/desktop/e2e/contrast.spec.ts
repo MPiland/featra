@@ -2,6 +2,7 @@ import { expect, test, type Page } from "./fixtures.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
 import { contrast, luminance, parseCssColor, resolve, sampleRenderedText, tokenColours } from "./contrast.ts";
 import { pressShortcut } from "./keys.ts";
+import { mac } from "./mac.ts";
 
 /**
  * AC4: the window follows the OS theme and meets WCAG AA. The OS theme is faked with prefers-color-scheme
@@ -13,10 +14,11 @@ const AA_NON_TEXT = 3;
 const STATUS = ["--ok", "--warn", "--bad", "--acc", "--pur"];
 const SURFACES = ["--bg", "--side", "--row"];
 /**
- * How many icons a view shows at least: the title bar's. On macOS the window controls are the native traffic lights,
- * not the page's, so it renders Menu, Toggle sidebar and Back/Forward only (3 sampled on CI).
+ * How many icons a view shows at least: the title bar's. On macOS the window controls (Minimize, Maximize, Close)
+ * are the native traffic lights, not the page's, so none of them is sampled there; nor are Back and Forward while
+ * they are disabled (nothing to go back or forward to: WCAG exempts inactive controls). 3 is the fewest a view has.
  */
-const ICONS = process.platform === "darwin" ? 3 : 4;
+const ICONS = mac ? 3 : 4;
 
 /** `min` guards against a vacuous pass: by default the view title, the placeholder text and the title bar icons. */
 async function failures(page: Page, min = { text: 2, icon: ICONS }): Promise<string[]> {

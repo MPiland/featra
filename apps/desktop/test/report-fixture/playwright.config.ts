@@ -1,3 +1,4 @@
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defineConfig } from "@playwright/test";
@@ -9,7 +10,8 @@ export default defineConfig({
   testMatch: "*.spec.ts",
   workers: 1,
   reporter: e2eReporters(),
-  // Outside the repo: the failure is made on purpose and nothing reads its output.
-  outputDir: join(tmpdir(), "featra-report-fixture"),
+  // Outside the repo, in the run's own folder (FIXTURE_OUTPUT, from e2e-report.test.ts): the failure is made on
+  // purpose and nothing reads its output.
+  outputDir: process.env.FIXTURE_OUTPUT ?? mkdtempSync(join(tmpdir(), "featra-report-fixture-")),
   preserveOutput: "never",
 });

@@ -12,6 +12,8 @@ import {
   windowVisible,
 } from "./app.ts";
 import { pressShortcut } from "./keys.ts";
+import { busyUserInFront } from "./foreground.ts";
+import { mac } from "./mac.ts";
 
 /**
  * STORY-63: macOS's own behaviour in the real app. Playwright can't click the menu bar or the Dock, so the native app
@@ -38,7 +40,7 @@ const windowCount = (app: ElectronApplication) =>
 const dockVisible = (app: ElectronApplication) => app.evaluate(({ app: electronApp }) => electronApp.dock?.isVisible());
 
 test.describe("macOS: the app menu, the menu bar and the Dock (STORY-63)", () => {
-  test.skip(process.platform !== "darwin", "macOS's own behaviour; tray.spec.ts covers Windows and Linux");
+  test.skip(!mac, "macOS's own behaviour; tray.spec.ts covers Windows and Linux");
 
   test("has the macOS app menu and Edit menu, and no menu bar icon", async () => {
     const profile = await tempUserData();
@@ -78,6 +80,8 @@ test.describe("macOS: the app menu, the menu bar and the Dock (STORY-63)", () =>
       expect(app.process().exitCode).toBeNull();
       expect(await dockVisible(app)).toBe(true);
       expect(await notices(app)).toEqual([]); // no "still running" notice: staying in the Dock is the norm
+      await busyUserInFront(); // the user is in Finder, so Featra must come to the front, not just stay there
+      expect(await windowInForeground(app)).toBe(false);
       await clickDock(app);
       await expect.poll(() => windowVisible(app)).toBe(true);
       await expect.poll(() => windowFocused(app)).toBe(true);

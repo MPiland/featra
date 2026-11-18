@@ -1,6 +1,7 @@
 import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
 import { launch, tempUserData, windowManagerCanMaximize } from "./app.ts";
 import { pressShortcut } from "./keys.ts";
+import { mac } from "./mac.ts";
 
 /**
  * BUG-1 in the real window: the title bar's maximize button, View > Full Screen and the window itself agree on
@@ -60,7 +61,7 @@ async function fullScreenChecked(page: Page) {
 }
 
 test.describe("BUG-1: the maximize button and Full Screen follow the window", () => {
-  test.skip(process.platform === "darwin", "macOS keeps its native traffic lights");
+  test.skip(mac, "macOS keeps its native traffic lights");
 
   test("in full screen the button shows restore and says Exit Full Screen; one click returns to the window's size", async () => {
     const profile = await tempUserData();

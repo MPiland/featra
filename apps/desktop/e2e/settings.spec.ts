@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "./fixtures.ts";
 import { closeFromOs, exited, launch, tempProject, tempUserData, trayExists, windowVisible } from "./app.ts";
 import { labelOf, pressShortcut } from "./keys.ts";
+import { mac } from "./mac.ts";
 
 /**
  * STORY-20: Settings, in the real app. Only the platform is faked: the userData and project folders are temporary,
@@ -13,7 +14,6 @@ const readSettings = async (dir: string) => JSON.parse(await readFile(settingsFi
 const dataTheme = (page: Page) => page.evaluate(() => document.documentElement.dataset.theme ?? "system");
 const pages = (page: Page) => page.getByRole("navigation", { name: "Settings pages" });
 /** macOS keeps a closed app in the Dock and shows no tray icon; the others keep it in the tray. */
-const mac = process.platform === "darwin";
 const KEEP_RUNNING = mac ? "Minimize to Dock" : "Minimize to tray";
 
 /** Presses Tab until `target` has focus: how a keyboard user reaches it. */
@@ -101,7 +101,7 @@ test.describe("STORY-20: Settings", () => {
   });
 
   test("with no tray, the Close button shows Quit, disabled, and says why (AC6)", async () => {
-    test.skip(process.platform === "darwin", "macOS always has the Dock");
+    test.skip(mac, "macOS always has the Dock");
     const profile = await tempUserData();
     try {
       const { app, page } = await launch(profile.dir, { FEATRA_E2E_TRAY: "absent" });

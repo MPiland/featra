@@ -2,6 +2,7 @@ import { execFileSync, spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { fileURLToPath } from "node:url";
 import { onWslg } from "../src/lifecycle.ts";
+import { finderInFront, mac } from "./mac.ts";
 
 /**
  * The OS foreground window, for the e2e harness only (BUG-2 and BUG-3, see decisions.md).
@@ -196,17 +197,6 @@ export async function foregroundWindow(): Promise<bigint | undefined> {
 }
 
 /**
- * macOS only: the process id of the frontmost app, the one whose menu bar shows and which gets the keyboard
- * (`lsappinfo`, which needs no Accessibility permission). Undefined when it can't say.
- */
-export function macFrontmostPid(): number | undefined {
-  const asn = execFileSync("lsappinfo", ["front"], { encoding: "utf8" }).trim();
-  const out = execFileSync("lsappinfo", ["info", "-only", "pid", asn], { encoding: "utf8" });
-  const pid = /"pid"\s*=\s*(\d+)/i.exec(out)?.[1];
-  return pid === undefined ? undefined : Number(pid);
-}
-
-/**
  * WSLg only: the Windows foreground window, which is what the user sees in front. The X server's active window can
  * be Featra's while Windows shows another app, or shows Featra's window minimised (BUG-4).
  */
@@ -220,9 +210,14 @@ export async function windowsForegroundWindow(): Promise<{ process: string; mini
  * input, so Windows' foreground lock is on for Featra, as it is while a person types elsewhere. Focus tests start one
  * so they prove focus under the lock on every run, not only when someone happens to be using the desktop. Under WSLg
  * the same window puts a Windows app in front of Featra's, which `focus()` alone can't get past there (BUG-4).
- * Resolves once that window is the foreground window; `dispose` closes it. Windows and WSLg: elsewhere it does nothing.
+ * Resolves once that window is the foreground window; `dispose` closes it. On macOS, Finder is put in front instead,
+ * so a check that Featra came to the front proves it did (`finderInFront`). Elsewhere (xvfb) it does nothing.
  */
 export async function busyUserInFront(): Promise<{ dispose: () => void }> {
+  if (mac) {
+    await finderInFront();
+    return { dispose: () => {} };
+  }
   if (process.platform !== "win32" && !wslg) return { dispose: () => {} };
   const [exe, script] = powershell("busy-user.ps1");
   // Under WSLg this process has no Windows pid; the helper's PowerShell lives as long as the test worker.

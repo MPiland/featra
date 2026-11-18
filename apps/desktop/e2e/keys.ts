@@ -1,5 +1,6 @@
 import { shortcutLabel, type ShortcutId } from "@featra/client/shortcuts";
 import type { Page } from "./fixtures.ts";
+import { mac } from "./mac.ts";
 
 /** macOS's modifier symbols, in the order its menus print them, as Playwright names the keys. */
 const MAC_MODIFIERS: Record<string, string> = { "⌃": "Control", "⌥": "Alt", "⇧": "Shift", "⌘": "Meta" };
@@ -28,7 +29,6 @@ export function labelOf(id: ShortcutId): string {
   return label;
 }
 
-const mac = process.platform === "darwin";
 /** Moves a text field's caret to the end of the line: End, or ⌘→ on macOS, where End only scrolls. */
 export const LINE_END = mac ? "Meta+ArrowRight" : "End";
 /** Selects back to the start of the line: Shift+Home, or ⇧⌘← on macOS. */

@@ -3,22 +3,24 @@ import type { EditCommand } from "./bridge.ts";
 export type KeyInput = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey" | "altKey" | "shiftKey">;
 
 /** Shortcuts the app handles itself. Edit shortcuts are left to the browser engine, which already does them. */
-export type AppShortcut =
-  | "newChat"
-  | "newProject"
-  | "openFolder"
-  | "projectSettings"
-  | "settings"
-  | "keyboardShortcuts"
-  | "closeWindow"
-  | "toggleSidebar"
-  | "zoomReset"
-  | "zoomIn"
-  | "zoomOut"
-  | "fullScreen"
-  | "reload"
-  | "back"
-  | "forward";
+export const APP_SHORTCUTS = [
+  "newChat",
+  "newProject",
+  "openFolder",
+  "projectSettings",
+  "settings",
+  "keyboardShortcuts",
+  "closeWindow",
+  "toggleSidebar",
+  "zoomReset",
+  "zoomIn",
+  "zoomOut",
+  "fullScreen",
+  "reload",
+  "back",
+  "forward",
+] as const;
+export type AppShortcut = (typeof APP_SHORTCUTS)[number];
 /** Every shortcut the menu shows: the app's own, the edit commands, and macOS's Cmd+Q (handled by its app menu). */
 export type ShortcutId = AppShortcut | Exclude<EditCommand, "delete"> | "quit";
 

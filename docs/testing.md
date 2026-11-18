@@ -58,9 +58,8 @@ Where "opens the Work list" stopped (timedOut):
 names the locator. A test that failed instead of timing out also prints the step's error.
 
 The job uploads the failed tests' output as an artifact named `e2e-windows-traces`, `e2e-ubuntu-traces` or
-`e2e-macos-traces`. Download it
-from the run's summary page, or with `gh run download <run id> -R MPiland/featra -n e2e-windows-traces`. Each failed
-test has a folder with:
+`e2e-macos-traces`. Download it from the run's summary page, or with
+`gh run download <run id> -R MPiland/featra -n e2e-windows-traces`. Each failed test has a folder with:
 
 - `electron-<n>-window-<w>.png`: each window of the app's `n`th launch, as it was when the test stopped.
 - `electron-<n>.zip`: that launch's trace: its actions, a DOM snapshot of each and a screencast.

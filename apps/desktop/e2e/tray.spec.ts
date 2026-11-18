@@ -22,6 +22,7 @@ import {
 } from "./app.ts";
 import { busyUserInFront } from "./foreground.ts";
 import { pressShortcut } from "./keys.ts";
+import { mac } from "./mac.ts";
 
 /**
  * AC6 in the real app. The tray icon is Electron's real Tray; only the OS side of it is driven from the test
@@ -30,7 +31,6 @@ import { pressShortcut } from "./keys.ts";
 
 const NOTICE = "Featra is still running in the system tray";
 /** macOS has no tray icon: a closed Featra stays in the Dock (mac.spec.ts). Its File menu says Quit Featra, not Exit. */
-const mac = process.platform === "darwin";
 const NO_TRAY_ON_MAC = "macOS keeps a closed app in the Dock, with no tray icon: mac.spec.ts covers it";
 const EXIT = mac ? "Quit Featra" : "Exit";
 
@@ -239,7 +239,7 @@ test.describe("AC6: close to tray", () => {
       await clickCloseButton(app, page);
       await expect.poll(() => windowVisible(app)).toBe(false);
 
-      busy = await busyUserInFront(); // someone is working in another app: Windows' foreground lock is on
+      busy = await busyUserInFront(); // someone is working in another app (Windows' foreground lock is on)
       await launchAgain(profile.dir, app); // the second process hands over to the first and exits
       await expect.poll(() => windowVisible(app)).toBe(true);
       await expect.poll(() => windowFocused(app)).toBe(true);

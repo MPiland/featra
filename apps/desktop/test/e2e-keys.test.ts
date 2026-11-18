@@ -1,4 +1,4 @@
-import { matchShortcut, shortcutLabel, type AppShortcut, type KeyInput } from "@featra/client/shortcuts";
+import { APP_SHORTCUTS, matchShortcut, shortcutLabel, type KeyInput } from "@featra/client/shortcuts";
 import { describe, expect, it } from "vitest";
 import { keysOf } from "../e2e/keys.ts";
 
@@ -16,24 +16,6 @@ function pressed(keys: string): KeyInput {
     shiftKey: mods.has("Shift"),
   };
 }
-
-const APP_SHORTCUTS: AppShortcut[] = [
-  "newChat",
-  "newProject",
-  "openFolder",
-  "projectSettings",
-  "settings",
-  "keyboardShortcuts",
-  "closeWindow",
-  "toggleSidebar",
-  "zoomReset",
-  "zoomIn",
-  "zoomOut",
-  "fullScreen",
-  "reload",
-  "back",
-  "forward",
-];
 
 describe("the e2e harness presses each platform's own shortcut (STORY-63)", () => {
   it.each(["win32", "linux", "darwin"])(
