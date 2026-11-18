@@ -32,7 +32,9 @@ async function main() {
     assets: join(DESKTOP, "assets"),
     electronVersion: await electronVersion(),
   });
-  await builder.build({ projectDir: DESKTOP, config, publish: "never" });
+  // Run in the staged folder: from apps/desktop, electron-builder collects the workspace's dependencies itself, the
+  // Agent SDK's Claude Code binaries among them, beside the staged node_modules.
+  await builder.build({ projectDir: STAGED_APP, config, publish: "never" });
   for (const file of installerFiles(platform, staged.version))
     process.stdout.write(`Built ${join(INSTALLERS, file)}\n`);
 }

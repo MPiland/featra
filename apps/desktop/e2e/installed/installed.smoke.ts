@@ -63,6 +63,11 @@ test("pnpm package built the installer, named with the version and architecture,
     installerFiles(installed.platform, installed.version),
   );
   expect(existsSync(installed.executable)).toBe(true);
+  // The staged node_modules, as staged: the Agent SDK, without Claude Code's binaries or the workspace's packages.
+  const modules = join(installed.appFolder, "node_modules");
+  expect(existsSync(join(modules, "@anthropic-ai", "claude-agent-sdk", "package.json"))).toBe(true);
+  expect((await readdir(join(modules, "@anthropic-ai"))).filter((p) => p.startsWith("claude-agent-sdk-"))).toEqual([]);
+  expect(existsSync(join(modules, "@featra"))).toBe(false);
   if (windows) {
     // Per user: under the user's own programs folder, registered to uninstall, with a Start menu shortcut.
     expect(installed.installedAt.startsWith(join(process.env.LOCALAPPDATA ?? "", "Programs"))).toBe(true);

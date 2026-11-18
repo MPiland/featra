@@ -1,4 +1,5 @@
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -23,6 +24,14 @@ const answering =
   (output: string | null): RunShell =>
   async () =>
     output;
+
+/** What the shell did, run again, for a failure message. */
+function shellReport(reason: string, asked: Parameters<RunShell> | undefined): string {
+  if (!asked) return reason;
+  const [shell, args, { timeoutMs, env }] = asked;
+  const ran = spawnSync(shell, args, { env, timeout: timeoutMs, encoding: "utf8", input: "" });
+  return `${reason}; again: status ${ran.status}, signal ${ran.signal}, error ${ran.error?.message}, stdout ${JSON.stringify(ran.stdout)}, stderr ${JSON.stringify(ran.stderr)}`;
+}
 
 describe("the login shell's PATH (STORY-64)", () => {
   it("is read only by the installed app, and not on Windows", () => {
@@ -124,11 +133,13 @@ describe("the login shell's PATH (STORY-64)", () => {
     try {
       await writeFile(join(home, ".profile"), 'PATH="$HOME/tools/bin:$PATH"\nexport PATH\necho "profile says hi"\n');
       await chmod(join(home, ".profile"), 0o644);
+      let asked: Parameters<RunShell> | undefined;
       const found = await readLoginPath({
         platform: "linux",
         env: { PATH: STARTED, SHELL: "/bin/sh", HOME: home, ENV: "" },
+        run: (...call) => ((asked = call), runShell(...call)),
       });
-      expect(found.source).toBe("login shell");
+      expect(found.source, found.source === "fallback" ? shellReport(found.reason, asked) : "").toBe("login shell");
       expect(found.path.split(":")[0]).toBe(join(home, "tools", "bin"));
       expect(found.path.split(":")).toEqual(expect.arrayContaining(STARTED.split(":")));
     } finally {

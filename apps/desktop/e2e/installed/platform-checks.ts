@@ -16,12 +16,20 @@ import { powershell } from "./install.ts";
 export function windowsIconDiff(exe: string, ico: string): { size: string; differing: number } {
   const out = powershell(
     [
-      "Add-Type -AssemblyName System.Drawing",
+      "Add-Type -AssemblyName System.Drawing, PresentationCore",
       "$a = [System.Drawing.Icon]::ExtractAssociatedIcon($env:EXE).ToBitmap()",
-      "$b = (New-Object System.Drawing.Icon($env:ICO, $a.Width, $a.Height)).ToBitmap()",
+      // The .ico's images are PNGs, which System.Drawing's Icon can't decode at a size; WPF's decoder can.
+      "$ico = New-Object System.Windows.Media.Imaging.IconBitmapDecoder((New-Object System.Uri $env:ICO), 'None', 'OnLoad')",
+      "$f = $ico.Frames | Where-Object { $_.PixelWidth -eq $a.Width -and $_.PixelHeight -eq $a.Height } | Select-Object -First 1",
+      "$b = New-Object System.Windows.Media.Imaging.FormatConvertedBitmap($f, [System.Windows.Media.PixelFormats]::Bgra32, $null, 0)",
+      "$px = New-Object byte[] ($a.Width * $a.Height * 4)",
+      "$b.CopyPixels($px, $a.Width * 4, 0)",
       "$d = 0",
-      "for ($x = 0; $x -lt $a.Width; $x++) { for ($y = 0; $y -lt $a.Height; $y++) {",
-      "  if ($a.GetPixel($x, $y).ToArgb() -ne $b.GetPixel($x, $y).ToArgb()) { $d++ } } }",
+      "for ($y = 0; $y -lt $a.Height; $y++) { for ($x = 0; $x -lt $a.Width; $x++) {",
+      "  $i = ($y * $a.Width + $x) * 4; $c = $a.GetPixel($x, $y)",
+      // A fully transparent pixel has no color to compare.
+      "  if ($c.A -eq 0 -and $px[$i + 3] -eq 0) { continue }",
+      "  if ($c.B -ne $px[$i] -or $c.G -ne $px[$i + 1] -or $c.R -ne $px[$i + 2] -or $c.A -ne $px[$i + 3]) { $d++ } } }",
       '"$($a.Width)x$($a.Height) $d"',
     ].join("\n"),
     { EXE: exe, ICO: ico },
@@ -30,11 +38,15 @@ export function windowsIconDiff(exe: string, ico: string): { size: string; diffe
   return { size, differing: Number(differing) };
 }
 
-/** The per-user uninstall entry the installer registers for Featra: its name and where it installed to. */
+/**
+ * The per-user uninstall entry the installer registers for Featra: its name and where it installed to, the folder of
+ * the uninstaller it runs (electron-builder's NSIS entry leaves InstallLocation empty).
+ */
 export function windowsUninstallEntry(): { name: string; location: string } {
   const out = powershell(
     "Get-ChildItem HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall | Get-ItemProperty | " +
-      "Where-Object { $_.DisplayName -eq 'Featra' } | ForEach-Object { \"$($_.DisplayName)`t$($_.InstallLocation)\" }",
+      "Where-Object { $_.DisplayName -eq 'Featra' } | ForEach-Object { " +
+      '"$($_.DisplayName)`t$(Split-Path ($_.UninstallString -replace \'^"([^"]+)".*\', \'$1\'))" }',
   );
   const [name = "", location = ""] = out.split("\t");
   return { name, location };

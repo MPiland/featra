@@ -102,6 +102,7 @@ export function builderConfig({ app, output, assets, electronVersion }: ConfigIn
       executableName: "featra",
       synopsis: "Run your AI coding agents like a product team",
     },
-    appImage: { artifactName: `${NAMED}.\${ext}` },
+    // electron-builder names x64 AppImages x86_64; the one Linux build is x64, named like the others.
+    appImage: { artifactName: `\${productName}-\${version}-x64.\${ext}` },
   };
 }
