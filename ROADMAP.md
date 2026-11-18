@@ -112,6 +112,7 @@ epics in `.featra/cards/`.
   process), so the unit run on a busy PC takes minutes. Under load, BUG-28 measured the server suite at 45 minutes or
   more, nearly all of it process starts.
 - Manual Merge of a story under a Cancelled feature: decide whether to refuse it (auto-merge already skips it).
+- Show when a feature is waiting on the user's Accept, computed rather than stored as a status. Today Accept appears only in the feature's card pane, once every story and bug is Done or Cancelled. Show an "Awaiting your Accept" mark on the feature's Work row and an Inbox item at that point.
 
 ## Before public release
 
@@ -120,3 +121,5 @@ epics in `.featra/cards/`.
   Send Feedback, and Check for Updates.
 - **Logo and app icon.** A real Featra logo to replace the placeholder "F" icon (BUG-14). The icon is generated from
   `tooling/icon/icon.svg`, so the new mark replaces that file.
+- **Signed installers.** Sign and notarize the macOS app (Apple Developer ID) and sign the Windows installer, so they
+  install without Gatekeeper or SmartScreen warnings. The first installers are unsigned (decisions.md, 2026-11-17).

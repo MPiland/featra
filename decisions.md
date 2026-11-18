@@ -2478,6 +2478,12 @@ an accepted feature with no facts yet expects "Checking…" instead of no reason
 - Dev-lead calls: stories under one feature merge one at a time; a story is checked when its evidence changes and once when the project opens; ADR 0034 ("only the user merges") is amended in STORY-59.
 - Stories: STORY-59 Merge a proven story on its own; STORY-60 An automatic merge that fails; STORY-61 Hold a story back from auto-merge. STORY-60 and STORY-61 depend on STORY-59.
 
+## 2026-11-16 — Design review of screenshots (user and dev-lead)
+
+- The user asked that UI be checked for standard design and clean layout, not only copy and tests.
+- Product: STORY-25 gains a criterion. Before a story moves to Acceptance, the reviewing agent checks its screenshots for layout and design and sends any findings to the story's session. Capture still needs no extra install (Electron's built-in Chromium) and spends no agent tokens; the review is agent work.
+- Our own build: every story that adds or changes UI gets a visual review of CI screenshots before the user's Accept, alongside the code review.
+
 ## 2026-11-16 — STORY-59 build choices (story agent; confirmed by the Dev Lead)
 
 Confirmed by dev-lead in review. The two points the story agent left open, a story whose session is running and the app
@@ -2772,3 +2778,10 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   341 s, all git and `gh` starts. Fewer starts per test is on the roadmap.
   After the review fixes, under the same load with the hook's 900 s guard: the server suite, 0 of 1090 failed in
   1756 s (slowest test 155 s); the client suite, 0 of 661 failed in 122 s.
+
+## 2026-11-17 — Installers (user)
+
+- Featra ships installers for Windows, macOS and Linux, published to GitHub Releases. Today it runs only from source (`pnpm start`).
+- The first release is unsigned. Testers click through one warning: SmartScreen on Windows, right-click then Open on macOS. Signing and notarization go on the "Before public release" list.
+- This is the next feature after FEAT-8. macOS joins CI first, because Featra has never run there. Then the packaging and the release workflow.
+- Features have no stored Acceptance status. Whether a feature is waiting on the user's Accept is computed (roadmap: an "Awaiting your Accept" mark on the Work row and in the Inbox).
