@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { _electron as electron, test, type ElectronApplication, type Page } from "@playwright/test";
 import electronPath from "electron";
 import { foregroundWindow, grantForeground, windowsForegroundWindow, wslg } from "./foreground.ts";
+import { EVIDENCE } from "./stuck-step-reporter.ts";
 
 // No trailing separator: on Windows a trailing backslash escapes the closing quote of the argument.
 const appDir = dirname(fileURLToPath(new URL("../package.json", import.meta.url)));
@@ -58,23 +59,82 @@ export async function launch(
 }
 
 let traceCount = 0;
+/** Each launched app not yet closed: its `close` saves its evidence first (BUG-30). */
+const openApps = new Set<ElectronApplication>();
+const SCREENSHOT_MS = 10_000;
+const CLOSE_MS = 15_000;
 
 /**
  * Playwright's `trace` option only records browser contexts, not an Electron app, so the app's own actions, DOM
- * snapshots and screenshots are traced here. Closing the app saves `electron-<n>.zip` to the test's output folder;
- * `preserveOutput: "failures-only"` keeps it only when the test fails. An app that exits on its own leaves no trace.
+ * snapshots and screenshots are traced here. Before the app closes, a screenshot of each of its windows and the trace
+ * are saved to the test's output folder as `electron-<n>-window-<w>.png` and `electron-<n>.zip`;
+ * `preserveOutput: "failures-only"` keeps them only when the test fails. A test that fails or times out before it
+ * closes the app gets them too: the evidence fixture (`fixtures.ts`) closes what it left running (BUG-30). An app that
+ * exits on its own leaves none.
  */
 function traceUntilClosed(app: ElectronApplication): void {
   const context = app.context();
   const started = context.tracing.start({ screenshots: true, snapshots: true, sources: true });
+  let saved: Promise<void> | undefined;
+  const keep = () =>
+    (saved ??= keepEvidence(
+      app,
+      started.then(() => context),
+    ));
+  openApps.add(app);
+  app.once("close", () => openApps.delete(app));
   const close = app.close.bind(app);
   app.close = async () => {
-    traceCount += 1;
-    await started
-      .then(() => context.tracing.stop({ path: test.info().outputPath(`electron-${traceCount}.zip`) }))
-      .catch(() => undefined);
+    await keep();
+    openApps.delete(app);
     await close();
   };
+}
+
+/** Saves a screenshot of each of the app's windows, then its trace, and names them on the test for the reporter. */
+async function keepEvidence(app: ElectronApplication, tracing: Promise<ReturnType<ElectronApplication["context"]>>) {
+  const info = test.info();
+  traceCount += 1;
+  const n = traceCount;
+  const kept: string[] = [];
+  for (const [w, page] of app.windows().entries()) {
+    // A hidden or minimised window (in the tray) draws no frame, so a screenshot of it would only wait.
+    const shown = await page.evaluate(() => document.visibilityState === "visible").catch(() => false);
+    if (!shown) continue;
+    const path = info.outputPath(`electron-${n}-window-${w + 1}.png`);
+    await page.screenshot({ path, timeout: SCREENSHOT_MS }).then(
+      () => kept.push(path),
+      () => undefined,
+    );
+  }
+  const trace = info.outputPath(`electron-${n}.zip`);
+  await tracing
+    .then((context) => context.tracing.stop({ path: trace }))
+    .then(
+      () => kept.push(trace),
+      () => undefined,
+    );
+  for (const path of kept) info.annotations.push({ type: EVIDENCE, description: path });
+}
+
+/**
+ * Closes every app the test left running, saving its evidence first (BUG-30): a spec closes its app at the end of
+ * `try`, so one that fails or times out never does. An app that won't close in time is killed.
+ */
+export async function closeLeftRunning(): Promise<void> {
+  for (const app of openApps) {
+    openApps.delete(app);
+    const proc = app.process();
+    if (proc.exitCode !== null || proc.signalCode !== null) continue;
+    let timer: NodeJS.Timeout | undefined;
+    const timedOut = new Promise<boolean>((r) => (timer = setTimeout(() => r(false), CLOSE_MS)));
+    const closed = app.close().then(
+      () => true,
+      () => false,
+    );
+    if (!(await Promise.race([closed, timedOut]))) proc.kill();
+    clearTimeout(timer);
+  }
 }
 
 /**

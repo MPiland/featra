@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
+import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
 import { newCard, parseCard, serializeCard, type Card, type CardType } from "@featra/work-format";
 import { launch, sizeTo, tempUserData } from "./app.ts";
 

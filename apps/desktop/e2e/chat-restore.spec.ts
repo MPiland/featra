@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
 

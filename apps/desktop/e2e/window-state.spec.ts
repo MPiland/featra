@@ -1,4 +1,4 @@
-import { expect, test, type ElectronApplication, type Page } from "@playwright/test";
+import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
 import { launch, tempUserData, windowManagerCanMaximize } from "./app.ts";
 
 /**

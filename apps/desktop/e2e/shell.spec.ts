@@ -1,4 +1,4 @@
-import { expect, test, type ElectronApplication } from "@playwright/test";
+import { expect, test, type ElectronApplication } from "./fixtures.ts";
 import { clickTray, launch, notices, tempUserData, windowVisible } from "./app.ts";
 
 const zoomFactor = (app: ElectronApplication) =>

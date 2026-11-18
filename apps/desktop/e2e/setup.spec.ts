@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures.ts";
 import { launch, queueFolderPicks, tempUserData } from "./app.ts";
 
 /**

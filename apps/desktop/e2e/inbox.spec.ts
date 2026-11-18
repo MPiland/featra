@@ -1,6 +1,6 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { clickLastNotification, launch, notificationsShown, setFocused, tempProject, tempUserData } from "./app.ts";
 

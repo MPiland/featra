@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import { parseCard } from "@featra/work-format";
 import { git } from "./draft-project.ts";
 import { githubApp, provenStory } from "./proven-story.ts";

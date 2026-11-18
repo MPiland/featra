@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { relative } from "node:path";
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import { parseCard } from "@featra/work-format";
 import { git } from "./draft-project.ts";
 import { githubApp, provenStory } from "./proven-story.ts";

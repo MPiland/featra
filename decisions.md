@@ -2785,3 +2785,35 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
 - The first release is unsigned. Testers click through one warning: SmartScreen on Windows, right-click then Open on macOS. Signing and notarization go on the "Before public release" list.
 - This is the next feature after FEAT-8. macOS joins CI first, because Featra has never run there. Then the packaging and the release workflow.
 - Features have no stored Acceptance status. Whether a feature is waiting on the user's Accept is computed (roadmap: an "Awaiting your Accept" mark on the Work row and in the Inbox).
+
+## 2026-11-18 — BUG-30 fix
+
+- **The problem.** A timed-out e2e test printed only "Test timeout of 60000ms exceeded". The app's trace was saved by
+  each spec's `app.close()` in `try`, so a test that failed or timed out never reached it and kept nothing. A unit
+  test the hang guard stopped said only how long it ran.
+- **One place, not 45 specs.** Every e2e spec imports `test` and `expect` from `e2e/fixtures.ts` (a mechanical
+  import change). Its auto fixture closes, after the test, every app the test left running. Each launch wraps the
+  app's `close` to first save a screenshot of each visible window and the app's trace (DOM snapshots and screencast)
+  to the test's output folder. Playwright gives fixture teardown its own time after a timeout, so this runs after a
+  timed-out test too. A spec's own `close` and the fixture share that one path. An app that won't close in 15 s is
+  killed. `e2e-harness.test.ts` checks every spec uses the fixture. Rejected: an `afterEach` per spec (45 edits), and
+  Playwright's `trace` option (it records browser contexts, not an Electron app).
+- **The log names the step.** A reporter (`e2e/stuck-step-reporter.ts`) runs beside the list reporter. For each
+  failed test it prints the step it was still waiting in, or else the last step that failed. Playwright's step title
+  names the locator ("Click getByRole('button', …)"), and the spec's code line is printed with it. Then come the
+  step's error and the files kept. Hooks and fixtures are never blamed, since they run after the test stopped. Chosen
+  over an `afterEach` printing `testInfo.errors`: after a timeout those hold only the timeout message, not the step.
+- **A stopped unit test says what it waited for.** `tooling/waits.ts` is one registry of open waits: `until`
+  (formerly copied in the server and mcp tests), `waitingFor` (any promise, with a name), the WebSocket client's
+  `next`, `expect.poll` (wrapped in the hang guard's setup file) and the client's Testing Library waits and user-event
+  actions (through its `asyncWrapper`). Each notes what it waits for and the test line that asked. When a test fails
+  with waits still open, the setup file adds an error listing them and stops each `until`. `HANG_GUARD` now carries
+  that setup file, so every project gets it with the time limit it already spreads. `vi.waitFor` is left out: it gives
+  up after 1 s on its own and names its own failure.
+- **`@featra/tooling` is a workspace package.** It exports `./waits`, and server, client and mcp take it as a dev
+  dependency, so their tests import one `until` rather than copies. This lifts BUG-28's "can't import from `tooling/`"
+  for test code only, without widening any `rootDir`.
+- **Proof.** Real-code tests run a fixture suite that hangs (`tooling/test/hang-fixture`, `apps/desktop/test/stuck-fixture`)
+  under the real hang guard and the real reporter and read their output. The e2e side was proved in CI with a probe
+  spec that timed out on a missing locator; it was reverted (see the PR).
+- No ADR: this changes the test harness only, within ADR 0013's rules.

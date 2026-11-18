@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures.ts";
 import { denyMessage } from "@featra/work-format";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";

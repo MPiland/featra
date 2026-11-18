@@ -19,6 +19,7 @@
     "ws": "^8.22.1"
   },
   "devDependencies": {
+    "@featra/tooling": "workspace:*",
     "@types/ws": "^8.18.2"
   }
 }

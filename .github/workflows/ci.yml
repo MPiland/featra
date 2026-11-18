@@ -51,7 +51,8 @@ jobs:
       - name: E2E suite
         shell: bash
         run: pnpm test:e2e
-      - name: Upload Playwright traces
+      # A failed test's window screenshots, app trace with DOM snapshots and runner trace (BUG-30, docs/testing.md).
+      - name: Upload screenshots and traces of failed tests
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -79,7 +80,8 @@ jobs:
           e2e: "true"
       - name: E2E suite under Xvfb and Openbox
         run: tooling/e2e/xvfb.sh pnpm test:e2e
-      - name: Upload Playwright traces
+      # A failed test's window screenshots, app trace with DOM snapshots and runner trace (BUG-30, docs/testing.md).
+      - name: Upload screenshots and traces of failed tests
         if: failure()
         uses: actions/upload-artifact@v4
         with:

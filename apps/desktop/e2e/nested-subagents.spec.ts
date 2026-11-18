@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
 

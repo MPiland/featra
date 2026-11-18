@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
-import { expect, test, type ElectronApplication } from "@playwright/test";
+import { expect, test, type ElectronApplication } from "./fixtures.ts";
 import { parseCard, serializeCard } from "@featra/work-format";
 import { checkRun, fakeGh, junitXml } from "../../../packages/server/test/fake-gh.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";

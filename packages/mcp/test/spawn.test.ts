@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { until } from "@featra/tooling/waits";
 import { newCard, parseCard, serializeCard, setStatus } from "@featra/work-format";
 import {
   createAllowedProjects,
@@ -191,13 +192,3 @@ describe("spawn_session through the Featra MCP", () => {
     expect(text(bad)).toBe("Not started. Give the story's id, such as STORY-9, as `story`.");
   });
 });
-
-/**
- * Waits until `ok` holds, with no deadline of its own: the run's hang guard ends a wait that never does (BUG-28). The
- * server's `test/until.ts` does the same, but this package's tsconfig keeps its files inside it.
- */
-async function until(ok: () => boolean) {
-  while (!ok()) {
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
-import { expect, test, type ElectronApplication } from "@playwright/test";
+import { expect, test, type ElectronApplication } from "./fixtures.ts";
 import { checkRun, fakeGh } from "../../../packages/server/test/fake-gh.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";

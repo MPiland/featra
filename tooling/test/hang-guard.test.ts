@@ -1,7 +1,14 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { DEFAULT_HANG_GUARD_MS, HANG_GUARD_ENV, hangGuard, hangGuardMs } from "../hang-guard.ts";
+import {
+  DEFAULT_HANG_GUARD_MS,
+  HANG_GUARD,
+  HANG_GUARD_ENV,
+  hangGuard,
+  hangGuardMs,
+  WAIT_REPORT_SETUP,
+} from "../hang-guard.ts";
 import { REPO } from "./run.ts";
 
 describe("the hang guard (BUG-28)", () => {
@@ -30,6 +37,20 @@ describe("the hang guard (BUG-28)", () => {
       return !config || !/\.\.\.HANG_GUARD\b/.test(readFileSync(config, "utf8"));
     });
     expect(unguarded).toEqual([]);
+  });
+
+  it("gives every project the setup file that names what a stopped test was waiting for (BUG-30)", () => {
+    expect(HANG_GUARD.setupFiles).toEqual([WAIT_REPORT_SETUP]);
+    expect(existsSync(WAIT_REPORT_SETUP)).toBe(true);
+    const root = readFileSync(join(REPO, "vitest.config.ts"), "utf8");
+    const projects = [...(/projects:\s*\[([^\]]*)\]/.exec(root)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
+    const dropped = projects.filter((dir) => {
+      const config = ["vitest.config.ts", "vite.config.ts"].map((f) => join(REPO, dir, f)).find((f) => existsSync(f));
+      const text = config ? readFileSync(config, "utf8") : "";
+      return /setupFiles\s*:/.test(text) && !/setupFiles\s*:\s*\[\s*\.\.\.HANG_GUARD\.setupFiles\b/.test(text);
+    });
+    expect(projects.length).toBeGreaterThan(5);
+    expect(dropped).toEqual([]);
   });
 
   it("is 300 s in CI, well inside the Gate job's own limit, so a hang fails a named test", () => {

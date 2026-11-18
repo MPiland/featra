@@ -1,4 +1,7 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { REPO } from "../../../tooling/test/run.ts";
 import { describeDesktop, desktopBlocker, parseDesktopState } from "../e2e/foreground.ts";
 import { isHarnessProcess } from "../e2e/leftovers.ts";
 
@@ -77,5 +80,46 @@ describe("e2e harness: leftover processes", () => {
     );
     expect(isHarnessProcess("pwsh.exe", "pwsh -NoProfile -Command Get-Process", dir)).toBe(false);
     expect(isHarnessProcess("conhost.exe", String.raw`conhost.exe busy-user.ps1`, dir)).toBe(false);
+  });
+});
+
+describe("e2e harness: what a failed test leaves behind (BUG-30)", () => {
+  const e2e = join(REPO, "apps", "desktop", "e2e");
+
+  it("gives every e2e test the fixture that keeps the app's screenshot and trace when it stops", () => {
+    const specs = readdirSync(e2e).filter((f) => f.endsWith(".spec.ts"));
+    expect(specs.length).toBeGreaterThan(0);
+    const unkept = specs.filter((f) => {
+      const source = readFileSync(join(e2e, f), "utf8");
+      return !/from "\.\/fixtures\.ts";/.test(source) || /from "@playwright\/test";/.test(source);
+    });
+    expect(unkept).toEqual([]);
+  });
+
+  it("uploads the failed tests' files from both e2e jobs in CI", () => {
+    const ci = readFileSync(join(REPO, ".github", "workflows", "ci.yml"), "utf8").replaceAll("\r\n", "\n");
+    for (const job of ["e2e-windows", "e2e-ubuntu"]) {
+      const body = ci.split(new RegExp(String.raw`^  ${job}:$`, "m"))[1]?.split(/^ {2}\S/m)[0] ?? "";
+      expect(body, job).toMatch(
+        /- name: Upload screenshots and traces of failed tests\n\s+if: failure\(\)\n\s+uses: actions\/upload-artifact@v4\n\s+with:\n\s+name: e2e-\w+-traces\n\s+path: apps\/desktop\/test-results\n/,
+      );
+    }
+  });
+
+  it("says in docs/testing.md where the files are and how to open them", () => {
+    const docs = readFileSync(join(REPO, "docs", "testing.md"), "utf8").replaceAll("\r\n", "\n");
+    const section = docs.split("## When a test fails")[1]?.split(/^## /m)[0] ?? "";
+    for (const named of [
+      "e2e-windows-traces",
+      "e2e-ubuntu-traces",
+      "electron-<n>-window-<w>.png",
+      "electron-<n>.zip",
+      "trace.zip",
+      "pnpm --filter @featra/desktop exec playwright show-trace <file>",
+      'Where "',
+      "The test ended while still waiting for:",
+    ]) {
+      expect(section, named).toContain(named);
+    }
   });
 });
