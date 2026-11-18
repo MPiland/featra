@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { MERGE_COPY } from "@featra/work-format/merge-copy";
 import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
@@ -72,8 +72,9 @@ export function CardPane({
   const review = useAction();
   const reviewAlert = useRef<HTMLParagraphElement>(null);
   const { view, setView } = card;
-  // A failure that comes when the buttons are gone (the card isn't a draft just now) takes focus itself.
-  useEffect(() => {
+  // A failure that comes when the buttons are gone (the card isn't a draft just now) takes focus itself, in the commit
+  // that shows it.
+  useLayoutEffect(() => {
     if (review.error && !pane.current?.contains(document.activeElement)) reviewAlert.current?.focus();
   }, [review.error]);
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CARD_COPY, type ReviewResult } from "../../card-pane.ts";
 import { ConfirmAsk } from "./ConfirmAsk.tsx";
 import type { Action } from "./useAction.ts";
@@ -38,10 +38,11 @@ export function DraftReview({ id, stories, onApprove, onReject, onRejected, acti
       reject.current?.focus();
     }
   }, [asking]);
-  // A refusal puts focus on Reject, these buttons mounted again while it ran included (BUG-31).
-  useEffect(() => {
-    if (action.error) reject.current?.focus();
-  }, [action.error]);
+  // A refusal puts focus on Reject, these buttons mounted again while it ran included (BUG-31): in the commit that shows
+  // it, and once Reject is on again (a disabled button takes no focus).
+  useLayoutEffect(() => {
+    if (action.error && !busy) reject.current?.focus();
+  }, [action.error, busy]);
 
   const run = async (act: () => Promise<ReviewResult>, done?: () => void) => {
     await action.run(act, done);
