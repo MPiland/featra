@@ -18,13 +18,16 @@ jobs:
   gate:
     name: Gate
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Well above the hang guard below, so a hung test fails by name and its report still uploads (BUG-28).
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
       - name: Format, lint, typecheck and unit tests
         run: pnpm check
         env:
+          # Every unit test's time limit (tooling/hang-guard.ts).
+          FEATRA_HANG_GUARD_MS: "300000"
           # A JUnit report of the unit tests as well, which Featra reads to prove criteria (STORY-57).
           FEATRA_JUNIT: test-report/unit.xml
       - name: Upload the unit test report

@@ -2711,29 +2711,64 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
 - **Cause 1: fixed deadlines in the tests.** `until` (5 s), `next` (2 s), `GIT_ASKED_MS` and `FIRST_ANSWER_MS`
   (20 s), literal 5 to 60 s deadlines, 10 s poll loops, and per-describe time limits of 30 and 60 s were all shorter
   than one stall. Fix: the wait helpers wait on the condition with no deadline of their own; a deadline stays only
-  where a criterion promises a time (STORY-3's 1 s push) or a quiet check waits to see nothing happen.
-- **The hang guard.** `tooling/hang-guard.ts` sets one time limit for every test, hook and `expect.poll`: 900 s. Each
-  project's config spreads it into `test`, since vitest gives projects neither the root config's limits nor
-  `--hookTimeout` from the command line (tried: hooks still stopped at the default 10 s). It replaces
-  `--testTimeout=30000` in `test:unit`, the server's `hookTimeout`, the mcp `testTimeout` and about 90 per-test
-  overrides. This is a raised limit, with evidence: under load one git call took 77 s and the slowest test, which only
-  starts git and `gh` and waits on nothing, took 244 s here and 341 s in the stress runs below; 900 s is over twice that, and only a hung test reaches it.
-  `test-waits.test.ts` fails if a project's config leaves it out.
+  where a criterion promises a time (STORY-3's 1 s push) or a quiet check waits to see nothing happen. The client's
+  Testing Library waits (`waitFor`, `findBy*`) gave up after a fixed 1 s; its setup file now gives them the hang guard.
+- **The hang guard.** `tooling/hang-guard.ts` sets one time limit for every test, hook, `expect.poll` and Testing
+  Library wait, read from `FEATRA_HANG_GUARD_MS` there and nowhere else. Code that needs the number reads it with
+  vitest's `inject("hangGuardMs")`, which the same settings provide (the server's `TEST_PROCESS_LIMIT_MS`, the
+  client's setup file), since the packages' tsconfigs can't import from `tooling/`. Each project's config spreads it
+  into `test`, since vitest gives projects neither the root config's limits nor `--hookTimeout` from the command
+  line (tried: hooks still stopped at the default 10 s). It replaces `--testTimeout=30000` in `test:unit`, the
+  server's `hookTimeout`, the mcp `testTimeout` and about 90 per-test overrides.
+  - 120 s by default, so a focused run reports a red or hung test soon (review: 900 s everywhere made a TDD run wait
+    15 minutes).
+  - 900 s from the pre-commit hook, for a loaded PC. Evidence: one git call took 77 s and the slowest test, which only
+    starts git and `gh`, took 341 s in the stress runs below; 900 s is over twice that.
+  - 300 s in CI. The Gate job's own limit went from 15 to 30 minutes: at 15 it equalled a 900 s guard, so a hang would
+    have killed the job with no test named and no JUnit report uploaded.
+  - An unreadable value throws rather than falling back. `hang-guard.test.ts` checks the default, the settings, that
+    every project spreads them, and that CI's value sits well inside the Gate's limit.
 - **Cause 2: the product's 15 s `gh` limit fired on the fake.** Under load the fake `gh` (cmd.exe and node) started
   late, `runGh` killed it, and the product took the "GitHub can't be read" path: "STORY-1 has no PR" in place of the
   conflict the test was about. `createServices` and the GitHub deps take `ghTimeoutMs` (15 s by default, unchanged
-  for the app); the tests pass `FAKE_GH_TIMEOUT_MS = 0`, no limit. Regression test: a `gh pr view` slower than 15 s
-  is still read (`story-prs-read.test.ts`), red with the 15 s limit. The stress run below found the last direct `runGh` call without it (`gh-run.test.ts`). The check commands the checks and feature-end tests start had a fixed 30 s kill too; they now get `TEST_PROCESS_LIMIT_MS`, the hang guard's 900 s.
-- **Cause 3: a card-only commit ran the whole gate.** The hook now runs `pnpm check:content` (format check and the
-  work-format tests, which validate every card in the repo) when the only changed paths, staged, unstaged or
-  untracked, are under `.featra/` or are Markdown at the root or in `docs/`. Markdown in a package runs the whole
-  gate. ADR 0014 amended.
-- **Guard.** `tooling/test/test-waits.test.ts` fails on a fixed wait in any unit test: a deadline on `until`,
-  `next`, `eventually` or `expect.poll`, a `Date.now() + N` deadline, a per-test or per-hook time limit, or a sleep
-  followed by a check. Each allowed wait is listed with its reason, and a stale entry fails too.
+  for the app); the tests pass `FAKE_GH_TIMEOUT_MS = 0`, no limit. Regression test (`story-prs-gh-limit.test.ts`):
+  a 500 ms limit kills a fake that takes 3 s, and with no limit the same fake is read. It proves the limit reaches
+  the PR reads without the 15.5 s sleep the first version took, and was red with the limit not passed through. The
+  check commands the checks and feature-end tests start had a fixed 30 s kill too; they now get the hang guard.
+  The wait scan now also fails on any test call that reaches `gh` without a limit (review: `check-settings`,
+  `ci-report`, `gh-run` and `story-prs-open` still had the 15 s kill; the scan was red on them first).
+- **Cause 3: a card-only commit ran the whole gate.** The hook runs `pnpm check:content` (format check and the
+  work-format tests, which validate every card in the repo) when every change, staged, unstaged or untracked, is
+  under `.featra/` or is Markdown at the root or in `docs/`. Markdown in a package runs the whole gate. ADR 0014
+  amended. From the review:
+  - Renames are read as a delete and an add (`--no-renames`), so `git mv` of code into `.featra/` runs the whole gate;
+    before, git listed only the new path.
+  - Paths are read unquoted (`core.quotePath=false`), so a card or doc with an accent in its name isn't taken for
+    code.
+  - An untracked file counts only if a test or build could load it: by type (ts, tsx, js, mjs, cjs, mts, cts, json,
+    yaml, yml, css, html) or by being in `packages/`, `apps/` or `tooling/`. A screenshot left at the root no longer
+    forces the whole gate.
+  - Hook tests cover each of these and a deleted code file. They were red with the old hook, except the delete, which
+    already ran the whole gate.
+- **Guard.** `tooling/test/wait-scan.ts` reads each unit test's code (strings and comments blanked) and finds:
+  - a deadline on `until`, `next`, `eventually`, `waitFor` or `vi.waitFor`/`waitUntil`, as a number, `5 * 1000`,
+    `1e4` or a named constant;
+  - a `timeout:` option on any line, so a multi-line `expect.poll`, `waitFor` or `findBy*` options object counts;
+  - a `Date.now() + N` deadline and a per-test or per-hook limit;
+  - a sleep, including `setTimeout(() => r(), N)`, followed by a check after blank or comment lines;
+  - a call that reaches `gh` with the product's limit.
+
+  Each allowed wait is pinned to its exact line and how many times that line appears, with its reason. A stale entry
+  fails. `test-waits.test.ts` tests both what the scan finds and what it passes (`until(() => rows.slice(0, 100))`,
+  a test name with "(AC6, AC7)" in it).
+
 - **Kept.** The tooling `run()` helper keeps its 120 s kill: `spawnSync` blocks the event loop, so vitest's own
-  limit can't end a hung child. The Electron e2e suite (CI only) keeps its waits.
+  limit can't end a hung child. The Electron e2e suite (CI only) keeps its waits. The mcp package keeps its own
+  three-line `until`: its tsconfig keeps its files inside the package, so it can't import the server's. The three
+  `eventually` copies in the story-stop tests are gone: the server's `until` takes an async condition.
 - **Stress result.** The same server suite, 3 workers, three runs back to back under the same load: 0 of 1089
   failed in 2860 s, 1 of 1089 in 3618 s (`gh-run.test.ts`, the 15 s kill above, fixed after), 0 of 1089 in 2015 s.
   Before: 13 failed in 1334 s. The runs are slower because no test now ends early on a deadline; the slowest test took
   341 s, all git and `gh` starts. Fewer starts per test is on the roadmap.
+  After the review fixes, under the same load with the hook's 900 s guard: the server suite, 0 of 1090 failed in
+  1756 s (slowest test 155 s); the client suite, 0 of 661 failed in 122 s.

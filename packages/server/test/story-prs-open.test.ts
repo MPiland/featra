@@ -32,7 +32,9 @@ describe("GitHub usable or local mode (AC1)", () => {
       missing: GITHUB_COPY.noRemote,
     });
     w.repo.git(w.repo.main, "remote", "add", "origin", w.remote);
-    expect(await detectGithubUse(w.repo.main, { ghCommand: "gh-that-is-not-installed" })).toEqual({
+    expect(
+      await detectGithubUse(w.repo.main, { ghCommand: "gh-that-is-not-installed", ghTimeoutMs: FAKE_GH_TIMEOUT_MS }),
+    ).toEqual({
       usable: false,
       missing: GITHUB_COPY.noGh,
     });

@@ -29,21 +29,6 @@ async function after(ms: number) {
   await w.settle();
 }
 
-describe("a gh slower than the product's 15 s limit (BUG-28)", () => {
-  it("is still read in these tests, as a gh a stalled PC starts late must be", async () => {
-    await w.start({ status: "In Review", gh: open14([checkRun("FAILURE")]) });
-    await w.move("In Review", { pr: URL });
-    await after(2 * MINUTE);
-    expect(prOf()?.status).toEqual({ state: "open", checks: "failing" });
-    await w.gh.change((s) => {
-      s.viewDelayMs = 15_500;
-      for (const pr of s.prs) pr.checks = [checkRun("SUCCESS")];
-    });
-    await after(2 * MINUTE);
-    expect(prOf()?.status).toEqual({ state: "open", checks: "passing" });
-  });
-});
-
 describe("the PR's state and checks (AC3)", () => {
   it("reach the card and the story's Work row once read", async () => {
     await w.start({ status: "In Review", gh: open14([checkRun("FAILURE")]) });

@@ -40,8 +40,8 @@ Suspect fixed timeouts and pollers racing under load.
 
 ## Acceptance criteria
 
-- [x] The local pre-commit gate passes on a busy machine (test: tooling/test/pre-commit-hook.test.ts BUG-28, packages/server/test/story-prs-read.test.ts BUG-28, tooling/test/test-waits.test.ts)
-- [x] No test relies on a fixed wall-clock wait (test: tooling/test/test-waits.test.ts)
+- [x] The local pre-commit gate passes on a busy machine (test: tooling/test/pre-commit-hook.test.ts BUG-28, packages/server/test/story-prs-gh-limit.test.ts, tooling/test/hang-guard.test.ts, tooling/test/test-waits.test.ts)
+- [x] No test relies on a fixed wall-clock wait (test: tooling/test/test-waits.test.ts, packages/client/test/hang-guard.test.ts)
 
 ## Tasks
 

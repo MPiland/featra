@@ -164,7 +164,12 @@ describe("reading CI's test report for a commit", () => {
   it("refuses an unsafe artifact name or commit without calling gh", async () => {
     expect(await read({ artifact: "a b & echo hi" })).toBeNull();
     expect(
-      await readCiReports(gh.bin, "HEAD; rm", { artifact: "x", files: null }, { ghCommand: gh.command }),
+      await readCiReports(
+        gh.bin,
+        "HEAD; rm",
+        { artifact: "x", files: null },
+        { ghCommand: gh.command, ghTimeoutMs: FAKE_GH_TIMEOUT_MS },
+      ),
     ).toBeNull();
     expect(await gh.calls()).toEqual([]);
   });

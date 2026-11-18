@@ -63,7 +63,7 @@ meanwhile, in this ADR's Consequences.
   in the working tree either, runs
   `pnpm check:content` (amended 2026-11-17, BUG-28): the format check and the work-format tests, which parse and
   validate every card in the repo. Lint, typecheck and the other tests would only repeat what the last code commit
-  proved, at 20 to 30 minutes on a busy PC. Any other changed path, staged, unstaged or untracked, runs `pnpm check`.
+  proved, at 20 to 30 minutes on a busy PC. Any other changed path, staged or unstaged, runs `pnpm check`; a rename counts as a delete and an add. An untracked file counts only if a test or build could load it (a source, config or style type, or any file in `packages/`, `apps/` or `tooling/`).
 - `pnpm install` sets `core.hooksPath` to `.githooks` (a relative path, in the repository's shared config), so every
   worktree runs its own checkout's hook.
 - The codebase gets one formatting commit. After that, no commit lands that fails the gate, whoever writes it.

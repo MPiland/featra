@@ -1,108 +1,94 @@
-import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO } from "./run.ts";
+import { ALLOWED, findings, GH_KIND, testFiles } from "./wait-scan.ts";
 
-/**
- * BUG-28: no unit test may rely on a fixed wall-clock wait. On a busy PC one process start stalled for up to 77 s, so
- * any deadline a test set itself, or any time limit shorter than the run's hang guard, failed at random. Tests wait on
- * the condition (`until`, `next`, `expect.poll`) and the hang guard (`tooling/hang-guard.ts`) ends a wait that never ends.
- *
- * The waits listed here are allowed, each for its reason. A time is part of the criterion: STORY-3 promises an edit
- * reaches the app within 1 s. A quiet check waits a moment to see nothing happen: on a slow PC it can only pass when
- * it should not, never fail at random.
- */
-const ALLOWED: readonly { file: string; line: string; why: string }[] = [
-  { file: "packages/server/test/ws-work.test.ts", line: '"work.list", 1000)', why: "STORY-3: within 1 s" },
-  { file: "packages/server/test/ws-work.test.ts", line: '"card.view", 1000)', why: "STORY-3: within 1 s" },
-  { file: "packages/server/test/ws-work.test.ts", line: '"work.list", 400)', why: "quiet: no push once unwatched" },
-  { file: "packages/server/test/work-watch.test.ts", line: "joiner.next(1000)", why: "STORY-3: within 1 s" },
-  { file: "packages/server/test/work-watch.test.ts", line: "heard.next(1000)", why: "STORY-3: within 1 s" },
-  { file: "packages/server/test/chat-approvals.test.ts", line: "setTimeout(r, 20)", why: "quiet: not answered yet" },
-  { file: "packages/server/test/chat-questions.test.ts", line: "setTimeout(r, 20)", why: "quiet: not answered yet" },
-  { file: "packages/server/test/copy-actions.test.ts", line: "setTimeout(r, 100)", why: "quiet: waits for the lane" },
-  {
-    file: "packages/server/test/feature-start-refusals.test.ts",
-    line: "setTimeout(r, 300)",
-    why: "quiet: waits for the lane",
-  },
-  {
-    file: "packages/server/test/role-watch.test.ts",
-    line: "setTimeout(r, 300)",
-    why: "quiet: stopped watch hears none",
-  },
-];
-
-/** What makes a test wait for a fixed time, each with the way it is written. */
-const FIXED_WAITS: readonly { kind: string; pattern: RegExp }[] = [
-  { kind: "a deadline on a wait helper", pattern: /\b(?:until|next|eventually)\([^;]*,\s*[\d_]{3,}\)/ },
-  { kind: "a deadline on expect.poll", pattern: /expect\s*\.poll\([^;]*\{\s*timeout:/ },
-  { kind: "a deadline of its own", pattern: /Date\.now\(\)\s*\+\s*[\d_]+/ },
-  { kind: "a test or hook time limit", pattern: /\{\s*timeout:\s*[\d_]+\s*\},\s*(?:async\s*)?\(/ },
-  { kind: "a test or hook time limit", pattern: /^\s*\{\s*timeout:\s*[\d_]+\s*\},\s*$/ },
-  { kind: "a test or hook time limit", pattern: /^\s*\}\s*,\s*[\d_]+\s*\);/ },
-  { kind: "a sleep before a check", pattern: /setTimeout\(\s*\w+\s*,\s*[\d_]+\s*\)\);\s*$/ },
-];
-
-/** The unit tests: every test folder and its helpers. The Electron e2e suite runs in CI only, with its own waits. */
-function testFiles(): string[] {
-  const listed = execFileSync(
-    "git",
-    [
-      "ls-files",
-      "--cached",
-      "--others",
-      "--exclude-standard",
-      "packages/*/test/*",
-      "apps/desktop/test",
-      "tooling/test",
-    ],
-    { cwd: REPO, encoding: "utf8" },
-  );
-  return listed.split("\n").filter((f) => /\.(?:ts|tsx|cjs|mjs)$/.test(f) && f !== "tooling/test/test-waits.test.ts");
-}
-
-/** A sleep is fixed only when a check follows it; one in a polling loop just paces the loop. */
-function findings(file: string, text: string): string[] {
-  const lines = text.split(/\r?\n/);
-  const found: string[] = [];
-  lines.forEach((line, i) => {
-    for (const { kind, pattern } of FIXED_WAITS) {
-      if (!pattern.test(line)) continue;
-      if (kind === "a sleep before a check" && !/^\s*expect\(/.test(lines[i + 1] ?? "")) continue;
-      if (ALLOWED.some((a) => a.file === file && line.includes(a.line))) continue;
-      found.push(`${file}:${i + 1}: ${kind}: ${line.trim()}`);
-    }
-  });
-  return found;
-}
+/** BUG-28: the scan in `wait-scan.ts` finds every fixed wait, however written, and none is left in the unit tests. */
+const kinds = (sample: string[]) => findings("sample.test.ts", sample.join("\n")).map((f) => f.split(": ")[1]);
 
 describe("no unit test relies on a fixed wall-clock wait (BUG-28)", () => {
-  it("finds each kind of fixed wait, so the guard below can't pass by seeing nothing", () => {
-    const sample = [
-      "await until(() => done, 20_000);",
-      "await socket.next((f) => f.id === 1, 5000);",
-      "await expect.poll(read, { timeout: 10_000 }).toBe(1);",
-      "const end = Date.now() + 10_000;",
-      'describe("x", { timeout: 60_000 }, () => {',
-      "  { timeout: 60_000 },",
-      "}, 60_000);",
-      "await new Promise((r) => setTimeout(r, 300));",
-      "expect(order).toEqual([]);",
-      "while (!ok()) await new Promise((r) => setTimeout(r, 20));",
-      "await until(() => done);",
-    ].join("\n");
-    expect(findings("sample.test.ts", sample).map((f) => f.split(": ")[1])).toEqual([
+  it("finds each kind of fixed wait, however it is written", () => {
+    expect(
+      kinds([
+        "await until(() => done, 20_000);",
+        "await until(ok, GIT_ASKED_MS);",
+        "await socket.next((f) => f.id === 1, 5 * 1000);",
+        "await eventually(check, 1e4);",
+        "await vi.waitFor(() => expect(x).toBe(1), 5000);",
+        "await vi.waitUntil(() => ready, { timeout: 5000 });",
+        "await expect.poll(read, {",
+        "  timeout: 10_000,",
+        "}).toBe(1);",
+        'await screen.findByText("Saved", {}, { timeout: 3000 });',
+        "await waitFor(() => expect(a).toBe(1), { timeout: LONG_MS });",
+        "const end = Date.now() + 10_000;",
+        'describe("x", { timeout: 60_000 }, () => {',
+        "}, 60_000);",
+        'it("y", async () => {}, 30_000);',
+        "await new Promise((r) => setTimeout(r, 300));",
+        "expect(order).toEqual([]);",
+        "await new Promise((r) => setTimeout(() => r(), 300));",
+        "",
+        "// then nothing more",
+        "expect(a).toBe(1);",
+        "await sleep(SETTLE_MS);",
+        "await expect(read()).resolves.toBe(1);",
+      ]),
+    ).toEqual([
       "a deadline on a wait helper",
       "a deadline on a wait helper",
-      "a deadline on expect.poll",
+      "a deadline on a wait helper",
+      "a deadline on a wait helper",
+      "a deadline on a wait helper",
+      "a time limit",
+      "a time limit",
+      "a time limit",
+      "a time limit",
       "a deadline of its own",
-      "a test or hook time limit",
+      "a time limit",
       "a test or hook time limit",
       "a test or hook time limit",
       "a sleep before a check",
+      "a sleep before a check",
+      "a sleep before a check",
     ]);
+  });
+
+  it("passes a wait on a condition, a sleep that paces a loop, and a number that isn't a time", () => {
+    expect(
+      kinds([
+        "while (!ok()) await new Promise((r) => setTimeout(r, 20));",
+        "await until(() => done);",
+        "await until(() => rows.slice(0, 100).length > 0);",
+        'it("says it (AC6, AC7) once", async () => {});',
+        'await until(() => seen("a, 100"));',
+        "await until(() => {",
+        "  // it's read twice, 100 times",
+        "  return reads() > 1;",
+        "});",
+        "export async function until(ok: () => boolean, ms?: number): Promise<void> {",
+        "  const end = ms === undefined ? Infinity : Date.now() + ms;",
+        "await waitFor(() => expect(a).toBe(1));",
+        "const first = rows.next(1);",
+        'it("z", async () => {});',
+        "const control = runCommand(command, cwd, timeoutMs);",
+      ]),
+    ).toEqual([]);
+  });
+
+  it("finds a gh that would get the product's 15 s limit, and passes one without it", () => {
+    expect(
+      kinds([
+        "await detectGithub(repo.main);",
+        "await runGh(dir, args, { gh: gh.command });",
+        "createCheckSettings({ scan, now, ghCommand: w.gh.command });",
+        "await detectGithub(repo.main, { ghTimeoutMs: FAKE_GH_TIMEOUT_MS });",
+        "await runGh(dir, args, { gh: gh.command, timeoutMs: FAKE_GH_TIMEOUT_MS });",
+        "const deps = { ghCommand: gh.command, ghTimeoutMs: FAKE_GH_TIMEOUT_MS };",
+        'import { detectGithub } from "../src/github-detect.ts";',
+      ]),
+    ).toEqual([GH_KIND, GH_KIND, GH_KIND]);
   });
 
   it("finds none in the unit tests, outside the waits allowed for their reason", () => {
@@ -111,19 +97,11 @@ describe("no unit test relies on a fixed wall-clock wait (BUG-28)", () => {
     expect(files.flatMap((f) => findings(f, readFileSync(join(REPO, f), "utf8")))).toEqual([]);
   });
 
-  it("gives every test project the one hang guard, since vitest passes it on to none", () => {
-    const root = readFileSync(join(REPO, "vitest.config.ts"), "utf8");
-    const projects = [...(/projects:\s*\[([^\]]*)\]/.exec(root)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]!);
-    expect(projects.length).toBeGreaterThan(5);
-    const unguarded = projects.filter((dir) => {
-      const config = ["vitest.config.ts", "vite.config.ts"].map((f) => join(REPO, dir, f)).find((f) => existsSync(f));
-      return !config || !/\.\.\.HANG_GUARD\b/.test(readFileSync(config, "utf8"));
+  it("allows each listed wait only on its exact line, as many times as listed", () => {
+    const stale = ALLOWED.filter((a) => {
+      const lines = readFileSync(join(REPO, a.file), "utf8").split(/\r?\n/);
+      return lines.filter((l) => l.trim() === a.line).length !== a.count;
     });
-    expect(unguarded).toEqual([]);
-  });
-
-  it("allows each listed wait only where it still is", () => {
-    const stale = ALLOWED.filter((a) => !readFileSync(join(REPO, a.file), "utf8").includes(a.line));
     expect(stale).toEqual([]);
   });
 });

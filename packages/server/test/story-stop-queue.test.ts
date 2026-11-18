@@ -10,6 +10,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { RESUME_MESSAGE, type ChatSummary } from "@featra/work-format";
 import { sdk } from "./fake-query.ts";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
+import { until } from "./until.ts";
 
 let w: StoryWorld;
 beforeAll(async () => {
@@ -21,12 +22,6 @@ const ask = (method: string, id: string) => w.window.ask(method, { dir: w.repo.m
 const sessionOf = async (id: string): Promise<ChatSummary | undefined> =>
   (await w.sessions()).find((c) => c.story?.id === id);
 const folder = (name: string) => join(w.repo.main, ".claude", "worktrees", name);
-/** Polls an async condition. */
-async function eventually(ok: () => Promise<boolean>) {
-  while (!(await ok())) {
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}
 
 describe("Stop on a story that is queued and never started", () => {
   it("takes it out of the queue: no session, the card keeps its stage with an event and no Stopped mark", async () => {
@@ -69,7 +64,7 @@ describe("Resume on an idle session whose turn failed", () => {
   it("goes on in the same session with no Stopped mark cleared, because there was none", async () => {
     const second = w.claude.runs[1]!;
     second.say(sdk.init("claude-sonnet-5-5", "session-7"), sdk.failure());
-    await eventually(async () => (await sessionOf("STORY-7"))?.stalled === true);
+    await until(async () => (await sessionOf("STORY-7"))?.stalled === true);
     const chat = (await sessionOf("STORY-7"))!;
     expect(chat.running).toBe(false);
     const before = (await w.card("STORY-7", folder("STORY-7-spawn-seven"))).history.length;
@@ -84,7 +79,7 @@ describe("Resume on an idle session whose turn failed", () => {
   it("is not offered after a turn that finished", async () => {
     const second = w.claude.runs[1]!;
     second.say(sdk.success("done"));
-    await eventually(async () => (await sessionOf("STORY-7"))?.running === false);
+    await until(async () => (await sessionOf("STORY-7"))?.running === false);
     expect(await ask("story.resume", "STORY-7")).toMatchObject({ ok: false, error: "STORY-7 isn't stopped." });
   });
 });

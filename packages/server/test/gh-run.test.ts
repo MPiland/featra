@@ -52,15 +52,22 @@ describe("running gh", () => {
   it.runIf(process.platform === "win32")(
     "on Windows runs nothing with a character cmd.exe reads in quotes",
     async () => {
-      expect(await runGh(process.cwd(), ["--version", '"&calc'], { gh: gh.command })).toBeNull();
-      expect(await runGh(process.cwd(), ["--version", "%PATH%"], { gh: gh.command })).toBeNull();
+      expect(
+        await runGh(process.cwd(), ["--version", '"&calc'], { gh: gh.command, timeoutMs: FAKE_GH_TIMEOUT_MS }),
+      ).toBeNull();
+      expect(
+        await runGh(process.cwd(), ["--version", "%PATH%"], { gh: gh.command, timeoutMs: FAKE_GH_TIMEOUT_MS }),
+      ).toBeNull();
       expect(await gh.calls()).toEqual([]);
     },
   );
 
   it("doesn't succeed when gh isn't there", async () => {
     // Null where it can't start; through cmd.exe, cmd's own failure exit code.
-    const r = await runGh(process.cwd(), ["--version"], { gh: "gh-that-is-not-installed" });
+    const r = await runGh(process.cwd(), ["--version"], {
+      gh: "gh-that-is-not-installed",
+      timeoutMs: FAKE_GH_TIMEOUT_MS,
+    });
     expect(r === null || r.code !== 0).toBe(true);
   });
 });

@@ -192,7 +192,10 @@ describe("spawn_session through the Featra MCP", () => {
   });
 });
 
-/** Waits until `ok` holds, with no deadline of its own: the run's hang guard ends a wait that never does (BUG-28). */
+/**
+ * Waits until `ok` holds, with no deadline of its own: the run's hang guard ends a wait that never does (BUG-28). The
+ * server's `test/until.ts` does the same, but this package's tsconfig keeps its files inside it.
+ */
 async function until(ok: () => boolean) {
   while (!ok()) {
     await new Promise((r) => setTimeout(r, 20));

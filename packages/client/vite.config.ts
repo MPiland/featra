@@ -31,5 +31,6 @@ export default defineConfig({
     ...HANG_GUARD,
     environment: "jsdom",
     include: ["test/**/*.test.{ts,tsx}"],
+    setupFiles: ["test/hang-guard-setup.ts"],
   },
 });

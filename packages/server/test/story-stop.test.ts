@@ -14,6 +14,7 @@ import { createStoryStop } from "../src/story-stop.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { sdk } from "./fake-query.ts";
 import { clockNow, storyWorld, type StoryWorld } from "./story-fixture.ts";
+import { until } from "./until.ts";
 
 let w: StoryWorld;
 beforeAll(async () => {
@@ -36,12 +37,6 @@ const rowOf = (node: unknown, id: string): Record<string, unknown> | null => {
   );
 };
 const row = async (id: string) => rowOf((await w.window.ask("work.watch", { dir: w.repo.main })).result, id);
-/** Polls an async condition. */
-async function eventually(ok: () => Promise<boolean>) {
-  while (!(await ok())) {
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}
 const kinds = (events: ChatEvent[]) => events.map((e) => (e.type === "turn-end" ? `end:${e.outcome}` : e.type));
 
 /** Starts the story's session and waits until its agent heard the first message. */
@@ -96,7 +91,7 @@ describe("AC2: Stop", () => {
     // A session whose turn ended waits for a message; it isn't running.
     const { run } = await started("STORY-9", "session-9");
     run.say(sdk.success("done"));
-    await eventually(async () => (await sessionOf("STORY-9"))?.running === false);
+    await until(async () => (await sessionOf("STORY-9"))?.running === false);
     expect(await ask("story.stop", "STORY-9")).toMatchObject({ ok: false, error: "STORY-9 isn't running." });
     expect((await w.card("STORY-9", folder("STORY-9-spawn-9"))).history.some((e) => e.field === "stopped")).toBe(false);
   });
@@ -131,7 +126,7 @@ describe("AC3: Resume", () => {
     const { run } = await started("STORY-6", "session-6");
     expect(await ask("story.stop", "STORY-6")).toMatchObject({ ok: true });
     run.say(sdk.failure());
-    await eventually(async () => (await sessionOf("STORY-6"))?.running === false);
+    await until(async () => (await sessionOf("STORY-6"))?.running === false);
     run.end();
     const runs = w.claude.runs.length;
     expect(await ask("story.resume", "STORY-6")).toMatchObject({ ok: true });
