@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { relative } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import type { Reporter, TestCase, TestResult, TestStep } from "@playwright/test/reporter";
+import { keptFiles } from "./evidence.ts";
 
 /**
  * Says where a failed e2e test stopped (BUG-30). When the test timeout ends a test that is waiting in a step, the
@@ -27,21 +28,37 @@ type Annotated = { annotations: readonly { type: string; description?: string }[
 const AFTER_THE_FACT = new Set(["hook", "fixture"]);
 const ERROR_LINES = 12;
 
-/** The annotation `app.ts` names each kept screenshot and trace with. */
-export const EVIDENCE = "app evidence";
-
 function inHarness(step: Step): boolean {
   for (let s: Step | undefined = step; s !== undefined; s = s.parent) if (AFTER_THE_FACT.has(s.category)) return true;
   return false;
 }
 
+const firstLine = (message: string | undefined) =>
+  stripVTControlCharacters(message ?? "")
+    .trim()
+    .split("\n")[0];
+
+/** What this reporter reads of a test's result. */
+export interface Outcome {
+  status: string;
+  errors: readonly { message?: string }[];
+}
+
 /**
- * The step a failed test stopped in: the last it began that never ended, or else the last that failed. A step with no
- * place in the test's code, such as one try of `expect.poll`, gives way to the step around it that has one.
+ * The step a failed test stopped in: the last it began that never ended, or else the last that failed with an error
+ * the test failed with, so not one whose failure the test caught. A timeout can drop the error that was on its way
+ * out (seen on Windows: a click's timeout, then a cleanup that ran out the test's time), so a timed-out test with no
+ * such step falls back to the last step that failed. A step with no place in the test's code, such as one try of
+ * `expect.poll`, gives way to the step around it that has one.
  */
-export function stoppedStep(begun: readonly Step[], ended: ReadonlySet<Step>): Step | undefined {
+export function stoppedStep(begun: readonly Step[], ended: ReadonlySet<Step>, outcome: Outcome): Step | undefined {
   const own = begun.filter((s) => !inHarness(s));
-  let step: Step | undefined = own.findLast((s) => !ended.has(s)) ?? own.findLast((s) => s.error !== undefined);
+  const failedWith = new Set(outcome.errors.map((e) => firstLine(e.message)));
+  const failed = own.filter((s) => s.error !== undefined);
+  let step: Step | undefined =
+    own.findLast((s) => !ended.has(s)) ??
+    failed.findLast((s) => failedWith.has(firstLine(s.error?.message))) ??
+    (outcome.status === "timedOut" ? failed.at(-1) : undefined);
   while (step?.location === undefined && step?.parent !== undefined) step = step.parent;
   return step;
 }
@@ -108,8 +125,7 @@ export function whereItStopped(
       );
     }
   }
-  const named = [...result.annotations, ...test.annotations];
-  const kept = [...new Set(named.flatMap((a) => (a.type === EVIDENCE && a.description ? [a.description] : [])))];
+  const kept = keptFiles(result.annotations, test.annotations);
   if (kept.length > 0) lines.push("  Kept:", ...kept.map((f) => `    ${fromRoot(root, f)}`));
   return lines;
 }
@@ -141,7 +157,7 @@ export default class StuckStepReporter implements Reporter {
     this.begun.delete(result);
     this.ended.delete(result);
     if (result.status === test.expectedStatus || result.status === "skipped") return;
-    const step = stoppedStep(begun, ended);
+    const step = stoppedStep(begun, ended, result);
     const stopped = {
       step,
       finished: step !== undefined && ended.has(step),

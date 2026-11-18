@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { closeLeftRunning, exited, launch, tempUserData } from "./app.ts";
+import { exited, launch, tempUserData } from "./app.ts";
+import { closeLeftRunning, keptFiles } from "./evidence.ts";
 import { expect, test } from "./fixtures.ts";
-import { EVIDENCE } from "./stuck-step-reporter.ts";
 import { readZip } from "./zip.ts";
 
 /**
@@ -27,7 +27,7 @@ test("BUG-30: a test stopped while the app waits keeps a screenshot of its windo
     await gone;
     expect(await stuck).toBeInstanceOf(Error);
 
-    const kept = test.info().annotations.flatMap((a) => (a.type === EVIDENCE && a.description ? [a.description] : []));
+    const kept = keptFiles(test.info().annotations);
     expect(kept).toEqual([
       expect.stringMatching(/electron-\d+-window-1\.png$/),
       expect.stringMatching(/electron-\d+\.zip$/),

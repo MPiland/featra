@@ -108,6 +108,8 @@ epics in `.featra/cards/`.
 - Hide the one-scan flash ("isn't in its owner", "Can't read", or the pre-Start status) for a worktree that Start is still making.
 - Decide whether the branch-name fallback in branchStateOf should wait until the worktree has a card file, so a bare git worktree add outside Featra doesn't take ownership.
 - Fast, non-Electron tests for shared e2e helpers.
+- Let `run()` in `tooling/test/run.ts` take paths with spaces (it passes one command line to the shell).
+- Leave the design-review screens out of the e2e traces artifact; they are uploaded on their own too.
 - Fewer git and `gh` starts per server test (fixture repositories copied, not built with git each time; one fake `gh`
   process), so the unit run on a busy PC takes minutes. Under load, BUG-28 measured the server suite at 45 minutes or
   more, nearly all of it process starts.

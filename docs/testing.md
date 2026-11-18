@@ -38,7 +38,7 @@ Renaming a job means updating branch protection with it.
 
 ```text
 Where "opens the Work list" stopped (timedOut):
-  Step: Click getByRole('button', { name: 'Cards and the feature list' })
+  Step: Click
   At: apps/desktop/e2e/work-list.spec.ts:42: await page.getByRole("button", { name: "Cards and the feature list" }).click();
   Still running after 57.3 s when the test ended
   Kept:
@@ -46,8 +46,8 @@ Where "opens the Work list" stopped (timedOut):
     apps/desktop/test-results/work-list-opens-the-Work-list/electron-1.zip
 ```
 
-`Step` is the action or assertion it was waiting in, or the last one that failed, with the locator as Playwright names
-it; `At` is that line of the spec. A test that failed instead of timing out also prints the step's error.
+`Step` is the action or assertion it was waiting in, or the last one that failed; `At` is that line of the spec, which
+names the locator. A test that failed instead of timing out also prints the step's error.
 
 The job uploads the failed tests' output as an artifact named `e2e-windows-traces` or `e2e-ubuntu-traces`. Download it
 from the run's summary page, or with `gh run download <run id> -R MPiland/featra -n e2e-windows-traces`. Each failed
@@ -62,7 +62,8 @@ Open a trace with `pnpm --filter @featra/desktop exec playwright show-trace <fil
 viewer. Passing tests keep no output.
 
 Every spec imports `test` and `expect` from `apps/desktop/e2e/fixtures.ts`, not `@playwright/test`. Its evidence
-fixture closes the apps a test left running, so a test that times out still keeps the screenshots and the trace.
+fixture closes the apps a test left running, so a test that times out still keeps the screenshots and the trace
+(`apps/desktop/e2e/evidence.ts`).
 
 **A unit test the hang guard stopped.** Vitest reports `Test timed out in <n>ms` and, as a second error, what the test
 was still waiting for, how long, and the test line that asked:
@@ -74,7 +75,8 @@ The test ended while still waiting for:
 ```
 
 Waits are noted by `until` and `waitingFor` in `tooling/waits.ts`, `expect.poll`, the WebSocket test client's `next`,
-and Testing Library's waits and user-event actions. A new kind of wait should go through `waitingFor`.
+and Testing Library's waits and user-event actions. A new kind of wait should go through `waitingFor`. The report is
+added after each test, so a wait in a `beforeEach` or `beforeAll` hook that the hang guard stops gets none.
 
 ## Screens for design review
 

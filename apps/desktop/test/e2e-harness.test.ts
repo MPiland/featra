@@ -101,7 +101,7 @@ describe("e2e harness: what a failed test leaves behind (BUG-30)", () => {
     for (const job of ["e2e-windows", "e2e-ubuntu"]) {
       const body = ci.split(new RegExp(String.raw`^  ${job}:$`, "m"))[1]?.split(/^ {2}\S/m)[0] ?? "";
       expect(body, job).toMatch(
-        /- name: Upload screenshots and traces of failed tests\n\s+if: failure\(\)\n\s+uses: actions\/upload-artifact@v4\n\s+with:\n\s+name: e2e-\w+-traces\n\s+path: apps\/desktop\/test-results\n/,
+        /- name: Upload screenshots and traces of failed tests\n\s+if: failure\(\) \|\| cancelled\(\)\n\s+uses: actions\/upload-artifact@v4\n\s+with:\n\s+name: e2e-\w+-traces\n\s+path: apps\/desktop\/test-results\n/,
       );
     }
   });

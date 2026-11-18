@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
  * nothing. Every wait helper notes its wait here: `until`, the server tests' `next`, Testing Library's waits (the
  * client's setup file) and `expect.poll` (`wait-report-setup.ts`). That setup file adds the open waits to a failed
  * test's errors.
+ *
+ * The registry is one per test file, not per test: tests a file runs at once (`describe.concurrent`) would see each
+ * other's waits in a failure's report.
  */
 interface Frame {
   file: string;

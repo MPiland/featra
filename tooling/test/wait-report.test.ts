@@ -1,3 +1,4 @@
+import { stripVTControlCharacters } from "node:util";
 import { describe, expect, it } from "vitest";
 import { endWaits, forgetWaits, openWaits, until, waitingFor } from "../waits.ts";
 import { run } from "./run.ts";
@@ -15,7 +16,7 @@ function hungRun(): Record<string, string> {
     env: { ...env, FEATRA_HANG_GUARD_MS: "1500", NO_COLOR: "1", FORCE_COLOR: "0" },
   });
   expect(result.status).toBe(1);
-  const out = result.output.replace(new RegExp(`${String.fromCharCode(27)}\\[[\\d;]*m`, "g"), "");
+  const out = stripVTControlCharacters(result.output);
   expect(out).toMatch(/Tests\s+3 failed \| 1 passed \(4\)/);
   const blocks: Record<string, string> = {};
   for (const block of out.split(/FAIL\s+stuck\.hang\.ts > /).slice(1)) {

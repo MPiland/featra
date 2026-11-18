@@ -2795,19 +2795,23 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   import change). Its auto fixture closes, after the test, every app the test left running. Each launch wraps the
   app's `close` to first save a screenshot of each visible window and the app's trace (DOM snapshots and screencast)
   to the test's output folder. Playwright gives fixture teardown its own time after a timeout, so this runs after a
-  timed-out test too. A spec's own `close` and the fixture share that one path. An app that won't close in 15 s is
-  killed. `e2e-harness.test.ts` checks every spec uses the fixture. Rejected: an `afterEach` per spec (45 edits), and
+  timed-out test too. A spec's own `close` and the fixture share that one path (`e2e/evidence.ts`). A screenshot from
+  a passing test's own `close` is written only if the test then fails. An app that won't close in 15 s is killed, on
+  Windows with its process tree. `e2e-harness.test.ts` checks every spec uses the fixture. Rejected: an `afterEach` per spec (45 edits), and
   Playwright's `trace` option (it records browser contexts, not an Electron app).
 - **The log names the step.** A reporter (`e2e/stuck-step-reporter.ts`) runs beside the list reporter. For each
-  failed test it prints the step it was still waiting in, or else the last step that failed. Playwright's step title
-  names the locator ("Click getByRole('button', …)"), and the spec's code line is printed with it. Then come the
-  step's error and the files kept. Hooks and fixtures are never blamed, since they run after the test stopped. Chosen
+  failed test it prints the step it was still waiting in, or else the last step that failed. Playwright titles an
+  action's step by the action alone ("Click"), so the spec's code line is printed with it, as the whole statement when
+  it spans several lines, and that names the locator. Then come the step's error and the files kept. Hooks and
+  fixtures are never blamed, since they run after the test stopped, and neither is a failed step whose error the test
+  caught. Chosen
   over an `afterEach` printing `testInfo.errors`: after a timeout those hold only the timeout message, not the step.
 - **A stopped unit test says what it waited for.** `tooling/waits.ts` is one registry of open waits: `until`
   (formerly copied in the server and mcp tests), `waitingFor` (any promise, with a name), the WebSocket client's
   `next`, `expect.poll` (wrapped in the hang guard's setup file) and the client's Testing Library waits and user-event
   actions (through its `asyncWrapper`). Each notes what it waits for and the test line that asked. When a test fails
-  with waits still open, the setup file adds an error listing them and stops each `until`. `HANG_GUARD` now carries
+  with waits still open, the setup file adds an error listing them and stops each `until`, after the test, so a
+  wait in a `beforeEach` or `beforeAll` hook is not listed. `HANG_GUARD` now carries
   that setup file, so every project gets it with the time limit it already spreads. `vi.waitFor` is left out: it gives
   up after 1 s on its own and names its own failure.
 - **`@featra/tooling` is a workspace package.** It exports `./waits`, and server, client and mcp take it as a dev
@@ -2815,5 +2819,6 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   for test code only, without widening any `rootDir`.
 - **Proof.** Real-code tests run a fixture suite that hangs (`tooling/test/hang-fixture`, `apps/desktop/test/stuck-fixture`)
   under the real hang guard and the real reporter and read their output. The e2e side was proved in CI with a probe
-  spec that timed out on a missing locator; it was reverted (see the PR).
+  spec that timed out on a missing locator; it was reverted (see the PR). `e2e/evidence-run.spec.ts` now runs such a
+  test for real in every e2e run, through the suite's fixtures and reporter, and checks the files it kept.
 - No ADR: this changes the test harness only, within ADR 0013's rules.
