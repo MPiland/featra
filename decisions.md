@@ -2876,4 +2876,11 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   AC6 journey proves it on the Mac job.
 - **The app menu's Quit can't be clicked from main on macOS.** `MenuItem.click()` leaves a native role to the OS and
   does nothing, so mac.spec sends Quit's own selector (`terminate:`), as the menu bar does.
+- **settings.spec's project override read the file too soon.** The page shows an override at once and writes it after
+  (ProjectPage's `set`), so the test's single read raced the write. It failed on Ubuntu at 1569d64 and on Windows at
+  c993c0c, so it is not macOS's; the same check now waits for the file.
+- **Open finding, not from this story: Approve on a draft once did nothing.** On the macOS job at 1569d64,
+  auto-merge-fails.spec's first step clicked Approve; the trace shows the buttons busy, then enabled again, with no
+  error shown, the card still Draft and its files uncommitted. The two other specs that use the same helper passed in
+  that job, and it passed on the next run. Without the app's log the cause isn't known; it goes to the Dev Lead.
 - No ADR: CI and the test harness only, within ADR 0009 and ADR 0013; `nameApp` and the Quit fix are small bug fixes.

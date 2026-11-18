@@ -138,7 +138,8 @@ test.describe("STORY-20: Settings", () => {
       await progress.getByRole("radio", { name: "Tasks" }).check();
       await expect(row.getByText(/^Overridden/)).toBeVisible();
       await expect(progress).toHaveAccessibleDescription(/Overridden\s*\. App default: Stories/);
-      expect(await readFile(project.config, "utf8")).toBe(`${before}progress: tasks\n`);
+      // The page shows the change at once and writes it after (ProjectPage's `set`), so wait for the file.
+      await expect.poll(() => readFile(project.config, "utf8")).toBe(`${before}progress: tasks\n`);
 
       await row.getByRole("button", { name: "Reset Feature progress to the app default" }).click();
       await expect(row.getByText(/^Overridden/)).toHaveCount(0);
