@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-28-gate-load
-pr: null
+pr: https://github.com/MPiland/featra/pull/68
 created: 2026-11-17T00:10:49Z
 history:
   - at: 2026-11-17T00:10:49Z
