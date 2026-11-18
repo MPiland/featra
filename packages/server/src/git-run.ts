@@ -45,6 +45,33 @@ export interface GitOptions {
   input?: string;
 }
 
+/** What git says when another git process holds a lock it needs, such as the index's (BUG-31). */
+export const LOCKED = /Unable to create '[^']*\.lock': File exists/;
+
+/** The waits before each new try while another git holds a lock: about 3 s in all (BUG-31). */
+export const LOCK_WAITS: readonly number[] = [50, 100, 200, 400, 800, 1600];
+
+/**
+ * Runs `git <args>` like `runGit`, and while it fails because another git process holds a lock it needs, tries again
+ * after each of `waits`. Any git that refreshes the index, `git status` in an editor or a terminal included, holds
+ * `index.lock` for a moment, and git refuses at once rather than wait for it (BUG-31). A git that fails that way has
+ * changed nothing, so trying again is safe.
+ */
+export async function runGitPatiently(
+  command: string,
+  dir: string,
+  args: string[],
+  waits: readonly number[] = LOCK_WAITS,
+): Promise<Run> {
+  let r = await runGit(command, dir, args);
+  for (const ms of waits) {
+    if (r.code === 0 || !LOCKED.test(r.stderr)) return r;
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    r = await runGit(command, dir, args);
+  }
+  return r;
+}
+
 /** Runs `git <args>` in `dir`. A non-zero exit resolves (callers decide); a git that can't start rejects. */
 export function runGit(command: string, dir: string, args: string[], options: GitOptions = {}): Promise<Run> {
   return new Promise<Run>((resolve, reject) => {

@@ -122,4 +122,11 @@ describe("e2e harness: what a failed test leaves behind (BUG-30)", () => {
       expect(section, named).toContain(named);
     }
   });
+
+  it("says in docs/testing.md that the app's log is kept too, and where (BUG-31)", () => {
+    const docs = readFileSync(join(REPO, "docs", "testing.md"), "utf8").replaceAll("\r\n", "\n");
+    const section = docs.split("## When a test fails")[1]?.split(/^## /m)[0] ?? "";
+    expect(section).toContain("`electron-<n>-logs/main.log`: that launch's log");
+    expect(section).toContain("/electron-1-logs/main.log");
+  });
 });

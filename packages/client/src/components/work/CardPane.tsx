@@ -16,6 +16,7 @@ import { AbandonStory } from "./AbandonStory.tsx";
 import { FeatureEnd } from "./FeatureEnd.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
+import { useAction } from "./useAction.ts";
 import { useCard } from "./useCard.ts";
 import { DockedAside } from "./DockedAside.tsx";
 import { AcSection, Evidence, TaskSection, TextSection, type SaveEdit } from "./CardSections.tsx";
@@ -67,6 +68,8 @@ export function CardPane({
   const card = useCard(work, dir, id);
   const pane = useRef<HTMLElement>(null);
   const [error, setError] = useState<string | null>(null);
+  // A draft's Approve and Reject, held here so they outlive their buttons (BUG-31).
+  const review = useAction();
   const { view, setView } = card;
 
   const send = async (edit: CardEdit) => {
@@ -151,8 +154,15 @@ export function CardPane({
                 onApprove={() => work.approve(dir, id)}
                 onReject={() => work.reject(dir, id)}
                 onRejected={onClose}
+                action={review}
               />
             </div>
+          )}
+          {/* Outside the draft's actions: it shows even when the card stopped being a draft while Approve ran (BUG-31). */}
+          {review.error && (
+            <p className="card-error" role="alert">
+              {review.error}
+            </p>
           )}
           {view.type === "story" && (
             <div className="draft-actions card-agent">

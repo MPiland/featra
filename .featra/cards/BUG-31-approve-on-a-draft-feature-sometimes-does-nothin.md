@@ -2,7 +2,7 @@
 id: BUG-31
 type: bug
 title: Approve on a draft feature sometimes does nothing
-status: New
+status: In Progress
 parent: null
 order: 0
 origin: bug
@@ -11,7 +11,7 @@ agent: null
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/bug-31-approve-noop
 pr: null
 created: 2026-11-18T20:39:26Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: dev-lead
+  - at: 2026-11-18T21:05:00Z
+    field: status
+    from: New
+    to: In Progress
+    by: dev
 ---
 
 ## Description
@@ -44,13 +49,15 @@ result. Underneath, the approve itself is stuck or failed without a word (the ca
 
 ## Acceptance criteria
 
-- [ ] Approve always either commits the draft (card Approved, its files committed on the feature branch per the app's rules) or shows an error
-- [ ] A failed approve is never silent
-- [ ] The e2e harness keeps the app's log (userData/logs) for a failed test, beside BUG-30's screenshot and trace, and docs/testing.md says so
-- [ ] Regression tests reproduce the race and fail before the fix
+- [x] Approve always either commits the draft (card Approved, its files committed on the feature branch per the app's rules) or shows an error (test: packages/server/test/draft-review-locked.test.ts::approving while another git holds the index lock (BUG-31) > waits for the lock and commits the draft once it is free, packages/server/test/draft-review-locked.test.ts::approving while another git holds the index lock (BUG-31) > fails with git's own words when the lock stays, puts the draft back, says nothing was changed, and logs it, packages/client/test/components/draft-review.test.tsx::an approve the card changes under while it runs (BUG-31) > keeps both buttons off while it still runs after the draft comes back, then shows the failure, apps/desktop/e2e/approve-reject.spec.ts::Approve commits the draft's cards to main without pushing and takes the buttons away; Reject deletes another draft's files)
+- [x] A failed approve is never silent (test: packages/client/test/components/draft-review.test.tsx::an approve the card changes under while it runs (BUG-31) > keeps both buttons off while it still runs after the draft comes back, then shows the failure, packages/client/test/components/draft-review.test.tsx::an approve the card changes under while it runs (BUG-31) > shows the failure in the pane even when the card is still not a draft when it comes, packages/server/test/draft-review-locked.test.ts::approving while another git holds the index lock (BUG-31) > fails with git's own words when the lock stays, puts the draft back, says nothing was changed, and logs it)
+- [x] The e2e harness keeps the app's log (userData/logs) for a failed test, beside BUG-30's screenshot and trace, and docs/testing.md says so (test: apps/desktop/e2e/failure-evidence.spec.ts::BUG-31: a test stopped while the app runs keeps the app's log, with the main process's and the server's lines, apps/desktop/e2e/failure-evidence.spec.ts::BUG-30: a test stopped while the app waits keeps a screenshot of its window and its trace with DOM snapshots, apps/desktop/e2e/evidence-run.spec.ts::BUG-30: a test that times out on a missing locator prints where it stopped and the files it kept, apps/desktop/test/e2e-harness.test.ts::e2e harness: what a failed test leaves behind (BUG-30) > says in docs/testing.md that the app's log is kept too, and where (BUG-31))
+- [x] Regression tests reproduce the race and fail before the fix (test: packages/server/test/draft-review-locked.test.ts::approving while another git holds the index lock (BUG-31) > waits for the lock and commits the draft once it is free, packages/server/test/draft-review-locked.test.ts::approving while another git holds the index lock (BUG-31) > fails with git's own words when the lock stays, puts the draft back, says nothing was changed, and logs it, packages/client/test/components/draft-review.test.tsx::an approve the card changes under while it runs (BUG-31) > keeps both buttons off while it still runs after the draft comes back, then shows the failure, packages/client/test/components/draft-review.test.tsx::an approve the card changes under while it runs (BUG-31) > shows the failure in the pane even when the card is still not a draft when it comes)
 
 ## Tasks
 
 ## Notes
 
 Filed by the dev lead from CI evidence on PR #70 and PR #72; the user asked for it to be fixed now.
+
+Cause and fix: decisions.md, "2026-11-18 — BUG-31 fix".

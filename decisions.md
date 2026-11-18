@@ -2836,3 +2836,24 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - macOS first launch: the docs say System Settings, Privacy & Security, then Open Anyway. The app is ad-hoc signed so Apple silicon runs it.
 - The packaged app reads the login shell's PATH at startup, so it finds `git`, `gh` and `claude` when opened from Finder or a desktop menu.
 - Stories: STORY-63 Featra runs and is tested on macOS; STORY-64 Install Featra from an installer; STORY-65 Download Featra from a release. Each depends on the one before it.
+
+## 2026-11-18 — BUG-31 fix
+
+- **The cause, server side.** `git status` takes `.git/index.lock` for a moment to refresh the index. A `git add` or
+  `git commit` that runs then fails at once with "Unable to create '.../index.lock': File exists". Every e2e spec that
+  failed polls `git status --porcelain` right after Approve; `approve-reject.spec`, which polls `git rev-list`, never
+  failed. A scratch loop of `git status` beside add and commit failed 16 of 60 commits the same way. So Approve's
+  `git add` failed, and its restore then ran `git reset` against the same lock and failed too.
+- **The cause, client side.** Approve writes the approved feature before it commits, so the card watch pushes a card
+  that is not a draft and CardPane unmounts DraftReview. The restore puts the draft back and DraftReview mounts again,
+  fresh: not busy, no error. The failure was lost, so the click "did nothing".
+- **Fix.** Approve's git commands wait for a held index lock (`runGitPatiently` in `git-run.ts`: up to six tries,
+  50 ms to 1.6 s apart, only on that error) and the restore resets the index only if something was staged. A failed
+  approve is logged to the app log. CardPane now holds Approve's and Reject's busy state and error (`useAction`), so
+  they outlive the buttons, and shows the error outside the draft-only block.
+- **Diagnosis next time.** The e2e fixture keeps each launch's `logs/main.log` beside BUG-30's screenshot and trace
+  (`electron-<n>-logs/`), and docs/testing.md says so.
+- **Proof.** `draft-review-locked.test.ts` holds the real index lock while real Approve runs: it commits once the lock
+  is freed, and fails with git's words, restored and logged, when it isn't. `draft-review.test.tsx` pushes the
+  not-a-draft card and the draft back while Approve runs. All four failed before the fix.
+- No ADR: a retry inside one module and state lifted one component up.
