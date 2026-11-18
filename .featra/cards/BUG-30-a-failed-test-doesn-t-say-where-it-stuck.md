@@ -2,7 +2,7 @@
 id: BUG-30
 type: bug
 title: A failed test doesn't say where it stuck or show the screen
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/bug-30-test-failures
-pr: null
+pr: https://github.com/MPiland/featra/pull/70
 created: 2026-11-18T15:30:00Z
 history:
   - at: 2026-11-18T15:30:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: dev
+  - at: 2026-11-18T16:38:14Z
+    field: status
+    from: In Progress
+    to: In Review
     by: dev
 ---
 
