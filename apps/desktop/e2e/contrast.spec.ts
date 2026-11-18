@@ -1,6 +1,8 @@
 import { expect, test, type Page } from "./fixtures.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
 import { contrast, luminance, parseCssColor, resolve, sampleRenderedText, tokenColours } from "./contrast.ts";
+import { pressShortcut } from "./keys.ts";
+import { mac } from "./mac.ts";
 
 /**
  * AC4: the window follows the OS theme and meets WCAG AA. The OS theme is faked with prefers-color-scheme
@@ -11,9 +13,15 @@ const AA_LARGE_TEXT = 3;
 const AA_NON_TEXT = 3;
 const STATUS = ["--ok", "--warn", "--bad", "--acc", "--pur"];
 const SURFACES = ["--bg", "--side", "--row"];
+/**
+ * How many icons a view shows at least: the title bar's. On macOS the window controls (Minimize, Maximize, Close)
+ * are the native traffic lights, not the page's, so none of them is sampled there; nor are Back and Forward while
+ * they are disabled (nothing to go back or forward to: WCAG exempts inactive controls). 3 is the fewest a view has.
+ */
+const ICONS = mac ? 3 : 4;
 
 /** `min` guards against a vacuous pass: by default the view title, the placeholder text and the title bar icons. */
-async function failures(page: Page, min = { text: 2, icon: 4 }): Promise<string[]> {
+async function failures(page: Page, min = { text: 2, icon: ICONS }): Promise<string[]> {
   const out: string[] = [];
   const samples = await sampleRenderedText(page);
   expect(samples.filter((s) => s.kind === "text").length).toBeGreaterThanOrEqual(min.text);
@@ -66,11 +74,11 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
             .click();
           await expect(page.getByRole("heading", { name, level: 2 })).toBeVisible();
           if (scope === "Project") await expect(page.getByText(/^Overridden/)).toBeVisible();
-          problems.push(...(await failures(page, { text: 6, icon: 4 })));
+          problems.push(...(await failures(page, { text: 6, icon: ICONS })));
         }
         await page.getByRole("button", { name: /^Project: / }).click();
         await expect(page.getByRole("listbox", { name: "Project" })).toBeVisible();
-        problems.push(...(await failures(page, { text: 6, icon: 4 })));
+        problems.push(...(await failures(page, { text: 6, icon: ICONS })));
         await page.keyboard.press("Escape");
         await expect(page.getByRole("listbox")).toHaveCount(0);
         const menuItem = (name: string | RegExp) =>
@@ -79,7 +87,7 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           await page.getByRole("button", { name: "Menu" }).click();
           for (const name of path) await menuItem(name).hover();
           await expect(page.getByRole("menu")).toHaveCount(path.length + 1);
-          problems.push(...(await failures(page, { text: 6, icon: 4 })));
+          problems.push(...(await failures(page, { text: 6, icon: ICONS })));
           await page.keyboard.press("Escape");
           await page.keyboard.press("Escape");
           await page.keyboard.press("Escape");
@@ -99,7 +107,7 @@ test.describe("AC4: theme follows the OS and meets WCAG AA", () => {
           await page.keyboard.press("Escape");
           await expect(dialog).toHaveCount(0);
         }
-        await page.keyboard.press("Control+B");
+        await pressShortcut(page, "toggleSidebar");
         problems.push(...(await failures(page)));
         expect(problems).toEqual([]);
 

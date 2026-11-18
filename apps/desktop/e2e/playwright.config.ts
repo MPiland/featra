@@ -1,5 +1,5 @@
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "@playwright/test";
+import { e2eReporters } from "./reporters.ts";
 
 export default defineConfig({
   testDir: ".",
@@ -10,8 +10,8 @@ export default defineConfig({
   // Refuse to start beside leftover harness processes or on a desktop the focus tests can't use; fail if any outlive the run.
   globalSetup: "./global-setup.ts",
   globalTeardown: "./global-teardown.ts",
-  // The list, plus where each failed test stopped and the files kept for it, with paths from the repo root (BUG-30).
-  reporter: [["list"], ["./stuck-step-reporter.ts", { root: fileURLToPath(new URL("../../..", import.meta.url)) }]],
+  // The list, where each failed test stopped (BUG-30), and the JUnit report CI uploads (STORY-63).
+  reporter: e2eReporters(),
   outputDir: "../test-results",
   // Keeps a failed test's output (traces and window screenshots from app.ts, the runner's trace) and drops a passing test's.
   preserveOutput: "failures-only",

@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { BrowserWindow, nativeTheme } from "electron";
 import { IPC, type WindowState } from "@featra/client/bridge";
 import { appIconPath } from "./app-icon.ts";
+import { e2e } from "./test-hooks.ts";
 
 /** `FEATRA_CLIENT_URL` loads the Vite dev server; otherwise the built client next to this app in the workspace. */
 const clientUrl = process.env.FEATRA_CLIENT_URL;
@@ -23,6 +24,9 @@ export function createWindow(): BrowserWindow {
     backgroundColor: windowBackground(),
     // The title bar is drawn by the client. macOS keeps its traffic lights; elsewhere the client draws the controls.
     ...(isMac ? { titleBarStyle: "hiddenInset" as const } : { frame: false }),
+    // The e2e layout journeys size the window to 1280×800, taller than a CI Mac's screen, which macOS otherwise
+    // shrinks the window to fit. Windows and Linux allow it already; the app itself keeps macOS's limit.
+    enableLargerThanScreen: e2e,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,

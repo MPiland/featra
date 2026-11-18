@@ -2836,3 +2836,68 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - macOS first launch: the docs say System Settings, Privacy & Security, then Open Anyway. The app is ad-hoc signed so Apple silicon runs it.
 - The packaged app reads the login shell's PATH at startup, so it finds `git`, `gh` and `claude` when opened from Finder or a desktop menu.
 - Stories: STORY-63 Featra runs and is tested on macOS; STORY-64 Install Featra from an installer; STORY-65 Download Featra from a release. Each depends on the one before it.
+
+## 2026-11-18 — STORY-63: Featra on macOS (dev)
+
+- **E2E (macOS)** runs the whole e2e suite on `macos-15` (Apple silicon) on every PR and push to main, with the same
+  setup and uploads as Windows and Ubuntu: `test-report-e2e-macos`, `e2e-macos-traces` and `ux-screens-macos`.
+- **Each e2e job uploads its own JUnit report** (`FEATRA_JUNIT` → `test-report/e2e-<os>.xml`, artifact
+  `test-report-e2e-<os>`). The default `testReportArtifact` changes from `test-report-unit` to `test-report-*`, so a
+  test that fails on one platform keeps its criterion from being Proven. Changed expectations: `card.test.ts`'s
+  default config, and `soak-plan.test.ts`'s rejected platform (`macos` is now valid, so `freebsd` stands in).
+- **The harness test is renamed** "uploads the failed tests' files from every e2e job in CI" and covers all three
+  jobs; BUG-30's criterion link follows the new name.
+- **Bug found: the app was named `@featra/desktop`.** Run from source, Electron names the app after the package, so
+  the macOS app menu read "About @featra/desktop" and "Quit @featra/desktop". `nameApp` (`app-name.ts`) names it
+  Featra before `ready` on every platform and keeps the userData folder where it was, so existing profiles
+  (`%APPDATA%\@featra\desktop`) aren't lost. Where the installed app keeps its data is STORY-64's call. The bold
+  title in the menu bar of a source run comes from Electron's own bundle and still says Electron; the installer
+  names the bundle.
+- **The Dock in tests.** Playwright can't click the Dock or the traffic lights, so `clickDock` emits Electron's
+  `activate` event in main, which Featra's own handler takes, and the red traffic light is `BrowserWindow.close()`
+  (`closeFromOs`). Whether Featra is really frontmost is read with `lsappinfo`, which needs no Accessibility grant.
+- **macOS has no tray icon and no "still running" notice**: a closed app staying in the Dock is the norm. tray.spec's
+  tray-only tests skip on macOS and say so; `mac.spec.ts` covers the app menu, the absent tray icon, closing to the
+  Dock and reopening from it, and Quit. The tests shared with the tray (close, second launch, Exit) run on macOS
+  through `clickCloseButton`, `showFromTrayOrDock` and `CLOSE_NOTICES`.
+- **e2e presses each platform's own shortcut**: `e2e/keys.ts` turns the menu's label (`shortcutLabel`, now exported
+  as `@featra/client/shortcuts`) into Playwright keys, so ⌘N on macOS and Ctrl+N elsewhere, and a unit test proves
+  every pressed shortcut is matched by the app's own `matchShortcut`.
+- **The CI Mac's screen is shorter than 800 px**, and macOS shrinks a window to fit its screen, so the layout journeys
+  couldn't size the window to 1280×800 (they got 1280×684). Under e2e only, the window is created with
+  `enableLargerThanScreen`, which fakes a big enough screen; the app itself keeps macOS's limit.
+- **macOS's temp folder is a link** (`/var` → `/private/var`). The stand-in `claude` now goes on the PATH by its real
+  path, so the path the app reports is the one the test expects, as with Windows' 8.3 short names.
+- **The contrast check's icon guard** expects 3 icons on macOS, not 4: the traffic lights are native, not the page's.
+- **Bug found: on macOS the Close button's Quit didn't quit.** `window-all-closed` skipped `app.quit()` on macOS
+  (its custom of staying open with no window), so with Quit chosen, closing the window left Featra in the Dock with
+  nothing to show. Close only reaches `window-all-closed` when it doesn't hide, that is when the user chose Quit, so
+  the lifecycle's `allWindowsClosed` now quits on every platform. A unit test proves it per platform; settings.spec's
+  AC6 journey proves it on the Mac job.
+- **The app menu's Quit can't be clicked from main on macOS.** `MenuItem.click()` leaves a native role to the OS and
+  does nothing, so mac.spec sends Quit's own selector (`terminate:`), as the menu bar does.
+- **settings.spec's project override read the file too soon.** The page shows an override at once and writes it after
+  (ProjectPage's `set`), so the test's single read raced the write. It failed on Ubuntu at 1569d64 and on Windows at
+  c993c0c, so it is not macOS's; the same check now waits for the file.
+- **Bug found: a settings save could be lost on Windows (BUG-33).** The JSON stores (`settings.json`, `ui-state.json`, saved
+  chats) save through a temp file and a rename, and Windows refuses that rename with EPERM while another program reads
+  the file. Nothing tried again, so Settings showed "Minimize to tray" while the file kept "quit" (E2E (Windows) at
+  432a5ea, settings.spec's AC6 polling the file). `createJsonStore` now retries a busy rename with BUG-16's
+  `retryBusy`, as card writes already do. `json-store-busy.test.ts` failed first: once with a stand-in rename, and once
+  with EPERM from a real reader holding the file on Windows. The save failure isn't shown on the page; that's left as
+  it was.
+- **Open finding, not from this story: Approve on a draft once did nothing.** On the macOS job at 1569d64,
+  auto-merge-fails.spec's first step clicked Approve; the trace shows the buttons busy, then enabled again, with no
+  error shown, the card still Draft and its files uncommitted. The two other specs that use the same helper passed in
+  that job, and it passed on the next run. Without the app's log the cause isn't known. The user filed it as BUG-31
+  (Approve on a draft feature sometimes does nothing), with BUG-32 (Settings shows a value that wasn't saved) for the
+  unshown save failure above.
+- **macOS focus checks start with Finder in front.** `busyUserInFront` did nothing on macOS, and a hidden Featra stays
+  the active app, so `windowInForeground` passed without Featra coming forward. It now puts Finder in front first (`open -a`,
+  no Automation permission). A Dock click or opening the app again makes macOS activate Featra before Featra hears of it;
+  the harness fakes that activation, as it fakes Windows' foreground grant, and Featra's handler must show and focus
+  the window.
+- **The userData folder is proved in the real app.** app-name.spec launches without a test folder, with the home faked
+  (CFFIXED_USER_HOME on macOS, XDG_CONFIG_HOME on Linux), and checks the profile is in `@featra/desktop`. Skipped on
+  Windows, where Electron reads AppData from the shell, not the environment, so it can't be faked.
+- No ADR: CI and the test harness only, within ADR 0009 and ADR 0013; `nameApp` and the Quit fix are small bug fixes.

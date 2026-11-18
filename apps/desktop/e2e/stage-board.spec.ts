@@ -2,7 +2,8 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
 import { newCard, serializeCard, type Card, type CardType } from "@featra/work-format";
-import { launch, sizeTo, tempUserData } from "./app.ts";
+import { launch, tempUserData } from "./app.ts";
+import { sizeTo } from "./size.ts";
 import { git, project } from "./draft-project.ts";
 
 /**

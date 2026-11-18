@@ -1,5 +1,14 @@
 import { expect, test, type ElectronApplication } from "./fixtures.ts";
-import { clickTray, launch, notices, tempUserData, windowVisible } from "./app.ts";
+import {
+  CLOSE_NOTICES,
+  clickCloseButton,
+  launch,
+  notices,
+  showFromTrayOrDock,
+  tempUserData,
+  windowVisible,
+} from "./app.ts";
+import { labelOf, pressShortcut } from "./keys.ts";
 
 const zoomFactor = (app: ElectronApplication) =>
   app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.webContents.getZoomFactor());
@@ -46,21 +55,22 @@ test("app window: title bar, menu, sidebar; close to tray and reopen; Ctrl+B col
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ArrowDown");
     await expect(viewMenu.getByRole("menuitem", { name: /^Zoom In/ })).toBeFocused();
-    await expect(viewMenu.getByRole("menuitem", { name: /^Zoom In/ })).toContainText("Ctrl+=");
+    await expect(viewMenu.getByRole("menuitem", { name: /^Zoom In/ })).toContainText(labelOf("zoomIn"));
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menu")).toHaveCount(0);
     await expect.poll(() => zoomFactor(app)).toBe(1.1);
 
-    // Close sends it to the tray with a one-time notice; the tray icon brings the same window back.
-    await bar.getByRole("button", { name: "Close window" }).click();
+    // Close sends it to the tray with a one-time notice (to the Dock on macOS, without one); the tray or Dock icon
+    // brings the same window back.
+    await clickCloseButton(app, page);
     await expect.poll(() => windowVisible(app)).toBe(false);
-    expect(await notices(app)).toEqual(["Featra is still running in the system tray"]);
-    await clickTray(app);
+    expect(await notices(app)).toEqual(CLOSE_NOTICES);
+    await showFromTrayOrDock(app);
     await expect.poll(() => windowVisible(app)).toBe(true);
     await expect.poll(() => zoomFactor(app)).toBe(1.1);
 
     // Ctrl+B collapses it: zero width and out of the tab order.
-    await page.keyboard.press("Control+B");
+    await pressShortcut(page, "toggleSidebar");
     await expect(toggle).toHaveAttribute("aria-expanded", "false");
     await expect.poll(async () => (await sidebar.boundingBox())?.width ?? 0).toBe(0);
     await page.getByRole("button", { name: "Menu" }).focus();

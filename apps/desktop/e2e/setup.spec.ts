@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, type Page } from "./fixtures.ts";
 import { launch, queueFolderPicks, tempUserData } from "./app.ts";
+import { pressShortcut } from "./keys.ts";
 
 /**
  * STORY-42 (which replaced STORY-2's offer): set a project up on one screen, in the real app with its real local
@@ -55,7 +56,7 @@ test.describe("STORY-42: set up a project on one screen", () => {
 
       // AC1: a folder that isn't set up shows the page in Work, not the list.
       await queueFolderPicks(app, project.dir);
-      await page.keyboard.press("Control+O");
+      await pressShortcut(page, "openFolder");
       await expect(setupPage(page).getByRole("heading", { name: "Set up project", level: 2 })).toBeVisible();
       await expect(list(page)).toHaveCount(0);
 
@@ -114,7 +115,7 @@ test.describe("STORY-42: set up a project on one screen", () => {
       await expect(setupPage(again.page)).toHaveCount(0);
 
       // AC1: "Set up project" in Project settings reopens it; everything is kept now.
-      await again.page.keyboard.press("Control+Shift+,");
+      await pressShortcut(again.page, "projectSettings");
       await again.page.getByRole("button", { name: "Set up project" }).click();
       await expect(row(again.page, "Git")).toContainText("Already a git repository");
       await expect(row(again.page, "CONTEXT.md")).toContainText("Kept");
@@ -135,7 +136,7 @@ test.describe("STORY-42: set up a project on one screen", () => {
     try {
       const { app, page } = await launch(profile.dir);
       await queueFolderPicks(app, project.dir);
-      await page.keyboard.press("Control+O");
+      await pressShortcut(page, "openFolder");
       await expect(row(page, "Git")).toContainText("Already a git repository");
       await expect(row(page, "CONTEXT.md")).toContainText("Kept");
       await expect(box(page, "CONTEXT.md")).toBeDisabled();
@@ -164,7 +165,7 @@ test.describe("STORY-42: set up a project on one screen", () => {
     const home = await tempFolder("featra-home-");
     try {
       const { app, page } = await launch(profile.dir);
-      await page.keyboard.press("Control+Shift+N");
+      await pressShortcut(page, "newProject");
       const dialog = page.getByRole("dialog");
       await dialog.getByRole("textbox", { name: "Location" }).fill(home.dir);
       await dialog.getByRole("textbox", { name: "Name" }).fill("fresh");

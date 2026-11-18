@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./bridge": "./src/bridge.ts",
+    "./shortcuts": "./src/shortcuts.ts",
     "./zoom": "./src/zoom.ts"
   },
   "scripts": {

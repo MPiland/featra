@@ -2,6 +2,7 @@ import { join } from "node:path";
 import { IPC } from "@featra/client/bridge";
 import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
 import { applyDockIcon } from "./app-icon.ts";
+import { nameApp } from "./app-name.ts";
 import { allowedDirs, registerIpc } from "./ipc.ts";
 import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog } from "./log.ts";
@@ -20,6 +21,7 @@ import { createWindow, windowBackground } from "./window.ts";
  * page calls, the native menu and the tray each live in their own module.
  */
 
+nameApp(app);
 // Tests (and anyone running a second profile) point userData at their own folder. Must happen before `ready`.
 const userDataDir = process.env.FEATRA_USER_DATA_DIR;
 if (userDataDir) app.setPath("userData", userDataDir);
@@ -165,6 +167,13 @@ if (!app.requestSingleInstanceLock()) {
       loggedQuit = true;
     });
 
+    // Only reached when close doesn't hide the window (the Close button is set to Quit).
+    app.on("window-all-closed", () => {
+      if (tray) destroyTray(tray);
+      tray = undefined;
+      lifecycle.allWindowsClosed();
+    });
+
     // A second launch (Start menu, shortcut) brings back the running app's window instead of starting another app.
     app.on("second-instance", () => {
       if (win && !win.isDestroyed()) lifecycle.reveal(win);
@@ -203,12 +212,5 @@ if (!app.requestSingleInstanceLock()) {
       projects.store.flush(),
       log.flush(),
     ]).finally(() => app.exit(0));
-  });
-
-  // Only reached when close-to-tray is off or the app is quitting.
-  app.on("window-all-closed", () => {
-    if (tray) destroyTray(tray);
-    tray = undefined;
-    if (process.platform !== "darwin") app.quit();
   });
 }

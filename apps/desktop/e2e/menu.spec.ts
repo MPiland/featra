@@ -1,7 +1,18 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
-import { clickTray, closeFromOs, exited, launch, notices, shownInFolder, tempUserData, windowVisible } from "./app.ts";
+import {
+  CLOSE_NOTICES,
+  closeFromOs,
+  exited,
+  launch,
+  notices,
+  showFromTrayOrDock,
+  shownInFolder,
+  tempUserData,
+  windowVisible,
+} from "./app.ts";
+import { LINE_END, pressShortcut, SELECT_TO_LINE_START } from "./keys.ts";
 
 /**
  * AC5 in the real app: what each menu item and its shortcut do to the window. Only the OS is faked (the storage
@@ -37,15 +48,15 @@ test.describe("AC5: app menu", () => {
       expect(await zoomFactor(app)).toBe(1);
       await choose(page, "View", "Zoom In");
       await expect.poll(() => zoomFactor(app)).toBe(1.1);
-      await page.keyboard.press("Control+=");
+      await pressShortcut(page, "zoomIn");
       await expect.poll(() => zoomFactor(app)).toBe(1.25);
-      await page.keyboard.press("Control+-");
-      await page.keyboard.press("Control+-");
-      await page.keyboard.press("Control+-");
+      await pressShortcut(page, "zoomOut");
+      await pressShortcut(page, "zoomOut");
+      await pressShortcut(page, "zoomOut");
       await expect.poll(() => zoomFactor(app)).toBe(0.9);
-      await page.keyboard.press("Control+=");
-      await page.keyboard.press("Control+=");
-      await page.keyboard.press("Control+=");
+      await pressShortcut(page, "zoomIn");
+      await pressShortcut(page, "zoomIn");
+      await pressShortcut(page, "zoomIn");
       await expect.poll(() => zoomFactor(app)).toBe(1.25);
 
       await app.close();
@@ -53,8 +64,8 @@ test.describe("AC5: app menu", () => {
       await expect.poll(() => zoomFactor(app)).toBe(1.25);
       await choose(page, "View", "Actual Size");
       await expect.poll(() => zoomFactor(app)).toBe(1);
-      await page.keyboard.press("Control+=");
-      await page.keyboard.press("Control+0");
+      await pressShortcut(page, "zoomIn");
+      await pressShortcut(page, "zoomReset");
       await expect.poll(() => zoomFactor(app)).toBe(1);
       await app.close();
     } finally {
@@ -95,11 +106,11 @@ test.describe("AC5: app menu", () => {
 
       await choose(page, "Edit", "Select All");
       await choose(page, "Edit", "Copy");
-      await field.press("End");
+      await field.press(LINE_END);
       await choose(page, "Edit", "Paste");
       await expect(field).toHaveValue("hello menuhello menu");
 
-      await field.press("Shift+Home");
+      await field.press(SELECT_TO_LINE_START);
       await choose(page, "Edit", "Delete");
       await expect(field).toHaveValue("");
     } finally {
@@ -128,7 +139,7 @@ test.describe("AC5: app menu", () => {
       await expect(heading(page)).toHaveText("Work");
       await expect(page.getByRole("button", { name: "Back" })).toBeDisabled();
       await sidebar.getByRole("button", { name: "Inbox" }).click();
-      await page.keyboard.press("F5");
+      await pressShortcut(page, "reload");
       await expect(heading(page)).toHaveText("Work");
       await expect(page.getByRole("button", { name: "Back" })).toBeDisabled();
 
@@ -151,9 +162,9 @@ test.describe("AC5: app menu", () => {
       expect(await fullScreen(app)).toBe(false);
       await choose(page, "View", "Full Screen");
       await expect.poll(() => fullScreen(app)).toBe(true);
-      await page.keyboard.press("F11");
+      await pressShortcut(page, "fullScreen");
       await expect.poll(() => fullScreen(app)).toBe(false);
-      await page.keyboard.press("F11");
+      await pressShortcut(page, "fullScreen");
       await expect.poll(() => fullScreen(app)).toBe(true);
       await choose(page, "View", "Full Screen");
       await expect.poll(() => fullScreen(app)).toBe(false);
@@ -181,11 +192,11 @@ test.describe("AC5: app menu", () => {
       await expect(heading(page)).toHaveText("Inbox");
       await choose(page, "Go", "Forward");
       await expect(heading(page)).toHaveText("Plugins");
-      await page.keyboard.press("Alt+ArrowLeft");
+      await pressShortcut(page, "back");
       await expect(heading(page)).toHaveText("Inbox");
-      await page.keyboard.press("Alt+ArrowLeft");
+      await pressShortcut(page, "back");
       await expect(heading(page)).toHaveText("Work");
-      await page.keyboard.press("Alt+ArrowRight");
+      await pressShortcut(page, "forward");
       await expect(heading(page)).toHaveText("Inbox");
     } finally {
       await app.close();
@@ -197,7 +208,7 @@ test.describe("AC5: app menu", () => {
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     try {
-      // "…in File Explorer" on Windows, "…in File Manager" on Linux (the label is unit-tested per platform).
+      // "…in File Explorer" on Windows, "…in Finder" on macOS, "…in File Manager" on Linux (unit-tested per platform).
       await choose(page, "Help", "Troubleshooting", "Show Logs in ");
       await expect.poll(() => shownInFolder(app)).toEqual([logFile(profile.dir)]);
       expect(await readFile(logFile(profile.dir), "utf8")).toMatch(
@@ -213,7 +224,7 @@ test.describe("AC5: app menu", () => {
     const profile = await tempUserData();
     try {
       let { app, page } = await launch(profile.dir);
-      await page.keyboard.press("Control+=");
+      await pressShortcut(page, "zoomIn");
       await expect.poll(() => zoomFactor(app)).toBe(1.1);
       const exit = exited(app);
       await choose(page, "Help", "Troubleshooting", "Clear Cache and Restart").catch(lastClick);
@@ -232,13 +243,13 @@ test.describe("AC5: app menu", () => {
     const profile = await tempUserData();
     try {
       let { app, page } = await launch(profile.dir);
-      await page.keyboard.press("Control+=");
-      await page.keyboard.press("Control+B");
+      await pressShortcut(page, "zoomIn");
+      await pressShortcut(page, "toggleSidebar");
       await expect.poll(() => zoomFactor(app)).toBe(1.1);
-      await closeFromOs(app); // the tray notice is shown and remembered
+      await closeFromOs(app); // the tray notice is shown and remembered (macOS has none)
       await expect.poll(() => windowVisible(app)).toBe(false);
-      expect(await notices(app)).toHaveLength(1);
-      await clickTray(app);
+      expect(await notices(app)).toEqual(CLOSE_NOTICES);
+      await showFromTrayOrDock(app);
       await expect.poll(() => windowVisible(app)).toBe(true);
 
       await choose(page, "Help", "Troubleshooting", "Reset App Data…");
@@ -261,7 +272,7 @@ test.describe("AC5: app menu", () => {
         "true",
       );
       await closeFromOs(app);
-      await expect.poll(() => notices(app)).toHaveLength(1); // the notice shows again
+      await expect.poll(() => notices(app)).toEqual(CLOSE_NOTICES); // the notice shows again
       await app.close();
     } finally {
       await profile.dispose();

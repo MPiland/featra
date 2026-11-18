@@ -1,5 +1,6 @@
-# The three checks main's branch protection requires (decisions.md, 2026-11-07): Gate, E2E (Windows), E2E (Ubuntu).
-# Renaming a job renames its check, so branch protection must be updated with it.
+# The checks main's branch protection requires (decisions.md, 2026-11-07): Gate, E2E (Windows), E2E (Ubuntu), and
+# E2E (macOS) once it passes on main (decisions.md, 2026-11-18). Renaming a job renames its check, so branch protection
+# must be updated with it.
 name: CI
 
 on:
@@ -51,6 +52,17 @@ jobs:
       - name: E2E suite
         shell: bash
         run: pnpm test:e2e
+        env:
+          FEATRA_JUNIT: test-report/e2e-windows.xml
+      # A JUnit report of the e2e tests, read with the other platforms' reports to prove criteria (STORY-63).
+      - name: Upload the e2e test report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-e2e-windows
+          path: test-report
+          retention-days: 14
+          if-no-files-found: ignore
       # A failed test's window screenshots, app trace with DOM snapshots and runner trace (BUG-30, docs/testing.md).
       - name: Upload screenshots and traces of failed tests
         if: failure() || cancelled()
@@ -80,6 +92,17 @@ jobs:
           e2e: "true"
       - name: E2E suite under Xvfb and Openbox
         run: tooling/e2e/xvfb.sh pnpm test:e2e
+        env:
+          FEATRA_JUNIT: test-report/e2e-ubuntu.xml
+      # A JUnit report of the e2e tests, read with the other platforms' reports to prove criteria (STORY-63).
+      - name: Upload the e2e test report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-e2e-ubuntu
+          path: test-report
+          retention-days: 14
+          if-no-files-found: ignore
       # A failed test's window screenshots, app trace with DOM snapshots and runner trace (BUG-30, docs/testing.md).
       - name: Upload screenshots and traces of failed tests
         if: failure() || cancelled()
@@ -94,6 +117,47 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ux-screens-ubuntu
+          path: apps/desktop/test-results/ux
+          retention-days: 7
+          if-no-files-found: ignore
+
+  e2e-macos:
+    name: E2E (macOS)
+    # Apple silicon (arm64).
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          e2e: "true"
+      - name: E2E suite
+        run: pnpm test:e2e
+        env:
+          FEATRA_JUNIT: test-report/e2e-macos.xml
+      # A JUnit report of the e2e tests, read with the other platforms' reports to prove criteria (STORY-63).
+      - name: Upload the e2e test report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-e2e-macos
+          path: test-report
+          retention-days: 14
+          if-no-files-found: ignore
+      # A failed test's window screenshots, app trace with DOM snapshots and runner trace (BUG-30, docs/testing.md).
+      - name: Upload screenshots and traces of failed tests
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-macos-traces
+          path: apps/desktop/test-results
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload screens for design review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ux-screens-macos
           path: apps/desktop/test-results/ux
           retention-days: 7
           if-no-files-found: ignore

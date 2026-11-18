@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
 import { newCard, parseCard, serializeCard, type Card, type CardType } from "@featra/work-format";
-import { launch, sizeTo, tempUserData } from "./app.ts";
+import { launch, tempUserData } from "./app.ts";
+import { sizeTo } from "./size.ts";
 
 /**
  * STORY-4: the card pane, in the real app with its real local server and real git. Only the platform is faked: the

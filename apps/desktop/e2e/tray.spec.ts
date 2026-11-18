@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "./fixtures.ts";
 import {
   chooseTrayItem,
+  clickCloseButton,
   clickTray,
   closeFromOs,
   exited,
@@ -20,6 +21,8 @@ import {
   windowVisible,
 } from "./app.ts";
 import { busyUserInFront } from "./foreground.ts";
+import { pressShortcut } from "./keys.ts";
+import { mac } from "./mac.ts";
 
 /**
  * AC6 in the real app. The tray icon is Electron's real Tray; only the OS side of it is driven from the test
@@ -27,6 +30,9 @@ import { busyUserInFront } from "./foreground.ts";
  */
 
 const NOTICE = "Featra is still running in the system tray";
+/** macOS has no tray icon: a closed Featra stays in the Dock (mac.spec.ts). Its File menu says Quit Featra, not Exit. */
+const NO_TRAY_ON_MAC = "macOS keeps a closed app in the Dock, with no tray icon: mac.spec.ts covers it";
+const EXIT = mac ? "Quit Featra" : "Exit";
 
 async function chooseFromMenu(page: Page, ...path: string[]) {
   await page.getByRole("button", { name: "Menu" }).click();
@@ -40,6 +46,7 @@ async function chooseFromMenu(page: Page, ...path: string[]) {
 
 test.describe("AC6: close to tray", () => {
   test("close hides the window and the app keeps running; the notice shows once and is remembered", async () => {
+    test.skip(mac, NO_TRAY_ON_MAC);
     const profile = await tempUserData();
     try {
       let { app, page } = await launch(profile.dir);
@@ -73,12 +80,13 @@ test.describe("AC6: close to tray", () => {
   });
 
   test("the tray's Show Featra and a tray click restore and focus the window", async () => {
+    test.skip(mac, NO_TRAY_ON_MAC);
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     let busy: { dispose: () => void } | undefined;
     try {
       await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Inbox" }).click();
-      await page.getByRole("button", { name: "Close window" }).click();
+      await clickCloseButton(app, page);
       await expect.poll(() => windowVisible(app)).toBe(false);
 
       busy = await busyUserInFront(); // someone is working in another app: Windows' foreground lock is on
@@ -117,7 +125,7 @@ test.describe("AC6: close to tray", () => {
       const { app, page } = await launch(profile.dir);
       const exit = exited(app);
       // The app exits mid-click, so Playwright's click can only report that the page went away.
-      await chooseFromMenu(page, "File", "Exit").catch((e: Error) => {
+      await chooseFromMenu(page, "File", EXIT).catch((e: Error) => {
         if (!/has been closed/.test(e.message)) throw e;
       });
       expect(await exit).toBe(0);
@@ -138,7 +146,7 @@ test.describe("AC6: close to tray", () => {
         )
         .toBe(true);
       const exit = exited(app);
-      await chooseFromMenu(page, "File", "Exit").catch((e: Error) => {
+      await chooseFromMenu(page, "File", EXIT).catch((e: Error) => {
         if (!/has been closed/.test(e.message)) throw e;
       });
       expect(await exit).toBe(0);
@@ -149,6 +157,7 @@ test.describe("AC6: close to tray", () => {
   });
 
   test("File > Close Window and Ctrl+Shift+W hide the window to the tray, like the close button", async () => {
+    test.skip(mac, NO_TRAY_ON_MAC);
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     try {
@@ -158,7 +167,7 @@ test.describe("AC6: close to tray", () => {
       expect(await notices(app)).toEqual([NOTICE]);
       await clickTray(app);
       await expect.poll(() => windowVisible(app)).toBe(true);
-      await page.keyboard.press("Control+Shift+W");
+      await pressShortcut(page, "closeWindow");
       await expect.poll(() => windowVisible(app)).toBe(false);
       expect(app.process().exitCode).toBeNull();
     } finally {
@@ -168,6 +177,7 @@ test.describe("AC6: close to tray", () => {
   });
 
   test("Ctrl+Q does not quit on Windows and Linux: Exit has no shortcut", async () => {
+    test.skip(mac, NO_TRAY_ON_MAC);
     const profile = await tempUserData();
     const { app, page } = await launch(profile.dir);
     try {
@@ -184,6 +194,7 @@ test.describe("AC6: close to tray", () => {
   });
 
   test("the tray's Exit exits while the window is hidden", async () => {
+    test.skip(mac, NO_TRAY_ON_MAC);
     const profile = await tempUserData();
     try {
       const { app, page } = await launch(profile.dir);
@@ -197,6 +208,7 @@ test.describe("AC6: close to tray", () => {
   });
 
   test("with no tray on the desktop (stock GNOME), close quits instead of hiding the window", async () => {
+    test.skip(mac, NO_TRAY_ON_MAC);
     const profile = await tempUserData();
     try {
       // Fakes the platform: the desktop has no StatusNotifier host (detection itself is unit-tested).
@@ -224,10 +236,10 @@ test.describe("AC6: close to tray", () => {
     let busy: { dispose: () => void } | undefined;
     try {
       await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Inbox" }).click();
-      await page.getByRole("button", { name: "Close window" }).click();
+      await clickCloseButton(app, page);
       await expect.poll(() => windowVisible(app)).toBe(false);
 
-      busy = await busyUserInFront(); // someone is working in another app: Windows' foreground lock is on
+      busy = await busyUserInFront(); // someone is working in another app (Windows' foreground lock is on)
       await launchAgain(profile.dir, app); // the second process hands over to the first and exits
       await expect.poll(() => windowVisible(app)).toBe(true);
       await expect.poll(() => windowFocused(app)).toBe(true);

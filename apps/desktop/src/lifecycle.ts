@@ -79,6 +79,12 @@ export interface Lifecycle {
   setCloseToTray: (on: boolean) => void;
   /** Electron's `before-quit`: any quit (Cmd+Q, OS shutdown, `app.quit`) closes windows for real from here on. */
   onBeforeQuit: () => void;
+  /**
+   * Electron's window-all-closed, reached only when close didn't hide the window (the Close button is set to Quit,
+   * or close can't hide): quits on every platform. macOS too, against its custom of staying open with no window,
+   * since the user chose Quit and the Dock icon would otherwise stay with nothing to show (STORY-63).
+   */
+  allWindowsClosed: () => void;
   trayMenu: (win: ManagedWindow) => TrayMenuItem[];
 }
 
@@ -127,6 +133,9 @@ export function createLifecycle(o: LifecycleOptions): Lifecycle {
     },
     onBeforeQuit() {
       quitting = true;
+    },
+    allWindowsClosed() {
+      o.exit();
     },
     trayMenu: (win) => [
       { label: "Show Featra", click: () => lifecycle.reveal(win) },
