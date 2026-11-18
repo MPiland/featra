@@ -2,7 +2,7 @@
 id: BUG-31
 type: bug
 title: Approve on a draft feature sometimes does nothing
-status: In Review
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: dev
+  - at: 2026-11-18T22:26:32Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-18T22:26:32Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
