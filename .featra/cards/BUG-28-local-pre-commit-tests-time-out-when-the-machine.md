@@ -2,7 +2,7 @@
 id: BUG-28
 type: bug
 title: Local pre-commit tests time out when the machine is busy
-status: In Progress
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -25,6 +25,16 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-18T13:10:23Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-18T13:10:23Z
+    field: status
+    from: In Progress
+    to: Done
+    by: user
 ---
 
 ## Description
