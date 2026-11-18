@@ -2,7 +2,7 @@
 id: FEAT-19
 type: feature
 title: Installers
-status: draft
+status: approved
 parent: EPIC-4
 order: 19
 origin: planned
@@ -13,6 +13,11 @@ history:
     from: null
     to: draft
     by: dev-lead
+  - at: 2026-11-18T18:14:33Z
+    field: status
+    from: draft
+    to: approved
+    by: user
 ---
 
 ## Description
@@ -20,6 +25,10 @@ history:
 Testers install Featra on Windows, macOS or Linux from a downloaded installer, without Node, pnpm or a checkout. Installers are unsigned for now and published to GitHub Releases (decisions.md, 2026-11-17). Signed installers stay on the "Before public release" list.
 
 Built in this order: macOS joins CI first, because Featra has never run there (STORY-63). Then the installers for each platform (STORY-64), then a release workflow that publishes them (STORY-65).
+
+## Notes
+
+Out of scope: signing and notarization, auto-update and a "Check for updates" item (roadmap, "Before public release"), more installer formats (roadmap).
 
 ## Decisions
 
@@ -33,10 +42,6 @@ Made by the user on 2026-11-18 (decisions.md; ADR 0040).
 - **CI:** package jobs run on every PR and upload their installers, but aren't required at first. "E2E (macOS)" becomes a required check, which the user sets in branch protection.
 - **macOS first launch:** the docs say System Settings, Privacy & Security, then Open Anyway. The app is ad-hoc signed so Apple silicon runs it.
 - **PATH:** the packaged app reads the login shell's PATH at startup, so it finds `git`, `gh` and `claude`.
-
-## Notes
-
-Out of scope: signing and notarization, auto-update and a "Check for updates" item (roadmap, "Before public release"), more installer formats (roadmap).
 
 ## Depends on
 
