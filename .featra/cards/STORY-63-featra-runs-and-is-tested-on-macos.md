@@ -2,7 +2,7 @@
 id: STORY-63
 type: story
 title: Featra runs and is tested on macOS
-status: In Progress
+status: In Review
 parent: FEAT-19
 order: 1
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-63-macos-ci
-pr: null
+pr: https://github.com/MPiland/featra/pull/72
 created: 2026-11-18T12:00:00Z
 history:
   - at: 2026-11-18T12:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: dev
+  - at: 2026-11-18T20:15:44Z
+    field: status
+    from: In Progress
+    to: In Review
     by: dev
 ---
 
