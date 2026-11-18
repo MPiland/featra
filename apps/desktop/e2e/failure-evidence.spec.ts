@@ -42,7 +42,18 @@ test("BUG-30: a test stopped while the app waits keeps a screenshot of its windo
       .join("\n");
     expect(events).toContain('"type":"frame-snapshot"');
     expect(events).toContain("Not in the app");
-    expect([...files.keys()].some((name) => /^resources\/.+\.(?:jpeg|png)$/.test(name))).toBe(true);
+    // The screencast: each frame event names its image, kept in the zip (seen in the BUG-30 probe run, 44338894157).
+    const frames = [...events.matchAll(/"type":"screencast-frame".*?"file":"([^"]+)"/g)].map(([, file]) => file);
+    expect(frames.length).toBeGreaterThan(0);
+    expect(
+      frames.filter(
+        (file) =>
+          files
+            .get(file ?? "")
+            ?.subarray(0, 3)
+            .toString("hex") !== "ffd8ff",
+      ),
+    ).toEqual([]);
   } finally {
     await profile.dispose();
   }

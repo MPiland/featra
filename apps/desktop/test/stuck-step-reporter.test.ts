@@ -100,6 +100,29 @@ describe("a timed-out e2e test names the step and the locator it was waiting on 
     }
   });
 
+  it("prints a failed step's error as plain text, without the colour codes Playwright puts in its call log", () => {
+    // As the BUG-30 probe run (44338894157) printed it, with the codes as text.
+    const message = [
+      "TimeoutError: locator.click: Timeout 30000ms exceeded.",
+      "Call log:",
+      "\u001B[2m  - waiting for getByRole('button', { name: 'Not in the app' })\u001B[22m",
+    ].join("\n");
+    const click = step("Click", { location: { file: SPEC, line: 1 }, duration: 30_000, error: { message } });
+    const lines = whereItStopped(
+      { title: "t", ...noNotes },
+      { status: "failed", ...noNotes },
+      { step: click, finished: true, ended: 0 },
+      REPO,
+    );
+    expect(lines.slice(-5)).toEqual([
+      "  Failed after 30.0 s",
+      "  Its error:",
+      "    TimeoutError: locator.click: Timeout 30000ms exceeded.",
+      "    Call log:",
+      "      - waiting for getByRole('button', { name: 'Not in the app' })",
+    ]);
+  });
+
   it("never blames the harness's hooks and fixtures that run after the test stopped", () => {
     const action = step("Click getByText('Saved')", { location: { file: SPEC, line: 1 } });
     const fixture = step('Fixture "appEvidence"', { category: "fixture" });

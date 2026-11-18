@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { relative } from "node:path";
+import { stripVTControlCharacters } from "node:util";
 import type { Reporter, TestCase, TestResult, TestStep } from "@playwright/test/reporter";
 
 /**
@@ -95,7 +96,8 @@ export function whereItStopped(
     lines.push(
       finished ? `  Failed after ${seconds(ran)}` : `  Still running after ${seconds(ran)} when the test ended`,
     );
-    const message = step.error?.message;
+    // Playwright colours the call log in an error; a CI log shows the codes as text.
+    const message = step.error?.message === undefined ? undefined : stripVTControlCharacters(step.error.message);
     if (message !== undefined) {
       lines.push(
         "  Its error:",
