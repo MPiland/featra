@@ -52,7 +52,7 @@ export async function launch(
     args: [appDir],
     env,
   });
-  traceUntilClosed(app);
+  traceUntilClosed(app, userDataDir);
   const page = await app.firstWindow();
   await page.getByRole("banner").waitFor();
   return { app, page };

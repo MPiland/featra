@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { join } from "node:path";
 import { exited, launch, tempUserData } from "./app.ts";
 import { closeLeftRunning, keptFiles } from "./evidence.ts";
 import { expect, test } from "./fixtures.ts";
@@ -31,6 +32,7 @@ test("BUG-30: a test stopped while the app waits keeps a screenshot of its windo
     expect(kept).toEqual([
       expect.stringMatching(/electron-\d+-window-1\.png$/),
       expect.stringMatching(/electron-\d+\.zip$/),
+      expect.stringMatching(/electron-\d+-logs[\\/]main\.log$/),
     ]);
     const [shot = "", trace = ""] = kept;
     expect((await readFile(shot)).subarray(0, 8)).toEqual(PNG);
@@ -54,6 +56,27 @@ test("BUG-30: a test stopped while the app waits keeps a screenshot of its windo
             .toString("hex") !== "ffd8ff",
       ),
     ).toEqual([]);
+  } finally {
+    await profile.dispose();
+  }
+});
+
+test("BUG-31: a test stopped while the app runs keeps the app's log, with the main process's and the server's lines", async () => {
+  const profile = await tempUserData();
+  try {
+    const { app } = await launch(profile.dir);
+    const log = join(profile.dir, "logs", "main.log");
+    await expect.poll(() => readFile(log, "utf8").catch(() => "")).toContain("Server listening");
+    const gone = exited(app);
+
+    await closeLeftRunning();
+    await gone;
+
+    const kept = keptFiles(test.info().annotations).filter((file) => /electron-\d+-logs[\\/]main\.log$/.test(file));
+    expect(kept).toHaveLength(1);
+    const text = await readFile(kept[0] ?? "", "utf8");
+    expect(text).toMatch(/Featra \S+ started \(/);
+    expect(text).toContain("Server listening");
   } finally {
     await profile.dispose();
   }

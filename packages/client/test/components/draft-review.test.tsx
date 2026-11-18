@@ -5,41 +5,11 @@
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_CONFIG, planDraft, type Card } from "@featra/work-format";
 import { PROJECT, renderApp } from "../harness.tsx";
 import { cardOf } from "../work-fixtures.ts";
+import { BUILT, button, chatWithDraft, drafted, FEATURE, gone, type Host } from "./draft-fixture.ts";
 
 afterEach(cleanup);
-
-const BUILT = [cardOf({ id: "FEAT-1", type: "feature", status: "done", title: "Built" })];
-const FEATURE = "FEAT-2";
-
-function drafted(chat: string): Card[] {
-  const planned = planDraft(
-    {
-      feature: { title: "Shaping", description: "Talk a feature through." },
-      stories: [
-        { id: null, title: "Draft it", story: "As a builder, I draft.", criteria: ["It shows"], tasks: ["Build"] },
-        { id: null, title: "Review it", story: "As a builder, I review.", criteria: ["It opens"], tasks: ["Wire"] },
-      ],
-    },
-    { cards: BUILT, config: DEFAULT_CONFIG, chat, at: "2026-11-10T09:00:00Z" },
-  );
-  if (!planned.ok) throw new Error(planned.error);
-  return planned.value.writes.map((w) => w.card);
-}
-
-type Host = Parameters<typeof renderApp>[0];
-
-/** A Dev Lead chat (chat-1) that has drafted FEAT-2, open with its pane. */
-async function chatWithDraft(host: Host = {}, more: Card[] = []) {
-  const app = renderApp({ ...host, cards: { [PROJECT.dir]: [...BUILT, ...drafted("chat-1"), ...more] } });
-  await app.chats.bridge.start(PROJECT.dir, "dev-lead");
-  await screen.findByRole("region", { name: "Work list" });
-  app.chats.retitle("chat-1", "Shaping", "draft");
-  await app.user.click(screen.getByRole("button", { name: `Review draft ${FEATURE}` }));
-  return { app, pane: await screen.findByRole("complementary", { name: `${FEATURE} card` }) };
-}
 
 /** The draft with no chat: Review draft opens it in Work's own pane. */
 async function workPane(host: Host = {}) {
@@ -48,10 +18,6 @@ async function workPane(host: Host = {}) {
   await app.user.click(screen.getByRole("button", { name: `Review draft ${FEATURE}` }));
   return { app, pane: await screen.findByRole("complementary", { name: `${FEATURE} card` }) };
 }
-
-const button = (pane: HTMLElement, name: string) => within(pane).getByRole<HTMLButtonElement>("button", { name });
-const gone = (pane: HTMLElement, ...names: string[]) =>
-  names.forEach((name) => expect(within(pane).queryByRole("button", { name })).toBeNull());
 
 describe("where Approve and Reject are offered", () => {
   it("sit next to Send back in the chat's draft pane, with exactly these names", async () => {
