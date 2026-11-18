@@ -2,7 +2,7 @@
 id: STORY-63
 type: story
 title: Featra runs and is tested on macOS
-status: In Review
+status: Done
 parent: FEAT-19
 order: 1
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: dev
+  - at: 2026-11-18T21:23:37Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-18T21:23:37Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description

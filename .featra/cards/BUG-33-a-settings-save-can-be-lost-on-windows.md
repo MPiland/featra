@@ -2,7 +2,7 @@
 id: BUG-33
 type: bug
 title: A settings save can be lost on Windows
-status: In Review
+status: Done
 parent: FEAT-19
 order: 4
 origin: bug
@@ -25,6 +25,16 @@ history:
     from: New
     to: In Review
     by: dev
+  - at: 2026-11-18T21:23:40Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-18T21:23:40Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
