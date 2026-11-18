@@ -21,9 +21,7 @@ afterAll(() => w.close());
 const ask = (method: string, id: string) => w.window.ask(method, { dir: w.repo.main, id });
 const sessionOf = async (id: string) => (await w.sessions()).find((c) => c.story?.id === id);
 async function eventually(ok: () => Promise<boolean>) {
-  const end = Date.now() + 10_000;
   while (!(await ok())) {
-    if (Date.now() > end) throw new Error("Not seen in 10 s");
     await new Promise((r) => setTimeout(r, 20));
   }
 }

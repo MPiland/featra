@@ -15,7 +15,7 @@ import { createStoryPrs, type StoryPrs } from "../src/story-prs.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { createWorkWatches, type WorkWatches } from "../src/work-watch.ts";
 import { card, cardRepo, moved, type CardRepo } from "./card-repo.ts";
-import { fakeGh, type FakeGh, type FakeGhState } from "./fake-gh.ts";
+import { FAKE_GH_TIMEOUT_MS, fakeGh, type FakeGh, type FakeGhState } from "./fake-gh.ts";
 import { manualClock } from "./manual-clock.ts";
 
 export const STORY_BRANCH = "featra/story-1-pr";
@@ -126,7 +126,7 @@ export function prWorld(): PrWorld {
     w.tree = repo.worktree(STORY_BRANCH, "story-1", FEATURE_BRANCH);
     await repo.write(w.tree, storyCard(status));
     w.gh = await fakeGh({ remote: w.remote, ...gh });
-    const deps = { ghCommand: noGh ? "gh-that-is-not-installed" : w.gh.command };
+    const deps = { ghCommand: noGh ? "gh-that-is-not-installed" : w.gh.command, ghTimeoutMs: FAKE_GH_TIMEOUT_MS };
     w.settings = createCheckSettings({ scan: w.watches.scan, now: w.clock.now, ...deps });
     w.allowed.set([repo.main]);
     w.prs = createStoryPrs({

@@ -6,7 +6,6 @@ import { createAllowedProjects } from "../src/allowed-projects.ts";
 import { createServices } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
-import { FIRST_ANSWER_MS } from "./until.ts";
 import { openFrames, type SocketFrame } from "./ws-frames.ts";
 
 /**
@@ -56,7 +55,7 @@ describe("STORY-61 AC1: Hold over the socket, while the auto-merge setting in ef
     const socket = await open();
     try {
       socket.send({ id: 1, method: "work.watch", params: { dir: repo.main } });
-      const answer = await socket.next((f) => f.id === 1, FIRST_ANSWER_MS);
+      const answer = await socket.next((f) => f.id === 1);
       expect(heldOf(answer)).toBeUndefined();
       socket.send({ id: 2, method: "story.hold", params: { dir: repo.main, id: "STORY-1", held: true } });
       expect(await socket.next((f) => f.id === 2)).toEqual({
@@ -68,12 +67,12 @@ describe("STORY-61 AC1: Hold over the socket, while the auto-merge setting in ef
       // The app default turned on, and the host says the app's settings were saved: the row offers Hold.
       await writeFile(settings, JSON.stringify({ work: { autoMerge: true } }));
       services.settingsChanged();
-      const offered = await socket.next((f) => f.event === "work.list" && heldOf(f) === false, 5000);
+      const offered = await socket.next((f) => f.event === "work.list" && heldOf(f) === false);
       expect(heldOf(offered)).toBe(false);
 
       socket.send({ id: 3, method: "story.hold", params: { dir: repo.main, id: "STORY-1", held: true } });
       expect(await socket.next((f) => f.id === 3)).toEqual({ id: 3, ok: true, result: null });
-      await socket.next((f) => f.event === "work.list" && heldOf(f) === true, 5000);
+      await socket.next((f) => f.event === "work.list" && heldOf(f) === true);
       const story = parseCard(await repo.read(tree, "STORY-1"));
       expect(isHeld(story)).toBe(true);
       expect(story.history.at(-1)).toMatchObject({ field: "held", to: "held", by: "user" });

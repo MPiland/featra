@@ -38,9 +38,7 @@ const rowOf = (node: unknown, id: string): Record<string, unknown> | null => {
 const row = async (id: string) => rowOf((await w.window.ask("work.watch", { dir: w.repo.main })).result, id);
 /** Polls an async condition. */
 async function eventually(ok: () => Promise<boolean>) {
-  const end = Date.now() + 10_000;
   while (!(await ok())) {
-    if (Date.now() > end) throw new Error("Not seen in 10 s");
     await new Promise((r) => setTimeout(r, 20));
   }
 }

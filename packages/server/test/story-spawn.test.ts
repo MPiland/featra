@@ -115,7 +115,7 @@ describe("AC2: the Dev Lead's brief", () => {
       method: "story.spawn",
       params: { story: "STORY-6", brief: "Mind the Windows paths." },
     });
-    const answered = await lead.agent.socket.next((f) => f.id === 1, 20_000);
+    const answered = await lead.agent.socket.next((f) => f.id === 1);
     expect(answered).toMatchObject({ ok: true, result: { queued: false } });
     await w.until(() => (w.claude.runs[before]?.heard.length ?? 0) === 1);
     const run = w.claude.runs[before]!;
@@ -132,7 +132,7 @@ describe("AC6: a role that can't run the story", () => {
   it("is refused in one sentence, and no worktree is made", async () => {
     const lead = await w.devLead();
     lead.agent.socket.send({ id: 1, method: "story.spawn", params: { story: "STORY-7", role: "nonesuch" } });
-    expect(await lead.agent.socket.next((f) => f.id === 1, 20_000)).toMatchObject({
+    expect(await lead.agent.socket.next((f) => f.id === 1)).toMatchObject({
       ok: false,
       error: "No such role.",
     });

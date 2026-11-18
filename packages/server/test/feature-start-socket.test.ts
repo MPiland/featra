@@ -12,7 +12,6 @@ import { createServices } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 import { fakeClaude } from "./fake-query.ts";
-import { FIRST_ANSWER_MS } from "./until.ts";
 import { openFrames } from "./ws-frames.ts";
 
 const TOKEN = "test-token-0123456789";
@@ -59,7 +58,7 @@ describe("AC1: the window's feature.start", () => {
       const ask = async (method: string, params: unknown) => {
         const id = n++;
         socket.send({ id, method, params });
-        return socket.next((f) => f.id === id, FIRST_ANSWER_MS);
+        return socket.next((f) => f.id === id);
       };
       expect(await ask("feature.start", { dir: repo.root, id: "FEAT-2" })).toMatchObject({
         ok: false,
@@ -102,17 +101,17 @@ describe("AC2: the Dev Lead's start_feature over the agent socket", () => {
     const socket = await openFrames(`ws://127.0.0.1:${server.port}${AGENT_PATH}?token=${encodeURIComponent(secret)}`);
     try {
       socket.send({ id: 1, method: "feature.start", params: { feature: "FEAT-3" } });
-      expect(await socket.next((f) => f.id === 1, FIRST_ANSWER_MS)).toMatchObject({
+      expect(await socket.next((f) => f.id === 1)).toMatchObject({
         ok: true,
         result: { branch: "feature/3-by-the-dev-lead" },
       });
       socket.send({ id: 2, method: "feature.start", params: { feature: "FEAT-3" } });
-      expect(await socket.next((f) => f.id === 2, FIRST_ANSWER_MS)).toMatchObject({
+      expect(await socket.next((f) => f.id === 2)).toMatchObject({
         ok: false,
         error: "FEAT-3 is already active.",
       });
       socket.send({ id: 3, method: "feature.start", params: { feature: "nonsense" } });
-      expect(await socket.next((f) => f.id === 3, FIRST_ANSWER_MS)).toMatchObject({
+      expect(await socket.next((f) => f.id === 3)).toMatchObject({
         ok: false,
         error: "Give the feature's id, such as FEAT-5, as `feature`.",
       });

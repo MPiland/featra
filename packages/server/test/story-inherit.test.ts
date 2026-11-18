@@ -35,7 +35,7 @@ describe("rules at launch time", () => {
 
     // STORY-6 queues behind STORY-5: no rule exists yet.
     lead.agent.socket.send({ id: 7, method: "story.spawn", params: { story: "STORY-6" } });
-    expect(await lead.agent.socket.next((f) => f.id === 7, 20_000)).toMatchObject({
+    expect(await lead.agent.socket.next((f) => f.id === 7)).toMatchObject({
       ok: true,
       result: { queued: true },
     });

@@ -21,4 +21,25 @@ export PATH
 VITEST_MAX_WORKERS=${VITEST_MAX_WORKERS:-3}
 export VITEST_MAX_WORKERS
 
+# A commit that changes only `.featra/` and the Markdown docs (at the root and in docs/), with nothing else changed in
+# the working tree either, runs the content
+# gate (BUG-28, ADR 0014): the format check and the card tests, which parse and validate every card. No code changed,
+# so the rest of the gate would only repeat what the last code commit proved, at 20 to 30 minutes on a busy PC.
+content_only() {
+  changed=$( (git diff --cached --name-only && git diff --name-only && git ls-files --others --exclude-standard) | sort -u)
+  [ -n "$changed" ] || return 1
+  printf '%s\n' "$changed" | while IFS= read -r path; do
+    case "$path" in
+      .featra/* | docs/*.md) ;;
+      */*) echo code ;;
+      *.md) ;;
+      *) echo code ;;
+    esac
+  done | grep -q code && return 1
+  return 0
+}
+
+if content_only; then
+  exec pnpm check:content
+fi
 exec pnpm check

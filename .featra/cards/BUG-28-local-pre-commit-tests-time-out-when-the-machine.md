@@ -2,7 +2,7 @@
 id: BUG-28
 type: bug
 title: Local pre-commit tests time out when the machine is busy
-status: New
+status: In Progress
 parent: null
 order: 0
 origin: bug
@@ -11,7 +11,7 @@ agent: null
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/bug-28-gate-load
 pr: null
 created: 2026-11-17T00:10:49Z
 history:
@@ -19,6 +19,11 @@ history:
     field: status
     from: null
     to: New
+    by: dev-lead
+  - at: 2026-11-17T22:41:32Z
+    field: status
+    from: New
+    to: In Progress
     by: dev-lead
 ---
 
@@ -35,11 +40,13 @@ Suspect fixed timeouts and pollers racing under load.
 
 ## Acceptance criteria
 
-- [ ] The local pre-commit gate passes on a busy machine
-- [ ] No test relies on a fixed wall-clock wait
+- [x] The local pre-commit gate passes on a busy machine (test: tooling/test/pre-commit-hook.test.ts BUG-28, packages/server/test/story-prs-read.test.ts BUG-28, tooling/test/test-waits.test.ts)
+- [x] No test relies on a fixed wall-clock wait (test: tooling/test/test-waits.test.ts)
 
 ## Tasks
 
 ## Notes
+
+Causes and fix: decisions.md, 2026-11-17 — BUG-28 fix.
 
 Related: BUG-5 (unit tests time out under load), BUG-6, BUG-7 and BUG-18 (fixed waits missed under load).

@@ -11,7 +11,7 @@ import { createServices } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 import { fakeClaude } from "./fake-query.ts";
-import { FIRST_ANSWER_MS, until } from "./until.ts";
+import { until } from "./until.ts";
 import { openFrames, type FrameSocket, type SocketFrame } from "./ws-frames.ts";
 
 const TOKEN = "test-token-0123456789";
@@ -31,7 +31,7 @@ async function clientOf(socket: FrameSocket<unknown>): Promise<Client> {
   const ask: Client["ask"] = async (method, params) => {
     const id = n++;
     socket.send({ id, method, params });
-    return socket.next((f) => f.id === id, FIRST_ANSWER_MS);
+    return socket.next((f) => f.id === id);
   };
   return {
     socket,
@@ -39,7 +39,7 @@ async function clientOf(socket: FrameSocket<unknown>): Promise<Client> {
     async watch(chat) {
       const id = n++;
       socket.send({ id, method: "chat.watch", params: { id: chat } });
-      const first = await socket.next((f) => f.id === id, FIRST_ANSWER_MS);
+      const first = await socket.next((f) => f.id === id);
       const kept = ((first.result as { events: ChatEvent[] }).events ?? []).slice();
       return () => [
         ...kept,
@@ -160,9 +160,9 @@ export async function storyWorld({
     const before = claude.runs.length;
     const id = Math.floor(Math.random() * 1e6);
     lead.agent.socket.send({ id, method: "story.spawn", params: { story: storyId } });
-    const answered = await lead.agent.socket.next((f) => f.id === id, 20_000);
+    const answered = await lead.agent.socket.next((f) => f.id === id);
     if (answered.ok !== true) throw new Error(`Spawn refused: ${String(answered.error)}`);
-    await until(() => (claude.runs[before]?.heard.length ?? 0) === 1, FIRST_ANSWER_MS);
+    await until(() => (claude.runs[before]?.heard.length ?? 0) === 1);
     return { chat: (answered.result as { chat: string }).chat, run: claude.runs[before]! };
   }
 

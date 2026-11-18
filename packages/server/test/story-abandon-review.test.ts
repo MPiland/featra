@@ -13,7 +13,7 @@ const a = abandonWorld();
 const { m } = a;
 const { w } = m;
 
-describe("the warning's loss set (review fix)", { timeout: 60_000 }, () => {
+describe("the warning's loss set (review fix)", () => {
   it("lists commits pushed only to the story's own remote branch, which goes with it", async () => {
     await a.start();
     await a.commitInTree("pushed.txt", "Pushed work");
@@ -41,7 +41,7 @@ async function story2OnFeature() {
   await a.scan();
 }
 
-describe("a story its feature branch owns (review fix)", { timeout: 60_000 }, () => {
+describe("a story its feature branch owns (review fix)", () => {
   it("is kept as Cancelled on that branch", async () => {
     await a.start({ remote: false });
     await story2OnFeature();
@@ -65,7 +65,7 @@ describe("a story its feature branch owns (review fix)", { timeout: 60_000 }, ()
   });
 });
 
-describe("a feature branch that moved after the scan (STORY-13 review)", { timeout: 60_000 }, () => {
+describe("a feature branch that moved after the scan (STORY-13 review)", () => {
   it("refuses the abandon, and a task edit committed there meanwhile is kept", async () => {
     await a.start({ remote: false });
     await story2OnFeature();
@@ -88,7 +88,7 @@ describe("a feature branch that moved after the scan (STORY-13 review)", { timeo
   });
 });
 
-describe("an abandon tried again (review fix)", { timeout: 60_000 }, () => {
+describe("an abandon tried again (review fix)", () => {
   it("makes no second commit on the feature branch when the card there is already as it should be", async () => {
     await a.start({ remote: false });
     let fail = true;

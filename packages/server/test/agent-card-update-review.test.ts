@@ -19,7 +19,7 @@ const at = (story: keyof typeof trees) => tree(trees[story]);
 async function update(agent: Client, params: Record<string, unknown>) {
   const id = Math.floor(Math.random() * 1e9);
   agent.socket.send({ id, method: "card.update", params });
-  return agent.socket.next((f) => f.id === id, 20_000);
+  return agent.socket.next((f) => f.id === id);
 }
 const outside = () => join(w.repo.main, "..", "outside-evidence");
 const link = (session: Client, path: string) => update(session, { criteria: [{ criterion: "A", evidence: path }] });
@@ -28,14 +28,14 @@ const refusal = (frame: { ok?: boolean; error?: string }) => (frame.ok === true 
 beforeAll(async () => {
   w = await storyWorld({ drafted: true, config: "maxStoryAgents: 10\n", watched: true });
   lead = await w.agentOf(w.drafter);
-}, 60_000);
+});
 afterAll(() => w.close());
 
 describe("a card that is closed", () => {
   let session: Client;
   beforeAll(async () => {
     session = await w.agentOf((await w.spawnAs({ agent: lead }, "STORY-5")).chat);
-  }, 30_000);
+  });
 
   it.each(["Done", "Cancelled"])("takes no report when it is %s, and the file is untouched", async (status) => {
     await w.repo.write(at("STORY-5"), { ...(await w.card("STORY-5", at("STORY-5"))), status });
@@ -168,5 +168,5 @@ describe("a session whose worktree is gone", () => {
       "STORY-10's worktree is gone, so this session can no longer update it.",
     );
     expect(w.repo.git(w.repo.main, "status", "--porcelain", "--", ".featra/cards")).toBe("");
-  }, 30_000);
+  });
 });

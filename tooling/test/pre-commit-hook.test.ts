@@ -137,6 +137,41 @@ describe("AC5: a git pre-commit hook runs `pnpm check` in every worktree", () =>
     expect(readFileSync(workersPath, "utf8")).toBe("6");
   });
 
+  it("a commit of only cards and Markdown runs the content gate, which still blocks on failure (BUG-28)", () => {
+    mkdirSync(join(repo, ".featra", "cards"), { recursive: true });
+    expect(commit(repo, ".featra/cards/BUG-1-card.md", 0)).toEqual({
+      status: 0,
+      gateArgs: "check:content",
+      committed: true,
+    });
+    expect(commit(repo, "notes.md", 0)).toEqual({ status: 0, gateArgs: "check:content", committed: true });
+    const blocked = commit(repo, ".featra/cards/BUG-2-card.md", 1);
+    expect(blocked.status).not.toBe(0);
+    expect(blocked.gateArgs).toBe("check:content");
+    expect(blocked.committed).toBe(false);
+    git(repo, "reset", "--quiet");
+    rmSync(join(repo, ".featra", "cards", "BUG-2-card.md"));
+  });
+
+  it("a card commit runs the whole gate when code changed too: staged, unstaged or untracked (BUG-28)", () => {
+    writeFileSync(join(repo, "code.ts"), "export {};\n");
+    git(repo, "add", "code.ts");
+    expect(commit(repo, ".featra/cards/BUG-3-card.md", 0).gateArgs).toBe("check");
+    writeFileSync(join(repo, "code.ts"), "export const a = 1;\n");
+    expect(commit(repo, ".featra/cards/BUG-4-card.md", 0).gateArgs).toBe("check");
+    git(repo, "checkout", "--", "code.ts");
+    writeFileSync(join(repo, "untracked.ts"), "export {};\n");
+    expect(commit(repo, ".featra/cards/BUG-5-card.md", 0).gateArgs).toBe("check");
+    rmSync(join(repo, "untracked.ts"));
+  });
+
+  it("Markdown in a package is code's to test: committing it runs the whole gate (BUG-28)", () => {
+    mkdirSync(join(repo, "packages", "server"), { recursive: true });
+    expect(commit(repo, "packages/server/prompt.md", 0).gateArgs).toBe("check");
+    mkdirSync(join(repo, "docs", "adr"), { recursive: true });
+    expect(commit(repo, "docs/adr/0001-note.md", 0).gateArgs).toBe("check:content");
+  });
+
   it("outside a git checkout the installer does nothing and succeeds", () => {
     const plain = join(root, "not-a-repo");
     mkdirSync(plain);

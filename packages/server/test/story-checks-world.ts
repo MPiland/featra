@@ -17,7 +17,7 @@ import { createScanner } from "../src/work-scan.ts";
 import { createWorkWatches, type WorkWatches } from "../src/work-watch.ts";
 import { card, cardRepo, moved, type CardRepo } from "./card-repo.ts";
 import { stagedScanner } from "./staged-scanner.ts";
-import { until } from "./until.ts";
+import { TEST_PROCESS_LIMIT_MS, until } from "./until.ts";
 
 const CHECK = `const fs = require("fs");
 fs.appendFileSync("runs.log", "x\\n");
@@ -145,7 +145,7 @@ export function checksWorld(): World {
         settings: w.settings,
         now: () => clock,
         log: () => {},
-        timeoutMs: 30_000,
+        timeoutMs: TEST_PROCESS_LIMIT_MS,
       });
     w.checks = make();
     // The watch starts, so what is in review now is the baseline and only a change runs.

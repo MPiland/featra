@@ -23,9 +23,7 @@ const sessionOf = async (id: string): Promise<ChatSummary | undefined> =>
 const folder = (name: string) => join(w.repo.main, ".claude", "worktrees", name);
 /** Polls an async condition. */
 async function eventually(ok: () => Promise<boolean>) {
-  const end = Date.now() + 10_000;
   while (!(await ok())) {
-    if (Date.now() > end) throw new Error("Not seen in 10 s");
     await new Promise((r) => setTimeout(r, 20));
   }
 }

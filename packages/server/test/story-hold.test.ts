@@ -77,7 +77,7 @@ const row = async (dir = w.repo.main) =>
     .flatMap((e) => e.features.flatMap((f) => f.stories))
     .find((s) => s.id === "STORY-1");
 
-describe("STORY-61 AC1: Hold is a toggle on a story, each turn recorded in its history", { timeout: 60_000 }, () => {
+describe("STORY-61 AC1: Hold is a toggle on a story, each turn recorded in its history", () => {
   it("writes held by the user in the story's worktree copy, and lets it go the same way", async () => {
     await m.start({ remote: false });
     await m.verified();
@@ -117,30 +117,26 @@ describe("STORY-61 AC1: Hold is a toggle on a story, each turn recorded in its h
   });
 });
 
-describe(
-  "STORY-61 AC1: the toggle shows only while the auto-merge setting in effect is on",
-  { timeout: 60_000 },
-  () => {
-    it("leaves Hold out of the row when the app default is off and the project doesn't set it", async () => {
-      await m.start({ remote: false });
-      await m.verified();
-      const data = await mkdtemp(join(w.repo.root, "data-"));
-      await writeFile(join(data, "settings.json"), JSON.stringify({ work: { autoMerge: false } }));
-      const scanner = createScanner(createRepoGit(), { appAutoMerge: readAppAutoMerge(data) });
-      const rows = async () =>
-        (await scanner.scan(w.repo.main))!.list.epics.flatMap((e) => e.features.flatMap((f) => f.stories));
-      try {
-        expect((await rows()).find((s) => s.id === "STORY-1")?.held).toBeUndefined();
-        await writeFile(join(data, "settings.json"), JSON.stringify({ work: { autoMerge: true } }));
-        expect((await rows()).find((s) => s.id === "STORY-1")?.held).toBe(false);
-      } finally {
-        await scanner.close();
-      }
-    });
-  },
-);
+describe("STORY-61 AC1: the toggle shows only while the auto-merge setting in effect is on", () => {
+  it("leaves Hold out of the row when the app default is off and the project doesn't set it", async () => {
+    await m.start({ remote: false });
+    await m.verified();
+    const data = await mkdtemp(join(w.repo.root, "data-"));
+    await writeFile(join(data, "settings.json"), JSON.stringify({ work: { autoMerge: false } }));
+    const scanner = createScanner(createRepoGit(), { appAutoMerge: readAppAutoMerge(data) });
+    const rows = async () =>
+      (await scanner.scan(w.repo.main))!.list.epics.flatMap((e) => e.features.flatMap((f) => f.stories));
+    try {
+      expect((await rows()).find((s) => s.id === "STORY-1")?.held).toBeUndefined();
+      await writeFile(join(data, "settings.json"), JSON.stringify({ work: { autoMerge: true } }));
+      expect((await rows()).find((s) => s.id === "STORY-1")?.held).toBe(false);
+    } finally {
+      await scanner.close();
+    }
+  });
+});
 
-describe("STORY-61 AC2: a held story never merges on its own, and Merge still works on it", { timeout: 60_000 }, () => {
+describe("STORY-61 AC2: a held story never merges on its own, and Merge still works on it", () => {
   it("leaves a held, Verified and Proven story unmerged, which Merge then merges", async () => {
     await m.start({ remote: false });
     const auto = autoMerge();
@@ -251,56 +247,52 @@ describe("STORY-61 AC2: a held story never merges on its own, and Merge still wo
   });
 });
 
-describe(
-  "STORY-61 AC3: turning Hold off lets a Verified and Proven story merge on its own",
-  { timeout: 60_000 },
-  () => {
-    it("merges the held story once it is let go, by system", async () => {
-      await m.start({ remote: false });
-      const auto = autoMerge();
-      await m.verified();
-      const hold = holds();
-      await hold.hold(w.repo.main, "STORY-1", true);
-      await proveTip();
-      await settled(auto);
-      expect(m.treeExists()).toBe(true);
+describe("STORY-61 AC3: turning Hold off lets a Verified and Proven story merge on its own", () => {
+  it("merges the held story once it is let go, by system", async () => {
+    await m.start({ remote: false });
+    const auto = autoMerge();
+    await m.verified();
+    const hold = holds();
+    await hold.hold(w.repo.main, "STORY-1", true);
+    await proveTip();
+    await settled(auto);
+    expect(m.treeExists()).toBe(true);
 
-      await hold.hold(w.repo.main, "STORY-1", false);
-      await settled(auto);
-      const card = onFeature();
-      expect(isMerged(card)).toBe(true);
-      expect(card.history.at(-1)).toMatchObject({ field: "merged", by: "system" });
-      expect(card.history.filter((e) => e.field === "held").map((e) => e.to)).toEqual(["held", null]);
-      expect(m.treeExists()).toBe(false);
-      stopAll();
+    await hold.hold(w.repo.main, "STORY-1", false);
+    await settled(auto);
+    const card = onFeature();
+    expect(isMerged(card)).toBe(true);
+    expect(card.history.at(-1)).toMatchObject({ field: "merged", by: "system" });
+    expect(card.history.filter((e) => e.field === "held").map((e) => e.to)).toEqual(["held", null]);
+    expect(m.treeExists()).toBe(false);
+    stopAll();
+  });
+
+  it("merges a story let go after a try that failed at the same commits", async () => {
+    await m.start({ remote: false });
+    await m.verified();
+    let calls = 0;
+    const auto = autoMerge(async (dir, id, options) => {
+      calls += 1;
+      if (calls === 1) throw new Error("The merge failed.");
+      return m.merges.merge(dir, id, options);
     });
+    await proveTip();
+    await settled(auto);
+    expect(calls).toBe(1);
+    expect(m.treeExists()).toBe(true);
+    // Tried once at these commits: nothing tries it again on its own.
+    await settled(auto);
+    expect(calls).toBe(1);
 
-    it("merges a story let go after a try that failed at the same commits", async () => {
-      await m.start({ remote: false });
-      await m.verified();
-      let calls = 0;
-      const auto = autoMerge(async (dir, id, options) => {
-        calls += 1;
-        if (calls === 1) throw new Error("The merge failed.");
-        return m.merges.merge(dir, id, options);
-      });
-      await proveTip();
-      await settled(auto);
-      expect(calls).toBe(1);
-      expect(m.treeExists()).toBe(true);
-      // Tried once at these commits: nothing tries it again on its own.
-      await settled(auto);
-      expect(calls).toBe(1);
-
-      const hold = holds();
-      await hold.hold(w.repo.main, "STORY-1", true);
-      await settled(auto);
-      await hold.hold(w.repo.main, "STORY-1", false);
-      await settled(auto);
-      expect(calls).toBe(2);
-      expect(isMerged(onFeature())).toBe(true);
-      expect(m.treeExists()).toBe(false);
-      stopAll();
-    });
-  },
-);
+    const hold = holds();
+    await hold.hold(w.repo.main, "STORY-1", true);
+    await settled(auto);
+    await hold.hold(w.repo.main, "STORY-1", false);
+    await settled(auto);
+    expect(calls).toBe(2);
+    expect(isMerged(onFeature())).toBe(true);
+    expect(m.treeExists()).toBe(false);
+    stopAll();
+  });
+});

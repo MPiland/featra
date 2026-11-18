@@ -76,7 +76,7 @@ describe("an app request with choices, as the chat manager asks it (rulings 8, 9
   });
 });
 
-describe("report_bug whose chat ends before the user answers (ruling 8)", { timeout: 60_000 }, () => {
+describe("report_bug whose chat ends before the user answers (ruling 8)", () => {
   const m = mergeWorld();
 
   it("tells the Dev Lead the bug wasn't filed because the request was cancelled, and writes nothing", async () => {

@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PR_FIELDS } from "@featra/work-format";
 import { runGh, windowsCommand } from "../src/gh-run.ts";
-import { fakeGh, type FakeGh } from "./fake-gh.ts";
+import { FAKE_GH_TIMEOUT_MS, fakeGh, type FakeGh } from "./fake-gh.ts";
 
 describe("the Windows command line", () => {
   it("quotes the program's path, and each argument that isn't plain", () => {
@@ -35,7 +35,7 @@ describe("the Windows command line", () => {
   });
 });
 
-describe("running gh", { timeout: 30_000 }, () => {
+describe("running gh", () => {
   let gh: FakeGh;
   beforeEach(async () => {
     gh = await fakeGh();
@@ -44,7 +44,7 @@ describe("running gh", { timeout: 30_000 }, () => {
 
   it("hands gh each argument whole, commas, braces and spaces included", async () => {
     const args = ["--version", "--json", PR_FIELDS, "repos/{owner}/{repo}/pulls", "a b", "x&y"];
-    const r = await runGh(process.cwd(), args, { gh: gh.command });
+    const r = await runGh(process.cwd(), args, { gh: gh.command, timeoutMs: FAKE_GH_TIMEOUT_MS });
     expect(r?.code).toBe(0);
     expect((await gh.calls()).at(-1)?.args).toEqual(args);
   });

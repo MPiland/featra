@@ -19,8 +19,9 @@ import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { createWorkWatches, type WorkWatches } from "../src/work-watch.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
-import { fakeGh, type FakeGh, type FakeGhState } from "./fake-gh.ts";
+import { FAKE_GH_TIMEOUT_MS, fakeGh, type FakeGh, type FakeGhState } from "./fake-gh.ts";
 import { manualClock, MINUTE } from "./manual-clock.ts";
+import { TEST_PROCESS_LIMIT_MS } from "./until.ts";
 
 export const FEATURE_BRANCH = "feature/1-ship";
 export const LEAD = "lead-1";
@@ -43,7 +44,7 @@ export interface FeatureStartOptions {
   checks?: "local" | "ci";
   /** STORY-2's status: Cancelled by default, which Accept counts as finished. */
   story2?: string;
-  /** How long a check run may take; 30 s by default. */
+  /** How long a check run may take; `TEST_PROCESS_LIMIT_MS` by default. */
   checkTimeoutMs?: number;
   /** Whether a story session under FEAT-1 names its Dev Lead; true by default. */
   lead?: boolean;
@@ -149,7 +150,12 @@ export function featureWorld(): FeatureWorld {
     // The feature has work of its own, so its branch is active (one with no commits reads as merged).
     await w.commitOn(FEATURE_BRANCH, "feature.txt", "feature\n");
     w.gh = await fakeGh({ remote: w.remote, ...gh });
-    w.settings = createCheckSettings({ scan: w.watches.scan, now: w.clock.now, ghCommand: w.gh.command });
+    w.settings = createCheckSettings({
+      scan: w.watches.scan,
+      now: w.clock.now,
+      ghCommand: w.gh.command,
+      ghTimeoutMs: FAKE_GH_TIMEOUT_MS,
+    });
     await w.settings.set(repo.main, { confirm: ["command"] });
     w.allowed.set([repo.main]);
     w.features = createFeatureEnd({
@@ -163,7 +169,8 @@ export function featureWorld(): FeatureWorld {
       lane,
       log: () => {},
       ghCommand: w.gh.command,
-      checkTimeoutMs: options.checkTimeoutMs ?? 30_000,
+      ghTimeoutMs: FAKE_GH_TIMEOUT_MS,
+      checkTimeoutMs: options.checkTimeoutMs ?? TEST_PROCESS_LIMIT_MS,
     });
     await w.watches.watch(repo.main, () => {});
     await w.settle();

@@ -71,7 +71,7 @@ describe("AC3 and AC7: an approval the session still needs", () => {
 
     // Both clients were told of the request as it was asked, once, for the session's own chat.
     for (const client of [w.window, other]) {
-      const frame = await client.socket.next((f) => f.event === "inbox.asked", 5000);
+      const frame = await client.socket.next((f) => f.event === "inbox.asked");
       expect(frame.data).toMatchObject({ chat: child.chat, card: "STORY-7", request: { id: "c1" } });
     }
     const inbox = (await w.window.ask("inbox.watch", { dir: w.repo.main, waitMs: 0 })).result as Inbox;

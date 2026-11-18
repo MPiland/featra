@@ -59,6 +59,11 @@ meanwhile, in this ADR's Consequences.
   hooks. On Windows the `git.exe` there has none of git's DLLs beside it, so every git the tests start began slower:
   a new watch's first answer took 2.2 s in the hook, against 0.5–0.9 s without it. Without this the server's timed
   tests failed in the hook and passed outside it.
+- A commit that changes only `.featra/` and the Markdown docs (at the root and in `docs/`), with nothing else changed
+  in the working tree either, runs
+  `pnpm check:content` (amended 2026-11-17, BUG-28): the format check and the work-format tests, which parse and
+  validate every card in the repo. Lint, typecheck and the other tests would only repeat what the last code commit
+  proved, at 20 to 30 minutes on a busy PC. Any other changed path, staged, unstaged or untracked, runs `pnpm check`.
 - `pnpm install` sets `core.hooksPath` to `.githooks` (a relative path, in the repository's shared config), so every
   worktree runs its own checkout's hook.
 - The codebase gets one formatting commit. After that, no commit lands that fails the gate, whoever writes it.

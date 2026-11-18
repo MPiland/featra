@@ -2700,3 +2700,40 @@ Confirmed by the Dev Lead in review (rulings below); updated where a ruling chan
   - _One action button._ Story rows' chips (Session, Merge, Hold, Start, Accept) and the card's buttons are one
     family: a light face (`--menu`) with a hairline border, 20 px in rows and lines of text, 28 px in a card's action
     rows. Hold on keeps the accent's pressed state. A primary button (Approve, Start a feature) keeps its fill.
+
+## 2026-11-17 — BUG-28 fix
+
+- **Measured first.** The server suite, 3 workers, on this PC under its usual load (about 150 to 400 MB of memory
+  free, up to 60k page faults a second): 13 of 1089 tests failed in 1334 s, a different set from the user's four
+  failed commits. One test alone ("is noticed by the PR poller") is about 100 git and `gh` starts, 12 s of serial
+  process time and no sleeps. Under load single git calls took 34 to 77 s (`symbolic-ref` 77 s, `push` 50 s), all
+  processes at once: the PC stalls, not one call.
+- **Cause 1: fixed deadlines in the tests.** `until` (5 s), `next` (2 s), `GIT_ASKED_MS` and `FIRST_ANSWER_MS`
+  (20 s), literal 5 to 60 s deadlines, 10 s poll loops, and per-describe time limits of 30 and 60 s were all shorter
+  than one stall. Fix: the wait helpers wait on the condition with no deadline of their own; a deadline stays only
+  where a criterion promises a time (STORY-3's 1 s push) or a quiet check waits to see nothing happen.
+- **The hang guard.** `tooling/hang-guard.ts` sets one time limit for every test, hook and `expect.poll`: 900 s. Each
+  project's config spreads it into `test`, since vitest gives projects neither the root config's limits nor
+  `--hookTimeout` from the command line (tried: hooks still stopped at the default 10 s). It replaces
+  `--testTimeout=30000` in `test:unit`, the server's `hookTimeout`, the mcp `testTimeout` and about 90 per-test
+  overrides. This is a raised limit, with evidence: under load one git call took 77 s and the slowest test, which only
+  starts git and `gh` and waits on nothing, took 244 s here and 341 s in the stress runs below; 900 s is over twice that, and only a hung test reaches it.
+  `test-waits.test.ts` fails if a project's config leaves it out.
+- **Cause 2: the product's 15 s `gh` limit fired on the fake.** Under load the fake `gh` (cmd.exe and node) started
+  late, `runGh` killed it, and the product took the "GitHub can't be read" path: "STORY-1 has no PR" in place of the
+  conflict the test was about. `createServices` and the GitHub deps take `ghTimeoutMs` (15 s by default, unchanged
+  for the app); the tests pass `FAKE_GH_TIMEOUT_MS = 0`, no limit. Regression test: a `gh pr view` slower than 15 s
+  is still read (`story-prs-read.test.ts`), red with the 15 s limit. The stress run below found the last direct `runGh` call without it (`gh-run.test.ts`). The check commands the checks and feature-end tests start had a fixed 30 s kill too; they now get `TEST_PROCESS_LIMIT_MS`, the hang guard's 900 s.
+- **Cause 3: a card-only commit ran the whole gate.** The hook now runs `pnpm check:content` (format check and the
+  work-format tests, which validate every card in the repo) when the only changed paths, staged, unstaged or
+  untracked, are under `.featra/` or are Markdown at the root or in `docs/`. Markdown in a package runs the whole
+  gate. ADR 0014 amended.
+- **Guard.** `tooling/test/test-waits.test.ts` fails on a fixed wait in any unit test: a deadline on `until`,
+  `next`, `eventually` or `expect.poll`, a `Date.now() + N` deadline, a per-test or per-hook time limit, or a sleep
+  followed by a check. Each allowed wait is listed with its reason, and a stale entry fails too.
+- **Kept.** The tooling `run()` helper keeps its 120 s kill: `spawnSync` blocks the event loop, so vitest's own
+  limit can't end a hung child. The Electron e2e suite (CI only) keeps its waits.
+- **Stress result.** The same server suite, 3 workers, three runs back to back under the same load: 0 of 1089
+  failed in 2860 s, 1 of 1089 in 3618 s (`gh-run.test.ts`, the 15 s kill above, fixed after), 0 of 1089 in 2015 s.
+  Before: 13 failed in 1334 s. The runs are slower because no test now ends early on a deadline; the slowest test took
+  341 s, all git and `gh` starts. Fewer starts per test is on the roadmap.

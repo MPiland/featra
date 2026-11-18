@@ -20,7 +20,7 @@ afterAll(() => w.close());
 const message = (agent: Awaited<ReturnType<StoryWorld["agentOf"]>>, params: unknown) =>
   agent.ask("session.message", params);
 
-describe("AC3: message_session", { timeout: 30_000 }, () => {
+describe("AC3: message_session", () => {
   it("sends to the session of the Dev Lead's story, in the same provider session, when it is idle", async () => {
     const lead = await idleLead(w);
     const child = await w.spawnAs(lead, "STORY-5");
