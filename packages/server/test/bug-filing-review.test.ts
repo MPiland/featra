@@ -38,7 +38,7 @@ const onDisk = async (tree: string, prefix: string) =>
 /** A file named as a card with `id` that isn't one, so no scan knows the ID but the folder has it. */
 const broken = (tree: string, id: string) => writeFile(join(tree, CARDS, `${id}-broken.md`), "not a card\n");
 
-describe("a story its feature branch owns, with no worktree (review 2a, ruling 7)", { timeout: 60_000 }, () => {
+describe("a story its feature branch owns, with no worktree (review 2a, ruling 7)", () => {
   it("is offered the feature bug, not a task, and a task on it is refused", async () => {
     await start();
     const story2 = card("STORY-2", "story", "FEAT-1", "In Progress");
@@ -52,7 +52,7 @@ describe("a story its feature branch owns, with no worktree (review 2a, ruling 7
   });
 });
 
-describe("where the owner is or isn't checked out (review 2b, 2c)", { timeout: 60_000 }, () => {
+describe("where the owner is or isn't checked out (review 2b, 2c)", () => {
   it("commits a project bug on main by plumbing when main isn't checked out", async () => {
     await start();
     w.repo.git(w.repo.main, "checkout", "-q", FEATURE_BRANCH);
@@ -78,7 +78,7 @@ describe("where the owner is or isn't checked out (review 2b, 2c)", { timeout: 6
   });
 });
 
-describe("an ID already taken where the bug goes (review 2d)", { timeout: 60_000 }, () => {
+describe("an ID already taken where the bug goes (review 2d)", () => {
   it("takes the next ID on a branch committed by plumbing", async () => {
     await start();
     await w.repo.commitOn(FEATURE_BRANCH, (tree) => broken(tree, "BUG-1"), "a file named BUG-1");
@@ -94,7 +94,7 @@ describe("an ID already taken where the bug goes (review 2d)", { timeout: 60_000
   });
 });
 
-describe("a branch that moved after the scan (review 1)", { timeout: 60_000 }, () => {
+describe("a branch that moved after the scan (review 1)", () => {
   it("refuses the bug rather than add a second BUG-1 beside one committed meanwhile", async () => {
     const theirs = card("BUG-1", "bug", "FEAT-1", "New", { title: "Theirs" });
     let moved = false;
@@ -116,7 +116,7 @@ describe("a branch that moved after the scan (review 1)", { timeout: 60_000 }, (
   });
 });
 
-describe("a task on a story whose worktree has no copy of its card (review 10)", { timeout: 60_000 }, () => {
+describe("a task on a story whose worktree has no copy of its card (review 10)", () => {
   it("is refused as a card edit would be, and writes nothing", async () => {
     await start();
     // STORY-2 is in progress on the feature branch; its worktree, made from main, never had its card.

@@ -1,8 +1,4 @@
 import { defineConfig } from "vitest/config";
+import { HANG_GUARD } from "../../tooling/hang-guard.ts";
 
-export default defineConfig({
-  test: {
-    // Each stdio test starts a real Node process and a real server.
-    testTimeout: 30000,
-  },
-});
+export default defineConfig({ test: { ...HANG_GUARD } });

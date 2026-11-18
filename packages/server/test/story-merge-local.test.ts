@@ -23,7 +23,7 @@ const local = () => m.start({ remote: false });
 const merge = () => m.merges.merge(w.repo.main, "STORY-1");
 const onFeature = () => parseCard(w.repo.show(w.repo.main, FEATURE_BRANCH, "STORY-1"));
 
-describe("a turn that runs mid-merge (review fix)", { timeout: 60_000 }, () => {
+describe("a turn that runs mid-merge (review fix)", () => {
   it("can't start: the Dev Lead's message and Resume are refused while the story merges", async () => {
     await local();
     await m.verified();
@@ -90,7 +90,7 @@ describe("a turn that runs mid-merge (review fix)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("after a restart (review fix)", { timeout: 60_000 }, () => {
+describe("after a restart (review fix)", () => {
   it("refuses a commit made since the checks passed: Featra never checked it", async () => {
     await local();
     await m.verified();
@@ -109,7 +109,7 @@ describe("after a restart (review fix)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("the merge commit (review fixes)", { timeout: 60_000 }, () => {
+describe("the merge commit (review fixes)", () => {
   it("has the card's uncommitted edits", async () => {
     await local();
     await m.verified();
@@ -170,7 +170,7 @@ describe("the merge commit (review fixes)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("what goes after a local merge (review fixes)", { timeout: 60_000 }, () => {
+describe("what goes after a local merge (review fixes)", () => {
   it("deletes the story's branch on a remote that has it", async () => {
     await m.start({ remote: true, noGh: true });
     await m.verified();

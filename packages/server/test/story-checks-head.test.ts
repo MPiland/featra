@@ -7,7 +7,7 @@ import { writeFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import { evidenceState } from "@featra/work-format";
 import { checksWorld } from "./story-checks-world.ts";
-import { GIT_ASKED_MS, until } from "./until.ts";
+import { until } from "./until.ts";
 
 const w = checksWorld();
 const head = () => w.repo.git(w.tree, "rev-parse", "HEAD").trim();
@@ -33,7 +33,7 @@ describe("the commit the checks settled on", () => {
     await writeFile(w.inTree("more.txt"), "more\n");
     w.repo.commit(w.tree, "more");
     expect(head()).not.toBe(before);
-    await until(() => w.checks.settledHead(w.repo.main, "STORY-1", null) === head(), GIT_ASKED_MS);
+    await until(() => w.checks.settledHead(w.repo.main, "STORY-1", null) === head());
     await w.checks.idle();
     expect(await settled()).toBe(head());
     expect(await stored()).toBe(head());

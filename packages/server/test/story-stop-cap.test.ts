@@ -11,6 +11,7 @@ import { createRoleRegistry } from "../src/role-registry.ts";
 import { DIR } from "./chat-fixture.ts";
 import { fakeClaude, sdk } from "./fake-query.ts";
 import { storyWorld, type StoryWorld } from "./story-fixture.ts";
+import { until } from "./until.ts";
 
 let w: StoryWorld;
 beforeAll(async () => {
@@ -20,13 +21,6 @@ afterAll(() => w.close());
 
 const ask = (method: string, id: string) => w.window.ask(method, { dir: w.repo.main, id });
 const sessionOf = async (id: string) => (await w.sessions()).find((c) => c.story?.id === id);
-async function eventually(ok: () => Promise<boolean>) {
-  const end = Date.now() + 10_000;
-  while (!(await ok())) {
-    if (Date.now() > end) throw new Error("Not seen in 10 s");
-    await new Promise((r) => setTimeout(r, 20));
-  }
-}
 
 describe("AC4: the cap", () => {
   it("frees the slot of a stopped session, so the next story starts", async () => {
@@ -65,13 +59,13 @@ describe("AC4: the cap", () => {
     const second = w.claude.runs[1]!;
     // STORY-5 is running again; its next turn waits behind STORY-6's.
     first.say(sdk.success("done"));
-    await eventually(async () => (await sessionOf("STORY-5"))?.running === false);
+    await until(async () => (await sessionOf("STORY-5"))?.running === false);
     const chat = (await sessionOf("STORY-6"))!.id;
     await w.window.ask("chat.send", { id: chat, text: "More." });
     await w.until(() => second.heard.length === 2);
     const queued = await w.window.ask("chat.send", { id: (await sessionOf("STORY-5"))!.id, text: "Again." });
     expect(queued).toMatchObject({ ok: true });
-    await eventually(async () => (await sessionOf("STORY-5"))?.queued === true);
+    await until(async () => (await sessionOf("STORY-5"))?.queued === true);
 
     expect(await ask("story.stop", "STORY-5")).toMatchObject({ ok: true });
     expect(first.interrupts).toBe(1);

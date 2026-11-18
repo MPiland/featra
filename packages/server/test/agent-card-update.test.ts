@@ -24,7 +24,7 @@ const six = () => tree("STORY-6-spawn-six");
 async function update(agent: Client, params: Record<string, unknown>) {
   const id = Math.floor(Math.random() * 1e9);
   agent.socket.send({ id, method: "card.update", params });
-  return agent.socket.next((f) => f.id === id, 20_000);
+  return agent.socket.next((f) => f.id === id);
 }
 const refusal = (frame: { ok?: boolean; error?: string }) => (frame.ok === true ? null : String(frame.error));
 
@@ -69,7 +69,7 @@ beforeAll(async () => {
   // The owner copies are the worktrees': give the stories something to tick.
   await w.repo.write(five(), withWork(await w.card("STORY-5", five())));
   await w.repo.write(six(), withWork(await w.card("STORY-6", six())));
-}, 60_000);
+});
 afterAll(() => w.close());
 
 describe("AC1: what a story session may write", () => {
@@ -162,7 +162,6 @@ describe("AC2: the owner copy, history, and the feature list", () => {
       (f) =>
         f.event === "work.list" &&
         (rowOf(f.data, "STORY-5")?.tasks as { total: number })?.total === card.tasks.length + 1,
-      15_000,
     );
     expect(rowOf(push.data, "STORY-5")).toMatchObject({ reported: true });
   });

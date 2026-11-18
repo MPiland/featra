@@ -37,6 +37,8 @@ export interface ServiceOptions {
   interruptMs?: number;
   /** The GitHub CLI to ask whether a repo is public; the one on the PATH by default (STORY-56). */
   ghCommand?: string;
+  /** How long a `gh` call may take before it is given up; 15 seconds by default. */
+  ghTimeoutMs?: number;
   /** How long a check command may run before it is killed (STORY-56). */
   checkTimeoutMs?: number;
   /** The timers PR reads wait on (STORY-11); the real ones by default. */

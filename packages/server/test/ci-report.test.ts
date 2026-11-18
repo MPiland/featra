@@ -6,14 +6,19 @@ import { existsSync } from "node:fs";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { CI_PROOF_COPY } from "@featra/work-format";
 import { readCiReports } from "../src/ci-report.ts";
-import { fakeGh, junitXml, type FakeGh } from "./fake-gh.ts";
+import { FAKE_GH_TIMEOUT_MS, fakeGh, junitXml, type FakeGh } from "./fake-gh.ts";
 
 const HEAD = "a".repeat(40);
 const OTHER = "b".repeat(40);
 const A = "packages/app/test/a.test.ts";
 let gh: FakeGh;
 const read = (setting: { artifact: string; files?: string | null }, extra = {}) =>
-  readCiReports(gh.bin, HEAD, { files: null, ...setting }, { ghCommand: gh.command, ...extra });
+  readCiReports(
+    gh.bin,
+    HEAD,
+    { files: null, ...setting },
+    { ghCommand: gh.command, ghTimeoutMs: FAKE_GH_TIMEOUT_MS, ...extra },
+  );
 const downloads = async () =>
   (await gh.calls()).map((c) => c.args).filter((a) => a[0] === "run" && a[1] === "download");
 
@@ -22,7 +27,7 @@ beforeEach(async () => {
 });
 afterEach(() => gh.dispose());
 
-describe("reading CI's test report for a commit", { timeout: 30_000 }, () => {
+describe("reading CI's test report for a commit", () => {
   it("lists the commit's runs, downloads the matching artifact of each with fixed arguments, and reads its XML", async () => {
     await gh.change((s) => {
       s.runs = [
@@ -159,7 +164,12 @@ describe("reading CI's test report for a commit", { timeout: 30_000 }, () => {
   it("refuses an unsafe artifact name or commit without calling gh", async () => {
     expect(await read({ artifact: "a b & echo hi" })).toBeNull();
     expect(
-      await readCiReports(gh.bin, "HEAD; rm", { artifact: "x", files: null }, { ghCommand: gh.command }),
+      await readCiReports(
+        gh.bin,
+        "HEAD; rm",
+        { artifact: "x", files: null },
+        { ghCommand: gh.command, ghTimeoutMs: FAKE_GH_TIMEOUT_MS },
+      ),
     ).toBeNull();
     expect(await gh.calls()).toEqual([]);
   });

@@ -151,7 +151,7 @@ beforeAll(async () => {
       tasks: [{ text: "Report it", done: false }],
     }),
   );
-}, 60_000);
+});
 
 afterAll(async () => {
   await Promise.all(clients.map((c) => c.close()));

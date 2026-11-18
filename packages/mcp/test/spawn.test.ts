@@ -127,7 +127,7 @@ beforeAll(async () => {
   services.agents.setPort(server.port);
   await call("feature.start", { dir: project, id: "FEAT-1" });
   lead = ((await call("chat.start", { dir: project, role: "dev-lead" })) as { id: string }).id;
-}, 60_000);
+});
 
 afterAll(async () => {
   await Promise.all(clients.map((c) => c.close()));
@@ -192,10 +192,12 @@ describe("spawn_session through the Featra MCP", () => {
   });
 });
 
-async function until(ok: () => boolean, ms = 20_000) {
-  const end = Date.now() + ms;
+/**
+ * Waits until `ok` holds, with no deadline of its own: the run's hang guard ends a wait that never does (BUG-28). The
+ * server's `test/until.ts` does the same, but this package's tsconfig keeps its files inside it.
+ */
+async function until(ok: () => boolean) {
   while (!ok()) {
-    if (Date.now() > end) throw new Error(`Not seen in ${ms} ms`);
     await new Promise((r) => setTimeout(r, 20));
   }
 }

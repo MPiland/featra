@@ -37,7 +37,7 @@ const approvals = (events: ChatEvent[]) =>
 /** Whether a Dev Lead's run has heard a notice line containing `text`. */
 const heard = (text: string) => w.claude.runs.some((r) => r.heard.some((h) => h.includes(text)));
 
-describe("report_bug (AC1, AC3)", { timeout: 60_000 }, () => {
+describe("report_bug (AC1, AC3)", () => {
   it("asks the user with the proposed place, and Create with another place files it there", async () => {
     const lead = await w.devLead();
     const asked = await lead.agent.ask("bug.report", {
@@ -63,7 +63,7 @@ describe("report_bug (AC1, AC3)", { timeout: 60_000 }, () => {
       option: "project",
     });
     expect(answered).toMatchObject({ ok: true });
-    await w.until(() => bugsOnMain().length === 1, 20_000);
+    await w.until(() => bugsOnMain().length === 1);
     expect(bugsOnMain()).toEqual(["BUG-1-spawn-hangs.md"]);
     await w.until(() => heard(`${bugSubject("Spawn hangs")} filed: BUG-1 on the project bug list.`));
   });
@@ -131,7 +131,7 @@ describe("report_bug (AC1, AC3)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("New bug in Work (AC1, AC3)", { timeout: 60_000 }, () => {
+describe("New bug in Work (AC1, AC3)", () => {
   it("proposes a place for the cause, and files at the place the user confirmed", async () => {
     const proposed = await w.window.ask("bug.propose", { dir: w.dir, cause: "FEAT-2" });
     expect(proposed).toMatchObject({ ok: true, result: { proposed: "feature:FEAT-2" } });

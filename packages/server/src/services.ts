@@ -64,6 +64,7 @@ export function createServices({
   logs,
   interruptMs,
   ghCommand,
+  ghTimeoutMs,
   checkTimeoutMs,
   prTimers = systemTimers(),
 }: ServiceOptions): {
@@ -89,7 +90,7 @@ export function createServices({
     prState: (dir, id) => prs.prState(dir, id) ?? features.prState(dir, id),
     merge: (dir, id) => features.mergeState(dir, id),
   });
-  const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand });
+  const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand, ghTimeoutMs });
   const checks = createStoryChecks({
     scan: watches.scan,
     observe: watches.observe,
@@ -111,6 +112,7 @@ export function createServices({
     log,
     gitCommand,
     ghCommand,
+    ghTimeoutMs,
     onMerged: (dir, id) => merges.merged(dir, id),
   });
   const roles = createRoleRegistry({
@@ -155,6 +157,7 @@ export function createServices({
     checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
     gitCommand,
     ghCommand,
+    ghTimeoutMs,
     ending,
     onGithubMerge: (dir) => prs.refresh(dir),
   });
@@ -176,6 +179,7 @@ export function createServices({
     chats,
     gitCommand,
     ghCommand,
+    ghTimeoutMs,
     ending,
   });
   const features = createFeatureEnd({
@@ -190,6 +194,7 @@ export function createServices({
     log,
     gitCommand,
     ghCommand,
+    ghTimeoutMs,
     checkTimeoutMs,
   });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });

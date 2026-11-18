@@ -41,7 +41,7 @@ function mergeMainIn() {
   w.repo.git(dir(), "worktree", "remove", "--force", tree);
 }
 
-describe("Accept on a feature (AC1)", { timeout: 60_000 }, () => {
+describe("Accept on a feature (AC1)", () => {
   it("is refused while a story under it isn't finished, and isn't offered", async () => {
     await w.start({ story2: "In Progress" });
     expect((await view())?.featureEnd).toEqual({
@@ -75,7 +75,7 @@ describe("Accept on a feature (AC1)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("local mode (AC2)", { timeout: 60_000 }, () => {
+describe("local mode (AC2)", () => {
   it("opens no PR and offers no Create PR", async () => {
     await w.start({ remote: false });
     await accept();
@@ -86,7 +86,7 @@ describe("local mode (AC2)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("Merge to main without GitHub (AC3, AC5)", { timeout: 60_000 }, () => {
+describe("Merge to main without GitHub (AC3, AC5)", () => {
   it("is refused before Accept", async () => {
     await w.start({ remote: false });
     await expect(merge()).rejects.toThrow(FEATURE_END_MESSAGES.notAccepted(ID));
@@ -152,7 +152,7 @@ describe("Merge to main without GitHub (AC3, AC5)", { timeout: 60_000 }, () => {
   });
 });
 
-describe("when main moves on (AC4)", { timeout: 60_000 }, () => {
+describe("when main moves on (AC4)", () => {
   it("turns Merge to main off and tells the Dev Lead to merge main in, once per main commit", async () => {
     await w.start({ remote: false });
     await accept();

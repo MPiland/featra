@@ -85,7 +85,7 @@ describe("a card write that fails", () => {
     const run = w.claude.runs[0]!;
     run.say(sdk.failure());
     await w.until(() => run.interrupts === 1);
-    for (let i = 0; i < 250 && (await sessionOf("STORY-5"))?.running !== false; i++) {
+    while ((await sessionOf("STORY-5"))?.running !== false) {
       await new Promise((r) => setTimeout(r, 20));
     }
     disk.failing = true;
@@ -136,7 +136,7 @@ describe("the interrupt", () => {
     expect(await stoppedEvents("STORY-11", "STORY-11-spawn-11")).toHaveLength(1);
     run.onInterrupt = null;
     run.say(sdk.failure());
-    for (let i = 0; i < 250 && (await sessionOf("STORY-11"))?.running !== false; i++) {
+    while ((await sessionOf("STORY-11"))?.running !== false) {
       await new Promise((r) => setTimeout(r, 20));
     }
     expect(await ask("story.resume", "STORY-11")).toMatchObject({ ok: true });

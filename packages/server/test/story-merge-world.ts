@@ -15,6 +15,7 @@ import { runGit } from "../src/git-run.ts";
 import { createMergeRequest, type MergeRequest } from "../src/merge-request.ts";
 import { createStoryChecks } from "../src/story-checks.ts";
 import { createStoryMerge, type StoryMerge } from "../src/story-merge.ts";
+import { FAKE_GH_TIMEOUT_MS } from "./fake-gh.ts";
 import {
   FEATURE_BRANCH,
   prWorld,
@@ -167,6 +168,7 @@ export function mergeWorld(): MergeWorld {
       chats,
       checkedHead: (dir, id, stored) => (m.checked === undefined ? checks.settledHead(dir, id, stored) : m.checked),
       ghCommand: options.noGh ? "gh-that-is-not-installed" : w.gh.command,
+      ghTimeoutMs: FAKE_GH_TIMEOUT_MS,
       gitRun: (...args) => (m.gitRun ?? runGit)(...args),
       onGithubMerge: (dir) => w.prs.refresh(dir),
     });
