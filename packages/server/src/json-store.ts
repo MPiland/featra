@@ -1,5 +1,6 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { retryBusy } from "./busy-retry.ts";
 
 export interface JsonStore<T> {
   readonly file: string;
@@ -19,12 +20,24 @@ export interface JsonStore<T> {
   readonly pending: boolean;
 }
 
+/** The platform calls a store makes that tests may stand in for. */
+export interface JsonStoreIo {
+  rename?: typeof rename;
+  pause?: (ms: number) => Promise<unknown>;
+}
+
 /**
  * A small JSON file in the app's data folder (Electron's userData): the desktop's own stores, and the server's saved
  * chats (STORY-44). Reads are defensive (`normalize` repairs anything stored);
- * writes are serialised and atomic (temp file + rename), so a crash mid-write never leaves a torn file.
+ * writes are serialised and atomic (temp file + rename), so a crash mid-write never leaves a torn file. A rename that
+ * Windows refuses while another program reads the file is tried again (BUG-16), so the save isn't lost.
  */
-export function createJsonStore<T>(dir: string, name: string, normalize: (raw: unknown) => T): JsonStore<T> {
+export function createJsonStore<T>(
+  dir: string,
+  name: string,
+  normalize: (raw: unknown) => T,
+  { rename: move = rename, pause }: JsonStoreIo = {},
+): JsonStore<T> {
   const file = join(dir, name);
   let queue: Promise<void> = Promise.resolve();
   let inFlight = 0;
@@ -33,7 +46,7 @@ export function createJsonStore<T>(dir: string, name: string, normalize: (raw: u
     await mkdir(dir, { recursive: true });
     const tmp = `${file}.tmp`;
     await writeFile(tmp, `${JSON.stringify(normalize(state), null, 2)}\n`, "utf8");
-    await rename(tmp, file);
+    await retryBusy(() => move(tmp, file), pause);
   };
 
   const enqueue = (op: () => Promise<void>) => {

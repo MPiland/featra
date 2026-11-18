@@ -2879,6 +2879,13 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **settings.spec's project override read the file too soon.** The page shows an override at once and writes it after
   (ProjectPage's `set`), so the test's single read raced the write. It failed on Ubuntu at 1569d64 and on Windows at
   c993c0c, so it is not macOS's; the same check now waits for the file.
+- **Bug found: a settings save could be lost on Windows.** The JSON stores (`settings.json`, `ui-state.json`, saved
+  chats) save through a temp file and a rename, and Windows refuses that rename with EPERM while another program reads
+  the file. Nothing tried again, so Settings showed "Minimize to tray" while the file kept "quit" (E2E (Windows) at
+  432a5ea, settings.spec's AC6 polling the file). `createJsonStore` now retries a busy rename with BUG-16's
+  `retryBusy`, as card writes already do. `json-store-busy.test.ts` failed first: once with a stand-in rename, and once
+  with EPERM from a real reader holding the file on Windows. The save failure isn't shown on the page; that's left as
+  it was.
 - **Open finding, not from this story: Approve on a draft once did nothing.** On the macOS job at 1569d64,
   auto-merge-fails.spec's first step clicked Approve; the trace shows the buttons busy, then enabled again, with no
   error shown, the card still Draft and its files uncommitted. The two other specs that use the same helper passed in
