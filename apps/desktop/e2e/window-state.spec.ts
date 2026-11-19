@@ -1,5 +1,7 @@
 import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
 import { launch, tempUserData, windowManagerCanMaximize } from "./app.ts";
+import { pressShortcut } from "./keys.ts";
+import { mac } from "./mac.ts";
 
 /**
  * BUG-1 in the real window: the title bar's maximize button, View > Full Screen and the window itself agree on
@@ -59,7 +61,7 @@ async function fullScreenChecked(page: Page) {
 }
 
 test.describe("BUG-1: the maximize button and Full Screen follow the window", () => {
-  test.skip(process.platform === "darwin", "macOS keeps its native traffic lights");
+  test.skip(mac, "macOS keeps its native traffic lights");
 
   test("in full screen the button shows restore and says Exit Full Screen; one click returns to the window's size", async () => {
     const profile = await tempUserData();
@@ -69,7 +71,7 @@ test.describe("BUG-1: the maximize button and Full Screen follow the window", ()
       expect(before.fullScreen).toBe(false);
       await expectSizeButton(page, "Maximize", "maximize");
 
-      await page.keyboard.press("F11");
+      await pressShortcut(page, "fullScreen");
       await expect.poll(async () => (await win(app)).fullScreen).toBe(true);
       await expectSizeButton(page, "Exit Full Screen", "restore");
 
@@ -97,7 +99,7 @@ test.describe("BUG-1: the maximize button and Full Screen follow the window", ()
       await expect.poll(async () => (await win(app)).maximized).toBe(true);
       await expectSizeButton(page, RESTORE, "restore");
 
-      await page.keyboard.press("F11");
+      await pressShortcut(page, "fullScreen");
       await expect.poll(async () => (await win(app)).fullScreen).toBe(true);
       await expectSizeButton(page, "Exit Full Screen", "restore");
 
@@ -118,7 +120,7 @@ test.describe("BUG-1: the maximize button and Full Screen follow the window", ()
     const { app, page } = await launch(profile.dir);
     try {
       expect(await fullScreenChecked(page)).toBe(false);
-      await page.keyboard.press("F11");
+      await pressShortcut(page, "fullScreen");
       await expect.poll(async () => (await win(app)).fullScreen).toBe(true);
       expect(await fullScreenChecked(page)).toBe(true);
 
@@ -131,7 +133,7 @@ test.describe("BUG-1: the maximize button and Full Screen follow the window", ()
       await fromOs(app, "enterFullScreen");
       await expectSizeButton(page, "Exit Full Screen", "restore");
       expect(await fullScreenChecked(page)).toBe(true);
-      await page.keyboard.press("F11");
+      await pressShortcut(page, "fullScreen");
       await expect.poll(async () => (await win(app)).fullScreen).toBe(false);
       await expectSizeButton(page, "Maximize", "maximize");
     } finally {

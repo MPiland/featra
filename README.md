@@ -23,16 +23,36 @@ delegates them to sub-sessions in their own git worktrees, and Featra shows you 
 Early development. See the [M1 backlog](.featra/) (Featra tracks its own work in Featra's card format) and the
 [architecture decisions](docs/adr/).
 
+## Install
+
+Download Featra for Windows, macOS or Linux from the [Releases page](https://github.com/MPiland/featra/releases):
+
+- Windows: `Featra-<version>-x64-setup.exe`
+- macOS (Apple silicon and Intel): `Featra-<version>-universal.dmg`
+- Linux: `Featra-<version>-x64.AppImage`
+
+The installers aren't signed yet, so Windows and macOS warn the first time Featra opens.
+[docs/install.md](docs/install.md) shows how to open it on each platform, and what Featra needs: `git`, `gh` and
+`claude`. Releases are cut from a version tag ([docs/releasing.md](docs/releasing.md)).
+
 ## Development
 
 Requires Node 24+ and pnpm.
+
+Featra runs on Windows, macOS and Linux, and CI runs its end-to-end tests on all three on every pull request
+([docs/testing.md](docs/testing.md)).
 
 ```bash
 pnpm install
 pnpm start        # build the client and desktop app, then launch Featra
 pnpm test         # unit tests, then the Electron end-to-end tests
 pnpm typecheck
+pnpm package      # build the installer for this platform into apps/desktop/out/installers
 ```
+
+`pnpm package` builds a Windows x64 setup, a universal macOS DMG and zip, or a Linux x64 AppImage, named with the
+version and architecture (ADR 0040). None is signed with a developer identity yet. CI builds, installs and launches
+each one on every pull request. The installed app keeps its data in a `Featra` folder, apart from a source run's.
 
 `pnpm dev:client` serves the UI in a browser with hot reload, for quick UI work. Electron loads that server instead of the
 built client when `FEATRA_CLIENT_URL=http://localhost:5174` is set. The first Electron launch downloads its binary.

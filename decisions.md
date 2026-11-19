@@ -2837,6 +2837,71 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - The packaged app reads the login shell's PATH at startup, so it finds `git`, `gh` and `claude` when opened from Finder or a desktop menu.
 - Stories: STORY-63 Featra runs and is tested on macOS; STORY-64 Install Featra from an installer; STORY-65 Download Featra from a release. Each depends on the one before it.
 
+## 2026-11-18 — STORY-63: Featra on macOS (dev)
+
+- **E2E (macOS)** runs the whole e2e suite on `macos-15` (Apple silicon) on every PR and push to main, with the same
+  setup and uploads as Windows and Ubuntu: `test-report-e2e-macos`, `e2e-macos-traces` and `ux-screens-macos`.
+- **Each e2e job uploads its own JUnit report** (`FEATRA_JUNIT` → `test-report/e2e-<os>.xml`, artifact
+  `test-report-e2e-<os>`). The default `testReportArtifact` changes from `test-report-unit` to `test-report-*`, so a
+  test that fails on one platform keeps its criterion from being Proven. Changed expectations: `card.test.ts`'s
+  default config, and `soak-plan.test.ts`'s rejected platform (`macos` is now valid, so `freebsd` stands in).
+- **The harness test is renamed** "uploads the failed tests' files from every e2e job in CI" and covers all three
+  jobs; BUG-30's criterion link follows the new name.
+- **Bug found: the app was named `@featra/desktop`.** Run from source, Electron names the app after the package, so
+  the macOS app menu read "About @featra/desktop" and "Quit @featra/desktop". `nameApp` (`app-name.ts`) names it
+  Featra before `ready` on every platform and keeps the userData folder where it was, so existing profiles
+  (`%APPDATA%\@featra\desktop`) aren't lost. Where the installed app keeps its data is STORY-64's call. The bold
+  title in the menu bar of a source run comes from Electron's own bundle and still says Electron; the installer
+  names the bundle.
+- **The Dock in tests.** Playwright can't click the Dock or the traffic lights, so `clickDock` emits Electron's
+  `activate` event in main, which Featra's own handler takes, and the red traffic light is `BrowserWindow.close()`
+  (`closeFromOs`). Whether Featra is really frontmost is read with `lsappinfo`, which needs no Accessibility grant.
+- **macOS has no tray icon and no "still running" notice**: a closed app staying in the Dock is the norm. tray.spec's
+  tray-only tests skip on macOS and say so; `mac.spec.ts` covers the app menu, the absent tray icon, closing to the
+  Dock and reopening from it, and Quit. The tests shared with the tray (close, second launch, Exit) run on macOS
+  through `clickCloseButton`, `showFromTrayOrDock` and `CLOSE_NOTICES`.
+- **e2e presses each platform's own shortcut**: `e2e/keys.ts` turns the menu's label (`shortcutLabel`, now exported
+  as `@featra/client/shortcuts`) into Playwright keys, so ⌘N on macOS and Ctrl+N elsewhere, and a unit test proves
+  every pressed shortcut is matched by the app's own `matchShortcut`.
+- **The CI Mac's screen is shorter than 800 px**, and macOS shrinks a window to fit its screen, so the layout journeys
+  couldn't size the window to 1280×800 (they got 1280×684). Under e2e only, the window is created with
+  `enableLargerThanScreen`, which fakes a big enough screen; the app itself keeps macOS's limit.
+- **macOS's temp folder is a link** (`/var` → `/private/var`). The stand-in `claude` now goes on the PATH by its real
+  path, so the path the app reports is the one the test expects, as with Windows' 8.3 short names.
+- **The contrast check's icon guard** expects 3 icons on macOS, not 4: the traffic lights are native, not the page's.
+- **Bug found: on macOS the Close button's Quit didn't quit.** `window-all-closed` skipped `app.quit()` on macOS
+  (its custom of staying open with no window), so with Quit chosen, closing the window left Featra in the Dock with
+  nothing to show. Close only reaches `window-all-closed` when it doesn't hide, that is when the user chose Quit, so
+  the lifecycle's `allWindowsClosed` now quits on every platform. A unit test proves it per platform; settings.spec's
+  AC6 journey proves it on the Mac job.
+- **The app menu's Quit can't be clicked from main on macOS.** `MenuItem.click()` leaves a native role to the OS and
+  does nothing, so mac.spec sends Quit's own selector (`terminate:`), as the menu bar does.
+- **settings.spec's project override read the file too soon.** The page shows an override at once and writes it after
+  (ProjectPage's `set`), so the test's single read raced the write. It failed on Ubuntu at 1569d64 and on Windows at
+  c993c0c, so it is not macOS's; the same check now waits for the file.
+- **Bug found: a settings save could be lost on Windows (BUG-33).** The JSON stores (`settings.json`, `ui-state.json`, saved
+  chats) save through a temp file and a rename, and Windows refuses that rename with EPERM while another program reads
+  the file. Nothing tried again, so Settings showed "Minimize to tray" while the file kept "quit" (E2E (Windows) at
+  432a5ea, settings.spec's AC6 polling the file). `createJsonStore` now retries a busy rename with BUG-16's
+  `retryBusy`, as card writes already do. `json-store-busy.test.ts` failed first: once with a stand-in rename, and once
+  with EPERM from a real reader holding the file on Windows. The save failure isn't shown on the page; that's left as
+  it was.
+- **Open finding, not from this story: Approve on a draft once did nothing.** On the macOS job at 1569d64,
+  auto-merge-fails.spec's first step clicked Approve; the trace shows the buttons busy, then enabled again, with no
+  error shown, the card still Draft and its files uncommitted. The two other specs that use the same helper passed in
+  that job, and it passed on the next run. Without the app's log the cause isn't known. The user filed it as BUG-31
+  (Approve on a draft feature sometimes does nothing), with BUG-32 (Settings shows a value that wasn't saved) for the
+  unshown save failure above.
+- **macOS focus checks start with Finder in front.** `busyUserInFront` did nothing on macOS, and a hidden Featra stays
+  the active app, so `windowInForeground` passed without Featra coming forward. It now puts Finder in front first (`open -a`,
+  no Automation permission). A Dock click or opening the app again makes macOS activate Featra before Featra hears of it;
+  the harness fakes that activation, as it fakes Windows' foreground grant, and Featra's handler must show and focus
+  the window.
+- **The userData folder is proved in the real app.** app-name.spec launches without a test folder, with the home faked
+  (CFFIXED_USER_HOME on macOS, XDG_CONFIG_HOME on Linux), and checks the profile is in `@featra/desktop`. Skipped on
+  Windows, where Electron reads AppData from the shell, not the environment, so it can't be faked.
+- No ADR: CI and the test harness only, within ADR 0009 and ADR 0013; `nameApp` and the Quit fix are small bug fixes.
+
 ## 2026-11-18 — BUG-31 fix
 
 - **The cause, server side.** `git status` takes `.git/index.lock` for a moment to refresh the index. A `git add` or
@@ -2865,6 +2930,121 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   `git-run-patient.test.ts` covers when git is tried again (a German lock message included), and an ignored story path
   proves the restore unstages what a failed add staged.
 - No ADR: a retry inside one module and state lifted one component up.
+
+## 2026-11-18 — STORY-64: installers from `pnpm package` (dev)
+
+- **Package layout.** `pnpm package` stages an app folder (`apps/desktop/out/app`): Vite's `dist/`, the client's
+  build in `client/`, the assets, and a `package.json` named `featra`, product name Featra, with no dependencies.
+  electron-builder 26 packages it as it is (`asar: false`, no rebuild, no install) into `apps/desktop/out/installers`.
+  No asar because the server and MCP run from `dist/` as their own processes and the SDK is imported from
+  `node_modules`; the archive would hold only the client. ADR 0040 amended.
+- **The Agent SDK is copied, not installed.** `packaging/modules.ts` copies it and its run-time needs (dependencies and
+  peers) from the workspace's installed packages, as Node resolves them, so the lockfile's versions ship with no
+  network install. Its optional dependencies are skipped: they are Claude Code's per-platform binaries (the Windows one
+  is 342 MB), and Featra runs the user's `claude`. Vite keeps the SDK external through the same list
+  (`packaging/runtime-packages.ts`).
+- **Installer names.** `Featra-<version>-x64-setup.exe`, `Featra-<version>-universal.dmg` and `.zip`,
+  `Featra-<version>-x64.AppImage` (`installerFiles` in `packaging/config.ts`, which the config's artifact names, the
+  smoke test and the CI uploads are checked against).
+- **Where the installed app keeps its data: a `Featra` folder** (`%APPDATA%\Featra`, `~/Library/Application
+  Support/Featra`, `~/.config/Featra`), from the staged package's product name. A source run keeps `@featra/desktop`
+  (STORY-63), so neither changes the other's projects or settings. Moving data between them is not offered.
+- **One Featra at a time, installed or from source** (the user's call, PR #74 review). One instance holds many
+  projects, so a second launch of either brings the running one forward. Electron's single-instance lock is taken in
+  the userData folder current when it is asked for, so both apps ask for it in `<appData>/Featra`, then go back to
+  their own folder (`instance-lock.ts`). A profile named with `FEATRA_USER_DATA_DIR` (tests, a second profile) keeps
+  its own lock. A unit test proves both apps meet at one lock; the smoke test starts Featra from source while the
+  installed one runs and sees it exit.
+- **The login shell's PATH.** Installed on macOS and Linux only, main runs `$SHELL -i -l -c` (else the account's
+  shell, else zsh on macOS and sh on Linux) and reads the PATH it prints between markers, so profile noise doesn't
+  matter. The command is shell-neutral: the login shell runs `/bin/sh -c 'printf ...'` with one single-quoted
+  argument, which sh, bash, zsh, fish, tcsh and nushell all parse alike; csh and tcsh get `-c` alone, since they take
+  `-l` only on its own. The login PATH goes first, then the PATH the app started with. If the shell fails, prints no
+  PATH or takes over 5 s, the started PATH is kept with the usual folders added: `/opt/homebrew/bin` (macOS),
+  `/usr/local/bin`, `~/.local/bin`, and on Linux Homebrew's, `~/.npm-global/bin` and `/snap/bin`. Windows apps get the
+  user's PATH already. The log says which happened.
+- **The shell can't hold up the start.** It runs in its own process group; the PATH is taken as soon as it is
+  printed, and at 5 s the group is killed with SIGKILL, since an interactive shell ignores SIGTERM and a background job
+  a profile starts keeps the output open (review B1; both have real-shell regression tests). The window opens while
+  the PATH is read; only the server, and so the agents, wait for it (`startAfter`). Gate installs zsh, fish, tcsh and
+  csh so each shell's test runs.
+- **Smoke test, CI only.** `apps/desktop/e2e/installed` (Playwright, `pnpm test:installed`) installs as a tester would:
+  NSIS silently, then the Start menu shortcut's target; Featra.app copied out of the DMG; the AppImage copied and run
+  with `APPIMAGE_EXTRACT_AND_RUN=1`. It launches the installed executable, and checks project, server, chat with the
+  MCP, the bundled SDK reading a chat back, the login-shell PATH, name, data folder and icons, and on macOS both
+  architectures (Intel under Rosetta) and the ad-hoc signature. e2e's launcher takes the executable
+  (`launchExecutable`), so the smoke test uses the same evidence and fakes as the e2e suite.
+- **Package jobs** `Package (Windows|Ubuntu|macOS)` run on every PR, upload `installer-<platform>` and
+  `test-report-package-<platform>`, and are not required checks.
+- **electron-builder runs in the staged folder** (`projectDir: out/app`). From `apps/desktop` it collected the
+  workspace's dependencies itself, the SDK's per-platform Claude Code binaries among them, and the universal Mac build
+  refused them. The smoke test checks the staged `node_modules` holds the SDK and none of them.
+- **PR builds are ad-hoc signed too.** electron-builder skips signing a pull request's build unless
+  `CSC_FOR_PULL_REQUEST` is set; the macOS package job sets it, since the ad-hoc signature needs no secret and testers
+  try PR builds on Apple silicon.
+- **Agent SDK bundled under Anthropic's terms, as T3 Code** (the user's call). The installed app carries
+  `THIRD-PARTY-NOTICES.md`, generated from the staged `node_modules` (`packaging/notices.ts`), each package with its
+  licence; the SDK's entry reads "© Anthropic PBC. All rights reserved. Use is subject to Anthropic's Commercial Terms
+  of Service" with the terms' link. The repo keeps the same file (`apps/desktop/THIRD-PARTY-NOTICES.md`, rewritten by
+  `node packaging/notices.ts`), and a test holds it equal to staging's and checks every staged package is in it.
+  Featra's own LICENSE is staged too, and the staged package.json's licence is `SEE LICENSE IN LICENSE and
+  THIRD-PARTY-NOTICES.md`, not MIT for the whole app. A direct stream-json `claude` driver is the fallback if Anthropic
+  objects.
+- **The shipped node_modules is trimmed**: type declarations, source maps, readmes, changelogs and test folders are
+  left out (a file a package names as its licence stays). A test runs the staged SDK's `query` with a stand-in `claude`
+  and sees it started, without the SDK looking for its own Claude Code binary.
+- **One app id** (`APP_ID` in `app-name.ts`), used by the installers and the Windows AppUserModelID.
+- `electron-builder` pulls in `electron-winstaller` (Squirrel.Windows); its build script is denied in
+  `pnpm-workspace.yaml`, since Featra ships NSIS.
+
+## 2026-11-18 — STORY-65: releases from a version tag (dev)
+
+- **`package.yml` is a reusable workflow** holding STORY-64's three package jobs, moved from `ci.yml` unchanged. CI
+  calls it as the `Installers` job, so its checks are now "Installers / Package (Windows|Ubuntu|macOS)"; they are still
+  not required. `release.yml` calls the same file, so a release builds and smoke-tests what every PR does.
+- **`release.yml`: Plan, Installers, Notes and checksums, Publish.** Plan (`tooling/release/plan.ts`) fails a tag that
+  doesn't match `apps/desktop/package.json`, naming both versions, before anything is built. Publish
+  (`tooling/release/publish.ts`) needs every job, runs only on a pushed tag, and alone has `contents: write`. It runs
+  `gh release create --verify-tag --draft` with every file, then `gh release edit --draft=false`, with `--prerelease`
+  for 0.x or a pre-release part, else `--latest`, so a failed upload never leaves a public release with files missing.
+  A re-run finishes a draft (`gh release upload --clobber`, then publishes); a published release fails the job,
+  unchanged. Before that it checks `git ls-remote` says the tag still names `GITHUB_SHA`. Its checkout keeps no
+  credentials (`persist-credentials: false`).
+- **The release's package checks are "Release installers / Package (…)"**, apart from CI's "Installers / …", since a PR
+  that changes the release runs both. Installer uploads use `overwrite: true`, so re-running a failed package job can
+  upload again.
+- **The previous release** is the highest `v*` tag merged into the commit being released (`git tag --merged HEAD`), so
+  a tag on an unmerged branch doesn't hide changes.
+- **A full release's notes list the changes since the previous full release (the user's call, 2026-11-19).** For a
+  version with no pre-release part (`v1.0.0`, `v0.2.0`), tags with one (`v1.0.0-rc.1`) don't count as the previous
+  release, so `v1.0.0` after `v0.9.0` and `v1.0.0-rc.1` lists everything since `v0.9.0`. A pre-release's notes list
+  the changes since the previous tag of any kind (`v1.0.0-rc.2` after `v1.0.0-rc.1`). "Full" means no SemVer
+  pre-release part; it is not GitHub's pre-release flag, which every 0.x release also carries.
+- **Pre-release tags are allowed** (`v0.1.0-rc.1`): the version is SemVer, and a release candidate lets the
+  pipeline be tested without spending a version.
+- **The app's version may be any SemVer version, release candidates included (the user's call, 2026-11-19).** STORY-64's
+  installer-name test asserted a plain `X.Y.Z`, which blocked bumping to `0.1.0-rc.1`. It now checks the version with
+  the release tooling's own parser (`parseVersion`), so it is still strict for anything that isn't SemVer, and a test
+  checks the installers are named with an rc's full version (`Featra-0.1.0-rc.1-x64-setup.exe`). Reason: the first
+  release is an rc, to test the pipeline end to end without spending 0.1.0.
+- **Notes from merge commits** since the highest earlier release tag (`tooling/release/notes.ts`), not the GitHub API,
+  so dry runs write them too and they're tested against a real git repo. Each PR is listed once, by its title. The
+  notes have an "Unsigned build" section linking `docs/install.md` at the tag.
+- **Release notes also list cards merged locally (the user's call, 2026-11-19).** A merge whose subject is
+  `Merge <EPIC|FEAT|STORY|BUG>-N: <title>` is listed once, as `<id>: <title>` with no PR number, in git's order among
+  the PRs. Syncs (`Merge main into …`, `Merge remote-tracking branch …`, `Merge origin/… into …`) and merges naming no
+  card are skipped. Reason: v0.1.0-rc.1's notes listed only 26 of the project's changes, since most work before #49
+  was merged locally (`Merge FEAT-6: PRs, CI, merges and bugs`) and only GitHub's `Merge pull request #N` was read. The
+  published rc is left as it is.
+- **SHA-256 checksums** in the notes and in `SHA256SUMS.txt`, sorted by file name, in `sha256sum -c` format.
+- **Dry runs:** a manual run, or a PR touching `release.yml`, `package.yml` or `tooling/release/`. They upload the
+  notes and checksums as the `release-notes` artifact. Manual runs only work once `release.yml` is on main.
+- **The version shows at the foot of the Settings nav** ("Version 0.1.0", shared with About via `versionText`),
+  read from `app:info`, i.e. `app.getVersion()`. The installed smoke test checks it equals the version the installer is
+  named with.
+- **Docs:** README Install section, `docs/install.md` (first launch per platform, the tools, checksums) and
+  `docs/releasing.md` (bump in a PR, tag main, push). A test checks the docs name the installers `pnpm package` builds.
+- ADR 0040 amended.
 
 ## 2026-11-18 — Know what needs you, shaping (user)
 

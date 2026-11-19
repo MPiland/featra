@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { _electron as electron, type ElectronApplication, type Page } from "@playwright/test";
 import electronPath from "electron";
 import { foregroundWindow, grantForeground, windowsForegroundWindow, wslg } from "./foreground.ts";
+import { activateAsMacOs, mac, macFrontmostPid } from "./mac.ts";
 import { traceUntilClosed } from "./evidence.ts";
 
 // No trailing separator: on Windows a trailing backslash escapes the closing quote of the argument.
@@ -33,7 +34,16 @@ export async function tempProject(
 }
 
 /** Launches the built app (run `pnpm --filter @featra/desktop build` first; `test:e2e` does). */
-export async function launch(
+export const launch = (userDataDir: string, extraEnv: Record<string, string> = {}) =>
+  launchExecutable(electronPath as unknown as string, [appDir], userDataDir, extraEnv);
+
+/**
+ * Launches Featra from `executablePath`: Electron on the app folder, or an installed Featra (STORY-64), and waits for
+ * its window. The app's evidence is kept if the test fails.
+ */
+export async function launchExecutable(
+  executablePath: string,
+  args: string[],
   userDataDir: string,
   extraEnv: Record<string, string> = {},
 ): Promise<{ app: ElectronApplication; page: Page }> {
@@ -47,11 +57,7 @@ export async function launch(
   } as Record<string, string>;
   delete env.FEATRA_CLIENT_URL;
   delete env.ELECTRON_RUN_AS_NODE;
-  const app = await electron.launch({
-    executablePath: electronPath as unknown as string,
-    args: [appDir],
-    env,
-  });
+  const app = await electron.launch({ executablePath, args, env });
   traceUntilClosed(app, userDataDir);
   const page = await app.firstWindow();
   await page.getByRole("banner").waitFor();
@@ -87,6 +93,8 @@ export const windowFocused = (app: ElectronApplication) =>
  * not minimised (BUG-4). There it is msrdc.exe's window titled "<title> (<distro>)".
  */
 export async function windowInForeground(app: ElectronApplication): Promise<boolean> {
+  // macOS: Featra is the frontmost app and its window is the key window.
+  if (mac) return macFrontmostPid() === (await mainPid(app)) && (await windowFocused(app));
   if (!windowManagerSupports("_NET_ACTIVE_WINDOW")) return windowFocused(app);
   const win = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows()[0];
@@ -137,6 +145,30 @@ export async function clickTray(app: ElectronApplication) {
     (globalThis as MainGlobal).featraTest.tray!.emit("click");
   });
 }
+/**
+ * What a click on Featra's Dock icon does on macOS: the OS activates the app (faked: see `activateAsMacOs`), and
+ * Electron emits `activate` on it with whether any window is visible. Playwright can't click the Dock, so the test
+ * emits that event, and Featra's own handler (main.ts) runs as it would.
+ */
+export async function clickDock(app: ElectronApplication) {
+  await activateAsMacOs(app);
+  await app.evaluate(({ app: electronApp, BrowserWindow }) => {
+    const visible = BrowserWindow.getAllWindows().some((w) => w.isVisible());
+    electronApp.emit("activate", { preventDefault: () => undefined }, visible);
+  });
+}
+/** How the user brings back the hidden window: the tray icon, or the Dock icon on macOS, which has no tray. */
+export const showFromTrayOrDock = (app: ElectronApplication) => (mac ? clickDock(app) : clickTray(app));
+/**
+ * The window's close button: the title bar's own on Windows and Linux; on macOS the red traffic light, which is
+ * native, so Playwright can't click it. It calls the same `BrowserWindow.close()` as `closeFromOs`.
+ */
+export async function clickCloseButton(app: ElectronApplication, page: Page) {
+  if (mac) await closeFromOs(app);
+  else await page.getByRole("banner").getByRole("button", { name: "Close window" }).click();
+}
+/** The notice the first close to the tray shows. macOS shows none: a closed app staying in the Dock is the norm there. */
+export const CLOSE_NOTICES: readonly string[] = mac ? [] : ["Featra is still running in the system tray"];
 export const trayMenuLabels = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.trayMenu!.items.map((i) => i.label));
 /**
@@ -196,21 +228,24 @@ export const exited = (app: ElectronApplication) =>
  * Starts Featra a second time on the same profile, as the Start menu would; resolves when that process ends. A Start
  * menu launch is the foreground process, and hands `running` the right to take the foreground along with the
  * command line (Chromium's single-instance lock does that); the harness launches from the background, so it fakes the
- * grant (see foreground.ts).
+ * grant (see foreground.ts). On macOS, opening a running app again activates it (faked: see `activateAsMacOs`).
  */
 export async function launchAgain(userDataDir: string, running: ElectronApplication): Promise<number | null> {
+  if (mac) await activateAsMacOs(running);
   await grantForeground(await mainPid(running));
-  const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", FEATRA_PROJECT_DIR: "" } as Record<
-    string,
-    string
-  >;
-  delete env.FEATRA_CLIENT_URL;
-  delete env.ELECTRON_RUN_AS_NODE;
-  const child = spawn(electronPath as unknown as string, [appDir], { env, stdio: "ignore" });
+  const child = startFromSource({ FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", FEATRA_PROJECT_DIR: "" });
   return new Promise<number | null>((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (code) => resolve(code));
   });
+}
+
+/** Starts Featra from source (Electron on the built app folder) with `extraEnv`, outside Playwright. */
+export function startFromSource(extraEnv: Record<string, string>) {
+  const env = { ...process.env, ...extraEnv } as Record<string, string>;
+  delete env.FEATRA_CLIENT_URL;
+  delete env.ELECTRON_RUN_AS_NODE;
+  return spawn(electronPath as unknown as string, [appDir], { env, stdio: "ignore" });
 }
 
 /** The desktop notifications Featra showed (STORY-7): what each said. */
@@ -226,62 +261,3 @@ export const setFocused = (app: ElectronApplication, focused: boolean) =>
 /** Clicks the newest notification, as a user would. */
 export const clickLastNotification = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.notifications.at(-1)!.click());
-
-const SIZE_TRIES = 5;
-
-/**
- * Sizes the window's content area, as a user dragging its edges would, and waits until the page has that size. A
- * window manager can apply a request late or drop it: one made before the window is first shown is lost when the
- * window is mapped at its default size (seen on WSLg). So the window is first shown, out of full screen and not
- * maximized, and the request is made again until it holds. A size the window manager never gives is a failure.
- * Shared by the journeys that check layout at 1280×800 and at the app's minimum size.
- */
-export async function sizeTo(app: ElectronApplication, page: Page, width: number, height: number) {
-  let got: number[] = [];
-  for (let attempt = 0; attempt < SIZE_TRIES; attempt++) {
-    got = await app.evaluate(
-      async ({ BrowserWindow }, [w, h]) => {
-        const win = BrowserWindow.getAllWindows()[0]!;
-        // Each wait ends on the window's event, or after a second when the event never comes.
-        // It runs in the main process: app.evaluate sends this function alone, so nothing outside it is there.
-        // oxlint-disable-next-line unicorn/consistent-function-scoping
-        const settle = (wait: (done: () => void) => void) =>
-          new Promise<void>((done) => {
-            wait(done);
-            setTimeout(done, 1000);
-          });
-        if (!win.isVisible()) await settle((done) => win.once("show", done));
-        if (win.isFullScreen()) {
-          win.setFullScreen(false);
-          await settle((done) => win.once("leave-full-screen", done));
-        }
-        if (win.isMaximized()) {
-          win.unmaximize();
-          await settle((done) => win.once("unmaximize", done));
-        }
-        const [cw, ch] = win.getContentSize();
-        if (cw !== w || ch !== h) {
-          win.setContentSize(w, h);
-          await settle((done) => win.once("resize", done));
-        }
-        return win.getContentSize();
-      },
-      [width, height] as const,
-    );
-    if (got[0] !== width || got[1] !== height) continue;
-    const settled = await page
-      .waitForFunction(([w, h]) => window.innerWidth === w && window.innerHeight === h, [width, height], {
-        timeout: 2000,
-      })
-      .then(
-        () => true,
-        () => false,
-      );
-    if (settled) return;
-  }
-  const inner = await page.evaluate(() => [window.innerWidth, window.innerHeight]);
-  throw new Error(
-    `The window manager didn't give the window ${width}×${height} after ${SIZE_TRIES} tries: ` +
-      `content ${got.join("×")}, page ${inner.join("×")}.`,
-  );
-}

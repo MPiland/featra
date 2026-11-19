@@ -20,7 +20,7 @@ on:
       platform:
         description: Runner OS.
         type: choice
-        options: [windows, ubuntu]
+        options: [windows, ubuntu, macos]
         default: windows
       runs:
         description: How many times to run each test.
@@ -42,6 +42,7 @@ jobs:
     outputs:
       suite: ${{ steps.plan.outputs.suite }}
       platform: ${{ steps.plan.outputs.platform }}
+      runner: ${{ steps.plan.outputs.runner }}
       specs: ${{ steps.plan.outputs.specs }}
       runs: ${{ steps.plan.outputs.runs }}
     steps:
@@ -60,7 +61,8 @@ jobs:
   soak:
     name: Soak ${{ needs.plan.outputs.suite }} (${{ needs.plan.outputs.platform }})
     needs: plan
-    runs-on: ${{ needs.plan.outputs.platform == 'windows' && 'windows-2025' || 'ubuntu-24.04' }}
+    # The platform's e2e runner in ci.yml (tooling/ci/soak-plan.ts); macOS is Apple silicon.
+    runs-on: ${{ needs.plan.outputs.runner }}
     timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4

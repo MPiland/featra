@@ -2,7 +2,7 @@ import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ElectronApplication, Locator, Page } from "@playwright/test";
-import { sizeTo } from "./app.ts";
+import { sizeTo } from "./size.ts";
 
 /** Where the screens land: CI uploads this folder as `ux-screens-windows` / `ux-screens-ubuntu` for design review. */
 const UX_DIR = join(

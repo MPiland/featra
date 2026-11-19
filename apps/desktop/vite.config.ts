@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import { HANG_GUARD } from "../../tooling/hang-guard.ts";
+import { RUNTIME_PACKAGES } from "./packaging/runtime-packages.ts";
 
 /**
  * Bundles Electron main (`vite build`), preload (`vite build --mode preload`), the local server
@@ -25,8 +26,9 @@ export default defineConfig(({ mode }) => {
       minify: false,
       rollupOptions: {
         // ws loads these optional native speed-ups only if they are installed; Featra doesn't ship them. The Agent SDK
-        // is ESM and spawns its own files, so the server imports it from node_modules when a chat starts (ADR 0018).
-        external: ["electron", "bufferutil", "utf-8-validate", "@anthropic-ai/claude-agent-sdk"],
+        // is ESM and spawns its own files, so the server imports it from node_modules when a chat starts (ADR 0018);
+        // the installed app carries it there (packaging/stage.ts).
+        external: ["electron", "bufferutil", "utf-8-validate", ...RUNTIME_PACKAGES],
         output: { format: "cjs", entryFileNames: `${entry}.cjs` },
       },
     },

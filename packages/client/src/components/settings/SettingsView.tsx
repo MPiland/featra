@@ -1,3 +1,4 @@
+import { versionText } from "../../app-info.ts";
 import type { FeatraBridge } from "../../bridge.ts";
 import type { ShortcutEntry } from "../../menu.ts";
 import type { ProjectsSnapshot } from "../../projects.ts";
@@ -23,13 +24,15 @@ export interface SettingsViewProps {
   shortcuts: readonly ShortcutEntry[];
   /** Reopens a project's setup page (STORY-42). */
   onSetUp?: (dir: string) => void;
+  /** The app's version, under the page list once the host has said it (STORY-65). */
+  version?: string | null;
 }
 
 const SCOPES: readonly SettingsScope[] = ["app", "project"];
 
 /** Settings: the page list, by scope, and the chosen page. */
 export function SettingsView(props: SettingsViewProps) {
-  const { bridge, snapshot, projects, projectKey, page, onPage, onAppChange, shortcuts, onSetUp } = props;
+  const { bridge, snapshot, projects, projectKey, page, onPage, onAppChange, shortcuts, onSetUp, version } = props;
   const pages = settingsPages(snapshot);
   const current = pages.find((p) => p.id === page) ?? pages[0];
   return (
@@ -58,6 +61,7 @@ export function SettingsView(props: SettingsViewProps) {
             </ul>
           </div>
         ))}
+        {version && <p className="settings-version">{versionText(version)}</p>}
       </nav>
       <section className="settings-page" aria-labelledby="settings-page-title">
         <div className="settings-content">

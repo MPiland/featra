@@ -15,8 +15,9 @@ import { createJsonStore, type JsonStore } from "@featra/server/json-store";
 export type SettingsStore = JsonStore<AppSettings>;
 
 /**
- * App settings: `settings.json` in the user's config folder (Electron's userData: %APPDATA%\Featra,
- * ~/Library/Application Support/Featra, ~/.config/Featra). Free of Electron imports.
+ * App settings: `settings.json` in the user's config folder (Electron's userData; run from source,
+ * %APPDATA%\@featra\desktop, ~/Library/Application Support/@featra/desktop, ~/.config/@featra/desktop, see
+ * `app-name.ts`). Free of Electron imports.
  *
  * The theme used to live in `ui-state.json` (STORY-18). A profile with no settings file yet takes the theme from there,
  * once, so a pinned theme survives the move.

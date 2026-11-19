@@ -44,7 +44,7 @@ function icoEntries(ico: Buffer) {
 
 describe("The taskbar, window and dock show Featra's icon, not Electron's", () => {
   it("creates the window with the icon path for the platform it runs on", () => {
-    createWindow();
+    createWindow("index.html");
     expect(created.at(-1)?.icon).toBe(appIconPath(process.platform));
   });
 

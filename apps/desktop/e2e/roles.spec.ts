@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
+import { pressShortcut } from "./keys.ts";
 
 /**
  * STORY-6: roles in the real app with its real local server. Faked: a stand-in `claude` on the PATH, the Agent SDK's
@@ -109,7 +110,7 @@ test("Roles lists built-in, custom and provider roles, edits them as project fil
     await expect
       .poll(async () => (existsSync(roleFile("qa")) ? await readFile(roleFile("qa"), "utf8") : ""))
       .toContain("Be strict.");
-    await page.keyboard.press("Control+N");
+    await pressShortcut(page, "newChat");
     await page.getByRole("dialog", { name: "New chat" }).getByRole("button", { name: /^QA/ }).click();
     const chat = page.getByRole("region", { name: "QA", exact: true });
     await expect(chat.locator(".chat-mode")).toHaveText("acceptEdits · from Claude settings");
@@ -154,7 +155,7 @@ test("a Claude agent with full access shows a warning in its chat, and an unknow
     [PATH_KEY]: bin.path,
   });
   try {
-    await page.keyboard.press("Control+N");
+    await pressShortcut(page, "newChat");
     await page
       .getByRole("dialog", { name: "New chat" })
       .getByRole("button", { name: /^scout/ })

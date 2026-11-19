@@ -2,15 +2,16 @@ import { join } from "node:path";
 import { BrowserWindow, nativeTheme } from "electron";
 import { IPC, type WindowState } from "@featra/client/bridge";
 import { appIconPath } from "./app-icon.ts";
+import { e2e } from "./test-hooks.ts";
 
-/** `FEATRA_CLIENT_URL` loads the Vite dev server; otherwise the built client next to this app in the workspace. */
+/** `FEATRA_CLIENT_URL` loads the Vite dev server instead of the built client. */
 const clientUrl = process.env.FEATRA_CLIENT_URL;
-const clientIndex = join(__dirname, "../../../packages/client/dist/index.html");
 
 /** Matches the client's --bg tokens so the window never flashes the wrong colour before the page paints. */
 export const windowBackground = () => (nativeTheme.shouldUseDarkColors ? "#1c1c1e" : "#fbfbfa");
 
-export function createWindow(): BrowserWindow {
+/** The window, showing the built client at `client` (`clientIndex`: the workspace's, or the installed app's). */
+export function createWindow(client: string): BrowserWindow {
   const isMac = process.platform === "darwin";
   const win = new BrowserWindow({
     width: 1280,
@@ -23,6 +24,9 @@ export function createWindow(): BrowserWindow {
     backgroundColor: windowBackground(),
     // The title bar is drawn by the client. macOS keeps its traffic lights; elsewhere the client draws the controls.
     ...(isMac ? { titleBarStyle: "hiddenInset" as const } : { frame: false }),
+    // The e2e layout journeys size the window to 1280×800, taller than a CI Mac's screen, which macOS otherwise
+    // shrinks the window to fit. Windows and Linux allow it already; the app itself keeps macOS's limit.
+    enableLargerThanScreen: e2e,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
@@ -41,7 +45,7 @@ export function createWindow(): BrowserWindow {
   win.on("enter-full-screen", sendState);
   win.on("leave-full-screen", sendState);
   if (clientUrl) void win.loadURL(clientUrl);
-  else void win.loadFile(clientIndex);
+  else void win.loadFile(client);
   return win;
 }
 

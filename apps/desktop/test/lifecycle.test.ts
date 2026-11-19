@@ -138,6 +138,16 @@ describe("AC6: close to tray", () => {
     lc.reveal(win);
     expect(win).toMatchObject({ visible: true, focused: true });
   });
+
+  it.each(["darwin", "win32", "linux"])(
+    "with the Close button set to Quit, closing the last window quits on %s, macOS too (STORY-63)",
+    (platform) => {
+      const { lc, win, log } = setup({ platform, closeToTray: false });
+      expect(win.tryClose()).toBe("closed");
+      lc.allWindowsClosed(); // Electron's window-all-closed, once the last window has closed
+      expect(log.exits).toBe(1);
+    },
+  );
 });
 
 describe("AC7: Linux", () => {

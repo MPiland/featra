@@ -47,6 +47,34 @@ interface Running {
   silence: () => void;
 }
 
+/**
+ * `server`, started only once `ready` settles, so it inherits what main sets up meanwhile: installed on macOS and Linux,
+ * the login shell's PATH, which the server and the agents it starts need (STORY-64), read while the window opens. A use
+ * still waiting when main stops the server is dropped, so a quit before then starts nothing.
+ */
+export function startAfter(ready: Promise<unknown>, server: ServerProcess): ServerProcess {
+  const settled = ready.then(
+    () => undefined,
+    () => undefined,
+  );
+  let stops = 0;
+  /** Runs `run` once `ready` settles, unless the server was stopped meanwhile. */
+  const after = async <T>(run: () => Promise<T>, dropped: T): Promise<T> => {
+    const at = stops;
+    await settled;
+    return at === stops ? run() : dropped;
+  };
+  return {
+    endpoint: () => after(() => server.endpoint(), null),
+    setProjects: (dirs) => after(() => server.setProjects(dirs), undefined),
+    settingsChanged: () => server.settingsChanged(),
+    stop() {
+      stops += 1;
+      return server.stop();
+    },
+  };
+}
+
 export function createServerProcess({ script, execPath, log, dataDir, mcpEntry }: ServerProcessDeps): ServerProcess {
   let running: Running | null = null;
   let dirs: string[] = [];

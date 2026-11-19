@@ -115,7 +115,12 @@ epics in `.featra/cards/`.
   more, nearly all of it process starts.
 - Manual Merge of a story under a Cancelled feature: decide whether to refuse it (auto-merge already skips it).
 - Show when a feature is waiting on the user's Accept, computed rather than stored as a status. Today Accept appears only in the feature's card pane, once every story and bug is Done or Cancelled. Show an "Awaiting your Accept" mark on the feature's Work row and an Inbox item at that point.
+- **macOS minimize and restore in e2e.** STORY-63 skips the minimize/restore journey on macOS; cover the native
+  traffic lights' minimize and a Dock restore there.
 - More installer formats after the first installers (FEAT-19): deb and rpm on Linux, and arm64 builds for Windows and Linux.
+- **A direct `claude` driver.** The installers bundle Anthropic's Agent SDK under Anthropic's terms, as T3 Code does
+  (decisions.md, STORY-64). If Anthropic objects, replace the SDK with Featra's own driver that runs `claude` in its
+  stream-json mode, behind the same provider adapter, so no Anthropic code ships.
 
 ## Before public release
 

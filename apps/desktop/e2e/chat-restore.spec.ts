@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempProject, tempUserData } from "./app.ts";
+import { pressShortcut } from "./keys.ts";
 
 /**
  * STORY-44: a chat comes back after a restart, in the real app with its real local server and the SDK's real session
@@ -23,7 +24,7 @@ test("a chat started before a restart is listed after it, shows its transcript, 
   try {
     const first = await launch(userData.dir, env);
     try {
-      await first.page.keyboard.press("Control+N");
+      await pressShortcut(first.page, "newChat");
       await first.page
         .getByRole("dialog", { name: "New chat" })
         .getByRole("button", { name: /^Developer/ })
