@@ -2,7 +2,7 @@
 id: STORY-66
 type: story
 title: See which projects need you
-status: In Progress
+status: In Review
 parent: FEAT-20
 order: 1
 origin: added
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-66-projects-need-you
-pr: null
+pr: 78
 created: 2026-11-18T23:30:00Z
 history:
   - at: 2026-11-18T23:30:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: dev
+  - at: 2026-11-19T22:33:12Z
+    field: status
+    from: In Progress
+    to: In Review
     by: dev
 ---
 
