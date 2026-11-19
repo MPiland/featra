@@ -2,7 +2,7 @@
 id: STORY-65
 type: story
 title: Download Featra from a release
-status: Acceptance
+status: Done
 parent: FEAT-19
 order: 3
 origin: planned
@@ -35,6 +35,16 @@ history:
     from: In Review
     to: Acceptance
     by: dev
+  - at: 2026-11-19T18:08:34Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-19T18:08:34Z
+    field: status
+    from: Acceptance
+    to: Done
+    by: user
 ---
 
 ## Description
