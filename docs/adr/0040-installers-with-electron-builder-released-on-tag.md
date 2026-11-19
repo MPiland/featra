@@ -67,7 +67,10 @@ Building the release workflow settled its shape:
 - **Notes come from git, not the GitHub API.** The notes job lists the merge commits since the previous release tag
   merged into the commit, one line per pull request, so a dry run writes the same notes as a release. For a full
   release (no pre-release part) the previous release is the last full one, skipping release candidates (the user's
-  call); for a pre-release it is the last tag of any kind. The notes say the build is
+  call); for a pre-release it is the last tag of any kind. Cards merged locally before every merge went through
+  GitHub (`Merge FEAT-6: <title>`, also STORY, BUG and EPIC) are listed by card id and title, without a PR number;
+  syncs (`Merge main into …`, `Merge remote-tracking branch …`) and merges naming no card are skipped (the user's
+  call, 2026-11-19, after v0.1.0-rc.1's notes left out everything merged before #49). The notes say the build is
   unsigned and link the install guide at the tag.
 - **Checksums** are SHA-256, listed in the notes and attached as `SHA256SUMS.txt` in `sha256sum` format.
 - **Dry runs:** any run that isn't a pushed tag publishes nothing. Besides a manual run, a pull request that changes

@@ -17,24 +17,36 @@ export const RECORD = "\x1e";
 export const MERGE_LOG_FORMAT = `%s${FIELD}%b${RECORD}`;
 
 export interface MergedPullRequest {
-  number: number;
+  /** The pull request's number; null for a card merged locally, which has none. */
+  number: number | null;
   title: string;
 }
 
 const MERGE_SUBJECT = /^Merge pull request #(\d+) from (\S+)/;
+/** A card merged locally, before every merge went through GitHub: `Merge FEAT-6: PRs, CI, merges and bugs`. */
+const LOCAL_MERGE_SUBJECT = /^Merge ((?:EPIC|FEAT|STORY|BUG)-\d+): (.+)$/;
 
 /**
  * The pull requests in `git log --merges --format=<MERGE_LOG_FORMAT>` output, each once, as git lists them. GitHub's
- * merge commit names the pull request in its subject and puts its title on the body's first line.
+ * merge commit names the pull request in its subject and puts its title on the body's first line. A card merged
+ * locally (`Merge STORY-12: <title>`) is listed too, by its id and title, once (the user's call, 2026-11-19); syncs
+ * such as `Merge main into …`, and merges that name no card, are not changes.
  */
 export function mergedPullRequests(log: string): MergedPullRequest[] {
-  const seen = new Set<number>();
+  const seen = new Set<string>();
   const prs: MergedPullRequest[] = [];
   for (const record of log.split(RECORD)) {
     const [subject = "", body = ""] = record.replace(/^\s+/, "").split(FIELD);
+    const local = LOCAL_MERGE_SUBJECT.exec(subject);
+    if (local) {
+      if (seen.has(local[1] ?? "")) continue;
+      seen.add(local[1] ?? "");
+      prs.push({ number: null, title: `${local[1]}: ${local[2]?.trim()}` });
+      continue;
+    }
     const m = MERGE_SUBJECT.exec(subject);
-    if (!m || seen.has(Number(m[1]))) continue;
-    seen.add(Number(m[1]));
+    if (!m || seen.has(`#${m[1]}`)) continue;
+    seen.add(`#${m[1]}`);
     const title =
       body
         .split("\n")
@@ -90,7 +102,9 @@ export interface NotesInput {
 
 /** The release's notes, in Markdown. */
 export function releaseNotes({ version, previous, prs, checksums, installGuide }: NotesInput): string {
-  const changes = prs.length ? prs.map((pr) => `- ${pr.title} (#${pr.number})`) : ["- No pull requests were merged."];
+  const changes = prs.length
+    ? prs.map((pr) => (pr.number === null ? `- ${pr.title}` : `- ${pr.title} (#${pr.number})`))
+    : ["- No pull requests were merged."];
   return [
     `Featra ${version} for Windows, macOS and Linux.`,
     "",

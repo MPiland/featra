@@ -38,6 +38,16 @@ async function mergePr(number: number, title: string) {
   git("merge", "-q", "--no-ff", branch, "-m", `Merge pull request #${number} from someone/${branch}`, "-m", title);
 }
 
+/** A branch with one commit, merged locally with `subject`, as cards were before every merge went through GitHub. */
+async function mergeLocal(branch: string, subject: string) {
+  git("checkout", "-q", "-b", branch);
+  await writeFile(join(repo, `${branch.replaceAll("/", "-")}.txt`), subject);
+  git("add", ".");
+  git("commit", "-q", "-m", `Work on ${branch}`);
+  git("checkout", "-q", "main");
+  git("merge", "-q", "--no-ff", branch, "-m", subject);
+}
+
 beforeEach(async () => {
   root = realpathSync.native(mkdtempSync(join(tmpdir(), "featra-release-")));
   repo = join(root, "repo");
@@ -104,6 +114,25 @@ describe("the notes job (STORY-65)", () => {
     expect(notes).not.toContain("STORY-1");
     expect(notes).toContain("[install guide](https://github.com/o/r/blob/v0.2.0/docs/install.md)");
     expect(notes).toContain(`\n\`\`\`\n${sums}\`\`\`\n`);
+  });
+
+  it("lists cards merged locally, by id and title, and skips syncs from main (the user's call)", async () => {
+    await mergePr(1, "STORY-1: Merged on GitHub");
+    await mergeLocal("feature/6", "Merge FEAT-6: PRs, CI, merges and bugs");
+    await mergeLocal("sync", "Merge main into feature/19-installers (BUG-31)");
+    const prepared = await prepareRelease({
+      installers: await installers({ "Featra-0.1.0-x64.AppImage": "hello\n" }),
+      out: join(root, "release"),
+      tag: "v0.1.0",
+      version: "0.1.0",
+      installGuide: "u",
+      git: gitIn(repo),
+    });
+    expect(prepared.previous).toBeNull();
+    expect(prepared.notes).toContain(
+      "\n## Changes\n\n- FEAT-6: PRs, CI, merges and bugs\n- STORY-1: Merged on GitHub (#1)\n\n",
+    );
+    expect(prepared.notes).not.toContain("Merge main");
   });
 
   it("counts only release tags this commit came from, not a higher tag on a branch that was never merged", async () => {

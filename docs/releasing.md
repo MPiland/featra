@@ -27,7 +27,8 @@ the maintainer pushes release tags: a tag publishes, with no second step.
   installed and smoke-tested on its own runner.
 - **Notes and checksums** (`tooling/release/prepare.ts`) writes the release notes, listing the pull requests merged
   since the last release tag that this commit came from, and `SHA256SUMS.txt`. A full release counts back to the last
-  full release, past its release candidates; a pre-release counts back to the last tag of any kind.
+  full release, past its release candidates; a pre-release counts back to the last tag of any kind. A card merged
+  locally (`Merge FEAT-6: <title>`) is listed by its id and title; syncs like `Merge main into …` are not.
 - **Publish** (`tooling/release/publish.ts`) runs only for a pushed tag, and only when every smoke test passed. It
   checks the tag on GitHub still names the commit the run built, then creates the release with `gh` as a draft holding
   the installers and `SHA256SUMS.txt`, and publishes it. A release is never public with files missing.

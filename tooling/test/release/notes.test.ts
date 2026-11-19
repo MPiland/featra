@@ -39,6 +39,39 @@ describe("the pull requests a release lists (STORY-65)", () => {
   it("finds no pull requests in an empty log", () => {
     expect(mergedPullRequests("")).toEqual([]);
   });
+
+  it("also lists a card merged locally by its id and title, once, among GitHub's merges (the user's call)", () => {
+    const log = [
+      merge("Merge pull request #49 from MPiland/claude/bug-21", "BUG-21: PR refresh test waits for both pollers\n"),
+      merge("Merge FEAT-6: PRs, CI, merges and bugs", ""),
+      merge("Merge STORY-12: Merge a story into its feature", "Co-Authored-By: someone\n"),
+      merge("Merge BUG-3: Tray e2e foreground helper", ""),
+      merge("Merge EPIC-1: Prove the core", ""),
+      merge("Merge STORY-12: Merge a story into its feature", ""),
+    ].join("");
+    expect(mergedPullRequests(log)).toEqual([
+      { number: 49, title: "BUG-21: PR refresh test waits for both pollers" },
+      { number: null, title: "FEAT-6: PRs, CI, merges and bugs" },
+      { number: null, title: "STORY-12: Merge a story into its feature" },
+      { number: null, title: "BUG-3: Tray e2e foreground helper" },
+      { number: null, title: "EPIC-1: Prove the core" },
+    ]);
+  });
+
+  it("skips syncs and merges that name no card", () => {
+    const log = [
+      merge("Merge main into feature/19-installers (BUG-31)", ""),
+      merge("Merge main into STORY-25; roadmap and installers decision", ""),
+      merge("Merge remote-tracking branch 'origin/main' into claude/feat-8-shaping", ""),
+      merge("Merge origin/main into FEAT-7 shaping", ""),
+      merge("Merge feature/8-auto-merge (STORY-60) into STORY-61", ""),
+      merge("Merge origin/feature/7-progress into STORY-16", ""),
+      merge("Merge branch 'topic'", ""),
+      merge("Merge STORY-12 into main", ""),
+      merge("Merge TASK-1: Not a card type", ""),
+    ].join("");
+    expect(mergedPullRequests(log)).toEqual([]);
+  });
 });
 
 describe("the last release before a tag (STORY-65)", () => {
@@ -115,5 +148,16 @@ describe("a release's notes and checksums (STORY-65)", () => {
   it("say so when it is the first release, or nothing was merged", () => {
     const notes = releaseNotes({ version: "0.1.0", previous: null, prs: [], checksums: SUMS, installGuide: "u" });
     expect(notes).toContain("\n## Changes\n\n- No pull requests were merged.\n");
+  });
+
+  it("list a card merged locally by its id and title, with no pull request number", () => {
+    const prs = [
+      { number: 49, title: "BUG-21: PR refresh test waits for both pollers" },
+      { number: null, title: "FEAT-6: PRs, CI, merges and bugs" },
+    ];
+    const notes = releaseNotes({ version: "0.1.0", previous: null, prs, checksums: SUMS, installGuide: "u" });
+    expect(notes).toContain(
+      "\n## Changes\n\n- BUG-21: PR refresh test waits for both pollers (#49)\n- FEAT-6: PRs, CI, merges and bugs\n\n",
+    );
   });
 });

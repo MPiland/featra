@@ -3030,6 +3030,12 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **Notes from merge commits** since the highest earlier release tag (`tooling/release/notes.ts`), not the GitHub API,
   so dry runs write them too and they're tested against a real git repo. Each PR is listed once, by its title. The
   notes have an "Unsigned build" section linking `docs/install.md` at the tag.
+- **Release notes also list cards merged locally (the user's call, 2026-11-19).** A merge whose subject is
+  `Merge <EPIC|FEAT|STORY|BUG>-N: <title>` is listed once, as `<id>: <title>` with no PR number, in git's order among
+  the PRs. Syncs (`Merge main into …`, `Merge remote-tracking branch …`, `Merge origin/… into …`) and merges naming no
+  card are skipped. Reason: v0.1.0-rc.1's notes listed only 26 of the project's changes, since most work before #49
+  was merged locally (`Merge FEAT-6: PRs, CI, merges and bugs`) and only GitHub's `Merge pull request #N` was read. The
+  published rc is left as it is.
 - **SHA-256 checksums** in the notes and in `SHA256SUMS.txt`, sorted by file name, in `sha256sum -c` format.
 - **Dry runs:** a manual run, or a PR touching `release.yml`, `package.yml` or `tooling/release/`. They upload the
   notes and checksums as the `release-notes` artifact. Manual runs only work once `release.yml` is on main.
