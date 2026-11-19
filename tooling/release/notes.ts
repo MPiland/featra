@@ -47,14 +47,20 @@ export function mergedPullRequests(log: string): MergedPullRequest[] {
   return prs;
 }
 
-/** The last release before `tag`: the highest release tag that comes before it. Null for the first release. */
+/**
+ * The last release before `tag`: the highest release tag that comes before it. Null for the first release. A full
+ * release (no pre-release part) counts only full releases, so its notes list everything since the last one, not since
+ * its own release candidate (the user's call); a pre-release counts every release tag.
+ */
 export function previousTag(tags: readonly string[], tag: string): string | null {
   const current = parseVersion(tagVersion(tag) ?? "");
   if (!current) throw new Error(`The tag ${tag} isn't a release tag, like v0.1.0.`);
+  const full = current.pre.length === 0;
   let best: { tag: string; version: NonNullable<ReturnType<typeof parseVersion>> } | null = null;
   for (const t of tags) {
     const version = parseVersion(tagVersion(t) ?? "");
     if (!version || compareVersions(version, current) >= 0) continue;
+    if (full && version.pre.length > 0) continue;
     if (!best || compareVersions(version, best.version) > 0) best = { tag: t, version };
   }
   return best?.tag ?? null;

@@ -42,12 +42,22 @@ describe("the pull requests a release lists (STORY-65)", () => {
 });
 
 describe("the last release before a tag (STORY-65)", () => {
-  it("is the highest release tag below it, pre-releases included", () => {
+  it("for a pre-release, is the highest release tag below it, pre-releases included", () => {
     const tags = ["v0.1.0", "v0.2.0-rc.1", "v0.10.0", "v0.2.0", "v0.3.0", "not-a-release", "v0.2.1-rc.1"];
-    expect(previousTag(tags, "v0.2.1")).toBe("v0.2.1-rc.1");
-    expect(previousTag(tags, "v0.2.0")).toBe("v0.2.0-rc.1");
+    expect(previousTag(tags, "v0.2.1-rc.2")).toBe("v0.2.1-rc.1");
+    expect(previousTag(tags, "v0.2.0-rc.2")).toBe("v0.2.0-rc.1");
+    expect(previousTag(tags, "v0.3.0-rc.1")).toBe("v0.2.1-rc.1");
+    expect(previousTag(["v1.0.0-rc.1"], "v1.0.0-rc.2")).toBe("v1.0.0-rc.1");
+  });
+
+  it("for a full release, is the highest full release below it, skipping release candidates (the user's call)", () => {
+    expect(previousTag(["v0.9.0", "v1.0.0-rc.1"], "v1.0.0")).toBe("v0.9.0");
+    const tags = ["v0.1.0", "v0.2.0-rc.1", "v0.10.0", "v0.2.0", "v0.3.0", "not-a-release", "v0.2.1-rc.1"];
+    expect(previousTag(tags, "v0.2.1")).toBe("v0.2.0");
+    expect(previousTag(tags, "v0.2.0")).toBe("v0.1.0");
     expect(previousTag(tags, "v0.11.0")).toBe("v0.10.0");
-    expect(previousTag(tags, "v0.3.0")).toBe("v0.2.1-rc.1");
+    expect(previousTag(tags, "v0.3.0")).toBe("v0.2.0");
+    expect(previousTag(["v1.0.0-rc.1"], "v1.0.0")).toBeNull();
   });
 
   it("is none for the first release", () => {

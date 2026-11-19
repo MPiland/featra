@@ -64,8 +64,10 @@ Building the release workflow settled its shape:
 - **Tags are `v` and the SemVer version, pre-release parts allowed** (`v0.2.0-rc.1`), so a release candidate can be
   tested without using up a version. 0.x versions and versions with a pre-release part publish as pre-releases; from
   1.0.0 a release is marked latest.
-- **Notes come from git, not the GitHub API.** The notes job lists the merge commits since the highest earlier
-  release tag, one line per pull request, so a dry run writes the same notes as a release. The notes say the build is
+- **Notes come from git, not the GitHub API.** The notes job lists the merge commits since the previous release tag
+  merged into the commit, one line per pull request, so a dry run writes the same notes as a release. For a full
+  release (no pre-release part) the previous release is the last full one, skipping release candidates (the user's
+  call); for a pre-release it is the last tag of any kind. The notes say the build is
   unsigned and link the install guide at the tag.
 - **Checksums** are SHA-256, listed in the notes and attached as `SHA256SUMS.txt` in `sha256sum` format.
 - **Dry runs:** any run that isn't a pushed tag publishes nothing. Besides a manual run, a pull request that changes

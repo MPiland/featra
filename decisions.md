@@ -3015,6 +3015,11 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   upload again.
 - **The previous release** is the highest `v*` tag merged into the commit being released (`git tag --merged HEAD`), so
   a tag on an unmerged branch doesn't hide changes.
+- **A full release's notes list the changes since the previous full release (the user's call, 2026-11-19).** For a
+  version with no pre-release part (`v1.0.0`, `v0.2.0`), tags with one (`v1.0.0-rc.1`) don't count as the previous
+  release, so `v1.0.0` after `v0.9.0` and `v1.0.0-rc.1` lists everything since `v0.9.0`. A pre-release's notes list
+  the changes since the previous tag of any kind (`v1.0.0-rc.2` after `v1.0.0-rc.1`). "Full" means no SemVer
+  pre-release part; it is not GitHub's pre-release flag, which every 0.x release also carries.
 - **Pre-release tags are allowed** (`v0.1.0-rc.1`): the version is SemVer, and a release candidate lets the
   pipeline be tested without spending a version.
 - **Notes from merge commits** since the highest earlier release tag (`tooling/release/notes.ts`), not the GitHub API,
