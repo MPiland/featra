@@ -2,7 +2,7 @@
 id: STORY-66
 type: story
 title: See which projects need you
-status: In Review
+status: Done
 parent: FEAT-20
 order: 1
 origin: added
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-66-projects-need-you
-pr: 78
+pr: "78"
 created: 2026-11-18T23:30:00Z
 history:
   - at: 2026-11-18T23:30:00Z
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: dev
+  - at: 2026-11-19T23:41:32Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-19T23:41:32Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -51,6 +61,8 @@ As a builder with several projects open, I see in the project switcher which pro
 - [x] Client: the switcher's dot and the menu's counts and marks, with short sentence-case labels
 - [x] Unit and integration tests for each criterion; one journey across two projects; tests linked on the criteria
 - [x] Decisions recorded for the Dev Lead; move to In Review
+
+## Notes
 
 ## Depends on
 
