@@ -13,6 +13,7 @@ import {
   serverChats,
   serverChecks,
   serverInbox,
+  serverNeeds,
   serverRoles,
   serverSetup,
   serverWork,
@@ -73,6 +74,7 @@ const bridge: FeatraBridge = {
   roles: serverRoles(server),
   checks: serverChecks(server),
   inbox: serverInbox(server),
+  needs: serverNeeds(server),
   notifications: {
     asked: (item) => ipcRenderer.send(IPC.notificationsAsked, item),
     onOpenChat: (listener) => {

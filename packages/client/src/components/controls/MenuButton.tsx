@@ -1,15 +1,7 @@
-import {
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type MouseEvent,
-  type ReactNode,
-} from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { MenuNode } from "../../menu.ts";
 import { focusedElement, isInside } from "../../utils/dom.ts";
-import { CheckIcon, ChevronRightIcon } from "../icons.tsx";
+import { MenuList } from "./MenuList.tsx";
 
 export interface MenuButtonProps {
   /** The menu's id; the button points at it while it is open. */
@@ -195,97 +187,6 @@ export function MenuButton({ id, label, menuLabel, nodes, className, menuClassNa
     </div>
   );
 }
-
-interface MenuListProps {
-  id?: string;
-  label: string;
-  className?: string;
-  nodes: readonly MenuNode[];
-  depth: number;
-  path: readonly string[];
-  onRun: (node: Extract<MenuNode, { onSelect: () => void }>) => void;
-  onOpenSub: (depth: number, id: string, focusFirst: boolean) => void;
-  onHoverLeaf: (depth: number) => void;
-}
-
-function MenuList(p: MenuListProps) {
-  return (
-    <div
-      id={p.id}
-      className={p.depth === 0 ? `menu top ${p.className ?? ""}`.trim() : "menu sub"}
-      role="menu"
-      aria-label={p.label}
-      data-depth={p.depth}
-    >
-      {p.nodes.map((node) => {
-        if (node.kind === "separator") return <hr key={node.id} className="msep" />;
-        const hover = (e: MouseEvent<HTMLButtonElement>) => {
-          e.currentTarget.focus();
-          if (node.kind === "submenu") p.onOpenSub(p.depth, node.id, false);
-          else p.onHoverLeaf(p.depth);
-        };
-        if (node.kind === "submenu") {
-          const expanded = p.path[p.depth] === node.id;
-          return (
-            <div key={node.id} role="none" className="mwrap">
-              <button
-                type="button"
-                role="menuitem"
-                className={expanded ? "mi open" : "mi"}
-                tabIndex={-1}
-                data-id={node.id}
-                aria-haspopup="menu"
-                aria-expanded={expanded}
-                onMouseEnter={hover}
-                // A keyboard click (Enter/Space, detail 0) moves into the submenu; a mouse click just opens it.
-                onClick={(e) => p.onOpenSub(p.depth, node.id, e.detail === 0)}
-              >
-                {node.label}
-                <span className="k chev">
-                  <ChevronRightIcon />
-                </span>
-              </button>
-              {expanded && (
-                <MenuList
-                  {...p}
-                  id={undefined}
-                  className={undefined}
-                  label={node.label}
-                  nodes={node.items}
-                  depth={p.depth + 1}
-                />
-              )}
-            </div>
-          );
-        }
-        return (
-          <div key={node.id} role="none">
-            {/* A disabled item stays focusable, so arrowing through the menu still finds it (WAI-ARIA). */}
-            <button
-              type="button"
-              role={ITEM_ROLES[node.kind]}
-              aria-checked={node.kind === "item" ? undefined : node.checked}
-              aria-disabled={node.kind === "item" && node.disabled ? true : undefined}
-              className="mi"
-              tabIndex={-1}
-              data-id={node.id}
-              onMouseEnter={hover}
-              onClick={() => {
-                if (!(node.kind === "item" && node.disabled)) p.onRun(node);
-              }}
-            >
-              {node.kind !== "item" && <span className="mcheck">{node.checked && <CheckIcon />}</span>}
-              {node.label}
-              {node.shortcut && <span className="k">{node.shortcut}</span>}
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-const ITEM_ROLES = { item: "menuitem", check: "menuitemcheckbox", radio: "menuitemradio" } as const;
 
 function findNode(nodes: readonly MenuNode[], id: string): MenuNode | undefined {
   for (const n of nodes) {

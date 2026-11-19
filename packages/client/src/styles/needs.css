@@ -1,0 +1,32 @@
+/* What each project needs from the user (STORY-66): the switcher's dot and the menu's counts and review marks. */
+
+/* The closed switcher's dot, on the avatar's corner (.av, shell.css): another project needs the user. */
+.proj-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--side);
+  border-radius: 50%;
+  background: var(--accbg);
+}
+
+/* A project's marks in the menu, after its name: the waiting count (drawn as the sidebar's count, .nav-count in
+   inbox.css), then the quieter review mark. */
+.mmarks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.mmark.quiet {
+  min-width: 0;
+  width: 8px;
+  height: 8px;
+  margin-left: 0;
+  padding: 0;
+  border: 1.5px solid var(--tx2);
+  background: none;
+}

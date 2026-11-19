@@ -18,6 +18,7 @@ import {
 import { noChats, type ChatBridge } from "./chats.ts";
 import { noChecks, type ChecksBridge } from "./checks-bridge.ts";
 import { noInbox, noNotifications, type InboxBridge, type NotificationsBridge } from "./inbox.ts";
+import { noNeeds, type NeedsBridge } from "./needs.ts";
 import { noRoles, type RolesBridge } from "./roles-bridge.ts";
 import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
 import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./projects.ts";
@@ -32,6 +33,7 @@ export { THEME_CHOICES, type ThemeChoice };
 export * from "./chats.ts";
 export * from "./checks-bridge.ts";
 export * from "./inbox.ts";
+export * from "./needs.ts";
 export * from "./project-setup.ts";
 export * from "./projects.ts";
 export * from "./roles-bridge.ts";
@@ -131,6 +133,8 @@ export interface FeatraBridge {
   readonly checks: ChecksBridge;
   /** The requests waiting on the user past the Inbox wait, from the local server (STORY-7). */
   readonly inbox: InboxBridge;
+  /** What every open project needs from the user, from the local server (STORY-66). */
+  readonly needs: NeedsBridge;
   /** Desktop notifications for the requests that arrive (STORY-7); the host decides when to show one. */
   readonly notifications: NotificationsBridge;
   edit: (command: EditCommand) => void;
@@ -257,6 +261,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
     roles: noRoles(NO_FOLDERS),
     checks: noChecks(NO_FOLDERS),
     inbox: noInbox(),
+    needs: noNeeds(),
     notifications: noNotifications(),
     edit: (command) => {
       document.execCommand(command);
