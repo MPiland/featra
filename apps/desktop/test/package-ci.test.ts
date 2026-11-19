@@ -46,6 +46,10 @@ describe("CI's package jobs (STORY-64)", () => {
     }
     expect(workflowJob("ci.yml", "package-ubuntu")).toMatch(/APPIMAGE_EXTRACT_AND_RUN: "1"\n/);
     expect(workflowJob("ci.yml", "package-macos")).toMatch(/softwareupdate --install-rosetta --agree-to-license\n/);
+    // electron-builder skips signing a pull request's build unless told to; the ad-hoc signature needs no secret.
+    expect(workflowJob("ci.yml", "package-macos")).toMatch(
+      /run: pnpm package\n\s+env:\n(\s+#.*\n)*\s+CSC_FOR_PULL_REQUEST: "true"\n/,
+    );
   });
 
   it("upload each platform's installer, the smoke test's report, and a failed run's traces", () => {

@@ -264,6 +264,10 @@ jobs:
         run: /usr/bin/pgrep -q oahd || softwareupdate --install-rosetta --agree-to-license
       - name: Build the installer
         run: pnpm package
+        env:
+          # electron-builder skips signing a PR's build; the ad-hoc signature has no secret, and Apple silicon runs
+          # only signed code.
+          CSC_FOR_PULL_REQUEST: "true"
       - name: Install it and launch the installed app
         run: pnpm test:installed
         env:
