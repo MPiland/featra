@@ -2964,5 +2964,11 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   (`launchExecutable`), so the smoke test uses the same evidence and fakes as the e2e suite.
 - **Package jobs** `Package (Windows|Ubuntu|macOS)` run on every PR, upload `installer-<platform>` and
   `test-report-package-<platform>`, and are not required checks.
+- **electron-builder runs in the staged folder** (`projectDir: out/app`). From `apps/desktop` it collected the
+  workspace's dependencies itself, the SDK's per-platform Claude Code binaries among them, and the universal Mac build
+  refused them. The smoke test checks the staged `node_modules` holds the SDK and none of them.
+- **PR builds are ad-hoc signed too.** electron-builder skips signing a pull request's build unless
+  `CSC_FOR_PULL_REQUEST` is set; the macOS package job sets it, since the ad-hoc signature needs no secret and testers
+  try PR builds on Apple silicon.
 - `electron-builder` pulls in `electron-winstaller` (Squirrel.Windows); its build script is denied in
   `pnpm-workspace.yaml`, since Featra ships NSIS.
