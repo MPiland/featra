@@ -1,0 +1,128 @@
+# The release (STORY-65, ADR 0040). Pushing a vX.Y.Z tag that matches apps/desktop/package.json's version builds,
+# installs and smoke-tests each platform's installer (package.yml, as CI does), then publishes them to a GitHub
+# release for the tag, with notes and checksums, only once every smoke test passed. 0.x releases are pre-releases.
+# Any other run is a dry run that builds and tests everything and publishes nothing: a manual run from the Actions tab
+# (`gh workflow run release.yml`, which needs this file on main), or a pull request that changes the release.
+# tooling/release/ holds the rules; docs/install.md says how to cut a release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - .github/workflows/package.yml
+      - tooling/release/**
+
+run-name: ${{ github.event_name == 'push' && format('Release {0}', github.ref_name) || format('Release dry run ({0})', github.ref_name) }}
+
+# One run at a time for a ref. A release that started is never cancelled; a pull request's newer push replaces its
+# dry run.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      tag: ${{ steps.plan.outputs.tag }}
+      prerelease: ${{ steps.plan.outputs.prerelease }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Fails before anything is built when a pushed tag isn't the app's version.
+      - name: Check the tag against the app's version
+        id: plan
+        run: node tooling/release/plan.ts
+
+  package:
+    # Not "Installers", CI's name for the same jobs: a pull request runs both, and their checks would share names.
+    name: Release installers
+    needs: plan
+    uses: ./.github/workflows/package.yml
+
+  notes:
+    name: Notes and checksums
+    needs: [plan, package]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      # The whole history and its tags: the notes list the pull requests merged since the last release.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Download the installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: installers
+          merge-multiple: true
+      - name: Write the notes and checksums
+        run: node tooling/release/prepare.ts
+        env:
+          INSTALLERS: installers
+          OUT: release
+          TAG: ${{ needs.plan.outputs.tag }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          PUBLISH: ${{ needs.plan.outputs.publish }}
+      - name: Upload the notes and checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release
+          retention-days: 14
+
+  publish:
+    name: Publish
+    # Every platform's installer passed its smoke test (the package jobs), and only a pushed tag publishes.
+    needs: [plan, package, notes]
+    if: success() && needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      # The token is gh's alone; git here only reads the public tag.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Download the installers
+        uses: actions/download-artifact@v4
+        with:
+          pattern: installer-*
+          path: installers
+          merge-multiple: true
+      - name: Download the notes and checksums
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: release
+      # Checks the tag on GitHub still names this run's commit (GITHUB_SHA), then makes the release as a draft with
+      # every file and publishes it. A re-run finishes a draft an earlier run left.
+      - name: Publish the release
+        run: node tooling/release/publish.ts
+        env:
+          INSTALLERS: installers
+          RELEASE: release
+          TAG: ${{ needs.plan.outputs.tag }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          GH_TOKEN: ${{ github.token }}

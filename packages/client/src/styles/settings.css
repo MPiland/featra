@@ -13,6 +13,17 @@
   padding: 20px 10px;
   border-right: 1px solid var(--line);
   overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The app's version, at the foot of the page list (STORY-65); selectable, so a tester can paste it into a bug. */
+.settings-version {
+  margin: auto 0 0;
+  padding: 16px 10px 0;
+  font-size: 12px;
+  color: var(--tx2);
+  user-select: text;
 }
 
 .settings-scope + .settings-scope {

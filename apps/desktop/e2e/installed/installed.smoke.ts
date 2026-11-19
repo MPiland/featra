@@ -5,6 +5,7 @@ import { basename, dirname, join, sep } from "node:path";
 import { expect, test } from "../fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "../agent.ts";
 import { launchExecutable, startFromSource, tempProject, tempUserData } from "../app.ts";
+import { pressShortcut } from "../keys.ts";
 import { chatLog, newDeveloperChat, queries, send, startedWith } from "./chat.ts";
 import { icons, installerFiles } from "../../packaging/config.ts";
 import { DESKTOP } from "../../packaging/paths.ts";
@@ -234,6 +235,19 @@ test("the installed app is named Featra, keeps its data in the Featra folder, an
     } finally {
       dmg.detach();
     }
+  }
+});
+
+test("the installed app shows its version under Settings, the version its installer is named with (STORY-65)", async () => {
+  const userData = await tempUserData();
+  const { app, page } = await open(userData.dir, {});
+  try {
+    await pressShortcut(page, "settings");
+    const pages = page.getByRole("navigation", { name: "Settings pages" });
+    await expect(pages.getByText(`Version ${installed.version}`, { exact: true })).toBeVisible();
+  } finally {
+    await app.close();
+    await userData.dispose();
   }
 });
 

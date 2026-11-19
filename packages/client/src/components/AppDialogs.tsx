@@ -1,3 +1,4 @@
+import { versionText } from "../app-info.ts";
 import type { AppInfo } from "../bridge.ts";
 import { Dialog } from "./Dialog.tsx";
 
@@ -14,7 +15,7 @@ export function AppDialogs({ dialog, info, onClose, onReset }: AppDialogsProps) 
     return (
       <Dialog title="About Featra" onClose={onClose}>
         <p className="about-name">{info?.name ?? "Featra"}</p>
-        <p>Version {info?.version ?? "…"}</p>
+        <p>{versionText(info?.version ?? "…")}</p>
         <p>Released under the MIT licence.</p>
       </Dialog>
     );

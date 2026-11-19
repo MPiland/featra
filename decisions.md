@@ -2996,3 +2996,52 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **One app id** (`APP_ID` in `app-name.ts`), used by the installers and the Windows AppUserModelID.
 - `electron-builder` pulls in `electron-winstaller` (Squirrel.Windows); its build script is denied in
   `pnpm-workspace.yaml`, since Featra ships NSIS.
+
+## 2026-11-18 — STORY-65: releases from a version tag (dev)
+
+- **`package.yml` is a reusable workflow** holding STORY-64's three package jobs, moved from `ci.yml` unchanged. CI
+  calls it as the `Installers` job, so its checks are now "Installers / Package (Windows|Ubuntu|macOS)"; they are still
+  not required. `release.yml` calls the same file, so a release builds and smoke-tests what every PR does.
+- **`release.yml`: Plan, Installers, Notes and checksums, Publish.** Plan (`tooling/release/plan.ts`) fails a tag that
+  doesn't match `apps/desktop/package.json`, naming both versions, before anything is built. Publish
+  (`tooling/release/publish.ts`) needs every job, runs only on a pushed tag, and alone has `contents: write`. It runs
+  `gh release create --verify-tag --draft` with every file, then `gh release edit --draft=false`, with `--prerelease`
+  for 0.x or a pre-release part, else `--latest`, so a failed upload never leaves a public release with files missing.
+  A re-run finishes a draft (`gh release upload --clobber`, then publishes); a published release fails the job,
+  unchanged. Before that it checks `git ls-remote` says the tag still names `GITHUB_SHA`. Its checkout keeps no
+  credentials (`persist-credentials: false`).
+- **The release's package checks are "Release installers / Package (…)"**, apart from CI's "Installers / …", since a PR
+  that changes the release runs both. Installer uploads use `overwrite: true`, so re-running a failed package job can
+  upload again.
+- **The previous release** is the highest `v*` tag merged into the commit being released (`git tag --merged HEAD`), so
+  a tag on an unmerged branch doesn't hide changes.
+- **A full release's notes list the changes since the previous full release (the user's call, 2026-11-19).** For a
+  version with no pre-release part (`v1.0.0`, `v0.2.0`), tags with one (`v1.0.0-rc.1`) don't count as the previous
+  release, so `v1.0.0` after `v0.9.0` and `v1.0.0-rc.1` lists everything since `v0.9.0`. A pre-release's notes list
+  the changes since the previous tag of any kind (`v1.0.0-rc.2` after `v1.0.0-rc.1`). "Full" means no SemVer
+  pre-release part; it is not GitHub's pre-release flag, which every 0.x release also carries.
+- **Pre-release tags are allowed** (`v0.1.0-rc.1`): the version is SemVer, and a release candidate lets the
+  pipeline be tested without spending a version.
+- **The app's version may be any SemVer version, release candidates included (the user's call, 2026-11-19).** STORY-64's
+  installer-name test asserted a plain `X.Y.Z`, which blocked bumping to `0.1.0-rc.1`. It now checks the version with
+  the release tooling's own parser (`parseVersion`), so it is still strict for anything that isn't SemVer, and a test
+  checks the installers are named with an rc's full version (`Featra-0.1.0-rc.1-x64-setup.exe`). Reason: the first
+  release is an rc, to test the pipeline end to end without spending 0.1.0.
+- **Notes from merge commits** since the highest earlier release tag (`tooling/release/notes.ts`), not the GitHub API,
+  so dry runs write them too and they're tested against a real git repo. Each PR is listed once, by its title. The
+  notes have an "Unsigned build" section linking `docs/install.md` at the tag.
+- **Release notes also list cards merged locally (the user's call, 2026-11-19).** A merge whose subject is
+  `Merge <EPIC|FEAT|STORY|BUG>-N: <title>` is listed once, as `<id>: <title>` with no PR number, in git's order among
+  the PRs. Syncs (`Merge main into …`, `Merge remote-tracking branch …`, `Merge origin/… into …`) and merges naming no
+  card are skipped. Reason: v0.1.0-rc.1's notes listed only 26 of the project's changes, since most work before #49
+  was merged locally (`Merge FEAT-6: PRs, CI, merges and bugs`) and only GitHub's `Merge pull request #N` was read. The
+  published rc is left as it is.
+- **SHA-256 checksums** in the notes and in `SHA256SUMS.txt`, sorted by file name, in `sha256sum -c` format.
+- **Dry runs:** a manual run, or a PR touching `release.yml`, `package.yml` or `tooling/release/`. They upload the
+  notes and checksums as the `release-notes` artifact. Manual runs only work once `release.yml` is on main.
+- **The version shows at the foot of the Settings nav** ("Version 0.1.0", shared with About via `versionText`),
+  read from `app:info`, i.e. `app.getVersion()`. The installed smoke test checks it equals the version the installer is
+  named with.
+- **Docs:** README Install section, `docs/install.md` (first launch per platform, the tools, checksums) and
+  `docs/releasing.md` (bump in a PR, tag main, push). A test checks the docs name the installers `pnpm package` builds.
+- ADR 0040 amended.
