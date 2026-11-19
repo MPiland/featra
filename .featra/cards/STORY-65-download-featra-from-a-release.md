@@ -2,7 +2,7 @@
 id: STORY-65
 type: story
 title: Download Featra from a release
-status: In Progress
+status: In Review
 parent: FEAT-19
 order: 3
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-65-releases
-pr: null
+pr: https://github.com/MPiland/featra/pull/76
 created: 2026-11-18T12:00:00Z
 history:
   - at: 2026-11-18T12:00:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: dev
+  - at: 2026-11-19T06:30:00Z
+    field: status
+    from: In Progress
+    to: In Review
     by: dev
 ---
 
@@ -49,7 +54,7 @@ As a tester, I download Featra for my platform from the project's Releases page,
 - [x] Client: the version under Settings, from the app
 - [x] Docs: README Install section, docs/install.md, how to cut a release (bump, PR, tag)
 - [ ] Unit and integration tests for each criterion; a dry run of the workflow and one published pre-release as its proof; tests linked on the criteria
-- [ ] Decisions recorded for the Dev Lead; move to In Review
+- [x] Decisions recorded for the Dev Lead; move to In Review
 
 ## Notes
 
