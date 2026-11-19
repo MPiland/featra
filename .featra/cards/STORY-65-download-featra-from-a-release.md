@@ -53,7 +53,7 @@ As a tester, I download Featra for my platform from the project's Releases page,
 - [x] Release notes from merged PRs, with a short "Unsigned build" note linking docs/install.md; checksums attached
 - [x] Client: the version under Settings, from the app
 - [x] Docs: README Install section, docs/install.md, how to cut a release (bump, PR, tag)
-- [ ] Unit and integration tests for each criterion; a dry run of the workflow and one published pre-release as its proof; tests linked on the criteria
+- [x] Unit and integration tests for each criterion; a dry run of the workflow and one published pre-release as its proof; tests linked on the criteria (pre-release: [v0.1.0-rc.1](https://github.com/MPiland/featra/releases/tag/v0.1.0-rc.1), published by [run 44568444932](https://github.com/MPiland/featra/actions/runs/44568444932); dry run: [run 44566543092](https://github.com/MPiland/featra/actions/runs/44566543092))
 - [x] Decisions recorded for the Dev Lead; move to In Review
 
 ## Notes
