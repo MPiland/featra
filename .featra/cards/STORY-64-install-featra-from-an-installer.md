@@ -2,7 +2,7 @@
 id: STORY-64
 type: story
 title: Install Featra from an installer
-status: In Review
+status: Done
 parent: FEAT-19
 order: 2
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: dev
+  - at: 2026-11-19T02:32:10Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-19T02:32:10Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
