@@ -2865,3 +2865,14 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   `git-run-patient.test.ts` covers when git is tried again (a German lock message included), and an ignored story path
   proves the restore unstages what a failed add staged.
 - No ADR: a retry inside one module and state lifted one component up.
+
+## 2026-11-18 — Know what needs you, shaping (user)
+
+- A new feature, FEAT-20 "Know what needs you", under EPIC-3, built after FEAT-19 Installers. FEAT-13 (App shell) is Done, so this is a new feature, not reopened scope.
+- **Waiting agents (urgent):** an agent stalled on the user: an unanswered question, a tool approval (inline or in the Inbox), or a request to do something. Counted by agent, not by request.
+- **Reviews (quiet):** a draft feature to review or a story at Acceptance, shown with a separate, quieter mark.
+- Failed CI and merge conflicts don't count: agents fix those. A finished turn waiting for a reply doesn't count.
+- **Switcher:** a dot on the closed switcher when another project needs the user; each project's count and review mark in the menu.
+- **Taskbar and Dock:** a badge with the number of waiting agents across all projects.
+- **Asking the user to do something** (run a command, sign in) is a Featra MCP tool with Done and Can't do it, not guessed from the agent's text. Featra never runs the command.
+- Stories: STORY-66 See which projects need you; STORY-67 A badge on the taskbar and Dock; STORY-68 An agent asks you to do something.
