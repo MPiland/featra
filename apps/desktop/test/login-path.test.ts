@@ -59,7 +59,10 @@ describe("the login shell's PATH (STORY-64)", () => {
         return "__FEATRA_PATH__/opt/homebrew/bin:/usr/bin:/bin__FEATRA_PATH__";
       },
     });
-    expect(asked).toEqual({ shell: "/bin/zsh", args: ["-ilc", `printf '%s' "__FEATRA_PATH__$PATH__FEATRA_PATH__"`] });
+    expect(asked).toEqual({
+      shell: "/bin/zsh",
+      args: ["-ilc", `printf '%s' "__FEATRA_PATH__\${PATH}__FEATRA_PATH__"`],
+    });
     expect(found).toEqual({
       source: "login shell",
       shell: "/bin/zsh",

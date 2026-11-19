@@ -85,7 +85,7 @@ export async function readLoginPath({
 }: LoginPathDeps): Promise<LoginPath> {
   const shell = loginShell(platform, env, accountShell);
   const started = (env.PATH ?? "").split(":");
-  const output = await run(shell, ["-ilc", `printf '%s' "${MARK}$PATH${MARK}"`], { timeoutMs, env });
+  const output = await run(shell, ["-ilc", `printf '%s' "${MARK}\${PATH}${MARK}"`], { timeoutMs, env });
   const path = parseShellPath(output);
   if (path !== null) return { source: "login shell", shell, path: mergePaths(path.split(":"), started) };
   const reason = output === null ? "it failed or didn't answer in time" : "it printed no PATH";
