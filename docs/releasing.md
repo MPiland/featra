@@ -23,12 +23,13 @@ the maintainer pushes release tags: a tag publishes, with no second step.
 
 - **Plan** (`tooling/release/plan.ts`) checks the tag against the app's version before anything is built. A tag that
   doesn't match fails here, naming both versions.
-- **Installers** runs the same package jobs as CI (`package.yml`): each platform's installer is built, installed and
-  smoke-tested on its own runner.
+- **Release installers** runs the same package jobs as CI (`package.yml`): each platform's installer is built,
+  installed and smoke-tested on its own runner.
 - **Notes and checksums** (`tooling/release/prepare.ts`) writes the release notes, listing the pull requests merged
-  since the last release tag, and `SHA256SUMS.txt`.
+  since the last release tag that this commit came from, and `SHA256SUMS.txt`.
 - **Publish** (`tooling/release/publish.ts`) runs only for a pushed tag, and only when every smoke test passed. It
-  creates the release with `gh`, attaching the installers and `SHA256SUMS.txt`.
+  checks the tag on GitHub still names the commit the run built, then creates the release with `gh` as a draft holding
+  the installers and `SHA256SUMS.txt`, and publishes it. A release is never public with files missing.
 
 0.x versions and versions with a pre-release part (`1.0.0-rc.1`) are published as pre-releases. From 1.0.0 a release
 is the latest one.
@@ -44,13 +45,17 @@ checksums (uploaded as the `release-notes` artifact), but publishes nothing.
 
 ## If a release fails
 
-Nothing is published unless every job before Publish passed. Fix the cause in a pull request, then delete the tag and
-push it again on the fixed commit:
+Nothing is published unless every job before Publish passed.
 
-```bash
-git push origin :refs/tags/v0.2.0
-git tag -f v0.2.0 <fixed commit>
-git push origin v0.2.0
-```
+- **Publish failed** (an upload, say): the release is left as a draft, which only maintainers see. **Re-run failed
+  jobs** on the run: Publish uploads every file to the draft again, replacing any, then publishes it.
+- **A build or smoke test failed**: fix the cause in a pull request, then delete the tag and push it again on the fixed
+  commit. Delete any draft release for the tag on the Releases page first.
 
-If Publish itself failed after the release was created, delete the release on the Releases page first.
+  ```bash
+  git push origin :refs/tags/v0.2.0
+  git tag -f v0.2.0 <fixed commit>
+  git push origin v0.2.0
+  ```
+
+Publish refuses a tag whose release is already published, and a tag that was moved after the run started.

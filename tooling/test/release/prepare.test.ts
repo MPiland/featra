@@ -3,12 +3,13 @@
  * repository whose merges look like GitHub's, and small files standing in for the installers.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, realpathSync } from "node:fs";
+import { mkdtempSync, readFileSync, realpathSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { gitIn, installGuideUrl, prepareRelease, repoEnv, sha256 } from "../../release/prepare.ts";
+import { gitIn, installGuideUrl, prepareRelease, REPO_OVERRIDES, repoEnv, sha256 } from "../../release/prepare.ts";
+import { REPO } from "../run.ts";
 
 // Known SHA-256s: of "hello\n" and of an empty file.
 const HELLO = "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03";
@@ -105,6 +106,28 @@ describe("the notes job (STORY-65)", () => {
     expect(notes).toContain(`\n\`\`\`\n${sums}\`\`\`\n`);
   });
 
+  it("counts only release tags this commit came from, not a higher tag on a branch that was never merged", async () => {
+    await mergePr(1, "STORY-1: Before the last release");
+    git("tag", "v0.1.0");
+    git("checkout", "-q", "-b", "abandoned");
+    await writeFile(join(repo, "abandoned.txt"), "never merged");
+    git("add", ".");
+    git("commit", "-q", "-m", "Never merged");
+    git("tag", "v0.1.5");
+    git("checkout", "-q", "main");
+    await mergePr(2, "STORY-2: The change since");
+    const prepared = await prepareRelease({
+      installers: await installers({ "Featra-0.2.0-x64.AppImage": "hello\n" }),
+      out: join(root, "release"),
+      tag: "v0.2.0",
+      version: "0.2.0",
+      installGuide: "u",
+      git: gitIn(repo),
+    });
+    expect(prepared.previous).toBe("v0.1.0");
+    expect(prepared.notes).toContain("\n## Changes since v0.1.0\n\n- STORY-2: The change since (#2)\n\n");
+  });
+
   it("lists every merged pull request for the first release", async () => {
     await mergePr(1, "STORY-1: The start");
     const prepared = await prepareRelease({
@@ -142,6 +165,13 @@ describe("the notes job (STORY-65)", () => {
       restore("GIT_DIR", saved.dir);
       restore("GIT_INDEX_FILE", saved.index);
     }
+  });
+
+  it("drops the same git variables as the server does", () => {
+    // The server's list (packages/server/src/git-run.ts) isn't importable here, so it is read from the source.
+    const source = readFileSync(join(REPO, "packages", "server", "src", "git-run.ts"), "utf8");
+    const list = /const REPO_OVERRIDES = \[([^\]]*)\]/.exec(source)?.[1] ?? "";
+    expect([...list.matchAll(/"(GIT_\w+)"/g)].map((m) => m[1])).toEqual(REPO_OVERRIDES);
   });
 
   it("fails when there are no installers", async () => {

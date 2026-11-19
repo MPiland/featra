@@ -64,7 +64,9 @@ export async function prepareRelease({
   const checksums: Checksum[] = await Promise.all(
     files.map(async (file) => ({ file, sha256: await sha256(join(installers, file)) })),
   );
-  const previous = previousTag(git(["tag", "--list", "v*"]).split("\n").filter(Boolean), tag);
+  // Only tags this commit came from: a tag on a branch that was never merged wasn't released from this line.
+  const tags = git(["tag", "--list", "v*", "--merged", "HEAD"]).split("\n").filter(Boolean);
+  const previous = previousTag(tags, tag);
   const log = git(["log", "--merges", `--format=${MERGE_LOG_FORMAT}`, previous ? `${previous}..HEAD` : "HEAD"]);
   const notes = releaseNotes({ version, previous, prs: mergedPullRequests(log), checksums, installGuide });
   await mkdir(out, { recursive: true });
@@ -73,8 +75,11 @@ export async function prepareRelease({
   return { notes, checksums: checksumsText(checksums), previous };
 }
 
-/** Variables git sets for hooks that point it at another repository, as the server's `gitEnv` drops them. */
-const REPO_OVERRIDES = [
+/**
+ * Variables git sets for hooks that point it at another repository: the same list as the server's `gitEnv` drops
+ * (packages/server/src/git-run.ts). A test keeps the two equal.
+ */
+export const REPO_OVERRIDES = [
   "GIT_DIR",
   "GIT_WORK_TREE",
   "GIT_INDEX_FILE",

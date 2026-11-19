@@ -3005,7 +3005,16 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **`release.yml`: Plan, Installers, Notes and checksums, Publish.** Plan (`tooling/release/plan.ts`) fails a tag that
   doesn't match `apps/desktop/package.json`, naming both versions, before anything is built. Publish
   (`tooling/release/publish.ts`) needs every job, runs only on a pushed tag, and alone has `contents: write`. It runs
-  `gh release create --verify-tag`, with `--prerelease` for 0.x or a pre-release part, else `--latest`.
+  `gh release create --verify-tag --draft` with every file, then `gh release edit --draft=false`, with `--prerelease`
+  for 0.x or a pre-release part, else `--latest`, so a failed upload never leaves a public release with files missing.
+  A re-run finishes a draft (`gh release upload --clobber`, then publishes); a published release fails the job,
+  unchanged. Before that it checks `git ls-remote` says the tag still names `GITHUB_SHA`. Its checkout keeps no
+  credentials (`persist-credentials: false`).
+- **The release's package checks are "Release installers / Package (…)"**, apart from CI's "Installers / …", since a PR
+  that changes the release runs both. Installer uploads use `overwrite: true`, so re-running a failed package job can
+  upload again.
+- **The previous release** is the highest `v*` tag merged into the commit being released (`git tag --merged HEAD`), so
+  a tag on an unmerged branch doesn't hide changes.
 - **Pre-release tags are allowed** (`v0.1.0-rc.1`): the version is SemVer, and a release candidate lets the
   pipeline be tested without spending a version.
 - **Notes from merge commits** since the highest earlier release tag (`tooling/release/notes.ts`), not the GitHub API,

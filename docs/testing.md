@@ -34,9 +34,10 @@ test, runs only in CI: it installs Featra on the machine it runs on.
   macOS's own behaviour: the app menu, no menu bar icon, and closing the last window keeps Featra in the Dock until the
   Dock icon shows it again (STORY-63).
 - **Package (Windows)**, **Package (Ubuntu)** and **Package (macOS)**, in `package.yml`, which CI and the release
-  workflow both call, so their checks show as **Installers / Package (Windows)** and so on (STORY-65). `pnpm package`
-  builds the platform's installer (ADR 0040), then `pnpm test:installed` installs it as a tester would and launches the
-  installed app, never `electron .` (STORY-64). Windows runs the NSIS installer silently and opens Featra from its Start menu shortcut.
+  workflow both call, so their checks show as **Installers / Package (Windows)** and so on (STORY-65); the release
+  workflow's show as **Release installers / Package (Windows)**. `pnpm package` builds the platform's installer (ADR
+  0040), then `pnpm test:installed` installs it as a tester would and launches the installed app, never `electron .`
+  (STORY-64). Windows runs the NSIS installer silently and opens Featra from its Start menu shortcut.
   macOS copies Featra.app out of the DMG and also checks both architectures and the ad-hoc signature, running the Intel
   half under Rosetta. Ubuntu runs the AppImage with `APPIMAGE_EXTRACT_AND_RUN=1`, since the runner has no FUSE. Each
   uploads its installer as `installer-windows`, `installer-ubuntu` or `installer-macos`, and its report as

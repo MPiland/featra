@@ -58,6 +58,9 @@ Building the release workflow settled its shape:
 - **Four jobs in order: Plan, Installers, Notes and checksums, Publish.** Plan checks the tag against the version
   before anything is built. Publish needs every earlier job, runs only for a pushed tag, and is the only job with
   write access to the repo.
+- **Publishing is all or nothing.** Publish checks the tag on GitHub still names the commit the run built, creates the
+  release as a draft with every file, then publishes it. A re-run finishes a draft a failed run left; a published
+  release is never changed.
 - **Tags are `v` and the SemVer version, pre-release parts allowed** (`v0.2.0-rc.1`), so a release candidate can be
   tested without using up a version. 0.x versions and versions with a pre-release part publish as pre-releases; from
   1.0.0 a release is marked latest.

@@ -1,7 +1,8 @@
 /**
  * STORY-64: CI's package jobs, one per platform, build the installer with `pnpm package`, install it and launch the
- * installed app (e2e/installed), and upload the installer and the smoke test's JUnit report. Read from the workflows themselves: the jobs are in package.yml, which ci.yml calls on every pull
- * request and the release workflow calls before it publishes (STORY-65).
+ * installed app (e2e/installed), and upload the installer and the smoke test's JUnit report. Read from the workflows
+ * themselves: the jobs are in package.yml, which ci.yml calls on every pull request and the release workflow calls
+ * before it publishes (STORY-65).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

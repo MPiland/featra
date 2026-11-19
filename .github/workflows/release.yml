@@ -48,7 +48,8 @@ jobs:
         run: node tooling/release/plan.ts
 
   package:
-    name: Installers
+    # Not "Installers", CI's name for the same jobs: a pull request runs both, and their checks would share names.
+    name: Release installers
     needs: plan
     uses: ./.github/workflows/package.yml
 
@@ -97,7 +98,10 @@ jobs:
     permissions:
       contents: write
     steps:
+      # The token is gh's alone; git here only reads the public tag.
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -112,6 +116,8 @@ jobs:
         with:
           name: release-notes
           path: release
+      # Checks the tag on GitHub still names this run's commit (GITHUB_SHA), then makes the release as a draft with
+      # every file and publishes it. A re-run finishes a draft an earlier run left.
       - name: Publish the release
         run: node tooling/release/publish.ts
         env:

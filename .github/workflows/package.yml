@@ -35,6 +35,8 @@ jobs:
           name: installer-windows
           path: apps/desktop/out/installers/*-setup.exe
           retention-days: 14
+          # A re-run of a failed job uploads it again.
+          overwrite: true
           if-no-files-found: ignore
       - name: Upload the smoke test report
         if: success() || failure()
@@ -78,6 +80,8 @@ jobs:
           name: installer-ubuntu
           path: apps/desktop/out/installers/*.AppImage
           retention-days: 14
+          # A re-run of a failed job uploads it again.
+          overwrite: true
           if-no-files-found: ignore
       - name: Upload the smoke test report
         if: success() || failure()
@@ -127,6 +131,8 @@ jobs:
             apps/desktop/out/installers/*.dmg
             apps/desktop/out/installers/*.zip
           retention-days: 14
+          # A re-run of a failed job uploads it again.
+          overwrite: true
           if-no-files-found: ignore
       - name: Upload the smoke test report
         if: success() || failure()

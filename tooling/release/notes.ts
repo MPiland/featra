@@ -91,7 +91,8 @@ export function releaseNotes({ version, previous, prs, checksums, installGuide }
     "## Unsigned build",
     "",
     "These installers aren't signed yet, so Windows and macOS warn the first time Featra opens. " +
-      `The [install guide](${installGuide}) shows how to open it anyway, and what Featra needs: \`git\`, \`gh\` and \`claude\`.`,
+      `The [install guide](${installGuide}) shows how to open it anyway, ` +
+      "and what Featra needs: `git`, `gh` and `claude`.",
     "",
     previous ? `## Changes since ${previous}` : "## Changes",
     "",

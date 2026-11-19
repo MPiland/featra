@@ -11,6 +11,8 @@ const job = (name: string) => workflowJob("release.yml", name);
 /** A job's `needs`, as a list. */
 const needs = (name: string) =>
   (/^ {4}needs: (?:\[(.*)\]|(\S+))$/m.exec(job(name)) ?? []).slice(1).find(Boolean)?.split(/,\s*/) ?? [];
+/** The name of a workflow's `package` job, the job that calls package.yml. */
+const caller = (file: string) => /^ {4}name: (.+)$/m.exec(workflowJob(file, "package"))?.[1];
 const jobIds = (file: string) =>
   [...(workflow(file).split("\njobs:\n")[1] ?? "").matchAll(/^ {2}([\w-]+):$/gm)].map((m) => m[1]);
 
@@ -50,6 +52,20 @@ describe("the release workflow (STORY-65)", () => {
     }
   });
 
+  it("names its package checks apart from CI's, since a pull request that changes the release runs both", () => {
+    // A called workflow's checks are "<caller's name> / <job's name>".
+    expect(caller("release.yml")).toBe("Release installers");
+    expect(caller("ci.yml")).toBe("Installers");
+  });
+
+  it("uploads each installer so a re-run of a failed package job can upload it again", () => {
+    for (const platform of PLATFORMS) {
+      const packageJob = workflowJob("package.yml", `package-${platform}`);
+      const upload = packageJob.split(`name: installer-${platform}\n`)[1]?.split("- name:")[0] ?? "";
+      expect(upload, platform).toMatch(/^ {10}overwrite: true$/m);
+    }
+  });
+
   it("publishes only from a pushed tag, in a last job that needs every smoke test to have passed", () => {
     expect(needs("notes")).toEqual(["plan", "package"]);
     expect(needs("publish")).toEqual(["plan", "package", "notes"]);
@@ -62,14 +78,14 @@ describe("the release workflow (STORY-65)", () => {
       expect(job(other), other).not.toMatch(/contents: write|publish\.ts|gh release/);
     }
     expect(workflow("package.yml")).not.toMatch(/contents: write|gh release/);
+    // The write token is gh's alone: the publish job's checkout keeps no credentials in git.
+    expect(job("publish")).toMatch(/- uses: actions\/checkout@v4\n\s+with:\n\s+persist-credentials: false\n/);
   });
 
   it("attaches every installer and writes the notes and checksums, in a dry run too", () => {
-    for (const name of ["notes", "publish"]) {
-      expect(job(name), name).toMatch(
-        /uses: actions\/download-artifact@v4\n\s+with:\n\s+pattern: installer-\*\n\s+path: installers\n\s+merge-multiple: true\n/,
-      );
-    }
+    const downloadsInstallers =
+      /uses: actions\/download-artifact@v4\n\s+with:\n\s+pattern: installer-\*\n\s+path: installers\n\s+merge-multiple: true\n/;
+    for (const name of ["notes", "publish"]) expect(job(name), name).toMatch(downloadsInstallers);
     expect(job("notes")).toMatch(/fetch-depth: 0\n\s+fetch-tags: true\n/);
     expect(job("notes")).toMatch(/run: node tooling\/release\/prepare\.ts\n/);
     expect(job("notes")).not.toMatch(/^ {4}if:/m);
