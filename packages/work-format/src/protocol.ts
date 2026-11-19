@@ -13,11 +13,13 @@ import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
 import type { Inbox, InboxItem } from "./inbox.ts";
+import type { NeedsList } from "./project-needs.ts";
 import type { Role } from "./roles.ts";
 import type { RoleEdit, RoleEditResult, RoleList } from "./role-edit.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
-import { isOneOf, isRecord } from "./utils/guards.ts";
+import { isRecord } from "./utils/guards.ts";
 import { isId } from "./protocol-frames.ts";
+import type { InitResult, ProjectSetup } from "./protocol-setup.ts";
 import type { WorkList } from "./work-list-types.ts";
 
 /** Only loopback, always: the server must not be reachable from another machine (docs/architecture.md). */
@@ -25,16 +27,6 @@ export const SERVER_HOST = "127.0.0.1";
 
 /** The URL path the server answers on: the protocol version. A breaking change gets a new path. */
 export const SERVER_PATH = "/v1";
-
-/** Where a project stands: not a git repository, a repository without `.featra/`, or set up. */
-export type ProjectSetup =
-  | { state: "no-git" }
-  | { state: "no-featra" }
-  | { state: "ready" }
-  | { state: "error"; error: string };
-
-/** What Featra init did: the paths it created and the ones it found and kept, relative to the project. */
-export type InitResult = { ok: true; created: string[]; kept: string[] } | { ok: false; error: string };
 
 /** What applying or discarding a stale copy did. */
 export type CopyActionResult = { ok: true } | { ok: false; error: string };
@@ -241,6 +233,12 @@ export interface ServerMethods {
    * answer, whatever the wait (STORY-7): what a desktop notification is made from. The request's id names the watch.
    */
   "inbox.asked": { params: { dir?: string }; result: null };
+  /**
+   * What each open project needs from the user (STORY-66): how many of its agents wait on an answer, and whether it has
+   * work to review; then, until `work.unwatch`, a `needs.list` push each time that changes. The request's id names the
+   * watch.
+   */
+  "needs.watch": { params: Record<string, never>; result: NeedsList };
 }
 
 /** Frames the server sends unasked, and the data each carries. */
@@ -259,6 +257,8 @@ export interface ServerPushes {
   "inbox.list": Inbox;
   /** A chat asked for an approval or an answer just now. */
   "inbox.asked": InboxItem;
+  /** What a project needs from the user changed: the whole new list, for the watch the frame names. */
+  "needs.list": NeedsList;
 }
 
 /** The `{ dir }` params every project method takes, or null. */
@@ -266,29 +266,14 @@ export function dirParams(params: unknown): { dir: string } | null {
   return isRecord(params) && typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
 }
 
-const SETUP_STATES = ["no-git", "no-featra", "ready"] as const;
-
-export function normalizeProjectSetup(raw: unknown): ProjectSetup {
-  const r = isRecord(raw) ? raw : {};
-  if (isOneOf(SETUP_STATES, r.state)) return { state: r.state };
-  return { state: "error", error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
-}
-
-const strings = (raw: unknown): string[] =>
-  Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string") : [];
-
-export function normalizeInitResult(raw: unknown): InitResult {
-  const r = isRecord(raw) ? raw : {};
-  if (r.ok === true) return { ok: true, created: strings(r.created), kept: strings(r.kept) };
-  return { ok: false, error: typeof r.error === "string" && r.error ? r.error : "Something went wrong." };
-}
-
 /** The `{ watch }` params of `work.unwatch`, or null. */
 export function unwatchParams(params: unknown): { watch: number } | null {
   return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
 }
 
-// The framing lives in protocol-frames.ts; it is part of this module's surface.
+// The framing lives in protocol-frames.ts and the setup shapes in protocol-setup.ts; both are part of this module's
+// surface.
+export { normalizeInitResult, normalizeProjectSetup, type InitResult, type ProjectSetup } from "./protocol-setup.ts";
 export {
   parsePush,
   parseRequest,

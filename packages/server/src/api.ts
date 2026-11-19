@@ -17,7 +17,7 @@ import {
 import type { AllowedProjects } from "./allowed-projects.ts";
 import type { AgentBridge } from "./agent-bridge.ts";
 import { ApiError } from "./api-error.ts";
-import { createChatApi } from "./api-chat.ts";
+import { createChatApi, type ChatApiDeps } from "./api-chat.ts";
 import { createBugApi } from "./api-bugs.ts";
 import { createStoryEndApi } from "./api-story-end.ts";
 import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
@@ -78,6 +78,7 @@ export interface ApiDeps {
   roleWatches: RoleWatches;
   /** Takes back what an agent logged; without it there is nothing to take back. */
   agents?: Pick<AgentBridge, "undo">;
+  needs?: ChatApiDeps["needs"];
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -125,6 +126,7 @@ export function createApi({
   roles,
   roleWatches,
   agents,
+  needs,
 }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
@@ -152,7 +154,7 @@ export function createApi({
   const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
   const bugApi = createBugApi({ bugs, allow });
   const featureApi = createFeatureApi({ features, card });
-  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, ...(busy ? { busy } : {}) });
+  const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, needs, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
     switch (method) {
@@ -283,6 +285,7 @@ export function createApi({
       case "chat.list":
       case "inbox.watch":
       case "inbox.asked":
+      case "needs.watch":
         return chatApi(method, params, id, connection);
       default:
         return assertNever(method);

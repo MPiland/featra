@@ -4,11 +4,32 @@ import { PROJECT_LABELS } from "./projects.ts";
 import { shortcutLabel, type ShortcutId } from "./shortcuts.ts";
 import { viewDef, VIEWS, type ViewId } from "./views.ts";
 
+/**
+ * A mark after an item's label, such as a count: `text` is what shows (none for a dot), `spoken` what a screen reader
+ * hears after the label (", 2 agents waiting"). A quiet mark is drawn with less weight.
+ */
+export interface MenuMark {
+  id: string;
+  text?: string;
+  spoken: string;
+  /** What a pointer resting on the mark shows, for a mark without words. */
+  tip?: string;
+  quiet?: boolean;
+}
+
 export type MenuNode =
   | { kind: "item"; id: string; label: string; shortcut?: string; disabled?: boolean; onSelect: () => void }
   | { kind: "check"; id: string; label: string; shortcut?: string; checked: boolean; onSelect: () => void }
   /** One of a set of choices, such as a project in the project switcher. */
-  | { kind: "radio"; id: string; label: string; shortcut?: string; checked: boolean; onSelect: () => void }
+  | {
+      kind: "radio";
+      id: string;
+      label: string;
+      shortcut?: string;
+      checked: boolean;
+      marks?: readonly MenuMark[];
+      onSelect: () => void;
+    }
   | { kind: "submenu"; id: string; label: string; items: MenuNode[] }
   | { kind: "separator"; id: string };
 

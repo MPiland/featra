@@ -72,3 +72,4 @@ What becomes easier or harder, and what we must now do.
 | [0038](0038-scope-baseline-is-the-start-of-the-feature.md)       | The scope baseline is the moment a feature goes in progress           | proposed |
 | [0039](0039-burn-up-series-on-the-feature-row.md)                | The burn-up series rides on the feature row                           | proposed |
 | [0040](0040-installers-with-electron-builder-released-on-tag.md) | Installers with electron-builder, released on a version tag           | proposed |
+| [0041](0041-project-needs-one-watch-across-open-projects.md)     | What each project needs: one server watch across the open projects    | proposed |

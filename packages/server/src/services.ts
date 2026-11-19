@@ -29,6 +29,7 @@ import { createBugRequest } from "./bug-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
+import { watchNeeds } from "./project-needs.ts";
 import { createLogWriter } from "./log-writer.ts";
 import { createStoryHold } from "./story-hold.ts";
 import { readAppAutoMerge, readAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
@@ -253,6 +254,7 @@ export function createServices({
     roles,
     roleWatches,
     agents,
+    needs: (listener) => watchNeeds({ allowed, watches, chats, log }, listener),
   });
   // Saved settings that change a project's auto-merge setting in effect rescan it and re-check auto-merge (STORY-61).
   const settingsChanges = createSettingsChanges({

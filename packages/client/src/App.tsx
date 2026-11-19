@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  DEFAULT_WINDOW_STATE,
   type AppInfo,
   type AppSettings,
   type FeatraBridge,
   type ProjectsSnapshot,
   type SettingsSnapshot,
   type UiState,
-  type WindowState,
 } from "./bridge.ts";
 import { CHAT_COPY, type ChatRoleRef } from "./chats.ts";
 import { ChatList, useChats } from "./components/chat/ChatList.tsx";
@@ -24,6 +22,7 @@ import { useProjects } from "./components/useProjects.tsx";
 import { usePrFocus } from "./components/usePrFocus.ts";
 import { useProjectSetup } from "./components/useProjectSetup.tsx";
 import { useShortcuts } from "./components/useShortcuts.tsx";
+import { useWindowSync } from "./components/useWindowSync.ts";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
 import { ExternalLinkContext } from "./components/work/PrChip.tsx";
@@ -31,7 +30,6 @@ import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import { canGoBack, canGoForward, currentView, entryChat, entryView, initialNav, leaveChats } from "./navigation.ts";
 import { useAppNav } from "./use-app-nav.ts";
 import { firstSettingsPage, type SettingsPage } from "./settings-pages.ts";
-import { applyTheme } from "./theme.ts";
 import { viewDef } from "./views.ts";
 import { sameBoardProjects, withWorkLayout, workLayoutOf, type WorkLayout } from "./work-layout.ts";
 import { DEFAULT_ZOOM, zoomIn, zoomOut } from "./zoom.ts";
@@ -56,7 +54,6 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   const [ui, setUi] = useState(initialUiState);
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const [info, setInfo] = useState<AppInfo | null>(null);
-  const [windowState, setWindowState] = useState<WindowState>(DEFAULT_WINDOW_STATE);
   const [settings, setSettings] = useState(initialSettings);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>(() => firstSettingsPage(initialSettings));
   const saved = useRef(initialUiState);
@@ -64,6 +61,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   const chatId = entryChat(entry);
   const view = viewDef(entryView(entry) ?? "work");
   const collapsed = ui.sidebarCollapsed;
+  const windowState = useWindowSync(bridge, ui.zoomFactor, settings.app.theme);
 
   const toggleSidebar = useCallback(() => {
     // Collapsing makes the sidebar inert; move keyboard focus out first so it isn't stranded.
@@ -173,24 +171,6 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     void bridge.uiState.save(ui);
   }, [bridge, ui]);
 
-  useEffect(() => bridge.window.setZoomFactor(ui.zoomFactor), [bridge, ui.zoomFactor]);
-  // The window's maximized and full-screen state comes from the host, which reports every change, the OS's too.
-  useEffect(() => {
-    let live = true;
-    const off = bridge.window.onStateChange((s) => live && setWindowState(s));
-    void bridge.window.state().then((s) => live && setWindowState(s));
-    return () => {
-      live = false;
-      off();
-    };
-  }, [bridge]);
-  // The theme setting (Settings > Appearance; System by default, so the OS decides).
-  const theme = settings.app.theme;
-  useEffect(() => {
-    applyTheme(theme);
-    bridge.window.setTheme(theme);
-  }, [bridge, theme]);
-
   // About and Settings show the version (STORY-65).
   const showsInfo = dialog === "about" || view.id === "settings";
   useEffect(() => {
@@ -238,7 +218,14 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
               />
             }
             counts={{ inbox: inbox.items.length }}
-            switcher={<ProjectSwitcher projects={projects} platform={bridge.platform} actions={projectActions} />}
+            switcher={
+              <ProjectSwitcher
+                projects={projects}
+                platform={bridge.platform}
+                actions={projectActions}
+                needs={inbox.needs}
+              />
+            }
           />
           <main aria-labelledby="view-title">
             {chatId !== null ? (
