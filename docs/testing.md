@@ -45,9 +45,9 @@ Each e2e job also writes a JUnit report and uploads it as `test-report-e2e-windo
 together to prove criteria, and a test that failed on any platform isn't proven (ADR 0033).
 
 Branch protection on main requires Gate, E2E (Windows) and E2E (Ubuntu), plus the user's Accept. The package jobs
-aren't required checks (decisions.md, 2026-11-18). Add **E2E (macOS)**
-to main's required checks once it passes on main (decisions.md, 2026-11-18). The check names are the job names.
-Renaming a job means updating branch protection with it.
+aren't required checks (decisions.md, 2026-11-18). Add **E2E (macOS)** to main's required checks once it passes on
+main (decisions.md, 2026-11-18). The check names are the job names. Renaming a job means updating branch protection
+with it.
 
 ## When a test fails
 

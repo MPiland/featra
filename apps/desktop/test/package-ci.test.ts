@@ -2,6 +2,7 @@
  * STORY-64: CI's package jobs, one per platform, build the installer with `pnpm package`, install it and launch the
  * installed app (e2e/installed), and upload the installer and the smoke test's JUnit report. Read from ci.yml itself.
  */
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { installerFiles, type InstallerPlatform } from "../packaging/config.ts";
@@ -72,10 +73,23 @@ describe("CI's package jobs (STORY-64)", () => {
     }
   });
 
-  it("are not among main's required checks", () => {
+  it("are not among main's required checks, as the workflow and docs/testing.md list them", () => {
     const header = workflow("ci.yml").split("\nname: CI")[0]!;
     expect(header).toContain("Gate, E2E (Windows), E2E (Ubuntu)");
     expect(header).not.toContain("Package");
-    expect(workflow("ci.yml")).toContain("Not required\n  # checks (decisions.md, 2026-11-18).");
+    // The checks are the jobs' names; the docs list the required ones, each a job, none a package job.
+    const jobNames = [...workflow("ci.yml").matchAll(/^ {2}[\w-]+:\n {4}name: (.+)$/gm)].map((m) => m[1]!);
+    const packageNames = JOBS.map(
+      ({ platform }) => /^ {4}name: (.+)$/m.exec(workflowJob("ci.yml", `package-${platform}`))?.[1],
+    );
+    expect(packageNames.every((name) => name !== undefined && jobNames.includes(name))).toBe(true);
+    const docs = readFileSync(join(REPO, "docs", "testing.md"), "utf8").replaceAll(/\s+/g, " ");
+    const required = /Branch protection on main requires (.+?), plus/.exec(docs)?.[1]?.split(/, | and /);
+    expect(required).toEqual(["Gate", "E2E (Windows)", "E2E (Ubuntu)"]);
+    for (const name of required ?? []) expect(jobNames).toContain(name);
+    for (const name of packageNames) {
+      expect(required).not.toContain(name);
+      expect(header).not.toContain(name);
+    }
   });
 });

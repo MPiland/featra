@@ -8,9 +8,11 @@ import {
   loginShell,
   mergePaths,
   parseShellPath,
+  PRINT_PATH,
   readLoginPath,
   readsLoginPath,
   runShell,
+  shellArgs,
   usualFolders,
   type RunShell,
 } from "../src/login-path.ts";
@@ -61,13 +63,20 @@ describe("the login shell's PATH (STORY-64)", () => {
     });
     expect(asked).toEqual({
       shell: "/bin/zsh",
-      args: ["-ilc", `printf '%s' "__FEATRA_PATH__\${PATH}__FEATRA_PATH__"`],
+      args: ["-i", "-l", "-c", `/bin/sh -c 'printf "%s" "__FEATRA_PATH__\${PATH}__FEATRA_PATH__"'`],
     });
     expect(found).toEqual({
       source: "login shell",
       shell: "/bin/zsh",
       path: "/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin:/Applications/Tool.app/bin",
     });
+  });
+
+  it("passes the command the same way to every shell, and csh and tcsh no -i or -l, which they take only alone", () => {
+    for (const shell of ["/bin/sh", "/bin/bash", "/bin/zsh", "/usr/bin/fish", "/opt/homebrew/bin/nu"]) {
+      expect(shellArgs(shell)).toEqual(["-i", "-l", "-c", PRINT_PATH]);
+    }
+    for (const shell of ["/bin/csh", "/bin/tcsh"]) expect(shellArgs(shell)).toEqual(["-c", PRINT_PATH]);
   });
 
   it("reads the PATH between its marks when the shell's rc files print lines of their own", () => {
@@ -101,18 +110,24 @@ describe("the login shell's PATH (STORY-64)", () => {
       source: "fallback",
       shell: "/bin/bash",
       reason: "it printed no PATH",
-      path: "/usr/local/bin:/usr/bin:/home/me/.local/bin",
+      path: "/usr/local/bin:/usr/bin:/home/me/.local/bin:/home/linuxbrew/.linuxbrew/bin:/home/me/.npm-global/bin:/snap/bin",
     });
     expect(parseShellPath("__FEATRA_PATH____FEATRA_PATH__")).toBeNull();
   });
 
-  it("names the usual folders per platform, claude's own installer folder in both", () => {
+  it("names the usual folders per platform, claude's own installer folder in both, and Homebrew, npm and snaps on Linux", () => {
     expect(usualFolders("darwin", "/Users/me")).toEqual([
       "/opt/homebrew/bin",
       "/usr/local/bin",
       "/Users/me/.local/bin",
     ]);
-    expect(usualFolders("linux", "/home/me")).toEqual(["/usr/local/bin", "/home/me/.local/bin"]);
+    expect(usualFolders("linux", "/home/me")).toEqual([
+      "/usr/local/bin",
+      "/home/me/.local/bin",
+      "/home/linuxbrew/.linuxbrew/bin",
+      "/home/me/.npm-global/bin",
+      "/snap/bin",
+    ]);
   });
 
   it("lists each folder once and drops empty ones", () => {
@@ -128,7 +143,7 @@ describe("the login shell's PATH (STORY-64)", () => {
       timeoutMs: 300,
     });
     expect(found.source).toBe("fallback");
-    expect(found.path).toBe(`${STARTED}:/usr/local/bin:/home/me/.local/bin`);
+    expect(found.path).toBe(`${STARTED}:${usualFolders("linux", "/home/me").join(":")}`);
   });
 
   it.skipIf(!existsSync("/bin/sh"))("reads the PATH a real login shell's profile sets", async () => {

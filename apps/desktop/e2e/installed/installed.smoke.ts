@@ -1,9 +1,11 @@
+import type { ChildProcess } from "node:child_process";
 import { readdir, readFile, readlink, realpath, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { basename, dirname, join, sep } from "node:path";
-import { expect, test, type Page } from "../fixtures.ts";
+import { expect, test } from "../fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "../agent.ts";
-import { launchExecutable, tempProject, tempUserData } from "../app.ts";
+import { launchExecutable, startFromSource, tempProject, tempUserData } from "../app.ts";
+import { chatLog, newDeveloperChat, queries, send, startedWith } from "./chat.ts";
 import { icons, installerFiles } from "../../packaging/config.ts";
 import { DESKTOP } from "../../packaging/paths.ts";
 import { install, openDmg, sameBytes, startMenuShortcut, type Installed } from "./install.ts";
@@ -31,31 +33,22 @@ test.afterAll(async () => {
 
 const open = (userData: string, env: Record<string, string>) =>
   launchExecutable(installed.executable, [], userData, { ...installed.env, ...env });
-const composer = (page: Page) => page.getByRole("textbox", { name: "Message" });
-const chatLog = (page: Page) => page.getByRole("log", { name: "Chat" });
+/** A fake home on macOS and Linux, where Electron puts the profile folder itself (Windows reads AppData from the shell). */
+const fakeHome = (home: string): Record<string, string> =>
+  windows ? {} : { HOME: home, CFFIXED_USER_HOME: home, XDG_CONFIG_HOME: join(home, ".config") };
 
-async function newDeveloperChat(page: Page) {
-  await page.getByRole("button", { name: "New chat" }).click();
-  await page
-    .getByRole("dialog", { name: "New chat" })
-    .getByRole("button", { name: /^Developer/ })
-    .click();
-  await expect(page.getByRole("region", { name: "Developer" })).toBeVisible();
-}
-
-async function send(page: Page, text: string) {
-  await composer(page).fill(text);
-  await composer(page).press("Enter");
-}
-
-/** The options each agent was started with, as fake-agent-sdk.mjs logs them. */
-const queries = async (agentLog: string): Promise<unknown[]> =>
-  (await readFile(agentLog, "utf8"))
-    .trim()
-    .split("\n")
-    .map((line): unknown => JSON.parse(line));
-/** One agent, started with this `claude`. */
-const startedWith = (claude: string) => [expect.objectContaining({ pathToClaudeCodeExecutable: claude })];
+/** The process's exit code, or "running" if it hasn't exited within `ms` (it is then ended). */
+const exitWithin = (child: ChildProcess, ms: number) =>
+  new Promise<number | null | "running">((resolve) => {
+    const timer = setTimeout(() => {
+      child.kill();
+      resolve("running");
+    }, ms);
+    child.once("exit", (code) => {
+      clearTimeout(timer);
+      resolve(code);
+    });
+  });
 
 test("pnpm package built the installer, named with the version and architecture, and it installs Featra", async () => {
   // AC1, AC7: the files the package job uploads.
@@ -102,8 +95,8 @@ test("the installed app opens a project, starts its local server, and chats with
       await send(first.page, "decide where entries go");
       await expect(chatLog(first.page).getByText("Logged to decisions.md", { exact: true })).toBeVisible();
       expect(await readFile(join(project.dir, "decisions.md"), "utf8")).toContain("Keep entries in the working folder");
-      // The turn ends before the next message is sent.
-      await expect(chatLog(first.page)).toContainText("Tool said: Logged to decisions.md.");
+      // The tool's answer shows before the turn ends, and a message sent during a turn is refused: wait for the end.
+      await expect(first.page.getByRole("button", { name: "Stop" })).toHaveCount(0);
       await send(first.page, "hello");
       await expect(chatLog(first.page)).toContainText("You said: hello");
       expect(await queries(agentLog)).toEqual(startedWith(bin.claude));
@@ -177,12 +170,9 @@ test("opened from Finder, the Dock or a desktop menu, it finds claude on the log
 
 test("the installed app is named Featra, keeps its data in the Featra folder, and carries the Featra icon", async () => {
   const icon = icons(ASSETS);
-  // Electron picks the profile folder itself here; on macOS and Linux in a fake home (Windows reads AppData from the shell).
+  // Electron picks the profile folder itself here.
   const home = await tempUserData();
-  const { app } = await open(
-    "",
-    windows ? {} : { HOME: home.dir, CFFIXED_USER_HOME: home.dir, XDG_CONFIG_HOME: join(home.dir, ".config") },
-  );
+  const { app } = await open("", fakeHome(home.dir));
   try {
     const paths = await app.evaluate(({ app: electronApp }) => ({
       name: electronApp.getName(),
@@ -244,6 +234,21 @@ test("the installed app is named Featra, keeps its data in the Featra folder, an
     } finally {
       dmg.detach();
     }
+  }
+});
+
+test("only one Featra runs: started from source while the installed one runs, it brings that one forward and exits", async () => {
+  const home = await tempUserData();
+  const { app } = await open("", fakeHome(home.dir));
+  try {
+    // Each on its own profile folder, as a user runs them; one lock for both (decisions.md, 2026-11-18).
+    const source = startFromSource({ ...fakeHome(home.dir), FEATRA_USER_DATA_DIR: "", FEATRA_PROJECT_DIR: "" });
+    expect(await exitWithin(source, 30_000)).toBe(0);
+    expect(app.process().exitCode).toBeNull();
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+  } finally {
+    await app.close();
+    await home.dispose();
   }
 });
 

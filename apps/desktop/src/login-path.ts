@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { homedir, userInfo } from "node:os";
 import { posix } from "node:path";
 
@@ -10,7 +10,7 @@ import { posix } from "node:path";
  * apps get the user's PATH from the registry, so Windows is left alone.
  */
 
-/** Runs the shell; resolves with what it printed, or null when it failed or didn't answer in time. */
+/** Runs the shell; resolves with what it printed, or null when it couldn't start or didn't answer in time. */
 export type RunShell = (
   shell: string,
   args: string[],
@@ -37,13 +37,62 @@ export const LOGIN_SHELL_TIMEOUT_MS = 5000;
 /** Marks the PATH in the shell's output, since an interactive shell's rc files may print their own lines. */
 const MARK = "__FEATRA_PATH__";
 
+/**
+ * What the login shell runs: `/bin/sh` prints the PATH it inherits between the marks. The login shell itself only runs
+ * one command with one single-quoted argument, which sh, bash, zsh, fish, tcsh and nushell all read alike; each has its
+ * own syntax for a variable.
+ */
+export const PRINT_PATH = `/bin/sh -c 'printf "%s" "${MARK}\${PATH}${MARK}"'`;
+
+/**
+ * The login shell's arguments. csh and tcsh take `-l` only on its own, and read `.cshrc` or `.tcshrc` for every
+ * command anyway; the others run it as an interactive login shell, which reads both the login and the rc files.
+ */
+export function shellArgs(shell: string): string[] {
+  return /^t?csh$/.test(posix.basename(shell)) ? ["-c", PRINT_PATH] : ["-i", "-l", "-c", PRINT_PATH];
+}
+
+/**
+ * Runs the shell in its own process group. Resolves as soon as the PATH is printed, so a background job the profile
+ * started can't hold it up by keeping the output open, and with null at the time limit even if the shell ignores
+ * SIGTERM, as an interactive one does. Either way the group is killed: the shell and whatever its profile started.
+ */
 export const runShell: RunShell = (shell, args, { timeoutMs, env }) =>
   new Promise((resolve) => {
-    const child = execFile(shell, args, { encoding: "utf8", timeout: timeoutMs, env }, (err, stdout) =>
-      resolve(err ? null : stdout),
-    );
-    child.stdin?.end();
+    let output = "";
+    let settled = false;
+    const child = spawn(shell, args, {
+      env,
+      stdio: ["ignore", "pipe", "ignore"],
+      detached: process.platform !== "win32",
+    });
+    const finish = (result: string | null) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.stdout?.destroy();
+      killGroup(child);
+      resolve(result);
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", (chunk: string) => {
+      output += chunk;
+      if (parseShellPath(output) !== null) finish(output);
+    });
+    child.on("error", () => finish(null));
+    child.on("close", () => finish(output));
   });
+
+function killGroup(child: ChildProcess) {
+  if (child.pid === undefined) return;
+  try {
+    if (process.platform === "win32") child.kill("SIGKILL");
+    else process.kill(-child.pid, "SIGKILL");
+  } catch {
+    // Already gone.
+  }
+}
 
 /** The shell to ask: SHELL, else the account's login shell, else the platform's default. */
 export function loginShell(platform: NodeJS.Platform, env: NodeJS.ProcessEnv, accountShell?: string | null): string {
@@ -68,7 +117,15 @@ export function mergePaths(first: readonly string[], rest: readonly string[]): s
 /** Where `git`, `gh` and `claude` are usually installed, for when the shell doesn't answer. */
 export function usualFolders(platform: NodeJS.Platform, home: string): string[] {
   const local = posix.join(home, ".local", "bin"); // claude's own installer
-  return platform === "darwin" ? ["/opt/homebrew/bin", "/usr/local/bin", local] : ["/usr/local/bin", local];
+  if (platform === "darwin") return ["/opt/homebrew/bin", "/usr/local/bin", local];
+  // Homebrew on Linux, npm's global folder as its docs suggest setting it, and snaps.
+  return [
+    "/usr/local/bin",
+    local,
+    "/home/linuxbrew/.linuxbrew/bin",
+    posix.join(home, ".npm-global", "bin"),
+    "/snap/bin",
+  ];
 }
 
 /**
@@ -85,7 +142,7 @@ export async function readLoginPath({
 }: LoginPathDeps): Promise<LoginPath> {
   const shell = loginShell(platform, env, accountShell);
   const started = (env.PATH ?? "").split(":");
-  const output = await run(shell, ["-ilc", `printf '%s' "${MARK}\${PATH}${MARK}"`], { timeoutMs, env });
+  const output = await run(shell, shellArgs(shell), { timeoutMs, env });
   const path = parseShellPath(output);
   if (path !== null) return { source: "login shell", shell, path: mergePaths(path.split(":"), started) };
   const reason = output === null ? "it failed or didn't answer in time" : "it printed no PATH";

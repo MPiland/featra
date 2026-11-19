@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -8,13 +8,12 @@ import { APP_ID, builderConfig, icons, installerFiles, PRODUCT_NAME } from "../p
 import { RUNTIME_PACKAGES } from "../packaging/runtime-packages.ts";
 import { stageApp } from "../packaging/stage.ts";
 import { clientIndex } from "../src/client-path.ts";
+import { ASSETS, builtApp, DESKTOP } from "./staged-app.ts";
 
 /**
  * STORY-64: what `pnpm package` builds, from the real electron-builder config and the real staging of the app folder.
  * Staging copies the Agent SDK from the workspace's installed packages; the built app is stood in for by small files.
  */
-const DESKTOP = join(import.meta.dirname, "..");
-const ASSETS = join(DESKTOP, "assets");
 const desktopManifest = JSON.parse(readFileSync(join(DESKTOP, "package.json"), "utf8")) as {
   version: string;
   dependencies: Record<string, string>;
@@ -81,23 +80,8 @@ describe("the staged app folder (STORY-64)", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  /** A desktop folder with the real package.json and assets, and a stand-in for the built `dist/` and client. */
-  async function builtApp() {
-    const desktop = join(root, "desktop");
-    await mkdir(join(desktop, "dist"), { recursive: true });
-    await writeFile(join(desktop, "package.json"), readFileSync(join(DESKTOP, "package.json")));
-    for (const name of ["main", "preload", "server", "mcp"]) await writeFile(join(desktop, "dist", `${name}.cjs`), "");
-    await mkdir(join(desktop, "assets"));
-    for (const name of await readdir(ASSETS))
-      await writeFile(join(desktop, "assets", name), readFileSync(join(ASSETS, name)));
-    const client = join(root, "client-dist");
-    await mkdir(client);
-    await writeFile(join(client, "index.html"), "<!doctype html>");
-    return { desktop, client };
-  }
-
   it("holds dist, the client where the installed app loads it, the assets, and a package.json named Featra", async () => {
-    const { desktop, client } = await builtApp();
+    const { desktop, client } = await builtApp(root);
     const out = join(root, "app");
     const staged = await stageApp({ desktop, client, out, modulesFrom: DESKTOP });
     expect(staged.version).toBe(desktopManifest.version);
@@ -112,13 +96,13 @@ describe("the staged app folder (STORY-64)", () => {
       version: desktopManifest.version,
       description: "Run your AI coding agents like a product team",
       author: "Mark Piland and Featra contributors",
-      license: "MIT",
+      license: "SEE LICENSE IN LICENSE and THIRD-PARTY-NOTICES.md",
       main: "dist/main.cjs",
     });
   });
 
   it("carries the Agent SDK the app imports, at the locked version, and what it needs, but not Claude Code's binaries", async () => {
-    const { desktop, client } = await builtApp();
+    const { desktop, client } = await builtApp(root);
     const out = join(root, "app");
     const staged = await stageApp({ desktop, client, out, modulesFrom: DESKTOP });
     const sdk = staged.packages.find((p) => p.name === "@anthropic-ai/claude-agent-sdk");
@@ -140,7 +124,7 @@ describe("the staged app folder (STORY-64)", () => {
   });
 
   it("fails, naming the package, when a runtime package isn't installed", async () => {
-    const { desktop, client } = await builtApp();
+    const { desktop, client } = await builtApp(root);
     await expect(stageApp({ desktop, client, out: join(root, "app"), modulesFrom: root })).rejects.toThrow(
       "@anthropic-ai/claude-agent-sdk isn't installed",
     );

@@ -2,7 +2,8 @@ import { join } from "node:path";
 import { IPC } from "@featra/client/bridge";
 import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
 import { applyDockIcon } from "./app-icon.ts";
-import { nameApp } from "./app-name.ts";
+import { APP_ID, nameApp } from "./app-name.ts";
+import { takeInstanceLock } from "./instance-lock.ts";
 import { allowedDirs, registerIpc } from "./ipc.ts";
 import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog, type Log } from "./log.ts";
@@ -10,7 +11,7 @@ import { readLoginPath, readsLoginPath } from "./login-path.ts";
 import { createNotifier } from "./notifier.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
-import { createServerProcess } from "./server-process.ts";
+import { createServerProcess, startAfter } from "./server-process.ts";
 import { createSettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 import { createTray, destroyTray, trayAvailable } from "./tray.ts";
@@ -30,9 +31,10 @@ if (userDataDir) app.setPath("userData", userDataDir);
 
 /**
  * Installed on macOS and Linux, takes the login shell's PATH, so the app, its server and the agents it starts find `git`,
- * `gh` and `claude` when opened from Finder, the Dock or a desktop menu (STORY-64). Must finish before the server starts.
+ * `gh` and `claude` when opened from Finder, the Dock or a desktop menu (STORY-64). Read while the window opens; the
+ * server starts once it has been.
  */
-async function useLoginPath(log: Log) {
+async function takeLoginPath(log: Log) {
   if (!readsLoginPath(process.platform, app.isPackaged)) return;
   const found = await readLoginPath({ platform: process.platform, env: process.env });
   process.env.PATH = found.path;
@@ -54,7 +56,7 @@ app.on("web-contents-created", (_e, contents) => {
   contents.setWindowOpenHandler(() => ({ action: "deny" }));
 });
 
-if (!app.requestSingleInstanceLock()) {
+if (!takeInstanceLock(app, userDataDir)) {
   app.quit();
 } else {
   const store = createUiStateStore(app.getPath("userData"));
@@ -68,20 +70,23 @@ if (!app.requestSingleInstanceLock()) {
     fallbackLocation: app.getPath("documents"),
   });
   log.info(`Featra ${app.getVersion()} started (${process.platform})`);
-  // The local server makes every project write (ADR 0012, ADR 0015). It runs on Electron's own Node.
-  const server = createServerProcess({
-    script: join(app.getAppPath(), "dist", "server.cjs"),
-    mcpEntry: join(app.getAppPath(), "dist", "mcp.cjs"),
-    execPath: process.execPath,
-    log: (message) => log.info(message),
-    dataDir: app.getPath("userData"),
-  });
+  // The local server makes every project write (ADR 0012, ADR 0015). It runs on Electron's own Node, with the PATH.
+  const server = startAfter(
+    takeLoginPath(log),
+    createServerProcess({
+      script: join(app.getAppPath(), "dist", "server.cjs"),
+      mcpEntry: join(app.getAppPath(), "dist", "mcp.cjs"),
+      execPath: process.execPath,
+      log: (message) => log.info(message),
+      dataDir: app.getPath("userData"),
+    }),
+  );
   const client = clientIndex({ appPath: app.getAppPath(), packaged: app.isPackaged });
   let win: BrowserWindow | undefined;
   let tray: Tray | undefined;
 
   void app.whenReady().then(async () => {
-    if (process.platform === "win32") app.setAppUserModelId("dev.featra.app"); // notifications need it on Windows
+    if (process.platform === "win32") app.setAppUserModelId(APP_ID); // notifications need it on Windows
     applyDockIcon(app.dock, process.platform);
     setNativeMenu();
     const [remembered, hasTray, stored] = await Promise.all([
@@ -89,7 +94,6 @@ if (!app.requestSingleInstanceLock()) {
       trayAvailable(),
       settingsStore.load(),
       findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR).then(projects.start),
-      useLoginPath(log),
     ]);
     const project = projects.current();
     void projects.snapshot().then((s) => server.setProjects(allowedDirs(s)));

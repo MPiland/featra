@@ -233,17 +233,19 @@ export const exited = (app: ElectronApplication) =>
 export async function launchAgain(userDataDir: string, running: ElectronApplication): Promise<number | null> {
   if (mac) await activateAsMacOs(running);
   await grantForeground(await mainPid(running));
-  const env = { ...process.env, FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", FEATRA_PROJECT_DIR: "" } as Record<
-    string,
-    string
-  >;
-  delete env.FEATRA_CLIENT_URL;
-  delete env.ELECTRON_RUN_AS_NODE;
-  const child = spawn(electronPath as unknown as string, [appDir], { env, stdio: "ignore" });
+  const child = startFromSource({ FEATRA_USER_DATA_DIR: userDataDir, FEATRA_E2E: "1", FEATRA_PROJECT_DIR: "" });
   return new Promise<number | null>((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", (code) => resolve(code));
   });
+}
+
+/** Starts Featra from source (Electron on the built app folder) with `extraEnv`, outside Playwright. */
+export function startFromSource(extraEnv: Record<string, string>) {
+  const env = { ...process.env, ...extraEnv } as Record<string, string>;
+  delete env.FEATRA_CLIENT_URL;
+  delete env.ELECTRON_RUN_AS_NODE;
+  return spawn(electronPath as unknown as string, [appDir], { env, stdio: "ignore" });
 }
 
 /** The desktop notifications Featra showed (STORY-7): what each said. */

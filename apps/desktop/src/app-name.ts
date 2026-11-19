@@ -3,6 +3,9 @@ import type { App } from "electron";
 /** The app's name, as menus and dialogs show it. */
 export const APP_NAME = "Featra";
 
+/** The app's id: the installers' appId, and the Windows AppUserModelID that notifications and the taskbar group by. */
+export const APP_ID = "dev.featra.app";
+
 /**
  * Names the app Featra. Run from source, Electron names it after the package, `@featra/desktop`, and macOS's app menu
  * then reads "About @featra/desktop" and "Quit @featra/desktop" (STORY-63). The userData folder must stay the one
@@ -11,7 +14,7 @@ export const APP_NAME = "Featra";
  *
  * Installed, the app's package is named Featra (packaging/stage.ts), so its userData folder is `Featra`, apart from a
  * source run's `@featra/desktop` (STORY-64): an installed Featra and one run from source each keep their own projects
- * and settings, and can run side by side.
+ * and settings. Only one of them runs at a time (instance-lock.ts).
  */
 export function nameApp(app: Pick<App, "getPath" | "setPath" | "setName">) {
   const userData = app.getPath("userData");

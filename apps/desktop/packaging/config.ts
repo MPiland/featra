@@ -1,5 +1,6 @@
 import { join } from "node:path";
 import type { Configuration } from "electron-builder";
+import { APP_ID, APP_NAME } from "../src/app-name.ts";
 
 /**
  * electron-builder's config for Featra's installers (ADR 0040, STORY-64): a Windows x64 NSIS per-user installer, a
@@ -7,9 +8,11 @@ import type { Configuration } from "electron-builder";
  * (`stage.ts`) as it is: no asar archive, no dependency install and no native rebuild.
  */
 
-export const PRODUCT_NAME = "Featra";
-/** Also the Windows AppUserModelID main.ts sets, which notifications and the taskbar group by. */
-export const APP_ID = "dev.featra.app";
+export const PRODUCT_NAME = APP_NAME;
+export { APP_ID };
+
+/** What Featra is, in the installed app's package.json and Linux's app menus. */
+export const DESCRIPTION = "Run your AI coding agents like a product team";
 
 export type InstallerPlatform = "win32" | "darwin" | "linux";
 
@@ -100,7 +103,7 @@ export function builderConfig({ app, output, assets, electronVersion }: ConfigIn
       icon: icon.linux,
       category: "Development",
       executableName: "featra",
-      synopsis: "Run your AI coding agents like a product team",
+      synopsis: DESCRIPTION,
     },
     // electron-builder names x64 AppImages x86_64; the one Linux build is x64, named like the others.
     appImage: { artifactName: `\${productName}-\${version}-x64.\${ext}` },

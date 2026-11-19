@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      # The login shells the installed app reads the PATH from (STORY-64), so their tests run rather than skip.
+      - name: Install the login shells
+        run: sudo apt-get update -q && sudo apt-get install -yq --no-install-recommends zsh fish tcsh csh
       - name: Format, lint, typecheck and unit tests
         run: pnpm check
         env:

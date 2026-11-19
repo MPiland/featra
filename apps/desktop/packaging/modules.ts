@@ -1,5 +1,5 @@
 import { cp, readFile } from "node:fs/promises";
-import { existsSync, realpathSync } from "node:fs";
+import { existsSync, statSync, realpathSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 
 /**
@@ -88,7 +88,11 @@ export async function copyPackages(from: string, names: readonly string[], targe
     if (done.has(key)) return;
     done.add(key);
     const dest = join(destRoot, m.name);
-    await cp(source, dest, { recursive: true, dereference: true, filter: (src) => !isNested(source, src) });
+    await cp(source, dest, {
+      recursive: true,
+      dereference: true,
+      filter: (src) => !isNested(source, src) && shipped(source, src, m),
+    });
     copied.push({ name: m.name, version: m.version, at: dest.slice(dirname(target).length + 1).replaceAll("\\", "/") });
     for (const need of needs(m)) {
       const found = findPackage(source, need.name);
@@ -106,6 +110,22 @@ export async function copyPackages(from: string, names: readonly string[], targe
     await place(found, target, null);
   }
   return copied;
+}
+
+/** The file a package's `license` names, as in `SEE LICENSE IN README.md`; null when it names none. */
+export const licenseFileOf = (m: Pick<Manifest, "license">) =>
+  /^SEE LICENSE IN (.+)$/i.exec(m.license ?? "")?.[1] ?? null;
+
+/** What the app has no use for at run time: types, source maps, docs and tests. Licence files are kept. */
+const UNSHIPPED_FILE = /(\.d\.[cm]?ts|\.map)$|^(readme|changelog|history)(\..*)?$/i;
+const UNSHIPPED_DIR = new Set(["test", "tests", "__tests__"]);
+
+/** Whether `path`, in the package at `root`, is shipped (STORY-64): not a file the app never loads. */
+function shipped(root: string, path: string, m: Manifest): boolean {
+  const inside = path.slice(root.length + 1).replaceAll("\\", "/");
+  if (inside === "" || inside === licenseFileOf(m)) return true;
+  const name = basename(path);
+  return statSync(path).isDirectory() ? !UNSHIPPED_DIR.has(name) : !UNSHIPPED_FILE.test(name);
 }
 
 /** A package's own `node_modules` (pnpm's links, `.bin`): its needs are copied by name instead. */
