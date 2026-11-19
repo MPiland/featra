@@ -21,8 +21,10 @@ const projectMenu = () => screen.getByRole("menu", { name: "Projects" });
 const projectItems = () => within(projectMenu()).getAllByRole("menuitemradio");
 const names = () => projectItems().map(accessibleName);
 const marks = (el: HTMLElement) => [...el.querySelectorAll(".mmark")].map((m) => [m.className, m.textContent]);
-/** The name a screen reader hears for an item: its text without what is hidden from it. */
+/** The name a screen reader hears for an item: its label when it has one, else its text without what is hidden. */
 const accessibleName = (el: HTMLElement) => {
+  const label = el.getAttribute("aria-label");
+  if (label !== null) return label;
   const copy = el.cloneNode(true) as HTMLElement;
   copy.querySelectorAll("[aria-hidden=true]").forEach((h) => h.remove());
   return copy.textContent;
@@ -38,6 +40,10 @@ describe("AC1: each project in the menu shows how many of its agents wait on the
     expect(within(projectMenu()).getByRole("menuitemradio", { name: "docs" })).toBeTruthy();
     const counts = projectItems().map((i) => [...i.querySelectorAll(".mmark:not(.quiet)")].map((m) => m.textContent));
     expect(counts).toEqual([["1"], ["2"], []]);
+    const tips = projectItems().map((i) =>
+      [...i.querySelectorAll(".mmark:not(.quiet)")].map((m) => m.getAttribute("title")),
+    );
+    expect(tips).toEqual([["1 agent waiting"], ["2 agents waiting"], []]);
   });
 });
 
@@ -61,9 +67,24 @@ describe("AC3: the closed switcher shows a dot when another project needs the us
   it("shows no dot for the current project's own waiting agents and reviews", async () => {
     const app = renderApp({ projects, needs: needs([PROJECT.dir, 2, true]) });
     await waitFor(() => expect(app.needs.watching()).toBe(1));
-    await Promise.resolve();
+    await app.user.click(switcher());
+    // The needs have landed: the menu shows them on the current project.
+    expect(
+      within(projectMenu()).getByRole("menuitemradio", { name: "manager, 2 agents waiting, to review" }),
+    ).toBeTruthy();
+    await app.user.keyboard("{Escape}");
     expect(dot()).toBeNull();
     expect(switcher().getAttribute("aria-label")).toBe("Switch project: manager");
+  });
+
+  it("shows the dot with no current project when any open project needs the user: every one is another", async () => {
+    const app = renderApp({ project: null, projects: [OTHER, THIRD], needs: needs([OTHER.dir, 0, true]) });
+    await waitFor(() => expect(dot()).not.toBeNull());
+    expect(switcher().getAttribute("aria-label")).toBe("Switch project: No project, another project needs you");
+    app.needs.push(needs([OTHER.dir, 1, false], [THIRD.dir, 2, false]));
+    expect(switcher().getAttribute("aria-label")).toBe("Switch project: No project, 2 other projects need you");
+    app.needs.push(needs());
+    expect(dot()).toBeNull();
   });
 
   it("shows the dot for another project's waiting agent, and for another's review", async () => {
@@ -107,5 +128,16 @@ describe("AC5: a screen reader hears each project's count and review mark, and t
     await app.user.click(switcher());
     expect(names()).toEqual(["manager", "website, 1 agent waiting", "docs, to review"]);
     for (const mark of projectMenu().querySelectorAll(".mmark")) expect(mark.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("names each item in one piece, so no layout of its marks can split the name (CI: Chromium heard a space before the comma)", async () => {
+    const app = renderApp({ projects, needs: needs([OTHER.dir, 1, true], [THIRD.dir, 2, false]) });
+    await waitFor(() => expect(dot()).not.toBeNull());
+    await app.user.click(switcher());
+    expect(projectItems().map((i) => i.getAttribute("aria-label"))).toEqual([
+      null,
+      "website, 1 agent waiting, to review",
+      "docs, 2 agents waiting",
+    ]);
   });
 });

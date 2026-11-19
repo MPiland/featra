@@ -18,6 +18,6 @@ export function useInboxApp(
   const openChatIn = useOpenChatIn(projectDir, switchTo, openChat);
   const inbox = useInbox(bridge.inbox, projectDir !== null, waitMs(inboxWaitMinutes));
   useNotifications(bridge.inbox, bridge.notifications, projectDir !== null, openChatIn);
-  const needs = useProjectNeeds(bridge.needs, projectDir !== null);
+  const needs = useProjectNeeds(bridge.needs);
   return { items: inbox.items, openChatIn, needs };
 }

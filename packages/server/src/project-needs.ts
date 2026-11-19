@@ -1,11 +1,14 @@
 /**
- * What every open project needs from the user (STORY-66), kept current: its waiting agents from the requests the Inbox
- * holds (at any wait, so a request answered inline counts as soon as it is asked), and its reviews from its Work list,
- * through the shared per-folder watch (ADR 0016). A project opened or closed meanwhile joins or leaves the list.
+ * What every open project needs from the user (STORY-66), kept current for every page that watches it. Its waiting
+ * agents come from the requests the Inbox holds (at any wait, so a request answered inline counts as soon as it is
+ * asked). Its reviews come from its Work list, through the shared per-folder watch (ADR 0016), one per open project,
+ * started and stopped with the project list (`watchProjects`). The first watch starts it; it runs until `close`, so a
+ * page that reconnects gets the numbers at once, with no new scans.
  */
 import { hasReview, waitingAgents, type InboxItem, type NeedsList } from "@featra/work-format";
 import { projectKey, type AllowedProjects } from "./allowed-projects.ts";
 import type { ChatManager } from "./chat-manager.ts";
+import { watchProjects } from "./project-watch.ts";
 import type { WorkWatches } from "./work-watch.ts";
 
 export interface NeedsDeps {
@@ -16,98 +19,114 @@ export interface NeedsDeps {
   platform?: string;
 }
 
-interface Observed {
-  review: boolean;
-  stop: (() => void) | null;
-  /** The project closed, or the watch ended, before its first scan answered. */
-  dropped: boolean;
+export interface ProjectNeeds {
+  /**
+   * Answers with every open project's needs at once, then calls `listener` with the whole list each time it changes.
+   * A project's review shows once its first scan has landed; until then it has none.
+   */
+  watch: (listener: (needs: NeedsList) => void) => { needs: NeedsList; stop: () => void };
+  /** Waits for the project watches still starting. */
+  ready: () => Promise<void>;
+  /** Stops every watch; a page watching after this hears nothing more. */
+  close: () => void;
 }
 
-/**
- * Starts watching: answers with every open project's needs once each has been scanned, then calls `listener` with the
- * whole list each time it changes. `stop` ends every watch it started.
- */
-export async function watchNeeds(
-  { allowed, watches, chats, log, platform = process.platform }: NeedsDeps,
-  listener: (needs: NeedsList) => void,
-): Promise<{ needs: NeedsList; stop: () => void }> {
-  const key = (dir: string) => projectKey(dir, platform);
-  const observed = new Map<string, Observed>();
-  let held: InboxItem[] = [];
-  let answered = false;
-  let last = "";
+/** One project's review mark, from its own watch: a later watch of the same folder has its own. */
+interface Review {
+  review: boolean;
+}
 
-  const current = (): NeedsList => {
-    return {
-      projects: allowed.dirs().map((dir) => ({
-        dir,
-        waiting: waitingAgents(held.filter((i) => key(i.project ?? "") === key(dir))),
-        review: observed.get(dir)?.review ?? false,
-      })),
-    };
-  };
+export function createProjectNeeds({
+  allowed,
+  watches,
+  chats,
+  log,
+  platform = process.platform,
+}: NeedsDeps): ProjectNeeds {
+  const key = (dir: string) => projectKey(dir, platform);
+  const reviews = new Map<string, Review>();
+  const listeners = new Set<(needs: NeedsList) => void>();
+  let held: InboxItem[] = [];
+  let last = "";
+  let running: { ready: () => Promise<void>; close: () => void } | null = null;
+
+  const inProject = (item: InboxItem, dir: string) => item.project !== undefined && key(item.project) === key(dir);
+  const current = (): NeedsList => ({
+    projects: allowed.dirs().map((dir) => ({
+      dir,
+      waiting: waitingAgents(held.filter((i) => inProject(i, dir))),
+      review: reviews.get(dir)?.review ?? false,
+    })),
+  });
   const changed = () => {
-    if (!answered) return;
     const next = current();
     const json = JSON.stringify(next);
     if (json === last) return;
     last = json;
-    listener(next);
+    for (const listener of listeners) listener(next);
   };
 
-  const observe = async (dir: string) => {
-    const entry: Observed = { review: false, stop: null, dropped: false };
-    observed.set(dir, entry);
+  /** One project's review watch; its stop forgets the mark, unless a later watch of the folder has taken its place. */
+  const startProject = async (dir: string) => {
+    const mine: Review = { review: false };
+    reviews.set(dir, mine);
     try {
       const { value, stop } = await watches.observe(
         dir,
         (_scan, list) => hasReview(list),
         (review) => {
-          entry.review = review;
+          mine.review = review;
           changed();
         },
       );
-      if (entry.dropped) return stop();
-      entry.review = value;
-      entry.stop = stop;
+      mine.review = value;
       changed();
+      return () => {
+        stop();
+        if (reviews.get(dir) === mine) reviews.delete(dir);
+        changed();
+      };
     } catch (err) {
-      // A folder that can't be watched has nothing to review; its waiting agents still count.
-      log(`needs: can't watch ${dir}: ${err instanceof Error ? err.message : String(err)}`);
+      if (reviews.get(dir) === mine) reviews.delete(dir);
+      throw err;
     }
   };
-  const drop = (dir: string, entry: Observed) => {
-    entry.dropped = true;
-    entry.stop?.();
-    observed.delete(dir);
-  };
-  /** Starts watching each project opened since and stops each one closed. */
-  const sync = () => {
-    const open = new Set(allowed.dirs());
-    for (const [dir, entry] of observed) if (!open.has(dir)) drop(dir, entry);
-    return [...open].filter((dir) => !observed.has(dir)).map(observe);
+
+  const start = () => {
+    // Every request held, whatever its wait: a request in its chat stalls its agent as much as one in the Inbox.
+    const inbox = chats.watchInbox(null, 0, (next) => {
+      held = next.items;
+      changed();
+    });
+    held = inbox.inbox.items;
+    // A project opened or closed changes the list at once; its review follows when its scan lands.
+    const stopAllowed = allowed.onChange(changed);
+    // A project whose watch fails is tried again at the next change of the project list.
+    const projects = watchProjects(allowed, startProject, log, "Needs");
+    last = JSON.stringify(current());
+    return {
+      ready: () => projects.ready(),
+      close: () => {
+        stopAllowed();
+        inbox.stop();
+        projects.close();
+        reviews.clear();
+      },
+    };
   };
 
-  // Every request held, whatever its wait: a request in its chat stalls its agent as much as one in the Inbox.
-  const inbox = chats.watchInbox(null, 0, (next) => {
-    held = next.items;
-    changed();
-  });
-  held = inbox.inbox.items;
-  const stopAllowed = allowed.onChange(() => {
-    void Promise.all(sync());
-    changed();
-  });
-  await Promise.all(sync());
-  answered = true;
-  const needs = current();
-  last = JSON.stringify(needs);
   return {
-    needs,
-    stop: () => {
-      stopAllowed();
-      inbox.stop();
-      for (const [dir, entry] of observed) drop(dir, entry);
+    watch(listener) {
+      running ??= start();
+      listeners.add(listener);
+      return { needs: current(), stop: () => void listeners.delete(listener) };
+    },
+    ready: () => running?.ready() ?? Promise.resolve(),
+    close() {
+      // Kept, so `ready` still waits for a project watch that was starting: it stops itself when it has.
+      running?.close();
+      running ??= { ready: () => Promise.resolve(), close: () => {} };
+      listeners.clear();
     },
   };
 }

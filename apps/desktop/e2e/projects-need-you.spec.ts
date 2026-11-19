@@ -56,7 +56,12 @@ test("another project's waiting agent and draft to review show on the switcher a
     await composer(page).press("Enter");
     await expect(page.getByRole("log", { name: "Chat" }).getByRole("group", { name: "Approve Bash" })).toBeVisible();
 
-    // AC3: the current project's own waiting agent and review show no dot.
+    // AC3: the current project's own waiting agent and review show no dot, once its needs have landed in the menu.
+    const busyItem = projectMenu(page).getByRole("menuitemradio", { name: new RegExp(`^${busyName}`) });
+    await switcher(page).click();
+    await expect(busyItem).toHaveAccessibleName(`${busyName}, 1 agent waiting, to review`);
+    await page.keyboard.press("Escape");
+    await expect(projectMenu(page)).toHaveCount(0);
     await expect(switcher(page)).toHaveAccessibleName(`Switch project: ${busyName}`);
     await expect(dot(page)).toHaveCount(0);
 
@@ -69,7 +74,6 @@ test("another project's waiting agent and draft to review show on the switcher a
 
     // AC1, AC2, AC5: the menu shows the busy project's one waiting agent and its review mark; the quiet one has none.
     await switcher(page).click();
-    const busyItem = projectMenu(page).getByRole("menuitemradio", { name: new RegExp(`^${busyName}`) });
     const quietItem = projectMenu(page).getByRole("menuitemradio", { name: new RegExp(`^${quietName}`) });
     await expect(busyItem).toHaveAccessibleName(`${busyName}, 1 agent waiting, to review`);
     await expect(quietItem).toHaveAccessibleName(quietName);

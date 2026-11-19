@@ -25,7 +25,12 @@ export function needsMarks(needs: ProjectNeeds | undefined): MenuMark[] {
   if (!needs) return [];
   const marks: MenuMark[] = [];
   if (needs.waiting > 0)
-    marks.push({ id: "waiting", text: String(needs.waiting), spoken: `, ${NEEDS_COPY.waiting(needs.waiting)}` });
+    marks.push({
+      id: "waiting",
+      text: String(needs.waiting),
+      spoken: `, ${NEEDS_COPY.waiting(needs.waiting)}`,
+      tip: NEEDS_COPY.waiting(needs.waiting),
+    });
   if (needs.review)
     marks.push({ id: "review", spoken: `, ${NEEDS_COPY.review}`, tip: NEEDS_COPY.reviewTip, quiet: true });
   return marks;

@@ -49,10 +49,16 @@ describe("STORY-66: needs.watch", () => {
         result: {
           projects: [
             { dir: a.main, waiting: 0, review: false },
-            { dir: b.main, waiting: 0, review: true },
+            { dir: b.main, waiting: 0, review: false },
           ],
         },
       });
+      // The answer comes at once; beta's review mark follows when its first scan lands.
+      const reviewed = await socket.next((f) => f.event === "needs.list" && f.watch === 1);
+      expect((reviewed.data as NeedsList).projects).toEqual([
+        { dir: a.main, waiting: 0, review: false },
+        { dir: b.main, waiting: 0, review: true },
+      ]);
 
       socket.send({ id: 2, method: "chat.start", params: { dir: a.main, role: "developer" } });
       const { id } = (await socket.next((f) => f.id === 2)).result as { id: string };

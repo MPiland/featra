@@ -3065,15 +3065,22 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   without a new rule.
 - **A review is the Work list's own review rows**: a feature an agent drafted (`review`) or a story waiting at
   Acceptance (`awaiting`), the same rows that get the Review badge and Accept in Work.
-- **One `needs.watch` for every open project, pushing `needs.list` on any change** (ADR 0041). The server composes it
-  from the Inbox hub and one shared folder watch per open project, following the project list. Folders match by
-  `projectKey`, so case differences don't split a project on Windows and macOS.
+- **One shared needs service behind `needs.watch`, pushing `needs.list` on any change** (ADR 0041). The first watch
+  starts it, and it runs until the server closes. It holds the Inbox hub and one shared folder watch per open project
+  through `watchProjects`, so a watch that fails is tried again at the next change of the project list. It answers at
+  once with the waiting counts; a project's review mark follows when its first scan lands. So a slow scan never holds
+  up the counts, and a reconnect causes no new scans. Folders match by `projectKey`, so case differences don't split a
+  project on Windows and macOS.
 - **The dot leaves out the current project**, which the user is already looking at. It sits on the switcher's avatar
   corner, and the switcher's name says what it means: "Switch project: website, another project needs you" or
   "…, 2 other projects need you".
-- **Menu marks:** the count is an accent pill like the sidebar's Inbox count. The review mark is a hollow ring after it,
-  with the tooltip "To review". Both are hidden from screen readers, which hear the item as "docs, 1 agent waiting, to
-  review" instead.
+- **With no current project, the dot shows when any open project needs the user**, since every one of them is
+  another project. The needs are watched whether or not a project is current.
+- **Menu marks:** the count uses the sidebar Inbox count's style (`.nav-count`), with the tooltip "1 agent waiting" or
+  "2 agents waiting". The review mark is a hollow ring after it, with the tooltip "To review". Both are hidden from
+  screen readers. Instead, the item's `aria-label` gives its whole name in one piece: "docs, 1 agent waiting, to
+  review". The first build put the spoken words in visually hidden text, and Chromium joined it to the label with a
+  space ("docs , 1 agent waiting"), which jsdom didn't. CI's e2e caught it, and a unit test now checks the label.
 - **Code moves to keep files under 300 lines:** `MenuList` out of `MenuButton.tsx`, `useWindowSync` out of `App.tsx`,
   and the project setup messages out of `protocol.ts` into `protocol-setup.ts`. Behavior is unchanged.
 - **Tests:** rules in work-format, the watch against the real server, Inbox hub and scanner, and the switcher through

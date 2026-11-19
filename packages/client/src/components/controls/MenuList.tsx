@@ -16,20 +16,26 @@ export interface MenuListProps {
 
 const ITEM_ROLES = { item: "menuitem", check: "menuitemcheckbox", radio: "menuitemradio" } as const;
 
-/** An item's marks: drawn after its label, and heard after it as their spoken words. */
+/** An item's marks, drawn after its label; screen readers hear them in the item's name instead (`markedName`). */
 function Marks({ marks }: { marks: readonly MenuMark[] }) {
   if (!marks.length) return null;
   return (
-    <span className="mmarks">
+    <span className="mmarks" aria-hidden="true">
       {marks.map((m) => (
         <span key={m.id} className={m.quiet ? "mmark quiet" : "mmark"} title={m.tip} aria-hidden="true">
           {m.text}
         </span>
       ))}
-      <span className="sr-only">{marks.map((m) => m.spoken).join("")}</span>
     </span>
   );
 }
+
+/**
+ * The name of an item with marks: its label, then their spoken words, in one piece. Text in the item would be joined by
+ * the browser, which can put a space before the comma.
+ */
+const markedName = (label: string, marks: readonly MenuMark[] | undefined) =>
+  marks?.length ? label + marks.map((m) => m.spoken).join("") : undefined;
 
 /** One level of a MenuButton's menu, with the submenu open under it, if any. */
 export function MenuList(p: MenuListProps) {
@@ -89,6 +95,7 @@ export function MenuList(p: MenuListProps) {
               type="button"
               role={ITEM_ROLES[node.kind]}
               aria-checked={node.kind === "item" ? undefined : node.checked}
+              aria-label={node.kind === "radio" ? markedName(node.label, node.marks) : undefined}
               aria-disabled={node.kind === "item" && node.disabled ? true : undefined}
               className="mi"
               tabIndex={-1}
