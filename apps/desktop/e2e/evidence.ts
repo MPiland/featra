@@ -119,7 +119,9 @@ async function keepEvidence(
       () => name(info, trace),
       () => undefined,
     );
-  await keepLogs(info, userData, n);
+  // An app launched without a profile folder of its own (userData "") keeps its log where Electron put it.
+  const logsIn = userData || (await app.evaluate(({ app: a }) => a.getPath("userData")).catch(() => ""));
+  if (logsIn) await keepLogs(info, logsIn, n);
 }
 
 /** Ends a process and, on Windows, the processes it started (Electron's GPU, renderer and utility processes). */

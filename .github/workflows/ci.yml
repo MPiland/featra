@@ -24,6 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
+      # The login shells the installed app reads the PATH from (STORY-64), so their tests run rather than skip.
+      - name: Install the login shells
+        run: sudo apt-get update -q && sudo apt-get install -yq --no-install-recommends zsh fish tcsh csh
       - name: Format, lint, typecheck and unit tests
         run: pnpm check
         env:
@@ -160,4 +163,141 @@ jobs:
           name: ux-screens-macos
           path: apps/desktop/test-results/ux
           retention-days: 7
+          if-no-files-found: ignore
+
+  # The installers (STORY-64, ADR 0040): each job builds its platform's installer with `pnpm package`, installs it as a
+  # tester would and launches the installed app (apps/desktop/e2e/installed), and uploads the installer. Not required
+  # checks (decisions.md, 2026-11-18).
+  package-windows:
+    name: Package (Windows)
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          e2e: "true"
+      - name: Build the installer
+        shell: bash
+        run: pnpm package
+      - name: Install it and launch the installed app
+        shell: bash
+        run: pnpm test:installed
+        env:
+          FEATRA_JUNIT: test-report/package-windows.xml
+      - name: Upload the installer
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-windows
+          path: apps/desktop/out/installers/*-setup.exe
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload the smoke test report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-package-windows
+          path: test-report
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload screenshots and traces of failed tests
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-windows-traces
+          path: apps/desktop/test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+  package-ubuntu:
+    name: Package (Ubuntu)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      # CI has no FUSE to mount the AppImage: it unpacks itself and runs.
+      APPIMAGE_EXTRACT_AND_RUN: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          e2e: "true"
+      - name: Build the installer
+        run: pnpm package
+      - name: Install it and launch the installed app under Xvfb and Openbox
+        run: tooling/e2e/xvfb.sh pnpm test:installed
+        env:
+          FEATRA_JUNIT: test-report/package-ubuntu.xml
+      - name: Upload the installer
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-ubuntu
+          path: apps/desktop/out/installers/*.AppImage
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload the smoke test report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-package-ubuntu
+          path: test-report
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload screenshots and traces of failed tests
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-ubuntu-traces
+          path: apps/desktop/test-results
+          retention-days: 14
+          if-no-files-found: ignore
+
+  package-macos:
+    name: Package (macOS)
+    # Apple silicon (arm64); Rosetta runs the app's Intel half.
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          e2e: "true"
+      - name: Install Rosetta
+        run: /usr/bin/pgrep -q oahd || softwareupdate --install-rosetta --agree-to-license
+      - name: Build the installer
+        run: pnpm package
+        env:
+          # electron-builder skips signing a PR's build; the ad-hoc signature has no secret, and Apple silicon runs
+          # only signed code.
+          CSC_FOR_PULL_REQUEST: "true"
+      - name: Install it and launch the installed app
+        run: pnpm test:installed
+        env:
+          FEATRA_JUNIT: test-report/package-macos.xml
+      - name: Upload the installer
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: installer-macos
+          path: |
+            apps/desktop/out/installers/*.dmg
+            apps/desktop/out/installers/*.zip
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload the smoke test report
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-package-macos
+          path: test-report
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Upload screenshots and traces of failed tests
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-macos-traces
+          path: apps/desktop/test-results
+          retention-days: 14
           if-no-files-found: ignore

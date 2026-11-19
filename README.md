@@ -35,7 +35,12 @@ pnpm install
 pnpm start        # build the client and desktop app, then launch Featra
 pnpm test         # unit tests, then the Electron end-to-end tests
 pnpm typecheck
+pnpm package      # build the installer for this platform into apps/desktop/out/installers
 ```
+
+`pnpm package` builds a Windows x64 setup, a universal macOS DMG and zip, or a Linux x64 AppImage, named with the
+version and architecture (ADR 0040). None is signed with a developer identity yet. CI builds, installs and launches
+each one on every pull request. The installed app keeps its data in a `Featra` folder, apart from a source run's.
 
 `pnpm dev:client` serves the UI in a browser with hot reload, for quick UI work. Electron loads that server instead of the
 built client when `FEATRA_CLIENT_URL=http://localhost:5174` is set. The first Electron launch downloads its binary.

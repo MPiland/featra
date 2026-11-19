@@ -32,6 +32,22 @@ The options were:
 - **PR builds:** CI builds and uploads each platform's installer on every PR. These jobs aren't required checks at
   first.
 
+## Amendment (STORY-64, 2026-11-18)
+
+Building it changed the package layout:
+
+- **No asar archive at all.** The server and the MCP run as their own processes from `dist/`, and the Agent SDK is
+  imported from `node_modules`. All would have to be unpacked, leaving only the client in the archive.
+- **The staged `package.json` declares no dependencies.** `pnpm package` copies the Agent SDK, and what it needs at run
+  time, from the workspace's installed packages into the staged `node_modules`, at the lockfile's versions and without
+  a network install. Its optional dependencies are left out: they are Claude Code's own binaries, one per platform,
+  and Featra runs the user's `claude`.
+- **The client is staged at `client/`**, and the installed app loads it from there.
+- **The installed app keeps its data in a `Featra` folder** (the staged package is named for the product). A source
+  run keeps `@featra/desktop`, so both can run side by side.
+- **The installed app reads the login shell's PATH on macOS and Linux**, since Finder, the Dock and a desktop menu
+  don't give it the terminal's. If the shell fails or takes over 5 seconds, it adds the usual folders instead.
+
 ## Consequences
 
 - One packaging config, kept beside the desktop app. Signing later adds identities to it rather than a new tool.

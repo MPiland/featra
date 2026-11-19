@@ -3,6 +3,9 @@ packages:
   - "apps/*"
   - "spikes/*"
   - "tooling"
+# electron-builder depends on Squirrel.Windows' installer maker, which Featra doesn't use (it ships NSIS, ADR 0040).
+allowBuilds:
+  electron-winstaller: false
 # Hold back releases younger than pnpm's minimumReleaseAge instead of excluding them from the check.
 overrides:
   vite: 8.3.5

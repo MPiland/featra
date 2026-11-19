@@ -118,6 +118,9 @@ epics in `.featra/cards/`.
 - **macOS minimize and restore in e2e.** STORY-63 skips the minimize/restore journey on macOS; cover the native
   traffic lights' minimize and a Dock restore there.
 - More installer formats after the first installers (FEAT-19): deb and rpm on Linux, and arm64 builds for Windows and Linux.
+- **A direct `claude` driver.** The installers bundle Anthropic's Agent SDK under Anthropic's terms, as T3 Code does
+  (decisions.md, STORY-64). If Anthropic objects, replace the SDK with Featra's own driver that runs `claude` in its
+  stream-json mode, behind the same provider adapter, so no Anthropic code ships.
 
 ## Before public release
 

@@ -13,14 +13,15 @@ happen locally in WSL under Xvfb.
 | `pnpm check`                    | Format, lint, typecheck and unit tests      | Anywhere; the pre-commit hook runs it |
 | `pnpm test:e2e:wsl [args]`      | The e2e suite on Linux under Xvfb + Openbox | WSL (Ubuntu), from Windows            |
 | `tooling/e2e/xvfb.sh <command>` | Any command on a private Xvfb display       | Linux: CI, WSL, a Linux machine       |
-| CI workflow (every PR)          | Gate, Windows, Ubuntu and macOS e2e         | GitHub Actions                        |
+| CI workflow (every PR)          | Gate, e2e and package jobs on each platform | GitHub Actions                        |
 | Soak workflow (on demand)       | One spec repeated until it fails            | GitHub Actions                        |
 
-Don't run `pnpm test:e2e` on a Windows desktop someone is using.
+Don't run `pnpm test:e2e` on a Windows desktop someone is using. `pnpm test:installed`, the installed app's smoke
+test, runs only in CI: it installs Featra on the machine it runs on.
 
 ## CI on every pull request
 
-`.github/workflows/ci.yml` runs four jobs on every pull request and on each push to main:
+`.github/workflows/ci.yml` runs seven jobs on every pull request and on each push to main:
 
 - **Gate**: `pnpm check` on Ubuntu.
 - **E2E (Windows)**: `pnpm test:e2e` on GitHub's Windows runner, including the foreground tests (tray, window state,
@@ -31,14 +32,22 @@ Don't run `pnpm test:e2e` on a Windows desktop someone is using.
 - **E2E (macOS)**: `pnpm test:e2e` on GitHub's Apple silicon macOS runner (`macos-15`). The platform tests there assert
   macOS's own behaviour: the app menu, no menu bar icon, and closing the last window keeps Featra in the Dock until the
   Dock icon shows it again (STORY-63).
+- **Package (Windows)**, **Package (Ubuntu)** and **Package (macOS)**: `pnpm package` builds the platform's installer
+  (ADR 0040), then `pnpm test:installed` installs it as a tester would and launches the installed app, never
+  `electron .` (STORY-64). Windows runs the NSIS installer silently and opens Featra from its Start menu shortcut.
+  macOS copies Featra.app out of the DMG and also checks both architectures and the ad-hoc signature, running the Intel
+  half under Rosetta. Ubuntu runs the AppImage with `APPIMAGE_EXTRACT_AND_RUN=1`, since the runner has no FUSE. Each
+  uploads its installer as `installer-windows`, `installer-ubuntu` or `installer-macos`, and its report as
+  `test-report-package-<platform>`. A failed run's traces are in `package-<platform>-traces`.
 
 Each e2e job also writes a JUnit report and uploads it as `test-report-e2e-windows`, `test-report-e2e-ubuntu` or
 `test-report-e2e-macos`, beside the Gate's `test-report-unit`. Featra reads every `test-report-*` artifact of a run
 together to prove criteria, and a test that failed on any platform isn't proven (ADR 0033).
 
-Branch protection on main requires Gate, E2E (Windows) and E2E (Ubuntu), plus the user's Accept. Add **E2E (macOS)**
-to main's required checks once it passes on main (decisions.md, 2026-11-18). The check names are the job names.
-Renaming a job means updating branch protection with it.
+Branch protection on main requires Gate, E2E (Windows) and E2E (Ubuntu), plus the user's Accept. The package jobs
+aren't required checks (decisions.md, 2026-11-18). Add **E2E (macOS)** to main's required checks once it passes on
+main (decisions.md, 2026-11-18). The check names are the job names. Renaming a job means updating branch protection
+with it.
 
 ## When a test fails
 
