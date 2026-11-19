@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { APP_ID, builderConfig, icons, installerFiles, PRODUCT_NAME } from "../packaging/config.ts";
 import { RUNTIME_PACKAGES } from "../packaging/runtime-packages.ts";
 import { stageApp } from "../packaging/stage.ts";
+import { parseVersion } from "../../../tooling/release/version.ts";
 import { clientIndex } from "../src/client-path.ts";
 import { ASSETS, builtApp, DESKTOP } from "./staged-app.ts";
 
@@ -21,17 +22,18 @@ const desktopManifest = JSON.parse(readFileSync(join(DESKTOP, "package.json"), "
 const config = builderConfig({ app: "/stage", output: "/out", assets: ASSETS, electronVersion: "45.2.2" });
 
 /** electron-builder's file name macros, filled in as it does. */
-const named = (pattern: string | null | undefined, arch: string, ext: string) =>
+const named = (pattern: string | null | undefined, arch: string, ext: string, version = desktopManifest.version) =>
   (pattern ?? "")
     .replaceAll("${productName}", PRODUCT_NAME)
-    .replaceAll("${version}", desktopManifest.version)
+    .replaceAll("${version}", version)
     .replaceAll("${arch}", arch)
     .replaceAll("${ext}", ext);
 
 describe("the installers pnpm package builds (STORY-64)", () => {
   it("are named with the app's version and architecture, on each platform", () => {
     const v = desktopManifest.version;
-    expect(v).toMatch(/^\d+\.\d+\.\d+$/);
+    // Any SemVer version, release candidates included (the user's call, 2026-11-19); anything else fails.
+    expect(parseVersion(v)).not.toBeNull();
     expect(installerFiles("win32", v)).toEqual([`Featra-${v}-x64-setup.exe`]);
     expect(installerFiles("darwin", v)).toEqual([`Featra-${v}-universal.dmg`, `Featra-${v}-universal.zip`]);
     expect(installerFiles("linux", v)).toEqual([`Featra-${v}-x64.AppImage`]);
@@ -42,6 +44,26 @@ describe("the installers pnpm package builds (STORY-64)", () => {
       named(config.mac?.artifactName, "universal", "zip"),
     ]).toEqual(installerFiles("darwin", v));
     expect([named(config.appImage?.artifactName, "x64", "AppImage")]).toEqual(installerFiles("linux", v));
+  });
+
+  it("are named with a release candidate's full version, on each platform", () => {
+    const rc = "0.1.0-rc.1";
+    expect(installerFiles("win32", rc)).toEqual(["Featra-0.1.0-rc.1-x64-setup.exe"]);
+    expect(installerFiles("darwin", rc)).toEqual([
+      "Featra-0.1.0-rc.1-universal.dmg",
+      "Featra-0.1.0-rc.1-universal.zip",
+    ]);
+    expect(installerFiles("linux", rc)).toEqual(["Featra-0.1.0-rc.1-x64.AppImage"]);
+    expect([named(config.nsis?.artifactName, "x64", "exe", rc)]).toEqual(installerFiles("win32", rc));
+    expect([
+      named(config.dmg?.artifactName, "universal", "dmg", rc),
+      named(config.mac?.artifactName, "universal", "zip", rc),
+    ]).toEqual(installerFiles("darwin", rc));
+    expect([named(config.appImage?.artifactName, "x64", "AppImage", rc)]).toEqual(installerFiles("linux", rc));
+  });
+
+  it("refuse an app version that isn't SemVer", () => {
+    for (const bad of ["0.1", "v0.1.0", "0.1.0-", "0.1.0-rc..1", "01.1.0"]) expect(parseVersion(bad)).toBeNull();
   });
 
   it("are a Windows x64 NSIS per-user installer, a universal macOS DMG and zip, and a Linux x64 AppImage", () => {

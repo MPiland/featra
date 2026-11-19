@@ -3022,6 +3022,11 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   pre-release part; it is not GitHub's pre-release flag, which every 0.x release also carries.
 - **Pre-release tags are allowed** (`v0.1.0-rc.1`): the version is SemVer, and a release candidate lets the
   pipeline be tested without spending a version.
+- **The app's version may be any SemVer version, release candidates included (the user's call, 2026-11-19).** STORY-64's
+  installer-name test asserted a plain `X.Y.Z`, which blocked bumping to `0.1.0-rc.1`. It now checks the version with
+  the release tooling's own parser (`parseVersion`), so it is still strict for anything that isn't SemVer, and a test
+  checks the installers are named with an rc's full version (`Featra-0.1.0-rc.1-x64-setup.exe`). Reason: the first
+  release is an rc, to test the pipeline end to end without spending 0.1.0.
 - **Notes from merge commits** since the highest earlier release tag (`tooling/release/notes.ts`), not the GitHub API,
   so dry runs write them too and they're tested against a real git repo. Each PR is listed once, by its title. The
   notes have an "Unsigned build" section linking `docs/install.md` at the tag.
