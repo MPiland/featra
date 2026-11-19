@@ -102,6 +102,8 @@ test("the installed app opens a project, starts its local server, and chats with
       await send(first.page, "decide where entries go");
       await expect(chatLog(first.page).getByText("Logged to decisions.md", { exact: true })).toBeVisible();
       expect(await readFile(join(project.dir, "decisions.md"), "utf8")).toContain("Keep entries in the working folder");
+      // The turn ends before the next message is sent.
+      await expect(chatLog(first.page)).toContainText("Tool said: Logged to decisions.md.");
       await send(first.page, "hello");
       await expect(chatLog(first.page)).toContainText("You said: hello");
       expect(await queries(agentLog)).toEqual(startedWith(bin.claude));
