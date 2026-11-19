@@ -48,6 +48,29 @@ Building it changed the package layout:
 - **The installed app reads the login shell's PATH on macOS and Linux**, since Finder, the Dock and a desktop menu
   don't give it the terminal's. If the shell fails or takes over 5 seconds, it adds the usual folders instead.
 
+## Amendment (STORY-65, 2026-11-18)
+
+Building the release workflow settled its shape:
+
+- **One set of package jobs.** The three package jobs live in a reusable workflow, `package.yml`, called by CI and by
+  `release.yml`. A release builds and smoke-tests exactly what every PR does. Their checks show as
+  "Installers / Package (Windows)".
+- **Four jobs in order: Plan, Installers, Notes and checksums, Publish.** Plan checks the tag against the version
+  before anything is built. Publish needs every earlier job, runs only for a pushed tag, and is the only job with
+  write access to the repo.
+- **Tags are `v` and the SemVer version, pre-release parts allowed** (`v0.2.0-rc.1`), so a release candidate can be
+  tested without using up a version. 0.x versions and versions with a pre-release part publish as pre-releases; from
+  1.0.0 a release is marked latest.
+- **Notes come from git, not the GitHub API.** The notes job lists the merge commits since the highest earlier
+  release tag, one line per pull request, so a dry run writes the same notes as a release. The notes say the build is
+  unsigned and link the install guide at the tag.
+- **Checksums** are SHA-256, listed in the notes and attached as `SHA256SUMS.txt` in `sha256sum` format.
+- **Dry runs:** any run that isn't a pushed tag publishes nothing. Besides a manual run, a pull request that changes
+  the release workflow or `tooling/release/` dry-runs it, since GitHub only offers manual runs for workflows on the
+  default branch.
+- **The app shows its version under Settings**, from `app.getVersion()`, the version the installer and the release
+  are named with.
+
 ## Consequences
 
 - One packaging config, kept beside the desktop app. Signing later adds identities to it rather than a new tool.

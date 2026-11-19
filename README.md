@@ -23,6 +23,18 @@ delegates them to sub-sessions in their own git worktrees, and Featra shows you 
 Early development. See the [M1 backlog](.featra/) (Featra tracks its own work in Featra's card format) and the
 [architecture decisions](docs/adr/).
 
+## Install
+
+Download Featra for Windows, macOS or Linux from the [Releases page](https://github.com/MPiland/featra/releases):
+
+- Windows: `Featra-<version>-x64-setup.exe`
+- macOS (Apple silicon and Intel): `Featra-<version>-universal.dmg`
+- Linux: `Featra-<version>-x64.AppImage`
+
+The installers aren't signed yet, so Windows and macOS warn the first time Featra opens.
+[docs/install.md](docs/install.md) shows how to open it on each platform, and what Featra needs: `git`, `gh` and
+`claude`. Releases are cut from a version tag ([docs/releasing.md](docs/releasing.md)).
+
 ## Development
 
 Requires Node 24+ and pnpm.

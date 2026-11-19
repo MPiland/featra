@@ -191,9 +191,11 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     bridge.window.setTheme(theme);
   }, [bridge, theme]);
 
+  // About and Settings show the version (STORY-65).
+  const showsInfo = dialog === "about" || view.id === "settings";
   useEffect(() => {
-    if (dialog === "about" && !info) void bridge.app.info().then(setInfo);
-  }, [bridge, dialog, info]);
+    if (showsInfo && !info) void bridge.app.info().then(setInfo);
+  }, [bridge, showsInfo, info]);
 
   useShortcuts(bridge.platform, actions);
 
@@ -261,6 +263,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
                 onAppChange={changeAppSettings}
                 shortcuts={shortcuts}
                 onSetUp={reopenSetup}
+                version={info?.version}
               />
             ) : view.id === "work" ? (
               <WorkView

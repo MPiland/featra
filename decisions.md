@@ -2996,3 +2996,27 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **One app id** (`APP_ID` in `app-name.ts`), used by the installers and the Windows AppUserModelID.
 - `electron-builder` pulls in `electron-winstaller` (Squirrel.Windows); its build script is denied in
   `pnpm-workspace.yaml`, since Featra ships NSIS.
+
+## 2026-11-18 — STORY-65: releases from a version tag (dev)
+
+- **`package.yml` is a reusable workflow** holding STORY-64's three package jobs, moved from `ci.yml` unchanged. CI
+  calls it as the `Installers` job, so its checks are now "Installers / Package (Windows|Ubuntu|macOS)"; they are still
+  not required. `release.yml` calls the same file, so a release builds and smoke-tests what every PR does.
+- **`release.yml`: Plan, Installers, Notes and checksums, Publish.** Plan (`tooling/release/plan.ts`) fails a tag that
+  doesn't match `apps/desktop/package.json`, naming both versions, before anything is built. Publish
+  (`tooling/release/publish.ts`) needs every job, runs only on a pushed tag, and alone has `contents: write`. It runs
+  `gh release create --verify-tag`, with `--prerelease` for 0.x or a pre-release part, else `--latest`.
+- **Pre-release tags are allowed** (`v0.1.0-rc.1`): the version is SemVer, and a release candidate lets the
+  pipeline be tested without spending a version.
+- **Notes from merge commits** since the highest earlier release tag (`tooling/release/notes.ts`), not the GitHub API,
+  so dry runs write them too and they're tested against a real git repo. Each PR is listed once, by its title. The
+  notes have an "Unsigned build" section linking `docs/install.md` at the tag.
+- **SHA-256 checksums** in the notes and in `SHA256SUMS.txt`, sorted by file name, in `sha256sum -c` format.
+- **Dry runs:** a manual run, or a PR touching `release.yml`, `package.yml` or `tooling/release/`. They upload the
+  notes and checksums as the `release-notes` artifact. Manual runs only work once `release.yml` is on main.
+- **The version shows at the foot of the Settings nav** ("Version 0.1.0", shared with About via `versionText`),
+  read from `app:info`, i.e. `app.getVersion()`. The installed smoke test checks it equals the version the installer is
+  named with.
+- **Docs:** README Install section, `docs/install.md` (first launch per platform, the tools, checksums) and
+  `docs/releasing.md` (bump in a PR, tag main, push). A test checks the docs name the installers `pnpm package` builds.
+- ADR 0040 amended.
