@@ -2,7 +2,7 @@
 id: STORY-67
 type: story
 title: A badge on the taskbar and Dock
-status: In Progress
+status: In Review
 parent: FEAT-20
 order: 2
 origin: added
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-67-badge
-pr: null
+pr: "79"
 created: 2026-11-18T23:30:00Z
 history:
   - at: 2026-11-18T23:30:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: dev
+  - at: 2026-11-20T00:43:39Z
+    field: status
+    from: In Progress
+    to: In Review
     by: dev
 ---
 
@@ -42,7 +47,7 @@ As a builder working in another app, I see on Featra's taskbar button or Dock ic
 
 - [x] Desktop: the badge from the server's total (macOS `app.dock.setBadge`, Windows taskbar overlay icon with an accessible description, Linux `setBadgeCount`)
 - [x] Unit tests for the count and the platform calls; a journey per platform on CI; tests linked on the criteria
-- [ ] Decisions recorded for the Dev Lead; move to In Review
+- [x] Decisions recorded for the Dev Lead; move to In Review
 
 ## Depends on
 
