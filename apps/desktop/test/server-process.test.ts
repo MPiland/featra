@@ -96,6 +96,23 @@ describe("the server child process", () => {
     expect(logged.slice(before)).toEqual([]);
   });
 
+  it("tells main how many agents wait on the user, 0 at the start, and 0 again once it stops (STORY-67)", async () => {
+    const counts: number[] = [];
+    const counted = createServerProcess({
+      script: SERVER_SOURCE,
+      execPath: process.execPath,
+      log: () => {},
+      waiting: (count) => counts.push(count),
+    });
+    try {
+      await counted.setProjects([await folder(true)]);
+      await expect.poll(() => counts).toEqual([0]);
+    } finally {
+      await counted.stop();
+    }
+    expect(counts).toEqual([0, 0]);
+  });
+
   it("refuses a client with an old token, and a stopped server comes back on next use", async () => {
     const dir = await folder(true);
     await server.setProjects([dir]);

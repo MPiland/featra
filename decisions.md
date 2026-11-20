@@ -3086,3 +3086,30 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **Tests:** rules in work-format, the watch against the real server, Inbox hub and scanner, and the switcher through
   the real App with only the socket faked. One e2e journey covers two projects, with screens
   `feat20-switcher-dot` and `feat20-switcher-menu-marks`.
+
+## 2026-11-19 — STORY-67: a badge on the taskbar and Dock (dev)
+
+- **The server tells main the total, over the host channel, not the page.** The server watches the STORY-66 needs
+  service with `watchWaitingTotal` and sends `{ type: "waiting", count }` on Node's IPC channel to the host (ADR 0015's
+  host messages) at start and on each change. Main's badge renders it. The page doesn't relay it: the badge stays right
+  while the window is hidden in the tray or reloading, there is one source for the count, and main reads nothing from
+  the untrusted page. No new ADR: it is one more host message on the existing channel, the use ADR 0041 planned for.
+- **The count is `waitingTotal`**, the sum of the switcher's per-project `waiting` across the open projects, in
+  work-format beside the STORY-66 rules. An agent is in one project, so the sum counts each agent once; an agent of a
+  closed project isn't counted, as in the switcher. Reviews are left out.
+- **The needs service now starts with the server**, not at the page's first watch, since the badge watches it from the
+  start. The page watched it at once anyway, so nothing else changes.
+- **A server that exits takes its count to 0** on the host: its agents went with it, and a restarted server reports
+  its own.
+- **macOS:** `app.dock.setBadge` with the whole number, "" at 0. **Windows:** `setOverlayIcon` on the main window with
+  an overlay drawn in code (a red disc, Windows' critical red `#C42B1C`, with white 5 × 7 digits; 32 px at scale 2, so
+  16 points), the number up to 9 and "9+" past it, and the description "1 agent waiting" / "12 agents waiting"
+  (the switcher's `NEEDS_COPY`), cleared with `null` and "". A hidden window loses its taskbar button, so the overlay is
+  set again when the window shows. **Linux:** `app.setBadgeCount`, which only Unity-launcher desktops show; where it
+  returns false, Featra logs "This desktop shows no count on the app's icon" once and keeps setting it.
+- **The OS is called only when the count changes**, and not at all while it stays 0 from the start.
+- **Tests:** the total in work-format; the watch against the real needs service, Inbox hub and scanner; the badge's
+  calls per OS with only the Electron calls faked; the overlay read pixel by pixel; main's real server process reporting
+  its count. One e2e journey across two projects runs on all three OSes. It reads macOS's Dock badge back from the Dock;
+  Windows' overlay and Linux's count can't be read back, so it reads the calls Featra made (`featraTest.badge`), with
+  the overlay as Electron took it (16 × 16, not empty).

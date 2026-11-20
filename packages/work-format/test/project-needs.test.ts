@@ -12,6 +12,7 @@ import {
   othersNeedingYou,
   recordAcceptance,
   waitingAgents,
+  waitingTotal,
   type Card,
   type InboxItem,
   type InboxRequest,
@@ -134,5 +135,25 @@ describe("normalizeNeeds", () => {
       ],
     });
     expect(normalizeNeeds(null)).toEqual(EMPTY_NEEDS);
+  });
+});
+
+/** Needs of projects with these waiting counts and review marks. */
+const list = (...projects: [number, boolean][]): NeedsList => ({
+  projects: projects.map(([waiting, review], i) => ({ dir: `/p${i}`, waiting, review })),
+});
+
+describe("STORY-67 AC1, AC3, AC4: waitingTotal is the badge's number, the switcher's counts summed across projects", () => {
+  it("adds every open project's waiting agents", () => {
+    expect(waitingTotal(list([1, false], [2, false], [0, false]))).toBe(3);
+  });
+
+  it("is 0 with nothing waiting or no project open", () => {
+    expect(waitingTotal(list([0, false], [0, false]))).toBe(0);
+    expect(waitingTotal(EMPTY_NEEDS)).toBe(0);
+  });
+
+  it("leaves reviews out: a project with only work to review adds nothing", () => {
+    expect(waitingTotal(list([0, true], [2, true]))).toBe(2);
   });
 });

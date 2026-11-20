@@ -2,7 +2,8 @@
  * Messages between the desktop host and the server child process, over Node's IPC channel (not the WebSocket).
  * The host starts the server with the token, keeps its list of open projects current and says when the app's settings
  * are saved; the server says where it
- * listens, acknowledges each list and forwards failures for the host's log.
+ * listens, acknowledges each list, forwards failures for the host's log and tells how many agents wait on the user
+ * across the open projects, for the taskbar and Dock badge (STORY-67).
  */
 import { isRecord } from "@featra/work-format";
 
@@ -16,7 +17,8 @@ export type ServerMessage =
   | { type: "listening"; port: number }
   | { type: "projects-ack"; seq: number }
   | { type: "log"; message: string }
-  | { type: "failed"; error: string };
+  | { type: "failed"; error: string }
+  | { type: "waiting"; count: number };
 
 const strings = (raw: unknown): raw is string[] => Array.isArray(raw) && raw.every((s) => typeof s === "string");
 
@@ -36,5 +38,8 @@ export function parseServerMessage(raw: unknown): ServerMessage | null {
   if (raw.type === "projects-ack" && typeof raw.seq === "number") return { type: "projects-ack", seq: raw.seq };
   if (raw.type === "log" && typeof raw.message === "string") return { type: "log", message: raw.message };
   if (raw.type === "failed" && typeof raw.error === "string") return { type: "failed", error: raw.error };
+  if (raw.type === "waiting" && typeof raw.count === "number" && Number.isSafeInteger(raw.count) && raw.count >= 0) {
+    return { type: "waiting", count: raw.count };
+  }
   return null;
 }

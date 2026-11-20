@@ -9,6 +9,7 @@ import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog, type Log } from "./log.ts";
 import { readLoginPath, readsLoginPath } from "./login-path.ts";
 import { createNotifier } from "./notifier.ts";
+import { createOsBadge } from "./os-badge.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
 import { createServerProcess, startAfter } from "./server-process.ts";
@@ -70,6 +71,12 @@ if (!takeInstanceLock(app, userDataDir)) {
     fallbackLocation: app.getPath("documents"),
   });
   log.info(`Featra ${app.getVersion()} started (${process.platform})`);
+  let win: BrowserWindow | undefined;
+  // The taskbar and Dock badge: the agents waiting on the user across every open project, as the server counts them.
+  const badge = createOsBadge(
+    () => win,
+    (message) => log.info(message),
+  );
   // The local server makes every project write (ADR 0012, ADR 0015). It runs on Electron's own Node, with the PATH.
   const server = startAfter(
     takeLoginPath(log),
@@ -79,10 +86,10 @@ if (!takeInstanceLock(app, userDataDir)) {
       execPath: process.execPath,
       log: (message) => log.info(message),
       dataDir: app.getPath("userData"),
+      waiting: (count) => void app.whenReady().then(() => badge.show(count)),
     }),
   );
   const client = clientIndex({ appPath: app.getAppPath(), packaged: app.isPackaged });
-  let win: BrowserWindow | undefined;
   let tray: Tray | undefined;
 
   void app.whenReady().then(async () => {
@@ -211,7 +218,10 @@ if (!takeInstanceLock(app, userDataDir)) {
     nativeTheme.themeSource = appSettings.theme;
     win = createWindow(client);
     win.on("hide", () => log.info("Window hidden"));
-    win.on("show", () => log.info("Window shown"));
+    win.on("show", () => {
+      log.info("Window shown");
+      badge.refresh();
+    });
     lifecycle.manage(win);
     syncTray(win);
   });

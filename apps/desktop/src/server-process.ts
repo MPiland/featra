@@ -33,6 +33,11 @@ export interface ServerProcessDeps {
   dataDir?: string;
   /** The bundled Featra MCP (`dist/mcp.cjs`) the server gives agents; without it no agent gets the MCP (STORY-47). */
   mcpEntry?: string;
+  /**
+   * How many agents wait on the user across the open projects (STORY-67), each time the server says it changed. A
+   * server that stops takes its agents with it, so its count goes back to 0.
+   */
+  waiting?: (count: number) => void;
 }
 
 const START_TIMEOUT_MS = 15_000;
@@ -75,7 +80,14 @@ export function startAfter(ready: Promise<unknown>, server: ServerProcess): Serv
   };
 }
 
-export function createServerProcess({ script, execPath, log, dataDir, mcpEntry }: ServerProcessDeps): ServerProcess {
+export function createServerProcess({
+  script,
+  execPath,
+  log,
+  dataDir,
+  mcpEntry,
+  waiting = () => {},
+}: ServerProcessDeps): ServerProcess {
   let running: Running | null = null;
   let dirs: string[] = [];
   let seq = 0;
@@ -124,6 +136,8 @@ export function createServerProcess({ script, execPath, log, dataDir, mcpEntry }
             return;
           case "log":
             return say(`Server: ${message.message}`);
+          case "waiting":
+            return waiting(message.count);
           default:
             return message satisfies never;
         }
@@ -136,6 +150,7 @@ export function createServerProcess({ script, execPath, log, dataDir, mcpEntry }
         if (running?.child === child) running = null;
         for (const ack of acks.values()) ack(); // nothing to wait for: a new server gets the list when it starts
         acks.clear();
+        waiting(0);
         say(`Server stopped (${signal ?? `exit code ${code}`})`);
         done(null);
       });

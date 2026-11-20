@@ -33,6 +33,12 @@ export function waitingAgents(requests: Iterable<{ chat: string }>): number {
   return new Set([...requests].map((r) => r.chat)).size;
 }
 
+/**
+ * How many agents wait on the user across every open project: the taskbar and Dock badge (STORY-67). Each agent is in
+ * one project, so it is the sum of the switcher's counts. Reviews don't count.
+ */
+export const waitingTotal = (list: NeedsList): number => list.projects.reduce((sum, p) => sum + p.waiting, 0);
+
 /** Whether the Work list has something for the user to review: a drafted feature, or a story waiting for Accept. */
 export function hasReview(list: WorkList): boolean {
   const features = list.epics.flatMap((e) => e.features);
