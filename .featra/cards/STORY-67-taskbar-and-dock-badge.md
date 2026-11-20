@@ -2,7 +2,7 @@
 id: STORY-67
 type: story
 title: A badge on the taskbar and Dock
-status: In Review
+status: Done
 parent: FEAT-20
 order: 2
 origin: added
@@ -32,8 +32,18 @@ history:
     by: dev
   - at: 2026-11-20T03:40:00Z
     field: content
-    from: '{"criteria":["The Dock icon on macOS and the taskbar button on Windows show the number of waiting agents across all projects, the same count the switcher uses","On Linux, desktops that support a count show it","The badge clears when no agent is waiting, and updates live","Reviews don''t change the badge"]}'
+    from: "{\"criteria\":[\"The Dock icon on macOS and the taskbar button on Windows show the number of waiting agents across all projects, the same count the switcher uses\",\"On Linux, desktops that support a count show it\",\"The badge clears when no agent is waiting, and updates live\",\"Reviews don't change the badge\"]}"
     to: criteria
+    by: user
+  - at: 2026-11-20T13:56:14Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-20T13:56:14Z
+    field: status
+    from: In Review
+    to: Done
     by: user
 ---
 
@@ -55,6 +65,8 @@ As a builder working in another app, I see on Featra's taskbar button or Dock ic
 - [x] Unit tests for the count and the platform calls; a journey per platform on CI; tests linked on the criteria
 - [x] Tray: a red dot on the icon and the count in its tooltip while agents wait (added scope)
 - [x] Decisions recorded for the Dev Lead; move to In Review
+
+## Notes
 
 ## Depends on
 
