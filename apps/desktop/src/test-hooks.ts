@@ -20,8 +20,33 @@ export interface TestHooks {
   notifications: ShownNotification[];
   /** Whether Featra counts as focused, for the test to set; null leaves it to the window. */
   focused: boolean | null;
+  /** The taskbar and Dock badge as Featra last set it (STORY-67), by the OS call that set it. */
+  badge: BadgeRecord;
   tray?: Tray;
   trayMenu?: Menu;
+}
+
+/**
+ * The badge calls Featra made: the Dock text, the launcher count, and the taskbar overlay as Electron took it (its size
+ * in screen points, and whether the image is empty) with its description; null once cleared.
+ */
+export interface BadgeRecord {
+  /**
+   * Every call in order: the badge's (what it showed, "" for none) and the tray's (its tooltip, and whether the icon
+   * had the dot), and whether the window was on screen when it was made.
+   */
+  calls: BadgeCall[];
+  dock?: string;
+  launcher?: number;
+  overlay?: { label: string; description: string; width: number; height: number; empty: boolean } | null;
+}
+
+/** One badge call: on the taskbar, Dock or launcher (`badge`), or on the tray icon (`tray`, with `dot`). */
+export interface BadgeCall {
+  on: "badge" | "tray";
+  shows: string;
+  visible: boolean;
+  dot?: boolean;
 }
 
 /** A notification as the test sees it: what it said, and a way to click it. */
@@ -39,6 +64,7 @@ export const testHooks: TestHooks = {
   folderDialogs: [],
   notifications: [],
   focused: null,
+  badge: { calls: [] },
 };
 
 declare global {

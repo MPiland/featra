@@ -19,8 +19,8 @@ taskbar badge) and STORY-68 (an agent asks the user to do something) will build 
   without a new rule.
 - **One shared server service, `createProjectNeeds`, behind one watch method, `needs.watch`.** The method answers
   `{ projects: { dir, waiting, review }[] }` for every allowed project and pushes `needs.list` with the whole list when
-  any project's numbers change, until `work.unwatch`. The first watch starts the service, and it runs until the server
-  closes. It holds the Inbox hub's requests at wait 0 and one shared folder watch per open project, through
+  any project's numbers change, until `work.unwatch`. The service starts with the server, and it runs until the server
+  closes (amended for STORY-67, below). It holds the Inbox hub's requests at wait 0 and one shared folder watch per open project, through
   `watchProjects` like the story checks and PR watches. So a project is started and stopped with the project list, and
   one whose watch fails is tried again at the next change of the list. Requests match projects by `projectKey`, so a
   path in another case counts on case-insensitive file systems.
@@ -36,3 +36,10 @@ taskbar badge) and STORY-68 (an agent asks the user to do something) will build 
 - The first answer can show no review mark for a project that has one, for as long as its first scan takes.
 - Each open project keeps a folder watch while Featra runs, shared with the Work list when it is the current project.
 - STORY-67's badge can sum `waiting` from the same push; STORY-68's request counts once it is an Inbox request.
+
+## Amendment (2026-11-19, STORY-67)
+
+The taskbar and Dock badge needs the count while no page is open, so the server watches the service as it starts
+(`watchWaitingTotal`) and sends the total to the desktop host. The service no longer waits for the first page's watch:
+it starts with the server, and each open project keeps its folder watch from then on. The host's project list is
+deduped by `projectKey`, so a folder sent in two cases is one project and its agents count once.

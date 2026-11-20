@@ -29,7 +29,7 @@ import { createBugRequest } from "./bug-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
-import { createProjectNeeds } from "./project-needs.ts";
+import { createProjectNeeds, type ProjectNeeds } from "./project-needs.ts";
 import { createLogWriter } from "./log-writer.ts";
 import { createStoryHold } from "./story-hold.ts";
 import { readAppAutoMerge, readAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
@@ -72,6 +72,8 @@ export function createServices({
   api: Api;
   /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
   agents: AgentBridge;
+  /** What every open project needs from the user: the switcher's watch, and the host's badge (STORY-67). */
+  needs: ProjectNeeds;
   /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
   settingsChanged: () => void;
   close: () => Promise<void>;
@@ -229,7 +231,8 @@ export function createServices({
     chats.closeProjects(allowed.has);
     roleWatches.closeProjects(allowed.has);
   });
-  // What every open project needs from the user, for the project switcher (STORY-66); started by the first watch.
+  // What every open project needs from the user, for the project switcher (STORY-66) and the taskbar and Dock badge
+  // (STORY-67); started by the first watch.
   const needs = createProjectNeeds({ allowed, watches, chats, log });
   const api = createApi({
     git: createGit(gitCommand),
@@ -269,6 +272,7 @@ export function createServices({
   return {
     api,
     agents,
+    needs,
     settingsChanged: settingsChanges.saved,
     async close() {
       stopClosing();

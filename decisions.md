@@ -3086,3 +3086,47 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **Tests:** rules in work-format, the watch against the real server, Inbox hub and scanner, and the switcher through
   the real App with only the socket faked. One e2e journey covers two projects, with screens
   `feat20-switcher-dot` and `feat20-switcher-menu-marks`.
+
+## 2026-11-19 — STORY-67: a badge on the taskbar and Dock (dev)
+
+- **The server tells main the total, over the host channel, not the page.** The server watches the STORY-66 needs
+  service with `watchWaitingTotal` and sends `{ type: "waiting", count }` on Node's IPC channel to the host (ADR 0015's
+  host messages) at start and on each change. Main's badge renders it. The page doesn't relay it: the badge stays right
+  while the window is hidden in the tray or reloading, there is one source for the count, and main reads nothing from
+  the untrusted page. No new ADR: it is one more host message on the existing channel, the use ADR 0041 planned for.
+- **The count is `waitingTotal`**, the sum of the switcher's per-project `waiting` across the open projects, in
+  work-format beside the STORY-66 rules. An agent is in one project, so the sum counts each agent once; an agent of a
+  closed project isn't counted, as in the switcher. Reviews are left out.
+- **The needs service now starts with the server**, not at the page's first watch, since the badge watches it from the
+  start. The page watched it at once anyway, so nothing else changes.
+- **A server that exits takes its count to 0** on the host: its agents went with it, and a restarted server reports
+  its own.
+- **macOS:** `app.dock.setBadge` with the whole number, "" at 0. **Windows:** `setOverlayIcon` on the main window with
+  an overlay drawn in code (a red disc, Windows' critical red `#C42B1C`, with white 5 × 7 digits; 32 px at scale 2, so
+  16 points), the number up to 9 and "9+" past it, and the description "1 agent waiting" / "12 agents waiting"
+  (the switcher's `NEEDS_COPY`), cleared with `null` and "". A hidden window loses its taskbar button, so the overlay is
+  set again when the window shows. **Linux:** `app.setBadgeCount`, which only Unity-launcher desktops show; where it
+  returns false, Featra logs "This desktop shows no count on the app's icon" once and keeps setting it.
+- **The OS is called only when the count changes**, and not at all while it stays 0 from the start.
+- **Tests:** the total in work-format; the watch against the real needs service, Inbox hub and scanner; the badge's
+  calls per OS with only the Electron calls faked; the overlay read pixel by pixel; main's real server process reporting
+  its count. One e2e journey across two projects runs on all three OSes. It reads macOS's Dock badge back from the Dock;
+  Windows' overlay and Linux's count can't be read back, so it reads the calls Featra made (`featraTest.badge`), with
+  the overlay as Electron took it (16 × 16, not empty).
+- **Review fixes (Dev Lead review).** The overlay is set again on `show`, once more 200 ms later (Windows makes the
+  taskbar button after the window shows and drops an overlay set before it), and on `restore` and `focus`, all in one
+  helper, `keepBadgeOn`, which main attaches to every window it makes, the one re-created on `activate` too. The
+  journey hides to the tray, reveals, and checks main set the badge again with the current count while the window was
+  visible (`featraTest.badge.calls`). A stopped server's late messages and exit no longer reset the badge once a newer
+  server runs. The host's project list is deduped by `projectKey`, so a folder sent in two cases counts its agents once.
+  ADR 0041 is amended: the needs service starts with the server.
+- **The tray shows it too (AC5, scope the user added).** While agents wait, the tray icon gets a red dot in its
+  bottom-right corner (the badge's red, with a clear ring cut around it so it reads on a light or dark tray) and its
+  tooltip says how many, in the switcher's words ("2 agents waiting"); at 0 it is the plain icon and "Featra" again.
+  A dot, not a number: a 16-point tray icon has no room for digits, and the tooltip carries the count. The dotted icon
+  is drawn once in code over the tray icon's own high-DPI pixels (`withDot` in badge-image.ts), so no image ships per
+  state. `createTrayBadge` keeps the count, as the tray comes and goes with the Close button setting: a tray made while
+  agents wait gets it at once. **macOS has no tray** (Featra keeps running in the Dock there), and the
+  Dock's badge already shows the number, so nothing is added; `tray.setTitle` would mean a menu bar item Featra
+  doesn't have. The journey answers the last agent with the window hidden to the tray and reads the tray's calls from
+  `featraTest.badge.calls`, since a test can't read the notification area.

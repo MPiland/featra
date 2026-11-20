@@ -2,10 +2,10 @@
  * What every open project needs from the user (STORY-66), kept current for every page that watches it. Its waiting
  * agents come from the requests the Inbox holds (at any wait, so a request answered inline counts as soon as it is
  * asked). Its reviews come from its Work list, through the shared per-folder watch (ADR 0016), one per open project,
- * started and stopped with the project list (`watchProjects`). The first watch starts it; it runs until `close`, so a
- * page that reconnects gets the numbers at once, with no new scans.
+ * started and stopped with the project list (`watchProjects`). The server starts it as it starts, to keep the taskbar
+ * badge (STORY-67), and it runs until `close`, so a page that reconnects gets the numbers at once, with no new scans.
  */
-import { hasReview, waitingAgents, type InboxItem, type NeedsList } from "@featra/work-format";
+import { hasReview, waitingAgents, waitingTotal, type InboxItem, type NeedsList } from "@featra/work-format";
 import { projectKey, type AllowedProjects } from "./allowed-projects.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import { watchProjects } from "./project-watch.ts";
@@ -129,4 +129,22 @@ export function createProjectNeeds({
       listeners.clear();
     },
   };
+}
+
+/**
+ * The taskbar and Dock badge's number (STORY-67): every open project's waiting agents, from the same watch as the
+ * switcher. Reports it now, then each time it changes; a review, or a change that keeps the total, reports nothing.
+ * Returns the stop.
+ */
+export function watchWaitingTotal(needs: Pick<ProjectNeeds, "watch">, report: (count: number) => void): () => void {
+  let last = -1;
+  const tell = (list: NeedsList) => {
+    const count = waitingTotal(list);
+    if (count === last) return;
+    last = count;
+    report(count);
+  };
+  const { needs: now, stop } = needs.watch(tell);
+  tell(now);
+  return stop;
 }
