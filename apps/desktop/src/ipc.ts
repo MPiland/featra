@@ -1,4 +1,13 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, shell, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  ipcMain,
+  nativeTheme,
+  shell,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+} from "electron";
 import {
   EDIT_COMMANDS,
   IPC,
@@ -145,6 +154,12 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
     if (!link) return;
     if (e2e) testHooks.openedExternal.push(link);
     else void shell.openExternal(link);
+  });
+  ipcMain.on(IPC.appCopyText, (_e, text: unknown) => {
+    // Only put on the clipboard: Featra never runs what it copies (STORY-68).
+    if (typeof text !== "string") return;
+    if (e2e) testHooks.copied.push(text);
+    else void clipboard.writeText(text);
   });
   ipcMain.on(IPC.appClearCacheAndRestart, () => void clearCacheAndRestart(troubleshoot));
   ipcMain.on(IPC.appResetAppData, () => void resetAppData(troubleshoot));

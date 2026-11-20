@@ -2,7 +2,7 @@
 id: STORY-68
 type: story
 title: An agent asks you to do something
-status: New
+status: In Progress
 parent: FEAT-20
 order: 3
 origin: added
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-68-request-action
 pr: null
 created: 2026-11-18T23:30:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: dev-lead
+  - at: 2026-11-20T14:31:13Z
+    field: status
+    from: New
+    to: In Progress
+    by: dev
 ---
 
 ## Description
@@ -28,20 +33,20 @@ As a builder, when an agent needs me to do something only I can do (run a comman
 
 ## Acceptance criteria
 
-- [ ] The Featra MCP has a tool to ask the user to do something, with what to do and any command to run; its description teaches agents when to use it
-- [ ] The request shows in the chat as a card with the steps, a Copy button for each command, Done, and Can't do it with a reason
-- [ ] The agent waits until the user answers; Done or the reason goes back to the agent as the tool's result
-- [ ] Like a tool approval, the request goes to the Inbox after it has waited a while, with a notification
-- [ ] While the request waits, its agent counts as waiting in the switcher and the badge
-- [ ] Featra never runs the command itself
+- [x] The Featra MCP has a tool to ask the user to do something, with what to do and any command to run; its description teaches agents when to use it (test: packages/mcp/test/request-action.test.ts::request_action through the Featra MCP (AC1) > is listed with a description that teaches when to use it, and when not, packages/mcp/test/request-action.test.ts::request_action through the Featra MCP (AC1) > tells the agent what to fix when the input is refused, and asks nothing, packages/work-format/test/action-request.test.ts::parseActionRequest (AC1) > takes a title, a why and steps, trimmed, and drops an empty why or command, packages/work-format/test/action-request.test.ts::parseActionRequest (AC1) > keeps a command's own lines and quoting as given, packages/work-format/test/action-request.test.ts::parseActionRequest (AC1) > refuses a missing or long title, packages/work-format/test/action-request.test.ts::parseActionRequest (AC1) > refuses a why that isn't text, or is long, packages/work-format/test/action-request.test.ts::parseActionRequest (AC1) > refuses no steps, too many, or steps that aren't a list, packages/work-format/test/action-request.test.ts::parseActionRequest (AC1) > names the step whose text or command is wrong, packages/server/test/action-request.test.ts::AC1: the call's input is checked > refuses a request without steps, and asks nothing, packages/server/test/action-request.test.ts::AC1: the call's input is checked > is refused when the MCP is off for the project, or the server can't ask, apps/desktop/e2e/request-action.spec.ts::an agent's request is a card the user copies from and answers, in the chat or the Inbox, and the agent gets the answer)
+- [x] The request shows in the chat as a card with the steps, a Copy button for each command, Done, and Can't do it with a reason (test: packages/work-format/test/action-request.test.ts::actionAsk (AC2) > reads the card's request from an approval's input, and nothing from another input, packages/server/test/action-request.test.ts::AC2, AC3: the request is a card in the chat, and the agent waits for the answer > shows the steps and commands, and Done is the call's answer, packages/client/test/components/action-request.test.tsx::AC2: the request is a card in the chat with its steps, Copy, Done and Can't do it > shows what to do, why, and each step in order, with Copy only beside a command, packages/client/test/components/action-request.test.tsx::AC2: the request is a card in the chat with its steps, Copy, Done and Can't do it > copies a step's command to the clipboard, and says so on that step, packages/client/test/components/action-request.test.tsx::AC2: the request is a card in the chat with its steps, Copy, Done and Can't do it > sends Done as the answer, and nothing else runs, packages/client/test/components/action-request.test.tsx::AC2: the request is a card in the chat with its steps, Copy, Done and Can't do it > sends Can't do it with the reason, by the button or Enter, and without one when it is empty, packages/client/test/components/action-request.test.tsx::AC2: the request is a card in the chat with its steps, Copy, Done and Can't do it > marks the row Done or Can't do it with the reason once answered, packages/client/test/components/action-request.test.tsx::AC2: the request is a card in the chat with its steps, Copy, Done and Can't do it > names the story whose session asked, in its Dev Lead's copy, apps/desktop/e2e/request-action.spec.ts::an agent's request is a card the user copies from and answers, in the chat or the Inbox, and the agent gets the answer)
+- [x] The agent waits until the user answers; Done or the reason goes back to the agent as the tool's result (test: packages/work-format/test/action-request.test.ts::the call's answer (AC3) > tells the agent Done, or that the user couldn't, with their reason, packages/work-format/test/action-request.test.ts::the call's answer (AC3) > reads the answer as it crosses the socket, and refuses anything else, packages/server/test/action-request.test.ts::AC2, AC3: the request is a card in the chat, and the agent waits for the answer > shows the steps and commands, and Done is the call's answer, packages/server/test/action-request.test.ts::AC2, AC3: the request is a card in the chat, and the agent waits for the answer > gives Can't do it with the user's reason, and without one when they gave none, packages/server/test/action-request.test.ts::AC2, AC3: the request is a card in the chat, and the agent waits for the answer > cuts a long reason to the length a Deny reason is, packages/server/test/action-request.test.ts::AC2, AC3: the request is a card in the chat, and the agent waits for the answer > ends as cancelled, never as Can't do it, when the user stops the turn, packages/server/test/action-request.test.ts::AC2, AC3: the request is a card in the chat, and the agent waits for the answer > ends as cancelled when the chat's agent ends, packages/mcp/test/request-action.test.ts::the agent waits for the user's answer (AC3, AC6) > waits until Done, which is the call's result, and never runs the command, packages/mcp/test/request-action.test.ts::the agent waits for the user's answer (AC3, AC6) > gives Can't do it and the user's reason as the call's result, apps/desktop/e2e/request-action.spec.ts::an agent's request is a card the user copies from and answers, in the chat or the Inbox, and the agent gets the answer)
+- [x] Like a tool approval, the request goes to the Inbox after it has waited a while, with a notification (test: packages/server/test/action-request.test.ts::AC4: like a tool approval, it goes to the Inbox after the wait, and is told as it arrives > is in the Inbox only once it has waited the wait, and leaves it when answered, apps/desktop/test/notifier-request.test.ts::AC4: a request is told as it arrives, saying what it asks > shows one when Featra isn't focused, with the chat and the request's title, apps/desktop/test/notifier-request.test.ts::AC4: a request is told as it arrives, saying what it asks > cuts a long title short, as it does a question, apps/desktop/test/notifier-request.test.ts::AC4: a request is told as it arrives, saying what it asks > names the tool, as for any approval, when the input isn't a request, packages/client/test/components/action-request.test.tsx::AC4: in the Inbox, the same card, named as a request > shows the card after the wait, and answers from there, apps/desktop/e2e/request-action.spec.ts::an agent's request is a card the user copies from and answers, in the chat or the Inbox, and the agent gets the answer)
+- [x] While the request waits, its agent counts as waiting in the switcher and the badge (test: packages/server/test/action-request-needs.test.ts::AC5: a waiting request counts its agent as waiting in the switcher and the badge > counts the agent from the moment it asks until the user answers, in its own project only, apps/desktop/e2e/request-action.spec.ts::an agent's request is a card the user copies from and answers, in the chat or the Inbox, and the agent gets the answer)
+- [x] Featra never runs the command itself (test: packages/server/test/action-request.test.ts::AC6: Featra never runs the command > leaves the command unrun through the ask and the Done, packages/mcp/test/request-action.test.ts::the agent waits for the user's answer (AC3, AC6) > waits until Done, which is the call's result, and never runs the command, packages/client/test/components/action-request.test.tsx::AC2: the request is a card in the chat with its steps, Copy, Done and Can't do it > sends Done as the answer, and nothing else runs, apps/desktop/e2e/request-action.spec.ts::an agent's request is a card the user copies from and answers, in the chat or the Inbox, and the agent gets the answer)
 
 ## Tasks
 
-- [ ] MCP: the request tool and its description
-- [ ] Server: the request as a pending item, with the same timeout to the Inbox as approvals
-- [ ] Client: the request card in the chat and the Inbox
-- [ ] Unit and integration tests for each criterion; a journey with the stand-in agent; tests linked on the criteria
-- [ ] Decisions recorded for the Dev Lead; move to In Review
+- [x] MCP: the request tool and its description
+- [x] Server: the request as a pending item, with the same timeout to the Inbox as approvals
+- [x] Client: the request card in the chat and the Inbox
+- [x] Unit and integration tests for each criterion; a journey with the stand-in agent; tests linked on the criteria
+- [x] Decisions recorded for the Dev Lead; move to In Review
 
 ## Depends on
 

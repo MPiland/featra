@@ -1,5 +1,7 @@
 /** The shapes every tool shares: what the host offers, what a tool is, and how it refuses. */
 import type {
+  ActionOutcome,
+  ActionRequest,
   BugReport,
   DraftInput,
   DraftResult,
@@ -32,6 +34,8 @@ export interface FeatraHost {
   requestMerge: (input: RequestMergeInput) => Promise<{ story: string }>;
   /** The Dev Lead reports a bug for the user to place; answers once the user is asked (STORY-13). */
   reportBug: (input: BugReport) => Promise<{ asked: true }>;
+  /** Asks the user to do something only they can do; answers once they say Done or Can't do it (STORY-68). */
+  requestAction: (input: ActionRequest) => Promise<ActionOutcome>;
 }
 
 export interface Tool {

@@ -1,6 +1,7 @@
 import {
   isRecord,
   LOG_FILES,
+  parseActionOutcome,
   parseDraftResult,
   parseResponse,
   type AgentMethod,
@@ -112,6 +113,11 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       const result = await call("bug.report", input);
       if (!isRecord(result) || result.asked !== true) throw new Error("Featra gave an unexpected answer.");
       return { asked: true };
+    },
+    async requestAction(input) {
+      const result = parseActionOutcome(await call("action.request", input));
+      if (!result) throw new Error("Featra gave an unexpected answer.");
+      return result;
     },
     async propose(input) {
       const result = await call("checks.propose", input);

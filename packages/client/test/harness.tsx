@@ -210,6 +210,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       toggleDevTools: () => void calls.push("toggleDevTools"),
       showLogs: () => void calls.push("showLogs"),
       openExternal: (url) => void calls.push(`openExternal:${url}`),
+      copyText: (text) => void calls.push(`copyText:${text}`),
       clearCacheAndRestart: () => void calls.push("clearCacheAndRestart"),
       resetAppData: () => void calls.push("resetAppData"),
       quit: () => void calls.push("quit"),

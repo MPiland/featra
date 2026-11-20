@@ -8,6 +8,7 @@ import {
   APPROVAL_CANCELLED,
   CHAT_MESSAGES,
   chatRule,
+  DENY_REASON_MAX,
   denyMessage,
   isRecord,
   validAnswers,
@@ -181,7 +182,8 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
       const input = option === undefined ? entry.request.input : { ...entry.request.input, option };
       if (choice === "deny") {
         const event: ChatEvent = { type: "tool-denied", id, name, input, ...(reason ? { reason } : {}) };
-        return entry.settle({ allow: false, message: denyMessage(reason) }, event);
+        const why = reason?.trim().slice(0, DENY_REASON_MAX);
+        return entry.settle({ allow: false, message: denyMessage(reason), ...(why ? { reason: why } : {}) }, event);
       }
       const { offer } = entry;
       if (choice === "allow-chat") {

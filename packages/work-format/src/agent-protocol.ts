@@ -4,6 +4,7 @@
  * `parseResponse`. Each connection is one chat's: the server knows which from the connection's token, never from the
  * params.
  */
+import type { ActionOutcome, ActionRequest } from "./action-request.ts";
 import type { BugReport } from "./bug-copy.ts";
 import type { ProposeInput } from "./checks.ts";
 import type { DraftInput, DraftResult } from "./card-draft-input.ts";
@@ -42,6 +43,8 @@ export interface AgentMethods {
   "story.requestMerge": { params: RequestMergeInput; result: { story: string } };
   /** The Dev Lead reports a bug (STORY-13): a card in its chat and the Inbox, where the user confirms its place. */
   "bug.report": { params: BugReport; result: { asked: true } };
+  /** An agent asks the user to do something only they can do (STORY-68); answers once the user says Done or Can't do it. */
+  "action.request": { params: ActionRequest; result: ActionOutcome };
 }
 export type AgentMethod = keyof AgentMethods;
 export const AGENT_METHODS = [
@@ -54,6 +57,7 @@ export const AGENT_METHODS = [
   "checks.propose",
   "story.requestMerge",
   "bug.report",
+  "action.request",
 ] as const satisfies readonly AgentMethod[];
 
 export interface AgentRequest {

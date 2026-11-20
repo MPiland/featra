@@ -136,3 +136,46 @@
   height: 100%;
   background: var(--tx2);
 }
+
+/* An agent's request to do something only the user can do (STORY-68): the steps, each command with Copy. */
+.action-request-title {
+  color: var(--tx);
+  font-size: 13px;
+}
+
+.action-request-why {
+  margin: 0 0 8px;
+  color: var(--tx2);
+}
+
+.action-request-steps {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.action-request-steps li + li {
+  margin-top: 6px;
+}
+
+.action-request-steps p {
+  margin: 0 0 4px;
+  overflow-wrap: anywhere;
+}
+
+.action-request-command {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.action-request-command code {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: var(--row);
+  color: var(--tx);
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

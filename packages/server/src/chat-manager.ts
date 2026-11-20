@@ -93,6 +93,7 @@ export function createChatManager({
     if (!found || found.closed) throw new ChatError(CHAT_MESSAGES.noChat);
     return found;
   };
+  const { turnEnded, ...approvals } = chatApprovals(desk, mirror, chat, open);
 
   const same = (a: string, b: string) => projectKey(a, platform) === projectKey(b, platform);
   const shown = (dir: string) => [...chats.values()].filter((c) => same(c.dir, dir) && !c.closed);
@@ -121,6 +122,8 @@ export function createChatManager({
     }
     if (event.type === "user") c.running = true;
     if (event.type === "turn-end") {
+      // What the turn asked and still waits on ends before it does (STORY-68's request_action).
+      turnEnded(c.id);
       c.running = false;
       // A story session's turn is over: what its parent shows of its requests closes with it.
       mirror.clear(c);
@@ -277,7 +280,7 @@ export function createChatManager({
     // Stop on a subagent ends it alone; on any other chat it ends the turn.
     stop: (id) => (subagents.is(id) ? subagents.stop(chat(id)) : control.stop(id)),
     archive: (id) => subagents.archive(chat(id)),
-    ...chatApprovals(desk, mirror, chat, open),
+    ...approvals,
     notify: (id, notice) => notices.tell(id, notice),
     report(id, event) {
       const c = chats.get(id);

@@ -9,6 +9,7 @@ import { access } from "node:fs/promises";
 import {
   AGENT_PATH,
   assertNever,
+  parseActionRequest,
   parseDraft,
   parseLogInput,
   parseReportInput,
@@ -21,6 +22,7 @@ import {
   type AgentMethods,
   type KnowledgePermission,
 } from "@featra/work-format";
+import type { ActionRequestService } from "./action-request.ts";
 import { createLeadCalls } from "./agent-lead.ts";
 import { AGENT_MESSAGES } from "./agent-messages.ts";
 import { ApiError } from "./api-error.ts";
@@ -75,6 +77,8 @@ export interface AgentBridgeDeps {
   merges?: MergeRequest;
   /** Asks the user to place a bug the Dev Lead reports (STORY-13). Without it `bug.report` is refused. */
   bugs?: BugRequest;
+  /** Asks the user to do something for any chat's agent (STORY-68). Without it ction.request is refused. */
+  actions?: ActionRequestService;
   newToken?: () => string;
 }
 
@@ -110,6 +114,7 @@ export function createAgentBridge({
   checkSettings,
   merges,
   bugs,
+  actions,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -144,6 +149,16 @@ export function createAgentBridge({
     const { entry: id, file, summary } = await writer.append(cwd, chat, input.value, session);
     chats.report(chat, { type: "logged", entry: id, file, summary });
     return { entry: id, file };
+  }
+
+  /** Any chat may ask, a story session too: its request shows in its Dev Lead's chat as well. */
+  async function requestAction(chat: string, dir: string, params: unknown) {
+    const off = await mcpRefusal(dir);
+    if (off !== null) throw new ApiError(off);
+    if (!actions) throw new ApiError(AGENT_MESSAGES.noAction);
+    const input = parseActionRequest(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return actions.request(chat, input.value);
   }
 
   async function draft(chat: string, dir: string, params: unknown) {
@@ -249,6 +264,8 @@ export function createAgentBridge({
           return leads.requestMerge(chat, info.dir, info.story, params);
         case "bug.report":
           return leads.reportBug(chat, info.dir, info.story, params);
+        case "action.request":
+          return requestAction(chat, info.dir, params);
         case "log.append":
           return appendLog(chat, info.dir, info.cwd ?? info.dir, info.session, params);
         default:

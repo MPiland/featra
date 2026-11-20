@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { actionAsk, REQUEST_ACTION_TOOL } from "@featra/work-format/action-request";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
 import { bugAsk, REPORT_BUG_TOOL } from "@featra/work-format/bug-copy";
 import { REQUEST_MERGE_TOOL } from "@featra/work-format/merge-copy";
 import { CHAT_COPY } from "../../chats.ts";
+import { ActionRequestPrompt } from "./ActionRequestPrompt.tsx";
 import { BugReportPrompt } from "./BugReportPrompt.tsx";
 import { mergeAsk, MergeRequestPrompt } from "./MergeRequestPrompt.tsx";
 
@@ -52,6 +54,8 @@ export function ApprovalPrompt({
   if (merge) return <MergeRequestPrompt {...merge} onAnswer={onAnswer} />;
   const bug = name === REPORT_BUG_TOOL ? bugAsk(input) : null;
   if (bug) return <BugReportPrompt {...bug} onAnswer={onAnswer} />;
+  const action = name === REQUEST_ACTION_TOOL ? actionAsk(input) : null;
+  if (action) return <ActionRequestPrompt {...action} story={story} subagent={subagent} onAnswer={onAnswer} />;
 
   return (
     <div className="chat-approval" role="group" aria-label={`${CHAT_COPY.approve} ${name}`}>
