@@ -51,6 +51,9 @@ test("an agent's request is a card the user copies from and answers, in the chat
       .getByRole("dialog", { name: "New chat" })
       .getByRole("button", { name: /^Developer/ })
       .click();
+    // Typing before the new chat shows would go to the chat still on screen, whose agent has answered already.
+    await expect(page.getByRole("region", { name: "Developer" })).toBeVisible();
+    await expect(log(page)).not.toContainText("Tool said");
     await composer(page).fill("request_action");
     await composer(page).press("Enter");
   };
