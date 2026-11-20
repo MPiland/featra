@@ -2,7 +2,7 @@
 id: STORY-68
 type: story
 title: An agent asks you to do something
-status: In Progress
+status: In Review
 parent: FEAT-20
 order: 3
 origin: added
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-68-request-action
-pr: null
+pr: "80"
 created: 2026-11-18T23:30:00Z
 history:
   - at: 2026-11-18T23:30:00Z
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: dev
+  - at: 2026-11-20T15:02:59Z
+    field: status
+    from: In Progress
+    to: In Review
     by: dev
 ---
 
