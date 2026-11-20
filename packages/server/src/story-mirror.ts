@@ -11,8 +11,11 @@ export interface StoryMirror {
   mirror: (child: Chat, event: ChatEvent) => void;
   /** The story session that holds the request `tool` the parent chat shows, or null when it is the parent's own. */
   holder: (parent: string, tool: string) => string | null;
-  /** The session's turn or the session ended with requests unanswered: its parent shows them cancelled. */
-  clear: (child: Chat) => void;
+  /**
+   * The session's turn or the session ended with requests unanswered: its parent shows them cancelled, except those
+   * `keep` says still wait (an app request, which its call ends, not the turn).
+   */
+  clear: (child: Chat, keep?: (tool: string) => boolean) => void;
   /** The chat ended: what it showed of its sessions' requests is gone with it. */
   ended: (parent: Chat) => void;
 }
@@ -47,9 +50,9 @@ export function createStoryMirror(chats: Map<string, Chat>, record: (c: Chat, ev
       record(parent, event);
     },
     holder: (parent, tool) => forwarded.get(keyOf(parent, tool))?.holder ?? null,
-    clear(child) {
+    clear(child, keep = () => false) {
       for (const [key, shown] of forwarded) {
-        if (shown.holder !== child.id) continue;
+        if (shown.holder !== child.id || keep(shown.tool)) continue;
         forwarded.delete(key);
         const c = chats.get(shown.parent);
         if (c && !c.closed && c.events !== null) record(c, { type: "approval-cancelled", id: shown.tool });

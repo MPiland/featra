@@ -8,8 +8,8 @@ import {
   APPROVAL_CANCELLED,
   CHAT_MESSAGES,
   chatRule,
-  DENY_REASON_MAX,
   denyMessage,
+  denyReason,
   isRecord,
   validAnswers,
   type Answers,
@@ -86,6 +86,8 @@ export interface ApprovalDesk {
   inherit: (from: string, to: string) => unknown[];
   /** The chat's agent ended: its requests end unanswered, quietly, and its Allow for this chat is forgotten. */
   forget: (chat: string) => void;
+  /** Whether the chat still waits on the app's request `tool`: its call, not the turn, ends it (STORY-68 review). */
+  holdsApp: (chat: string, tool: string) => boolean;
 }
 
 /** `tell` records an event in the chat it names. */
@@ -181,9 +183,9 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
       }
       const input = option === undefined ? entry.request.input : { ...entry.request.input, option };
       if (choice === "deny") {
-        const event: ChatEvent = { type: "tool-denied", id, name, input, ...(reason ? { reason } : {}) };
-        const why = reason?.trim().slice(0, DENY_REASON_MAX);
-        return entry.settle({ allow: false, message: denyMessage(reason), ...(why ? { reason: why } : {}) }, event);
+        const why = denyReason(reason);
+        const event: ChatEvent = { type: "tool-denied", id, name, input, ...(why ? { reason: why } : {}) };
+        return entry.settle({ allow: false, message: denyMessage(why), ...(why ? { reason: why } : {}) }, event);
       }
       const { offer } = entry;
       if (choice === "allow-chat") {
@@ -219,6 +221,10 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
       const given = [...(provided.get(from) ?? [])];
       if (given.length > 0) provided.set(to, [...given]);
       return given;
+    },
+    holdsApp(chat, tool) {
+      const entry = waiting.get(chat)?.get(tool);
+      return entry?.kind === "tool" && entry.request.app === true;
     },
     forget(chat) {
       rules.delete(chat);

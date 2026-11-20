@@ -2,6 +2,7 @@ import { createContext, useContext, useState } from "react";
 import { ACTION_COPY, type ActionRequest } from "@featra/work-format/action-request";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
 import { CHAT_COPY } from "../../chats.ts";
+import { DenyWithReason } from "./DenyWithReason.tsx";
 
 /** Puts text on the clipboard (the host's `app.copyText`); App provides it. Default: nothing is copied. */
 export const CopyTextContext = createContext<(text: string) => void>(() => {});
@@ -25,7 +26,6 @@ export function ActionRequestPrompt({
 }) {
   const copyText = useContext(CopyTextContext);
   const [copied, setCopied] = useState<number | null>(null);
-  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,7 +35,6 @@ export function ActionRequestPrompt({
     setError(await onAnswer(a));
     setBusy(false);
   }
-  const cant = () => answer(reason.trim() ? { choice: "deny", reason: reason.trim() } : { choice: "deny" });
   const copy = (n: number, command: string) => {
     copyText(command);
     setCopied(n);
@@ -45,7 +44,6 @@ export function ActionRequestPrompt({
     <div className="chat-approval action-request" role="group" aria-label={title}>
       {story && <p className="meta">{CHAT_COPY.askedFor(story)}</p>}
       {subagent && <p className="meta">{CHAT_COPY.askedBySubagent(subagent)}</p>}
-      <p className="meta">{ACTION_COPY.asked}</p>
       <h3 className="action-request-title">{title}</h3>
       {why && <p className="action-request-why">{why}</p>}
       <ol className="action-request-steps">
@@ -74,24 +72,18 @@ export function ActionRequestPrompt({
         <button type="button" className="btn primary" disabled={busy} onClick={() => void answer({ choice: "allow" })}>
           {ACTION_COPY.done}
         </button>
-        <input
-          type="text"
-          className="text-field chat-approval-reason"
-          aria-label={ACTION_COPY.reason}
-          placeholder={ACTION_COPY.reasonHint}
-          value={reason}
-          disabled={busy}
-          onChange={(e) => setReason(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-            e.preventDefault();
-            void cant();
-          }}
+        <DenyWithReason
+          label={ACTION_COPY.reason}
+          hint={ACTION_COPY.reasonHint}
+          action={ACTION_COPY.cantDo}
+          busy={busy}
+          onDeny={(a) => void answer(a)}
         />
-        <button type="button" className="btn" disabled={busy} onClick={() => void cant()}>
-          {ACTION_COPY.cantDo}
-        </button>
       </div>
+      {/* Copy's "Copied" is said to screen readers too, politely, as the button's words change. */}
+      <p className="sr-only" role="status" aria-live="polite">
+        {copied === null ? "" : ACTION_COPY.copiedStep(copied)}
+      </p>
       {error && (
         <p className="chat-error" role="alert">
           {error}

@@ -3145,10 +3145,18 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   the call can give it back. The agent is told "The user says it's done." or "The user couldn't do it: <reason>."; both
   are results, not errors, so the agent reads them as answers. Input that fails the checks (title, why, 1 to 10 steps,
   each with its text and an optional command, with limits) is refused with what to fix, and nothing is asked.
-- **A request ends with its turn.** A request has no story subject, so nothing else holds it: it is cancelled when the
-  turn ends (Stop, an error, the end of the turn) and when the chat's agent ends, before the turn's end is shown, so no
-  card stays waiting after. The call then fails as cancelled, never as Can't do it, so the agent can tell the user
-  stopped it from the user saying no.
+- **A request lives as long as its call, not its turn (review B1).** The MCP's CallTool handler passes the host's
+  abort signal (`extra.signal`) to the tool. The MCP names each call (`action-N`) in `action.request` and sends
+  `action.cancel` for it when the host drops the call: its tool timeout (Claude Code's `MCP_TOOL_TIMEOUT`, Codex's
+  60 seconds) or Stop, which cancels the turn's tool calls. The server keeps an `AbortController` per call on each
+  MCP connection and cancels all of them when that connection closes (the MCP's process died). The chat ending cancels
+  it too. A turn ending doesn't: a background subagent can ask after the main result, so the next turn's end must not
+  cancel it. The call then fails as cancelled, never as Can't do it, so the agent can tell a dropped call from the user
+  saying no.
+- **It stays open past the turn the way other app requests do.** The request carries the title as its `subject`, as
+  `report_bug`'s does, so the chat's fold, the waiting count and the Inbox keep it after the turn's end. For a story
+  session, the Dev Lead's mirror keeps the app requests the desk still holds (`desk.holdsApp`) when the session's
+  turn ends; when the session ends they go.
 - **Featra never runs a command.** A step's command is shown as text with a Copy button. Copy goes to main over a new
   `app:copy-text` IPC message, which only writes the clipboard (Electron's `clipboard.writeText`); under E2E it records
   the text instead (`featraTest.copied`), so the journey proves what was copied and that nothing ran (the stand-in
@@ -3157,7 +3165,15 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   session's request shows in its Dev Lead's chat with the story named, as its tool approvals do.
 - **The notification says what is asked** ("<chat>: Sign in to the CLI", cut like a question), not
   "approve request_action".
-- **Risk: the agent's own wait for a tool call.** The call waits until the user answers. An agent host can give up on
-  a long MCP call first (Claude Code's `MCP_TOOL_TIMEOUT`); the request then stays on the card until the turn ends.
-  Not changed here; noted for the Dev Lead.
+- **The card stands in for the agent's raw tool row (review S1).** For `request_action`, `request_merge` and
+  `report_bug`, the chat hides the provider's own row for the call (`mcp__featra__request_action` on Claude) once
+  the app's card for it shows (`cardCalls` in work-format). A row pairs with the nearest card of the same tool in the
+  same turn whose text fields match; a call refused for its input never becomes a card, so its row and error stay. The
+  request card's head reads "Request" with no summary while it waits, and the title shows once.
+- **A request's text can't hide what it says (review S2).** The title, why, each step's text and each command refuse
+  control characters other than tab and newline (C0, DEL, C1), bidi embeddings, overrides and isolates, and zero-width
+  spaces and the BOM. Zero-width joiners are allowed in text (emoji, some scripts) and refused in commands.
+- **One Deny reason, everywhere (review S4).** `denyReason()` trims and cuts the reason to 500 characters for both the
+  agent's answer and the chat's `tool-denied` event, and the reason field has that `maxLength`. The clipboard IPC
+  copies at most a command's length.
 - **No ADR:** one more MCP tool and app approval on existing paths, and one IPC message.

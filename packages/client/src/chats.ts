@@ -161,6 +161,15 @@ export function noticeText(notice: ChatNotice): string {
 }
 
 /** The mark a tool row's head shows: where its approval stands, or how it ended unanswered; null for none. */
+/**
+ * A tool row's head: the tool and a short summary. An agent's request to do something (STORY-68) reads as a Request,
+ * and its title shows once: in the card while it waits, in the head after.
+ */
+export function toolHead(item: Extract<ChatItem, { kind: "tool" }>): { name: string; summary: string } {
+  if (item.name !== REQUEST_ACTION_TOOL) return { name: item.name, summary: item.summary };
+  return { name: ACTION_COPY.kind, summary: item.approval?.status === "pending" ? "" : item.summary };
+}
+
 export function toolMark(item: Extract<ChatItem, { kind: "tool" }>): string | null {
   // An agent's request to do something (STORY-68) says how the user answered it, not that a call was allowed.
   const action = item.name === REQUEST_ACTION_TOOL;

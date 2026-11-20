@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import { cardCalls } from "@featra/work-format/app-calls";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
 import type { Answers } from "@featra/work-format/questions";
 import type { ChatItem } from "@featra/work-format/chat";
@@ -68,12 +69,17 @@ export function Transcript({
 }) {
   const end = useRef<HTMLDivElement>(null);
   const last = items.at(-1);
+  // An app card (request_action, request_merge, report_bug) says all the agent's own row for that call does.
+  const shown = useMemo(() => {
+    const hidden = cardCalls(items);
+    return hidden.size === 0 ? items : items.filter((i) => i.kind !== "tool" || !hidden.has(i.id));
+  }, [items]);
   useEffect(() => {
     if (last) end.current?.scrollIntoView?.({ block: "end" });
   }, [last]);
   return (
     <div className="chat-log" role="log" aria-label={CHAT_COPY.transcript}>
-      {items.map((item) => (
+      {shown.map((item) => (
         <Item key={item.key} item={item} actions={actions} />
       ))}
       {running && <p className="chat-working">{CHAT_COPY.working}</p>}

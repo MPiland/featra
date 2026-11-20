@@ -10,6 +10,7 @@ export * from "./bugs.ts";
 export * from "./bug-copy.ts";
 export * from "./bug-filing.ts";
 export * from "./action-request.ts";
+export * from "./app-calls.ts";
 export * from "./ids.ts";
 export * from "./validate.ts";
 export * from "./utils/guards.ts";

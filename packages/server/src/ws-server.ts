@@ -16,7 +16,10 @@ import { sameSecret } from "./secret.ts";
 /** The agent socket (ADR 0019): which chat a secret opens, and what a chat's MCP process may ask. */
 export interface AgentSockets {
   resolve: (token: string) => string | null;
-  call: (chat: string, method: AgentMethod, params: unknown) => Promise<unknown>;
+  /** A request on the connection `link`: an object that stands for that one socket. */
+  call: (chat: string, method: AgentMethod, params: unknown, link: object) => Promise<unknown>;
+  /** The connection `link` closed: what its calls wait on ends (an MCP process that died asks nothing more). */
+  dropped: (link: object) => void;
 }
 
 export interface ServerOptions {
@@ -103,13 +106,13 @@ async function respond(socket: WebSocket, id: number, work: () => Promise<unknow
 }
 
 /** An agent's request, answered on its socket: the chat is the connection's, and the method one it may call. */
-async function answerAgent(socket: WebSocket, chat: string, agent: AgentSockets, text: string) {
+async function answerAgent(socket: WebSocket, chat: string, agent: AgentSockets, link: object, text: string) {
   const request = parseAgentRequest(text);
   if ("error" in request) {
     if (request.id !== null) socket.send(JSON.stringify({ id: request.id, ok: false, error: request.error }));
     return;
   }
-  await respond(socket, request.id, () => agent.call(chat, request.method, request.params));
+  await respond(socket, request.id, () => agent.call(chat, request.method, request.params, link));
 }
 
 /**
@@ -144,9 +147,11 @@ export function startServer({ token, api, agents, log, port = 0 }: ServerOptions
   wss.on("connection", (socket, req) => {
     const chat = agentChat(req, agents);
     if (agents && chat !== null) {
+      const link = {};
+      socket.on("close", () => agents.dropped(link));
       socket.on("message", (data, isBinary) => {
         if (isBinary) return socket.close(1003, "Text frames only.");
-        void answerAgent(socket, chat, agents, frameText(data));
+        void answerAgent(socket, chat, agents, link, frameText(data));
       });
       socket.on("error", (err) => log(`Socket error: ${err.message}`));
       return;

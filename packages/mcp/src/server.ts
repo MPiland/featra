@@ -14,11 +14,11 @@ export function createMcpServer(host: FeatraHost, tools: readonly Tool[] = TOOLS
     tools: tools.map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async ({ params }) => {
+  server.setRequestHandler(CallToolRequestSchema, async ({ params }, extra) => {
     const tool = tools.find((t) => t.name === params.name);
     if (!tool) return reply(`No such tool: ${params.name}.`, true);
     try {
-      return reply(await tool.run(params.arguments, host), false);
+      return reply(await tool.run(params.arguments, host, extra.signal), false);
     } catch (err) {
       // A refusal is the agent's to fix; anything else (the server gone) is told plainly and is not retried here. A tool
       // says in `failed` how its errors start, so the prefix is added here and nowhere else.

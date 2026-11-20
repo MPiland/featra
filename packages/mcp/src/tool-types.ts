@@ -34,8 +34,11 @@ export interface FeatraHost {
   requestMerge: (input: RequestMergeInput) => Promise<{ story: string }>;
   /** The Dev Lead reports a bug for the user to place; answers once the user is asked (STORY-13). */
   reportBug: (input: BugReport) => Promise<{ asked: true }>;
-  /** Asks the user to do something only they can do; answers once they say Done or Can't do it (STORY-68). */
-  requestAction: (input: ActionRequest) => Promise<ActionOutcome>;
+  /**
+   * Asks the user to do something only they can do; answers once they say Done or Can't do it (STORY-68). `signal`
+   * is the call's: when the agent's host drops the call, the request ends as cancelled.
+   */
+  requestAction: (input: ActionRequest, signal?: AbortSignal) => Promise<ActionOutcome>;
 }
 
 export interface Tool {
@@ -43,8 +46,11 @@ export interface Tool {
   description: string;
   /** JSON Schema of the input, as an agent sees it. */
   inputSchema: { type: "object"; properties: Record<string, unknown>; required: string[] };
-  /** Runs the call; throws a `ToolRefusal` for input to fix. Resolves with the line the agent is told. */
-  run: (input: unknown, host: FeatraHost) => Promise<string>;
+  /**
+   * Runs the call; throws a `ToolRefusal` for input to fix. Resolves with the line the agent is told. `signal` aborts
+   * when the agent's host drops the call (its tool timeout, or Stop).
+   */
+  run: (input: unknown, host: FeatraHost, signal?: AbortSignal) => Promise<string>;
   /** What a failure that isn't a refusal (the server said no, or is gone) starts with. Default: "Not logged." */
   failed?: string;
 }

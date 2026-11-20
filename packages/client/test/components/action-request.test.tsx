@@ -5,7 +5,7 @@
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { ACTION_COPY, REQUEST_ACTION_TOOL, type ActionRequest } from "@featra/work-format/action-request";
-import type { ChatEvent } from "@featra/work-format";
+import { CHAT_MESSAGES, type ChatEvent } from "@featra/work-format";
 import { CHAT_COPY } from "../../src/chats.ts";
 import { INBOX_COPY } from "../../src/inbox.ts";
 import { renderApp, sidebar } from "../harness.tsx";
@@ -29,15 +29,22 @@ const asked: ChatEvent = {
   input: { ...REQUEST },
   forChat: false,
 };
+/** The agent's own row for the call, as its provider names Featra's tool. */
+const RAW = `mcp__featra__${REQUEST_ACTION_TOOL}`;
 
 /** A Developer chat whose agent asked the user to do something: the app and the card. */
-async function requested(extra: Partial<Extract<ChatEvent, { type: "approval" }>> = {}) {
-  const app = renderApp();
+async function requested(
+  extra: Partial<Extract<ChatEvent, { type: "approval" }>> = {},
+  host: Parameters<typeof renderApp>[0] = {},
+) {
+  const app = renderApp(host);
   await app.user.click(screen.getByRole("button", { name: CHAT_COPY.newChat }));
   const dialog = await screen.findByRole("dialog", { name: CHAT_COPY.newChat });
   await app.user.click(await within(dialog).findByRole("button", { name: /^Developer/ }));
   await screen.findByRole("region", { name: "Developer" });
   await app.user.type(screen.getByRole("textbox", { name: CHAT_COPY.composer }), "release it{Enter}");
+  // The agent's call shows as its own row first; the app's card for it follows.
+  app.chats.emit("chat-1", { type: "tool", id: "toolu_1", name: RAW, input: { ...REQUEST } });
   app.chats.emit("chat-1", { ...asked, ...extra } as ChatEvent);
   const log = screen.getByRole("log", { name: CHAT_COPY.transcript });
   const card = await within(log).findByRole("group", { name: REQUEST.title });
@@ -47,8 +54,12 @@ async function requested(extra: Partial<Extract<ChatEvent, { type: "approval" }>
 describe("AC2: the request is a card in the chat with its steps, Copy, Done and Can't do it", () => {
   it("shows what to do, why, and each step in order, with Copy only beside a command", async () => {
     const { card, log } = await requested();
-    expect(within(card).getByText(ACTION_COPY.asked)).toBeTruthy();
     expect(within(card).getByRole("heading", { name: REQUEST.title })).toBeTruthy();
+    // Review S1: the head reads Request, the title shows once (the card's heading), and the agent's own row is hidden.
+    expect([...log.querySelectorAll(".chat-tool-name")].map((n) => n.textContent)).toEqual([ACTION_COPY.kind]);
+    expect(within(log).getAllByText(REQUEST.title)).toHaveLength(1);
+    expect(within(log).queryByText(RAW)).toBeNull();
+    expect(within(log).queryByText(REQUEST_ACTION_TOOL)).toBeNull();
     expect(within(card).getByText(REQUEST.why!)).toBeTruthy();
     const steps = within(within(card).getByRole("list")).getAllByRole("listitem");
     expect(steps.map((s) => s.querySelector("p")?.textContent)).toEqual(REQUEST.steps.map((s) => s.text));
@@ -70,9 +81,14 @@ describe("AC2: the request is a card in the chat with its steps, Copy, Done and 
   it("copies a step's command to the clipboard, and says so on that step", async () => {
     const { app, card } = await requested();
     const third = within(card).getByRole("button", { name: ACTION_COPY.copyLabel(3) });
+    const said = within(card).getByRole("status");
+    expect(said.getAttribute("aria-live")).toBe("polite");
+    expect(said.textContent).toBe("");
     await app.user.click(third);
     expect(app.calls).toContain("copyText:gh auth status");
     expect(third.textContent).toBe(ACTION_COPY.copied);
+    // A screen reader hears it too.
+    expect(said.textContent).toBe(ACTION_COPY.copiedStep(3));
     expect(within(card).getByRole("button", { name: ACTION_COPY.copyLabel(1) }).textContent).toBe(ACTION_COPY.copy);
   });
 
@@ -110,7 +126,7 @@ describe("AC2: the request is a card in the chat with its steps, Copy, Done and 
       input: { ...REQUEST },
       reason: "No admin rights.",
     });
-    expect(await within(log).findByText(ACTION_COPY.cantDo)).toBeTruthy();
+    expect(await within(log).findByText(ACTION_COPY.cantDo, { selector: ".chat-tool-mark" })).toBeTruthy();
     expect(within(log).getByText("No admin rights.")).toBeTruthy();
     expect(within(log).queryByRole("group", { name: REQUEST.title })).toBeNull();
     cleanup();
@@ -122,7 +138,12 @@ describe("AC2: the request is a card in the chat with its steps, Copy, Done and 
       input: { ...REQUEST },
       scope: "once",
     });
-    expect(await within(done.log).findByText(ACTION_COPY.done)).toBeTruthy();
+    // Review S3: the mark says Done, and the card (with its own Done button) is gone.
+    expect(await within(done.log).findByText(ACTION_COPY.done, { selector: ".chat-tool-mark" })).toBeTruthy();
+    expect(within(done.log).queryByRole("group", { name: REQUEST.title })).toBeNull();
+    // Answered, the head names the request by its title, and the agent's own row stays hidden.
+    expect(within(done.log).getByText(REQUEST.title, { selector: ".chat-tool-summary" })).toBeTruthy();
+    expect(within(done.log).queryByText(RAW)).toBeNull();
   });
 
   it("names the story whose session asked, in its Dev Lead's copy", async () => {
@@ -147,5 +168,20 @@ describe("AC4: in the Inbox, the same card, named as a request", () => {
     expect(app.calls).toContain("copyText:gh auth login");
     await app.user.click(within(card).getByRole("button", { name: ACTION_COPY.done }));
     expect(app.calls).toContain("chat.approve:chat-1:action-1:allow");
+  });
+
+  it("says why the second answer isn't taken when the chat and the Inbox answer at once (review S5)", async () => {
+    const host: Parameters<typeof renderApp>[0] = {};
+    const { app, card } = await requested({}, host);
+    app.chats.inbox.advance(10 * MINUTE);
+    await app.user.click(within(card).getByRole("button", { name: ACTION_COPY.done }));
+    // The chat's Done was taken first; the server refuses another answer to it (its own test proves that).
+    host.approveError = CHAT_MESSAGES.noRequest;
+    await app.user.click(within(sidebar()).getByRole("button", { name: /^Inbox/ }));
+    const list = await screen.findByRole("region", { name: INBOX_COPY.list });
+    const inboxCard = within(list).getByRole("group", { name: REQUEST.title });
+    await app.user.click(within(inboxCard).getByRole("button", { name: ACTION_COPY.done }));
+    expect((await within(inboxCard).findByRole("alert")).textContent).toBe(CHAT_MESSAGES.noRequest);
+    expect(app.calls.filter((c) => c === "chat.approve:chat-1:action-1:allow")).toHaveLength(2);
   });
 });

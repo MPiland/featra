@@ -34,7 +34,8 @@ describe("AC4: a request is told as it arrives, saying what it asks", () => {
 
   it("cuts a long title short, as it does a question", () => {
     const body = notificationBody(request(`Approve ${"the app ".repeat(14)}`));
-    expect(body.length).toBeLessThan(120);
+    // The title is cut to 80 characters, its last one the ellipsis.
+    expect(body).toBe(`Ship the release: Approve ${"the app ".repeat(8)}the app…`);
     expect(body).toMatch(/^Ship the release: Approve the app .*…$/);
   });
 

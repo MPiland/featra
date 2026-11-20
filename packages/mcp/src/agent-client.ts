@@ -35,6 +35,8 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
   await opened(socket);
 
   let next = 1;
+  /** How many `request_action` calls this process made: each one's name. */
+  let actions = 0;
   const pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
   const failAll = (message: string) => {
     for (const waiter of pending.values()) waiter.reject(new Error(message));
@@ -114,10 +116,19 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       if (!isRecord(result) || result.asked !== true) throw new Error("Featra gave an unexpected answer.");
       return { asked: true };
     },
-    async requestAction(input) {
-      const result = parseActionOutcome(await call("action.request", input));
-      if (!result) throw new Error("Featra gave an unexpected answer.");
-      return result;
+    async requestAction(input, signal) {
+      // The call has a name of its own, so that when the agent's host drops it, the request it made ends with it.
+      const name = `action-${++actions}`;
+      const drop = () => void call("action.cancel", { call: name }).catch(() => {});
+      signal?.addEventListener("abort", drop, { once: true });
+      try {
+        if (signal?.aborted) throw new Error("The call was cancelled.");
+        const result = parseActionOutcome(await call("action.request", { ...input, call: name }));
+        if (!result) throw new Error("Featra gave an unexpected answer.");
+        return result;
+      } finally {
+        signal?.removeEventListener("abort", drop);
+      }
     },
     async propose(input) {
       const result = await call("checks.propose", input);

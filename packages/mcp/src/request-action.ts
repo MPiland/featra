@@ -25,21 +25,30 @@ export const REQUEST_ACTION: Tool = {
     properties: {
       title: {
         type: "string",
+        maxLength: ACTION_LIMITS.title,
         description: `What the user should do, in a short line (under ${ACTION_LIMITS.title} characters), such as "Sign in to the GitHub CLI".`,
       },
       why: {
         type: "string",
+        maxLength: ACTION_LIMITS.why,
         description: `Why you need it, in a sentence or two (under ${ACTION_LIMITS.why} characters). Leave it out when the title says it.`,
       },
       steps: {
         type: "array",
+        minItems: 1,
+        maxItems: ACTION_LIMITS.steps,
         description: `The steps, in order (1 to ${ACTION_LIMITS.steps}).`,
         items: {
           type: "object",
           properties: {
-            text: { type: "string", description: "What to do in this step, in one or two sentences." },
+            text: {
+              type: "string",
+              maxLength: ACTION_LIMITS.step,
+              description: "What to do in this step, in one or two sentences.",
+            },
             command: {
               type: "string",
+              maxLength: ACTION_LIMITS.command,
               description: "The exact command to run for this step, if it runs one. Leave it out otherwise.",
             },
           },
@@ -49,10 +58,10 @@ export const REQUEST_ACTION: Tool = {
     },
     required: ["title", "steps"],
   },
-  async run(input, host) {
+  async run(input, host, signal) {
     const parsed = parseActionRequest(input);
     if (!parsed.ok) throw new ToolRefusal(parsed.error);
-    const answer = await host.requestAction(parsed.value);
+    const answer = await host.requestAction(parsed.value, signal);
     return answer.outcome === "done" ? ACTION_RESULTS.done : ACTION_RESULTS.cant(answer.reason);
   },
 };

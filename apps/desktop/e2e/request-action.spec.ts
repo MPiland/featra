@@ -69,7 +69,11 @@ test("an agent's request is a card the user copies from and answers, in the chat
     await expect(card(page).getByRole("button", { name: /^Copy the command of step/ })).toHaveCount(2);
     await expect(card(page).getByRole("button", { name: "Done", exact: true })).toBeVisible();
     await expect(card(page).getByRole("button", { name: "Can't do it", exact: true })).toBeVisible();
-    await uxShot(page, "feat20-request-chat-card", card(page));
+    // Review S1: the row's head reads Request with the title once, in the card; the agent's own row for the call is hidden.
+    await expect(log(page).locator(".chat-tool-name")).toHaveText(["Request"]);
+    await expect(log(page).getByText(TITLE, { exact: true })).toHaveCount(1);
+    await expect(log(page)).not.toContainText("mcp__featra__request_action");
+    await uxShot(page, "feat20-request-chat-card", log(page));
 
     // AC2, AC6: Copy puts the command on the clipboard, and nothing runs it.
     await card(page).getByRole("button", { name: "Copy the command of step 1" }).click();
