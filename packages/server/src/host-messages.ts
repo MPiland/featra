@@ -32,13 +32,16 @@ export function parseHostMessage(raw: unknown): HostMessage | null {
   return null;
 }
 
+/** True for a whole number JavaScript holds exactly, narrowing it to a number. */
+const wholeNumber = (value: unknown): value is number => Number.isSafeInteger(value);
+
 export function parseServerMessage(raw: unknown): ServerMessage | null {
   if (!isRecord(raw)) return null;
   if (raw.type === "listening" && typeof raw.port === "number") return { type: "listening", port: raw.port };
   if (raw.type === "projects-ack" && typeof raw.seq === "number") return { type: "projects-ack", seq: raw.seq };
   if (raw.type === "log" && typeof raw.message === "string") return { type: "log", message: raw.message };
   if (raw.type === "failed" && typeof raw.error === "string") return { type: "failed", error: raw.error };
-  if (raw.type === "waiting" && typeof raw.count === "number" && Number.isSafeInteger(raw.count) && raw.count >= 0) {
+  if (raw.type === "waiting" && wholeNumber(raw.count) && raw.count >= 0) {
     return { type: "waiting", count: raw.count };
   }
   return null;

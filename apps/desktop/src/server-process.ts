@@ -137,7 +137,8 @@ export function createServerProcess({
           case "log":
             return say(`Server: ${message.message}`);
           case "waiting":
-            return waiting(message.count);
+            // A server main has stopped or replaced no longer speaks for the agents.
+            return running?.child === child ? waiting(message.count) : undefined;
           default:
             return message satisfies never;
         }
@@ -150,7 +151,8 @@ export function createServerProcess({
         if (running?.child === child) running = null;
         for (const ack of acks.values()) ack(); // nothing to wait for: a new server gets the list when it starts
         acks.clear();
-        waiting(0);
+        // Its agents went with it; a newer server already running reports its own.
+        if (!running) waiting(0);
         say(`Server stopped (${signal ?? `exit code ${code}`})`);
         done(null);
       });

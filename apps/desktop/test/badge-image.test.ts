@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BADGE_PX, BADGE_RED, BADGE_WHITE, overlayBitmap, overlayLabel } from "../src/badge-image.ts";
+import { BADGE_PX, BADGE_RED, BADGE_WHITE, overlayBitmap, overlayLabel, withDot } from "../src/badge-image.ts";
 import { contrast, type Rgba } from "../e2e/contrast.ts";
 
 const rgba = (c: readonly number[]) => [...c, 1] as Rgba;
@@ -62,5 +62,35 @@ describe("AC1: the taskbar overlay draws the count on a red disc", () => {
 
   it("has white on red at 4.5:1 or more, so the number reads at 16 pixels", () => {
     expect(contrast(rgba(BADGE_WHITE), rgba(BADGE_RED))).toBeGreaterThanOrEqual(4.5);
+  });
+});
+/** A 32-pixel icon of solid grey, premultiplied BGRA, as Electron gives the tray icon. */
+const icon = () => Buffer.alloc(BADGE_PX * BADGE_PX * 4, 0x80);
+/** The BGRA bytes of the pixel at (x, y). */
+const pixel = (bitmap: Buffer, x: number, y: number) => [
+  ...bitmap.subarray((y * BADGE_PX + x) * 4, (y * BADGE_PX + x) * 4 + 4),
+];
+
+describe("AC5: the tray icon with agents waiting has a red dot", () => {
+  const [red, green, blue] = BADGE_RED;
+
+  it("draws an opaque red dot in the bottom-right corner", () => {
+    const dotted = withDot(icon(), BADGE_PX);
+    expect(pixel(dotted, BADGE_PX - 6, BADGE_PX - 6)).toEqual([blue, green, red, 255]);
+  });
+
+  it("leaves the rest of the icon as it was, and the icon given untouched", () => {
+    const base = icon();
+    const dotted = withDot(base, BADGE_PX);
+    expect(dotted.length).toBe(base.length);
+    expect(pixel(dotted, 2, 2)).toEqual([0x80, 0x80, 0x80, 0x80]);
+    expect(pixel(dotted, BADGE_PX - 6, 2)).toEqual([0x80, 0x80, 0x80, 0x80]);
+    expect(base.every((byte) => byte === 0x80)).toBe(true);
+  });
+
+  it("cuts a clear ring around the dot, so it reads on any icon", () => {
+    const dotted = withDot(icon(), BADGE_PX);
+    const ring = [...Array(BADGE_PX).keys()].map((x) => pixel(dotted, x, BADGE_PX - 6)).filter(([, , , a]) => a === 0);
+    expect(ring.length).toBeGreaterThan(0);
   });
 });

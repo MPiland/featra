@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 export interface AllowedProjects {
   set: (dirs: readonly string[]) => void;
   has: (dir: string) => boolean;
-  /** The folders as the host sent them. */
+  /** The folders as the host sent them, each once: a folder listed again, in any spelling that compares the same, is dropped. */
   dirs: () => string[];
   /** Calls `listener` after every change of the list; returns the stop. */
   onChange: (listener: () => void) => () => void;
@@ -24,8 +24,13 @@ export function createAllowedProjects(platform: string = process.platform): Allo
   const listeners = new Set<() => void>();
   return {
     set: (next) => {
-      dirs = new Set(next.map(key));
-      originals = [...next];
+      dirs = new Set();
+      originals = [];
+      for (const dir of next) {
+        if (dirs.has(key(dir))) continue;
+        dirs.add(key(dir));
+        originals.push(dir);
+      }
       for (const listener of listeners) listener();
     },
     has: (dir) => dirs.has(key(dir)),

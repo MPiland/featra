@@ -9,20 +9,27 @@ import { e2e, testHooks } from "./test-hooks.ts";
  */
 export function createOsBadge(window: () => BrowserWindow | undefined, log: (message: string) => void): Badge {
   const record = testHooks.badge;
+  const note = (shows: string) => {
+    const win = window();
+    if (e2e) record.calls.push({ on: "badge", shows, visible: !!win && !win.isDestroyed() && win.isVisible() });
+  };
   return createBadge({
     platform: process.platform,
     dock: app.dock && {
       setBadge(text) {
         app.dock?.setBadge(text);
         if (e2e) record.dock = text;
+        note(text);
       },
     },
     setBadgeCount(count) {
       if (e2e) record.launcher = count;
+      note(count > 0 ? String(count) : "");
       return app.setBadgeCount(count);
     },
     setOverlay(overlay, description) {
       const win = window();
+      note(overlay?.label ?? "");
       if (!win || win.isDestroyed()) return;
       const image =
         overlay &&

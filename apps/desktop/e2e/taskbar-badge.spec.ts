@@ -4,7 +4,16 @@ import { NEEDS_COPY } from "@featra/client/bridge";
 import { newCard, serializeCard } from "@featra/work-format";
 import { expect, test, type ElectronApplication, type Page } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
-import { launch, queueFolderPicks, tempProject, tempUserData } from "./app.ts";
+import {
+  clickDock,
+  clickTray,
+  closeFromOs,
+  launch,
+  queueFolderPicks,
+  tempProject,
+  tempUserData,
+  windowVisible,
+} from "./app.ts";
 import { git, project } from "./draft-project.ts";
 import { pressShortcut } from "./keys.ts";
 
@@ -22,6 +31,7 @@ interface Shown {
 }
 
 interface BadgeHooks {
+  calls: { on: "badge" | "tray"; shows: string; visible: boolean; dot?: boolean }[];
   dock?: string;
   launcher?: number;
   overlay?: { label: string; description: string; width: number; height: number; empty: boolean } | null;
@@ -41,6 +51,20 @@ const badge = (app: ElectronApplication): Promise<Shown> =>
     }
     return { text: hooks.launcher ? String(hooks.launcher) : "" };
   });
+
+/** The badge calls Featra has made, in order. */
+const badgeCalls = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as typeof globalThis & { featraTest: { badge: BadgeHooks } }).featraTest.badge.calls);
+
+/** The tray icon's calls Featra has made, in order: its tooltip, whether it had the dot, and whether the window showed. */
+const trayCalls = async (app: ElectronApplication) => (await badgeCalls(app)).filter((c) => c.on === "tray");
+
+/** The tray icon for `n` waiting agents: the dot and the count in the tooltip, or the plain icon. */
+const trayShowing = (n: number) =>
+  n === 0 ? { dot: false, shows: "Featra" } : { dot: true, shows: NEEDS_COPY.waiting(n) };
+
+/** Featra keeps a tray on Windows and Linux; macOS has the Dock instead. */
+const hasTray = process.platform !== "darwin";
 
 /** What the badge shows for `n` waiting agents on this OS. */
 const showing = (n: number): Shown =>
@@ -114,6 +138,21 @@ test("the badge counts the agents waiting across projects, leaves reviews out, a
     await expect(switcher).toHaveAccessibleName(new RegExp(`^Switch project: ${basename(other.dir)}`));
     await agentAsks(page);
     await expect.poll(() => badge(app)).toEqual(showing(2));
+    // AC5: the tray icon has the dot, and its tooltip says how many.
+    if (hasTray) await expect.poll(async () => (await trayCalls(app)).at(-1)).toMatchObject(trayShowing(2));
+
+    // AC1, regression (review): a window hidden to the tray and brought back has its badge set again once it shows,
+    // as Windows drops the overlay of a taskbar button that is made again.
+    await closeFromOs(app);
+    await expect.poll(() => windowVisible(app)).toBe(false);
+    const before = (await badgeCalls(app)).length;
+    if (process.platform === "darwin") await clickDock(app);
+    else await clickTray(app);
+    await expect.poll(() => windowVisible(app)).toBe(true);
+    await expect
+      .poll(async () => (await badgeCalls(app)).slice(before).filter((c) => c.visible && c.shows === "2").length)
+      .toBeGreaterThanOrEqual(2);
+    expect(await badge(app)).toEqual(showing(2));
 
     // AC3: answering one, inline, takes the badge down by one.
     await approval(page).getByRole("button", { name: "Allow", exact: true }).click();
@@ -124,8 +163,18 @@ test("the badge counts the agents waiting across projects, leaves reviews out, a
     await page.getByRole("button", { name: /^Inbox/ }).click();
     const item = page.getByRole("region", { name: "Waiting for you" }).getByRole("listitem");
     await expect(item).toHaveCount(1, { timeout: 15_000 });
-    await item.getByRole("button", { name: "Allow", exact: true }).click();
+    if (hasTray) expect((await trayCalls(app)).at(-1)).toMatchObject(trayShowing(1));
+    // AC5: with the window hidden to the tray, the answer (sent from the hidden page, as the OS can't click it)
+    // takes the tray back to the plain icon.
+    await closeFromOs(app);
+    await expect.poll(() => windowVisible(app)).toBe(false);
+    const hidden = (await trayCalls(app)).length;
+    await item.getByRole("button", { name: "Allow", exact: true }).dispatchEvent("click");
     await expect.poll(() => badge(app)).toEqual(showing(0));
+    if (hasTray)
+      await expect
+        .poll(async () => (await trayCalls(app)).slice(hidden))
+        .toEqual([{ on: "tray", visible: false, ...trayShowing(0) }]);
   } finally {
     await app.close();
     await userData.dispose();

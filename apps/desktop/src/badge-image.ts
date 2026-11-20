@@ -52,14 +52,13 @@ function inkAt(label: string): (x: number, y: number) => boolean {
   };
 }
 
-/** How much of the pixel at (x, y) the disc covers, from 0 to 1. */
-function discCover(x: number, y: number): number {
-  const r = BADGE_PX / 2;
+/** How much of the pixel at (x, y) a disc of radius `r` centred at (`c`, `c`) covers, from 0 to 1. */
+function discCover(x: number, y: number, c = BADGE_PX / 2, r = BADGE_PX / 2): number {
   let inside = 0;
   for (let i = 0; i < AA; i += 1)
     for (let j = 0; j < AA; j += 1) {
-      const dx = x + (i + 0.5) / AA - r;
-      const dy = y + (j + 0.5) / AA - r;
+      const dx = x + (i + 0.5) / AA - c;
+      const dy = y + (j + 0.5) / AA - c;
       if (dx * dx + dy * dy <= r * r) inside += 1;
     }
   return inside / (AA * AA);
@@ -81,6 +80,29 @@ export function overlayBitmap(label: string): Buffer {
       out[at + 1] = Math.round(g * alpha);
       out[at + 2] = Math.round(r * alpha);
       out[at + 3] = Math.round(255 * alpha);
+    }
+  return out;
+}
+/**
+ * The tray icon with agents waiting (STORY-67): `icon`, `size` × `size` pixels in premultiplied BGRA (what Electron's
+ * `toBitmap` gives), with the badge's red dot in its bottom-right corner and a clear ring cut around the dot, so it
+ * reads on a light or dark tray. A tray icon is too small for a number, so the count is in the tooltip. A new buffer.
+ */
+export function withDot(icon: Buffer, size: number): Buffer {
+  const r = Math.round(size * 0.28);
+  const ring = r + Math.max(1, Math.round(size / 16));
+  const c = size - r;
+  const out = Buffer.from(icon);
+  for (let y = 0; y < size; y += 1)
+    for (let x = 0; x < size; x += 1) {
+      const keep = 1 - discCover(x, y, c, ring);
+      const dot = discCover(x, y, c, r);
+      if (keep === 1 && dot === 0) continue;
+      const at = (y * size + x) * 4;
+      const [red, green, blue] = BADGE_RED;
+      [blue, green, red, 255].forEach((value, i) => {
+        out[at + i] = Math.round(value * dot + (out[at + i] ?? 0) * keep * (1 - dot));
+      });
     }
   return out;
 }

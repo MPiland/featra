@@ -9,7 +9,9 @@ import { createLifecycle, onWslg } from "./lifecycle.ts";
 import { createLog, type Log } from "./log.ts";
 import { readLoginPath, readsLoginPath } from "./login-path.ts";
 import { createNotifier } from "./notifier.ts";
+import { keepBadgeOn } from "./badge-window.ts";
 import { createOsBadge } from "./os-badge.ts";
+import { createTrayBadge } from "./tray-badge.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
 import { createServerProcess, startAfter } from "./server-process.ts";
@@ -77,6 +79,7 @@ if (!takeInstanceLock(app, userDataDir)) {
     () => win,
     (message) => log.info(message),
   );
+  const trayBadge = createTrayBadge();
   // The local server makes every project write (ADR 0012, ADR 0015). It runs on Electron's own Node, with the PATH.
   const server = startAfter(
     takeLoginPath(log),
@@ -86,7 +89,11 @@ if (!takeInstanceLock(app, userDataDir)) {
       execPath: process.execPath,
       log: (message) => log.info(message),
       dataDir: app.getPath("userData"),
-      waiting: (count) => void app.whenReady().then(() => badge.show(count)),
+      waiting: (count) =>
+        void app.whenReady().then(() => {
+          badge.show(count);
+          trayBadge.show(count);
+        }),
     }),
   );
   const client = clientIndex({ appPath: app.getAppPath(), packaged: app.isPackaged });
@@ -120,9 +127,9 @@ if (!takeInstanceLock(app, userDataDir)) {
     });
     // The tray icon is there while close keeps Featra running, and goes when the Close button is set to quit.
     const syncTray = (w: BrowserWindow) => {
-      if (lifecycle.usesTray && !tray) tray = createTray(w, lifecycle);
+      if (lifecycle.usesTray && !tray) tray = createTray(w, lifecycle, trayBadge);
       else if (!lifecycle.usesTray && tray) {
-        destroyTray(tray);
+        destroyTray(tray, trayBadge);
         tray = undefined;
       }
     };
@@ -199,7 +206,7 @@ if (!takeInstanceLock(app, userDataDir)) {
 
     // Only reached when close doesn't hide the window (the Close button is set to Quit).
     app.on("window-all-closed", () => {
-      if (tray) destroyTray(tray);
+      if (tray) destroyTray(tray, trayBadge);
       tray = undefined;
       lifecycle.allWindowsClosed();
     });
@@ -208,21 +215,24 @@ if (!takeInstanceLock(app, userDataDir)) {
     app.on("second-instance", () => {
       if (win && !win.isDestroyed()) lifecycle.reveal(win);
     });
+    /** The window, logged as it hides and shows, keeping the badge on its taskbar button, managed by the lifecycle. */
+    const openWindow = () => {
+      const w = createWindow(client);
+      w.on("hide", () => log.info("Window hidden"));
+      w.on("show", () => log.info("Window shown"));
+      keepBadgeOn(w, badge);
+      lifecycle.manage(w);
+      return w;
+    };
     // macOS: clicking the Dock icon brings the hidden window back.
     app.on("activate", () => {
       if (win && !win.isDestroyed()) lifecycle.reveal(win);
-      else lifecycle.manage((win = createWindow(client)));
+      else win = openWindow();
     });
 
     // Apply a pinned theme before the window exists so its background matches from the first frame.
     nativeTheme.themeSource = appSettings.theme;
-    win = createWindow(client);
-    win.on("hide", () => log.info("Window hidden"));
-    win.on("show", () => {
-      log.info("Window shown");
-      badge.refresh();
-    });
-    lifecycle.manage(win);
+    win = openWindow();
     syncTray(win);
   });
 

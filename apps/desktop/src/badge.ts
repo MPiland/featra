@@ -31,6 +31,9 @@ export interface Badge {
   refresh: () => void;
 }
 
+/** The count a badge shows: a whole number above 0, or 0 for anything else. */
+export const badgeCount = (count: number): number => (Number.isSafeInteger(count) && count > 0 ? count : 0);
+
 export function createBadge({ platform, dock, setBadgeCount, setOverlay, log }: BadgeDeps): Badge {
   let count = 0;
   let toldNoCount = false;
@@ -53,7 +56,7 @@ export function createBadge({ platform, dock, setBadgeCount, setOverlay, log }: 
 
   return {
     show(next) {
-      const valid = Number.isSafeInteger(next) && next > 0 ? next : 0;
+      const valid = badgeCount(next);
       if (valid === count) return;
       count = valid;
       apply();

@@ -3113,3 +3113,20 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   its count. One e2e journey across two projects runs on all three OSes. It reads macOS's Dock badge back from the Dock;
   Windows' overlay and Linux's count can't be read back, so it reads the calls Featra made (`featraTest.badge`), with
   the overlay as Electron took it (16 × 16, not empty).
+- **Review fixes (Dev Lead review).** The overlay is set again on `show`, once more 200 ms later (Windows makes the
+  taskbar button after the window shows and drops an overlay set before it), and on `restore` and `focus`, all in one
+  helper, `keepBadgeOn`, which main attaches to every window it makes, the one re-created on `activate` too. The
+  journey hides to the tray, reveals, and checks main set the badge again with the current count while the window was
+  visible (`featraTest.badge.calls`). A stopped server's late messages and exit no longer reset the badge once a newer
+  server runs. The host's project list is deduped by `projectKey`, so a folder sent in two cases counts its agents once.
+  ADR 0041 is amended: the needs service starts with the server.
+- **The tray shows it too (AC5, scope the user added).** While agents wait, the tray icon gets a red dot in its
+  bottom-right corner (the badge's red, with a clear ring cut around it so it reads on a light or dark tray) and its
+  tooltip says how many, in the switcher's words ("2 agents waiting"); at 0 it is the plain icon and "Featra" again.
+  A dot, not a number: a 16-point tray icon has no room for digits, and the tooltip carries the count. The dotted icon
+  is drawn once in code over the tray icon's own high-DPI pixels (`withDot` in badge-image.ts), so no image ships per
+  state. `createTrayBadge` keeps the count, as the tray comes and goes with the Close button setting: a tray made while
+  agents wait gets it at once. **macOS has no tray** (Featra keeps running in the Dock there), and the
+  Dock's badge already shows the number, so nothing is added; `tray.setTitle` would mean a menu bar item Featra
+  doesn't have. The journey answers the last agent with the window hidden to the tray and reads the tray's calls from
+  `featraTest.badge.calls`, since a test can't read the notification area.

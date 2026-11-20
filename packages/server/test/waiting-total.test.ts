@@ -41,8 +41,8 @@ afterEach(async () => {
 });
 
 /** The badge's reports from a needs service over `w`, and the service, to see what the switcher gets beside it. */
-function badge(w: ReturnType<typeof world>) {
-  const needs = createProjectNeeds({ allowed, watches, chats: w.manager, log: () => {} });
+function badge(w: ReturnType<typeof world>, list: AllowedProjects = allowed, platform?: string) {
+  const needs = createProjectNeeds({ allowed: list, watches, chats: w.manager, log: () => {}, platform });
   const reports: number[] = [];
   const stop = watchWaitingTotal(needs, (count) => reports.push(count));
   stops.push(stop, () => needs.close());
@@ -83,6 +83,17 @@ describe("AC1: the badge counts the waiting agents across every open project, as
     await until(() => n.last() === 0);
     expect(n.reports).toEqual([0, 1, 0]);
   });
+
+  // Regression (STORY-67 review): a folder the host listed in two cases was two projects, so its agent counted twice.
+  it("counts an agent once when its folder is listed in two cases where case doesn't matter", async () => {
+    const caseless = createAllowedProjects("win32");
+    caseless.set([a.main, a.main.toUpperCase(), b.main]);
+    const w = world();
+    const n = badge(w, caseless, "win32");
+    await (await w.chatCalling({ dir: a.main })).askApproval();
+    await until(() => n.last() !== 0);
+    expect(n.reports).toEqual([0, 1]);
+  });
 });
 
 describe("AC3: the badge clears when no agent is waiting, and updates live", () => {
@@ -104,15 +115,17 @@ describe("AC3: the badge clears when no agent is waiting, and updates live", () 
 });
 
 describe("AC4: reviews don't change the badge", () => {
-  it("reports nothing when a project gains a draft feature to review", async () => {
+  it("keeps the count when a project gains a draft feature to review, with an agent waiting", async () => {
     const w = world();
     const n = badge(w);
+    await (await w.chatCalling({ dir: a.main })).askApproval();
+    await until(() => n.last() === 1);
     const review = new Promise<void>((resolve) =>
       n.needs.watch((list) => list.projects.some((p) => p.review) && resolve()),
     );
     await n.needs.ready();
     await b.write(b.main, card("FEAT-2", "feature", null, "draft", { extra: { "drafted-by": "chat-1" } }));
     await review;
-    expect(n.reports).toEqual([0]);
+    expect(n.reports).toEqual([0, 1]);
   });
 });
