@@ -1,4 +1,4 @@
-import { normalizeInboxItem, type InboxItem } from "@featra/work-format";
+import { REQUEST_ACTION_TOOL, actionAsk, normalizeInboxItem, type InboxItem } from "@featra/work-format";
 
 /** What the notifier needs from Electron and the app, so its rules run in tests without either. */
 export interface NotifierDeps {
@@ -20,10 +20,14 @@ export interface Notifier {
 /** The notification's one line: which chat, and what it needs. */
 export function notificationBody(item: InboxItem): string {
   const { request } = item;
+  // An agent's request to the user (STORY-68) says what it asks, as a question does, not "approve request_action".
+  const action = request.type === "approval" && request.name === REQUEST_ACTION_TOOL ? actionAsk(request.input) : null;
+  if (action) return `${item.chatName}: ${cut(action.title)}`;
   if (request.type === "approval") return `${item.chatName}: approve ${request.name}`;
-  const ask = request.questions[0]?.question ?? "";
-  return `${item.chatName}: ${ask.length > MAX_ASK ? `${ask.slice(0, MAX_ASK - 1).trimEnd()}…` : ask}`;
+  return `${item.chatName}: ${cut(request.questions[0]?.question ?? "")}`;
 }
+
+const cut = (ask: string) => (ask.length > MAX_ASK ? `${ask.slice(0, MAX_ASK - 1).trimEnd()}…` : ask);
 
 /** How much of a question the notification quotes. */
 const MAX_ASK = 80;

@@ -1,6 +1,6 @@
 /**
  * The scripted turns of fake-agent-sdk.mjs that need more than a reply: a background subagent (STORY-55), an
- * AskUserQuestion and a report_bug (STORY-13). Each takes the SDK fake's message builders as `h`, so the numbering and
+ * AskUserQuestion, a report_bug (STORY-13) and a request_action (STORY-68). Each takes the SDK fake's message builders as `h`, so the numbering and
  * token use stay in one place.
  */
 import { callMcpTool } from "./fake-mcp-client.mjs";
@@ -109,6 +109,38 @@ export async function* reportBugTurn(h, options) {
   const id = `toolu_mcp_${next()}`;
   yield assistant(`msg_${next()}`, [{ type: "tool_use", id, name: "mcp__featra__report_bug", input: REPORTED_BUG }]);
   const result = await callMcpTool(spec, "report_bug", REPORTED_BUG);
+  yield toolResult(id, result.text, result.isError);
+  yield* say(`Tool said: ${result.text}`);
+  yield success("Done.");
+}
+
+/** The request the fake agent makes: its last command would leave a file at FEATRA_E2E_ACTION_MARKER if it ever ran. */
+export function requestedAction() {
+  const marker = process.env.FEATRA_E2E_ACTION_MARKER ?? "featra-action-ran.txt";
+  return {
+    title: "Sign in to the CLI",
+    why: "The release needs your account.",
+    steps: [
+      { text: "Run this in a terminal.", command: "gh auth login" },
+      { text: "Pick your account in the browser." },
+      { text: "Check it worked.", command: `node -e "require('fs').writeFileSync(${JSON.stringify(marker)}, 'ran')"` },
+    ],
+  };
+}
+
+/** Asks the user to do something through the Featra MCP's request_action, and says back the call's result. */
+export async function* requestActionTurn(h, options) {
+  const { assistant, toolResult, say, success, next } = h;
+  const spec = options.mcpServers?.featra;
+  if (!spec) {
+    yield* say("No Featra MCP.");
+    yield success("No Featra MCP.");
+    return;
+  }
+  const id = `toolu_mcp_${next()}`;
+  const input = requestedAction();
+  yield assistant(`msg_${next()}`, [{ type: "tool_use", id, name: "mcp__featra__request_action", input }]);
+  const result = await callMcpTool(spec, "request_action", input);
   yield toolResult(id, result.text, result.isError);
   yield* say(`Tool said: ${result.text}`);
   yield success("Done.");

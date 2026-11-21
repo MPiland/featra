@@ -3,6 +3,7 @@
  * The session itself runs in the local server; this module holds the bridge's shape, its wording, and how the client
  * calls the server.
  */
+import { ACTION_COPY, REQUEST_ACTION_TOOL } from "@featra/work-format/action-request";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
 import type { Answers } from "@featra/work-format/questions";
 import {
@@ -160,11 +161,23 @@ export function noticeText(notice: ChatNotice): string {
 }
 
 /** The mark a tool row's head shows: where its approval stands, or how it ended unanswered; null for none. */
+/**
+ * A tool row's head: the tool and a short summary. An agent's request to do something (STORY-68) reads as a Request,
+ * and its title shows once: in the card while it waits, in the head after.
+ */
+export function toolHead(item: Extract<ChatItem, { kind: "tool" }>): { name: string; summary: string } {
+  if (item.name !== REQUEST_ACTION_TOOL) return { name: item.name, summary: item.summary };
+  return { name: ACTION_COPY.kind, summary: item.approval?.status === "pending" ? "" : item.summary };
+}
+
 export function toolMark(item: Extract<ChatItem, { kind: "tool" }>): string | null {
-  if (item.denied) return CHAT_COPY.denied;
+  // An agent's request to do something (STORY-68) says how the user answered it, not that a call was allowed.
+  const action = item.name === REQUEST_ACTION_TOOL;
+  if (item.denied) return action ? ACTION_COPY.cantDo : CHAT_COPY.denied;
   if (item.stopped) return CHAT_COPY.toolStopped;
   if (item.cancelled) return CHAT_COPY.cancelled;
-  if (item.approval?.status === "pending") return CHAT_COPY.needsApproval;
+  if (item.approval?.status === "pending") return action ? ACTION_COPY.waiting : CHAT_COPY.needsApproval;
+  if (item.approval?.status === "allowed" && action) return ACTION_COPY.done;
   if (item.approval?.status === "allowed")
     return item.approval.scope === "chat" ? CHAT_COPY.allowedForChat : CHAT_COPY.allowed;
   return null;

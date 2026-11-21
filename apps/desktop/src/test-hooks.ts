@@ -12,6 +12,8 @@ export interface TestHooks {
   shownInFolder: string[];
   /** Links Featra asked the OS browser to open (a story's PR). */
   openedExternal: string[];
+  /** Text Featra put on the clipboard (STORY-68's Copy on a command). */
+  copied: string[];
   /** Folders the next folder dialogs return, in order; an empty queue is a cancelled dialog. */
   folderPicks: string[];
   /** Titles of the folder dialogs Featra opened. */
@@ -60,6 +62,7 @@ export const testHooks: TestHooks = {
   notices: [],
   shownInFolder: [],
   openedExternal: [],
+  copied: [],
   folderPicks: [],
   folderDialogs: [],
   notifications: [],

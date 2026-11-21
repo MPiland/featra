@@ -1,5 +1,6 @@
 /** The session manager's interface and its dependencies (ADR 0018); `chat-manager.ts` builds it. */
 import type {
+  ActionOutcome,
   Answers,
   ApprovalAnswer,
   ChatControlState,
@@ -69,6 +70,11 @@ export interface ChatManager {
    * first, so the user never answered.
    */
   askChoice: (id: string, request: AppApproval) => Promise<ChoiceAnswer>;
+  /**
+   * Asks the user, in chat id and the Inbox, to do something for its agent (STORY-68's request_action), and waits for
+   * Done or Can't do it. Null when the request ended unanswered: `signal` (the call dropped), or the chat's agent ending.
+   */
+  askAction: (id: string, request: AppApproval, signal: AbortSignal) => Promise<ActionOutcome | null>;
   /** Puts a notice in the Dev Lead's chat `id`, as story sessions' notices are (STORY-12: how a merge it asked for went). */
   notify: (id: string, notice: Notice) => void;
   /** Takes a story session that is queued and has never started out of the queue, and forgets it. False if it isn't one. */

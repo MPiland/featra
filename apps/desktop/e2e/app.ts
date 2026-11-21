@@ -72,6 +72,7 @@ interface TestHooks {
   notices: string[];
   shownInFolder: string[];
   openedExternal: string[];
+  copied: string[];
   folderPicks: string[];
   folderDialogs: string[];
   notifications: { title: string; body: string; click: () => void }[];
@@ -122,6 +123,9 @@ export const shownInFolder = (app: ElectronApplication) =>
 /** Links Featra asked the OS browser to open (a PR chip's link). */
 export const openedExternal = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.openedExternal);
+/** Text Featra put on the clipboard (a request's Copy on a command). */
+export const copiedText = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as MainGlobal).featraTest.copied);
 /** Queues the folders the next folder dialogs return (Playwright can't drive the OS picker); then they cancel. */
 export const queueFolderPicks = (app: ElectronApplication, ...dirs: string[]) =>
   app.evaluate((_e, picks) => {

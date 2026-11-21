@@ -9,6 +9,7 @@ import { access } from "node:fs/promises";
 import {
   AGENT_PATH,
   assertNever,
+  parseActionRequest,
   parseDraft,
   parseLogInput,
   parseReportInput,
@@ -21,6 +22,7 @@ import {
   type AgentMethods,
   type KnowledgePermission,
 } from "@featra/work-format";
+import { callName, type ActionRequestService } from "./action-request.ts";
 import { createLeadCalls } from "./agent-lead.ts";
 import { AGENT_MESSAGES } from "./agent-messages.ts";
 import { ApiError } from "./api-error.ts";
@@ -75,6 +77,8 @@ export interface AgentBridgeDeps {
   merges?: MergeRequest;
   /** Asks the user to place a bug the Dev Lead reports (STORY-13). Without it `bug.report` is refused. */
   bugs?: BugRequest;
+  /** Asks the user to do something for any chat's agent (STORY-68). Without it `action.request` is refused. */
+  actions?: ActionRequestService;
   newToken?: () => string;
 }
 
@@ -83,8 +87,18 @@ export interface AgentBridge extends McpAttach {
   setPort: (port: number | null) => void;
   /** The chat a connection's secret belongs to; null for any other. */
   resolve: (token: string) => string | null;
-  /** One request from a chat's MCP process. */
-  call: (chat: string, method: AgentMethod, params: unknown) => Promise<AgentMethods[AgentMethod]["result"]>;
+  /**
+   * One request from a chat's MCP process, on its connection `link` (any object that stands for it): a request the
+   * call makes ends with the call (`action.cancel`) or the connection (`dropped`).
+   */
+  call: (
+    chat: string,
+    method: AgentMethod,
+    params: unknown,
+    link?: object,
+  ) => Promise<AgentMethods[AgentMethod]["result"]>;
+  /** The MCP's connection `link` closed, as when its process ends: what its calls still wait on ends as cancelled. */
+  dropped: (link: object) => void;
   /** Takes back an entry the chat's agent logged (the user's Undo). */
   undo: (chat: string, entry: string) => Promise<void>;
 }
@@ -110,6 +124,7 @@ export function createAgentBridge({
   checkSettings,
   merges,
   bugs,
+  actions,
   newToken = () => randomBytes(24).toString("base64url"),
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
@@ -144,6 +159,16 @@ export function createAgentBridge({
     const { entry: id, file, summary } = await writer.append(cwd, chat, input.value, session);
     chats.report(chat, { type: "logged", entry: id, file, summary });
     return { entry: id, file };
+  }
+
+  /** Any chat may ask, a story session too: its request shows in its Dev Lead's chat as well. */
+  async function requestAction(chat: string, dir: string, params: unknown, link: object) {
+    const off = await mcpRefusal(dir);
+    if (off !== null) throw new ApiError(off);
+    if (!actions) throw new ApiError(AGENT_MESSAGES.noAction);
+    const input = parseActionRequest(params);
+    if (!input.ok) throw new ApiError(input.error);
+    return actions.request(chat, input.value, { link, call: callName(params) });
   }
 
   async function draft(chat: string, dir: string, params: unknown) {
@@ -229,7 +254,7 @@ export function createAgentBridge({
       for (const [chat, secret] of byChat) if (sameSecret(token, secret)) found = chat;
       return found;
     },
-    async call(chat, method, params) {
+    async call(chat, method, params, link = {}) {
       const info = chats.info(chat);
       if (!info) throw new ApiError("No such chat.");
       switch (method) {
@@ -249,12 +274,18 @@ export function createAgentBridge({
           return leads.requestMerge(chat, info.dir, info.story, params);
         case "bug.report":
           return leads.reportBug(chat, info.dir, info.story, params);
+        case "action.request":
+          return requestAction(chat, info.dir, params, link);
+        case "action.cancel":
+          actions?.cancel({ link, call: callName(params) });
+          return null;
         case "log.append":
           return appendLog(chat, info.dir, info.cwd ?? info.dir, info.session, params);
         default:
           return assertNever(method);
       }
     },
+    dropped: (link) => actions?.dropped(link),
     async undo(chat, id) {
       await writer.undo(chat, id);
       chats.report(chat, { type: "log-undone", entry: id });

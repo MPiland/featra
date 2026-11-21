@@ -3130,3 +3130,50 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   Dock's badge already shows the number, so nothing is added; `tray.setTitle` would mean a menu bar item Featra
   doesn't have. The journey answers the last agent with the window hidden to the tray and reads the tray's calls from
   `featraTest.badge.calls`, since a test can't read the notification area.
+
+## 2026-11-20 — STORY-68: an agent asks you to do something (dev)
+
+- **A request is an app approval, not a new kind of pending item.** `request_action` (Featra MCP) goes through the
+  agent bridge's `action.request` to `chats.askAction`, which holds it on the approval desk like the MCP's other app
+  approvals (`app: true`), named `request_action`, with the request as its input. So it shares everything a tool
+  approval has: the chat card's place, the Dev Lead's mirror for a story session, the Inbox after the same wait, the
+  notification as it arrives, and the count in the switcher and the badge (`waitingAgents`, `waitingTotal`), with no
+  new code in the Inbox hub or the needs service. The client draws its own card for that name (`ActionRequestPrompt`)
+  in the chat and the Inbox, and the Inbox calls it a "Request".
+- **The answer is Done or Can't do it, with an optional reason.** Done is the approval's allow; Can't do it is its deny,
+  and the deny's reason now rides on the desk's refusal (`Refusal.reason`, cut to the Deny reason's 500 characters) so
+  the call can give it back. The agent is told "The user says it's done." or "The user couldn't do it: <reason>."; both
+  are results, not errors, so the agent reads them as answers. Input that fails the checks (title, why, 1 to 10 steps,
+  each with its text and an optional command, with limits) is refused with what to fix, and nothing is asked.
+- **A request lives as long as its call, not its turn (review B1).** The MCP's CallTool handler passes the host's
+  abort signal (`extra.signal`) to the tool. The MCP names each call (`action-N`) in `action.request` and sends
+  `action.cancel` for it when the host drops the call: its tool timeout (Claude Code's `MCP_TOOL_TIMEOUT`, Codex's
+  60 seconds) or Stop, which cancels the turn's tool calls. The server keeps an `AbortController` per call on each
+  MCP connection and cancels all of them when that connection closes (the MCP's process died). The chat ending cancels
+  it too. A turn ending doesn't: a background subagent can ask after the main result, so the next turn's end must not
+  cancel it. The call then fails as cancelled, never as Can't do it, so the agent can tell a dropped call from the user
+  saying no.
+- **It stays open past the turn the way other app requests do.** The request carries the title as its `subject`, as
+  `report_bug`'s does, so the chat's fold, the waiting count and the Inbox keep it after the turn's end. For a story
+  session, the Dev Lead's mirror keeps the app requests the desk still holds (`desk.holdsApp`) when the session's
+  turn ends; when the session ends they go.
+- **Featra never runs a command.** A step's command is shown as text with a Copy button. Copy goes to main over a new
+  `app:copy-text` IPC message, which only writes the clipboard (Electron's `clipboard.writeText`); under E2E it records
+  the text instead (`featraTest.copied`), so the journey proves what was copied and that nothing ran (the stand-in
+  agent's command would leave a marker file).
+- **Any chat may ask, story sessions included**, when the project's MCP is on, as for the other MCP tools. A story
+  session's request shows in its Dev Lead's chat with the story named, as its tool approvals do.
+- **The notification says what is asked** ("<chat>: Sign in to the CLI", cut like a question), not
+  "approve request_action".
+- **The card stands in for the agent's raw tool row (review S1).** For `request_action`, `request_merge` and
+  `report_bug`, the chat hides the provider's own row for the call (`mcp__featra__request_action` on Claude) once
+  the app's card for it shows (`cardCalls` in work-format). A row pairs with the nearest card of the same tool in the
+  same turn whose text fields match; a call refused for its input never becomes a card, so its row and error stay. The
+  request card's head reads "Request" with no summary while it waits, and the title shows once.
+- **A request's text can't hide what it says (review S2).** The title, why, each step's text and each command refuse
+  control characters other than tab and newline (C0, DEL, C1), bidi embeddings, overrides and isolates, and zero-width
+  spaces and the BOM. Zero-width joiners are allowed in text (emoji, some scripts) and refused in commands.
+- **One Deny reason, everywhere (review S4).** `denyReason()` trims and cuts the reason to 500 characters for both the
+  agent's answer and the chat's `tool-denied` event, and the reason field has that `maxLength`. The clipboard IPC
+  copies at most a command's length.
+- **No ADR:** one more MCP tool and app approval on existing paths, and one IPC message.

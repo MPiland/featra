@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
 import type { ChatItem } from "@featra/work-format/chat";
-import { CHAT_COPY, toolMark } from "../../chats.ts";
+import { CHAT_COPY, toolHead, toolMark } from "../../chats.ts";
 import { ApprovalPrompt, showInput } from "./ApprovalPrompt.tsx";
 
 type ToolItem = Extract<ChatItem, { kind: "tool" }>;
@@ -20,11 +20,12 @@ export function ToolRow({
   const [open, setOpen] = useState(false);
   const failed = item.result?.isError === true;
   const mark = toolMark(item);
+  const head = toolHead(item);
   return (
     <div className={failed || item.denied ? "chat-tool bad" : "chat-tool"}>
       <button type="button" className="chat-tool-head" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span className="chat-tool-name">{item.name}</span>
-        <span className="chat-tool-summary">{item.summary}</span>
+        <span className="chat-tool-name">{head.name}</span>
+        {head.summary && <span className="chat-tool-summary">{head.summary}</span>}
         {mark && <span className="chat-tool-mark">{mark}</span>}
       </button>
       {item.denied && item.reason && <p className="chat-tool-reason">{item.reason}</p>}

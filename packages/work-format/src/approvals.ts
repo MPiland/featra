@@ -23,9 +23,14 @@ export interface ApprovalAnswer {
 /** The longest Deny reason the agent is sent. */
 export const DENY_REASON_MAX = 500;
 
+/** The user's Deny reason as the agent is sent it and the chat shows it: trimmed and cut; undefined when there is none. */
+export function denyReason(reason?: string | null): string | undefined {
+  return reason?.trim().slice(0, DENY_REASON_MAX) || undefined;
+}
+
 /** What the agent is told when the user denies a call, with the user's reason when there is one. */
 export function denyMessage(reason?: string | null): string {
-  const why = reason?.trim().slice(0, DENY_REASON_MAX);
+  const why = denyReason(reason);
   return why ? `The user denied this tool call: ${why}` : "The user denied this tool call.";
 }
 
