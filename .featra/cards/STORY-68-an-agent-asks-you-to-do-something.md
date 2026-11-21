@@ -2,7 +2,7 @@
 id: STORY-68
 type: story
 title: An agent asks you to do something
-status: In Review
+status: Done
 parent: FEAT-20
 order: 3
 origin: added
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: dev
+  - at: 2026-11-21T00:25:39Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-21T00:25:39Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -52,6 +62,8 @@ As a builder, when an agent needs me to do something only I can do (run a comman
 - [x] Client: the request card in the chat and the Inbox
 - [x] Unit and integration tests for each criterion; a journey with the stand-in agent; tests linked on the criteria
 - [x] Decisions recorded for the Dev Lead; move to In Review
+
+## Notes
 
 ## Depends on
 
