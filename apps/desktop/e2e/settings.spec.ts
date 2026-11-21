@@ -10,7 +10,18 @@ import { mac } from "./mac.ts";
  * and FEATRA_E2E_TRAY says whether the desktop has a tray.
  */
 const settingsFile = (dir: string) => join(dir, "settings.json");
-const readSettings = async (dir: string) => JSON.parse(await readFile(settingsFile(dir), "utf8"));
+/**
+ * The stored settings, or none while a fresh profile has no file yet: the first save lands a moment after the click,
+ * and a poll whose read throws fails at once instead of trying again.
+ */
+const readSettings = async (dir: string): Promise<Record<string, unknown>> => {
+  try {
+    return JSON.parse(await readFile(settingsFile(dir), "utf8"));
+  } catch (err) {
+    if (err instanceof Error && "code" in err && err.code === "ENOENT") return {};
+    throw err;
+  }
+};
 const dataTheme = (page: Page) => page.evaluate(() => document.documentElement.dataset.theme ?? "system");
 const pages = (page: Page) => page.getByRole("navigation", { name: "Settings pages" });
 /** macOS keeps a closed app in the Dock and shows no tray icon; the others keep it in the tray. */
