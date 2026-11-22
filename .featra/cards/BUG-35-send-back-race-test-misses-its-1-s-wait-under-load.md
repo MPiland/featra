@@ -56,3 +56,6 @@ take longer than that, so the wait gives up before `open` is called. If so, this
 
 - Found by STORY-65 (PR #76). Gate logs from the two failures are in the STORY-65 session's scratchpad (s65-commit4,
   s65-commit6).
+- Failed again in 2 of 2 full local `pnpm check` runs during STORY-66 (2026-11-19, Windows), with the same assertion at
+  line 265, and passed when run alone. See BUG-37 for the merge request test that failed in the same runs.
+- 2026-11-20: STORY-67's local hook run failed "refuses a Send back whose session was still opening when Accept landed" (story-acceptance.test.ts) once under load; it passed in the other runs and in CI.

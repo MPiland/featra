@@ -26,6 +26,7 @@ import { fakeCardServer } from "./card-server.ts";
 import { fakeChatServer } from "./chat-server.ts";
 import type { HostOptions } from "./harness-options.ts";
 import { fakeChecksServer } from "./checks-server.ts";
+import { fakeNeedsServer } from "./needs-server.ts";
 import { fakeRolesServer } from "./roles-server.ts";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
@@ -90,6 +91,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   );
   const chats: ReturnType<typeof fakeChatServer> = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
+  const needs = fakeNeedsServer(host.needs);
   const listOf = (dir: string) => cards.listOf(dir) ?? workLists.get(dir) ?? EMPTY_WORK_LIST;
   const bridge: FeatraBridge = {
     platform,
@@ -193,6 +195,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     roles: roles.bridge,
     checks: fakeChecksServer(host.checks ?? {}, calls),
     inbox: chats.inbox.bridge,
+    needs: needs.bridge,
     notifications: {
       asked: (item) => void calls.push(`notify:${item.chat}:${item.request.id}`),
       onOpenChat: (listener) => {
@@ -207,6 +210,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       toggleDevTools: () => void calls.push("toggleDevTools"),
       showLogs: () => void calls.push("showLogs"),
       openExternal: (url) => void calls.push(`openExternal:${url}`),
+      copyText: (text) => void calls.push(`copyText:${text}`),
       clearCacheAndRestart: () => void calls.push("clearCacheAndRestart"),
       resetAppData: () => void calls.push("resetAppData"),
       quit: () => void calls.push("quit"),
@@ -233,6 +237,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     pushCard,
     chats,
     roles,
+    needs,
     cardsIn: cards.cardsIn,
     watchingCards: cards.watching,
     /** How many watches are open on `dir`. */

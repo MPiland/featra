@@ -55,6 +55,8 @@ export interface Refusal {
   allow: false;
   message: string;
   interrupt?: boolean;
+  /** The user's own reason, when they denied it with one (STORY-68's Can't do it). */
+  reason?: string;
 }
 
 /** `rule` on an allow is the provider's suggested rule the user chose Allow for this chat for: the provider applies it. */

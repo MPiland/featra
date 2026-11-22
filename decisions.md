@@ -3056,3 +3056,124 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **Taskbar and Dock:** a badge with the number of waiting agents across all projects.
 - **Asking the user to do something** (run a command, sign in) is a Featra MCP tool with Done and Can't do it, not guessed from the agent's text. Featra never runs the command.
 - Stories: STORY-66 See which projects need you; STORY-67 A badge on the taskbar and Dock; STORY-68 An agent asks you to do something.
+
+## 2026-11-19 — STORY-66: which projects need you (dev)
+
+- **A waiting agent is a chat with any request the Inbox hub holds**, read at wait 0, so an approval or question counts
+  as soon as it's asked, inline or in the Inbox. Several requests from one chat count once. A finished turn holds no
+  request, so it doesn't count. Any new request kind counts once the hub holds it, so STORY-68's request plugs in
+  without a new rule.
+- **A review is the Work list's own review rows**: a feature an agent drafted (`review`) or a story waiting at
+  Acceptance (`awaiting`), the same rows that get the Review badge and Accept in Work.
+- **One shared needs service behind `needs.watch`, pushing `needs.list` on any change** (ADR 0041). The first watch
+  starts it, and it runs until the server closes. It holds the Inbox hub and one shared folder watch per open project
+  through `watchProjects`, so a watch that fails is tried again at the next change of the project list. It answers at
+  once with the waiting counts; a project's review mark follows when its first scan lands. So a slow scan never holds
+  up the counts, and a reconnect causes no new scans. Folders match by `projectKey`, so case differences don't split a
+  project on Windows and macOS.
+- **The dot leaves out the current project**, which the user is already looking at. It sits on the switcher's avatar
+  corner, and the switcher's name says what it means: "Switch project: website, another project needs you" or
+  "…, 2 other projects need you".
+- **With no current project, the dot shows when any open project needs the user**, since every one of them is
+  another project. The needs are watched whether or not a project is current.
+- **Menu marks:** the count uses the sidebar Inbox count's style (`.nav-count`), with the tooltip "1 agent waiting" or
+  "2 agents waiting". The review mark is a hollow ring after it, with the tooltip "To review". Both are hidden from
+  screen readers. Instead, the item's `aria-label` gives its whole name in one piece: "docs, 1 agent waiting, to
+  review". The first build put the spoken words in visually hidden text, and Chromium joined it to the label with a
+  space ("docs , 1 agent waiting"), which jsdom didn't. CI's e2e caught it, and a unit test now checks the label.
+- **Code moves to keep files under 300 lines:** `MenuList` out of `MenuButton.tsx`, `useWindowSync` out of `App.tsx`,
+  and the project setup messages out of `protocol.ts` into `protocol-setup.ts`. Behavior is unchanged.
+- **Tests:** rules in work-format, the watch against the real server, Inbox hub and scanner, and the switcher through
+  the real App with only the socket faked. One e2e journey covers two projects, with screens
+  `feat20-switcher-dot` and `feat20-switcher-menu-marks`.
+
+## 2026-11-19 — STORY-67: a badge on the taskbar and Dock (dev)
+
+- **The server tells main the total, over the host channel, not the page.** The server watches the STORY-66 needs
+  service with `watchWaitingTotal` and sends `{ type: "waiting", count }` on Node's IPC channel to the host (ADR 0015's
+  host messages) at start and on each change. Main's badge renders it. The page doesn't relay it: the badge stays right
+  while the window is hidden in the tray or reloading, there is one source for the count, and main reads nothing from
+  the untrusted page. No new ADR: it is one more host message on the existing channel, the use ADR 0041 planned for.
+- **The count is `waitingTotal`**, the sum of the switcher's per-project `waiting` across the open projects, in
+  work-format beside the STORY-66 rules. An agent is in one project, so the sum counts each agent once; an agent of a
+  closed project isn't counted, as in the switcher. Reviews are left out.
+- **The needs service now starts with the server**, not at the page's first watch, since the badge watches it from the
+  start. The page watched it at once anyway, so nothing else changes.
+- **A server that exits takes its count to 0** on the host: its agents went with it, and a restarted server reports
+  its own.
+- **macOS:** `app.dock.setBadge` with the whole number, "" at 0. **Windows:** `setOverlayIcon` on the main window with
+  an overlay drawn in code (a red disc, Windows' critical red `#C42B1C`, with white 5 × 7 digits; 32 px at scale 2, so
+  16 points), the number up to 9 and "9+" past it, and the description "1 agent waiting" / "12 agents waiting"
+  (the switcher's `NEEDS_COPY`), cleared with `null` and "". A hidden window loses its taskbar button, so the overlay is
+  set again when the window shows. **Linux:** `app.setBadgeCount`, which only Unity-launcher desktops show; where it
+  returns false, Featra logs "This desktop shows no count on the app's icon" once and keeps setting it.
+- **The OS is called only when the count changes**, and not at all while it stays 0 from the start.
+- **Tests:** the total in work-format; the watch against the real needs service, Inbox hub and scanner; the badge's
+  calls per OS with only the Electron calls faked; the overlay read pixel by pixel; main's real server process reporting
+  its count. One e2e journey across two projects runs on all three OSes. It reads macOS's Dock badge back from the Dock;
+  Windows' overlay and Linux's count can't be read back, so it reads the calls Featra made (`featraTest.badge`), with
+  the overlay as Electron took it (16 × 16, not empty).
+- **Review fixes (Dev Lead review).** The overlay is set again on `show`, once more 200 ms later (Windows makes the
+  taskbar button after the window shows and drops an overlay set before it), and on `restore` and `focus`, all in one
+  helper, `keepBadgeOn`, which main attaches to every window it makes, the one re-created on `activate` too. The
+  journey hides to the tray, reveals, and checks main set the badge again with the current count while the window was
+  visible (`featraTest.badge.calls`). A stopped server's late messages and exit no longer reset the badge once a newer
+  server runs. The host's project list is deduped by `projectKey`, so a folder sent in two cases counts its agents once.
+  ADR 0041 is amended: the needs service starts with the server.
+- **The tray shows it too (AC5, scope the user added).** While agents wait, the tray icon gets a red dot in its
+  bottom-right corner (the badge's red, with a clear ring cut around it so it reads on a light or dark tray) and its
+  tooltip says how many, in the switcher's words ("2 agents waiting"); at 0 it is the plain icon and "Featra" again.
+  A dot, not a number: a 16-point tray icon has no room for digits, and the tooltip carries the count. The dotted icon
+  is drawn once in code over the tray icon's own high-DPI pixels (`withDot` in badge-image.ts), so no image ships per
+  state. `createTrayBadge` keeps the count, as the tray comes and goes with the Close button setting: a tray made while
+  agents wait gets it at once. **macOS has no tray** (Featra keeps running in the Dock there), and the
+  Dock's badge already shows the number, so nothing is added; `tray.setTitle` would mean a menu bar item Featra
+  doesn't have. The journey answers the last agent with the window hidden to the tray and reads the tray's calls from
+  `featraTest.badge.calls`, since a test can't read the notification area.
+
+## 2026-11-20 — STORY-68: an agent asks you to do something (dev)
+
+- **A request is an app approval, not a new kind of pending item.** `request_action` (Featra MCP) goes through the
+  agent bridge's `action.request` to `chats.askAction`, which holds it on the approval desk like the MCP's other app
+  approvals (`app: true`), named `request_action`, with the request as its input. So it shares everything a tool
+  approval has: the chat card's place, the Dev Lead's mirror for a story session, the Inbox after the same wait, the
+  notification as it arrives, and the count in the switcher and the badge (`waitingAgents`, `waitingTotal`), with no
+  new code in the Inbox hub or the needs service. The client draws its own card for that name (`ActionRequestPrompt`)
+  in the chat and the Inbox, and the Inbox calls it a "Request".
+- **The answer is Done or Can't do it, with an optional reason.** Done is the approval's allow; Can't do it is its deny,
+  and the deny's reason now rides on the desk's refusal (`Refusal.reason`, cut to the Deny reason's 500 characters) so
+  the call can give it back. The agent is told "The user says it's done." or "The user couldn't do it: <reason>."; both
+  are results, not errors, so the agent reads them as answers. Input that fails the checks (title, why, 1 to 10 steps,
+  each with its text and an optional command, with limits) is refused with what to fix, and nothing is asked.
+- **A request lives as long as its call, not its turn (review B1).** The MCP's CallTool handler passes the host's
+  abort signal (`extra.signal`) to the tool. The MCP names each call (`action-N`) in `action.request` and sends
+  `action.cancel` for it when the host drops the call: its tool timeout (Claude Code's `MCP_TOOL_TIMEOUT`, Codex's
+  60 seconds) or Stop, which cancels the turn's tool calls. The server keeps an `AbortController` per call on each
+  MCP connection and cancels all of them when that connection closes (the MCP's process died). The chat ending cancels
+  it too. A turn ending doesn't: a background subagent can ask after the main result, so the next turn's end must not
+  cancel it. The call then fails as cancelled, never as Can't do it, so the agent can tell a dropped call from the user
+  saying no.
+- **It stays open past the turn the way other app requests do.** The request carries the title as its `subject`, as
+  `report_bug`'s does, so the chat's fold, the waiting count and the Inbox keep it after the turn's end. For a story
+  session, the Dev Lead's mirror keeps the app requests the desk still holds (`desk.holdsApp`) when the session's
+  turn ends; when the session ends they go.
+- **Featra never runs a command.** A step's command is shown as text with a Copy button. Copy goes to main over a new
+  `app:copy-text` IPC message, which only writes the clipboard (Electron's `clipboard.writeText`); under E2E it records
+  the text instead (`featraTest.copied`), so the journey proves what was copied and that nothing ran (the stand-in
+  agent's command would leave a marker file).
+- **Any chat may ask, story sessions included**, when the project's MCP is on, as for the other MCP tools. A story
+  session's request shows in its Dev Lead's chat with the story named, as its tool approvals do.
+- **The notification says what is asked** ("<chat>: Sign in to the CLI", cut like a question), not
+  "approve request_action".
+- **The card stands in for the agent's raw tool row (review S1).** For `request_action`, `request_merge` and
+  `report_bug`, the chat hides the provider's own row for the call (`mcp__featra__request_action` on Claude) once
+  the app's card for it shows (`cardCalls` in work-format). A row pairs with the nearest card of the same tool in the
+  same turn whose text fields match; a call refused for its input never becomes a card, so its row and error stay. The
+  request card's head reads "Request" with no summary while it waits, and the title shows once.
+- **A request's text can't hide what it says (review S2).** The title, why, each step's text and each command refuse
+  control characters other than tab and newline (C0, DEL, C1), bidi embeddings, overrides and isolates, and zero-width
+  spaces and the BOM. Zero-width joiners are allowed in text (emoji, some scripts) and refused in commands.
+- **One Deny reason, everywhere (review S4).** `denyReason()` trims and cuts the reason to 500 characters for both the
+  agent's answer and the chat's `tool-denied` event, and the reason field has that `maxLength`. The clipboard IPC
+  copies at most a command's length.
+- **No ADR:** one more MCP tool and app approval on existing paths, and one IPC message.

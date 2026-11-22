@@ -1,5 +1,7 @@
-/* The Inbox view (STORY-7) and the count beside the sidebar entry. */
-.nav-count {
+/* The Inbox view (STORY-7) and the count beside the sidebar entry, which a project's waiting count in the project menu
+   shares (STORY-66). */
+.nav-count,
+.mmark {
   margin-left: auto;
   min-width: 18px;
   padding: 0 6px;

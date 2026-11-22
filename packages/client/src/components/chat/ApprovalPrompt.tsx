@@ -1,8 +1,11 @@
 import { useState } from "react";
+import { actionAsk, REQUEST_ACTION_TOOL } from "@featra/work-format/action-request";
 import type { ApprovalAnswer } from "@featra/work-format/approvals";
 import { bugAsk, REPORT_BUG_TOOL } from "@featra/work-format/bug-copy";
 import { REQUEST_MERGE_TOOL } from "@featra/work-format/merge-copy";
 import { CHAT_COPY } from "../../chats.ts";
+import { ActionRequestPrompt } from "./ActionRequestPrompt.tsx";
+import { DenyWithReason } from "./DenyWithReason.tsx";
 import { BugReportPrompt } from "./BugReportPrompt.tsx";
 import { mergeAsk, MergeRequestPrompt } from "./MergeRequestPrompt.tsx";
 
@@ -36,7 +39,6 @@ export function ApprovalPrompt({
   subagent = null,
   onAnswer,
 }: ApprovalPromptProps) {
-  const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,11 +49,13 @@ export function ApprovalPrompt({
     setError(why);
     setBusy(false);
   }
-  const deny = () => answer(reason.trim() ? { choice: "deny", reason: reason.trim() } : { choice: "deny" });
+
   const merge = name === REQUEST_MERGE_TOOL ? mergeAsk(input) : null;
   if (merge) return <MergeRequestPrompt {...merge} onAnswer={onAnswer} />;
   const bug = name === REPORT_BUG_TOOL ? bugAsk(input) : null;
   if (bug) return <BugReportPrompt {...bug} onAnswer={onAnswer} />;
+  const action = name === REQUEST_ACTION_TOOL ? actionAsk(input) : null;
+  if (action) return <ActionRequestPrompt {...action} story={story} subagent={subagent} onAnswer={onAnswer} />;
 
   return (
     <div className="chat-approval" role="group" aria-label={`${CHAT_COPY.approve} ${name}`}>
@@ -74,23 +78,13 @@ export function ApprovalPrompt({
             {CHAT_COPY.allowForChat}
           </button>
         )}
-        <input
-          type="text"
-          className="text-field chat-approval-reason"
-          aria-label={CHAT_COPY.denyReason}
-          placeholder={CHAT_COPY.denyReasonHint}
-          value={reason}
-          disabled={busy}
-          onChange={(e) => setReason(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-            e.preventDefault();
-            void deny();
-          }}
+        <DenyWithReason
+          label={CHAT_COPY.denyReason}
+          hint={CHAT_COPY.denyReasonHint}
+          action={CHAT_COPY.deny}
+          busy={busy}
+          onDeny={(a) => void answer(a)}
         />
-        <button type="button" className="btn" disabled={busy} onClick={() => void deny()}>
-          {CHAT_COPY.deny}
-        </button>
       </div>
       {error && (
         <p className="chat-error" role="alert">

@@ -1,4 +1,6 @@
+import { EMPTY_NEEDS, needsOf, type NeedsList } from "@featra/work-format/project-needs";
 import type { MenuNode } from "./menu.ts";
+import { needsMarks } from "./needs.ts";
 import { PROJECT_LABELS, type ProjectsSnapshot } from "./projects.ts";
 import { shortcutLabel, type ShortcutId } from "./shortcuts.ts";
 
@@ -12,9 +14,14 @@ export interface ProjectMenuActions {
 /**
  * The project switcher's menu: every known project (the current one checked), then New Project… and Open Folder…,
  * then Project Settings…. The last three are the File menu's items, with the same words and shortcuts. A browser tab
- * has no folders, so it gets only Project Settings….
+ * has no folders, so it gets only Project Settings…. Each project carries what it needs from the user (STORY-66).
  */
-export function buildProjectMenu(projects: ProjectsSnapshot, platform: string, a: ProjectMenuActions): MenuNode[] {
+export function buildProjectMenu(
+  projects: ProjectsSnapshot,
+  platform: string,
+  a: ProjectMenuActions,
+  needs: NeedsList = EMPTY_NEEDS,
+): MenuNode[] {
   const item = (id: string, label: string, onSelect: () => void, shortcut: ShortcutId): MenuNode => {
     const k = shortcutLabel(shortcut, platform);
     return { kind: "item", id, label, onSelect, ...(k ? { shortcut: k } : {}) };
@@ -24,6 +31,7 @@ export function buildProjectMenu(projects: ProjectsSnapshot, platform: string, a
     id: `project.${i}`,
     label: p.name,
     checked: p.dir === projects.current?.dir,
+    marks: needsMarks(needsOf(needs, p.dir)),
     onSelect: () => a.switchTo(p.dir),
   }));
   const add: MenuNode[] =

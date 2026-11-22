@@ -14,6 +14,7 @@ const PUSH_EVENTS: readonly PushEvent[] = [
   "roles.list",
   "inbox.list",
   "inbox.asked",
+  "needs.list",
 ];
 
 /**
@@ -79,6 +80,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "chat.list",
   "inbox.watch",
   "inbox.asked",
+  "needs.watch",
 ];
 
 export interface ServerRequest {

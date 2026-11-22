@@ -44,7 +44,8 @@ export type WatchMethod =
   | "chat.list"
   | "roles.watch"
   | "inbox.watch"
-  | "inbox.asked";
+  | "inbox.asked"
+  | "needs.watch";
 
 /** How long a dropped watch waits before it tries again. */
 export const REWATCH_MS = 1000;

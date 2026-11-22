@@ -22,6 +22,7 @@ export const AGENT_MESSAGES = {
   /** A story session's work is reviewed, not merged on its own word. */
   sessionMerge: "A story session can't ask to merge. Ask the Dev Lead.",
   noBug: "Reporting a bug isn't available.",
+  noAction: "Asking the user to do something isn't available.",
   /** A story session tells its Dev Lead what it found; the Dev Lead proposes where the bug goes. */
   sessionBug: "A story session can't report bugs. Tell the Dev Lead what you found.",
 } as const;

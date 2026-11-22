@@ -1,3 +1,4 @@
+import { ACTION_COPY, REQUEST_ACTION_TOOL } from "@featra/work-format/action-request";
 import type { InboxItem } from "@featra/work-format/inbox";
 import type { ChatBridge } from "../../chats.ts";
 import { CHAT_COPY } from "../../chats.ts";
@@ -20,6 +21,17 @@ interface InboxViewProps {
 /** A project's name: the list's, else the last part of its folder. */
 const projectName = (projects: readonly ProjectRef[], dir: string) =>
   projects.find((p) => p.dir === dir)?.name ?? dir.split(/[\\/]/).findLast(Boolean) ?? dir;
+
+/** An agent's request to do something (STORY-68): the Inbox names it as such, not by its tool. */
+const isActionRequest = (item: InboxItem) =>
+  item.request.type === "approval" && item.request.name === REQUEST_ACTION_TOOL;
+
+const inboxKind = (item: InboxItem) =>
+  isActionRequest(item)
+    ? ACTION_COPY.kind
+    : item.request.type === "approval"
+      ? INBOX_COPY.approval
+      : INBOX_COPY.question;
 
 function Request({ item, chats }: { item: InboxItem; chats: Answering }) {
   const { request } = item;
@@ -58,10 +70,10 @@ export function InboxView({ items, projects, chats, onOpenChat }: InboxViewProps
         {items.map((item) => (
           <li key={`${item.chat}:${item.request.id}`} className="inbox-item" data-chat={item.chat}>
             <div className="inbox-head">
-              <span className="inbox-kind">
-                {item.request.type === "approval" ? INBOX_COPY.approval : INBOX_COPY.question}
-              </span>
-              {item.request.type === "approval" && <span className="inbox-tool">{item.request.name}</span>}
+              <span className="inbox-kind">{inboxKind(item)}</span>
+              {item.request.type === "approval" && !isActionRequest(item) && (
+                <span className="inbox-tool">{item.request.name}</span>
+              )}
               <button type="button" className="btn inbox-chat" onClick={() => onOpenChat(item.chat, item.project)}>
                 {item.chatName}
               </button>

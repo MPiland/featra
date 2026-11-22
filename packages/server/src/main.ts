@@ -1,11 +1,12 @@
 /**
  * The server process (ADR 0015). The desktop host forks it on Electron's own Node (`ELECTRON_RUN_AS_NODE=1`) with an
- * IPC channel, sends `start` with the token, and keeps the open-project list current. When the host goes, so does
- * the server.
+ * IPC channel, sends `start` with the token, and keeps the open-project list current. The server tells it how many
+ * agents wait on the user, for the taskbar and Dock badge (STORY-67). When the host goes, so does the server.
  */
 import { errorMessage } from "@featra/work-format";
 import { createAllowedProjects } from "./allowed-projects.ts";
 import { parseHostMessage, type ServerMessage } from "./host-messages.ts";
+import { watchWaitingTotal } from "./project-needs.ts";
 import { nodeRoleFs } from "./role-fs.ts";
 import { createServices } from "./services.ts";
 import { startServer, type RunningServer } from "./ws-server.ts";
@@ -25,6 +26,8 @@ const services = createServices({
 });
 const { api, agents } = services;
 let server: RunningServer | undefined;
+// The badge counts the same waiting agents as the switcher, across every open project (STORY-67).
+watchWaitingTotal(services.needs, (count) => send({ type: "waiting", count }));
 
 process.on("message", (raw) => {
   const message = parseHostMessage(raw);

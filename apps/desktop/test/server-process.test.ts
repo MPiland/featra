@@ -96,6 +96,47 @@ describe("the server child process", () => {
     expect(logged.slice(before)).toEqual([]);
   });
 
+  it("tells main how many agents wait on the user, 0 at the start, and 0 again once it stops (STORY-67)", async () => {
+    const counts: number[] = [];
+    const counted = createServerProcess({
+      script: SERVER_SOURCE,
+      execPath: process.execPath,
+      log: () => {},
+      waiting: (count) => counts.push(count),
+    });
+    try {
+      await counted.setProjects([await folder(true)]);
+      await expect.poll(() => counts).toEqual([0]);
+    } finally {
+      await counted.stop();
+    }
+    expect(counts).toEqual([0, 0]);
+  });
+
+  // Regression (STORY-67 review): a stopped server's exit cleared the count while the next server was already running.
+  it("takes no 0 from a stopped server once the next one is running: that one reports its own (STORY-67)", async () => {
+    const counts: number[] = [];
+    const counted = createServerProcess({
+      script: SERVER_SOURCE,
+      execPath: process.execPath,
+      log: () => {},
+      waiting: (count) => counts.push(count),
+    });
+    try {
+      await counted.setProjects([]);
+      await expect.poll(() => counts).toEqual([0]);
+      const stopped = counted.stop();
+      const next = counted.endpoint();
+      // The stopped server's exit is handled by the time its stop resolves; the next server reports its count as it
+      // starts, before it says it is listening, so both are in by the time the endpoint resolves.
+      await stopped;
+      await next;
+      expect(counts).toEqual([0, 0]);
+    } finally {
+      await counted.stop();
+    }
+  });
+
   it("refuses a client with an old token, and a stopped server comes back on next use", async () => {
     const dir = await folder(true);
     await server.setProjects([dir]);

@@ -1,4 +1,13 @@
-import { app, BrowserWindow, ipcMain, nativeTheme, shell, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  ipcMain,
+  nativeTheme,
+  shell,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+} from "electron";
 import {
   EDIT_COMMANDS,
   IPC,
@@ -16,6 +25,7 @@ import {
 } from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
 import { httpsLink, isOneOf, toText } from "@featra/work-format";
+import { copyable } from "./copy-text.ts";
 import { pickFolder } from "./folder-dialog.ts";
 import { closeToTraySupport, type Lifecycle } from "./lifecycle.ts";
 import type { Log } from "./log.ts";
@@ -145,6 +155,13 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
     if (!link) return;
     if (e2e) testHooks.openedExternal.push(link);
     else void shell.openExternal(link);
+  });
+  ipcMain.on(IPC.appCopyText, (_e, text: unknown) => {
+    // Only put on the clipboard: Featra never runs what it copies (STORY-68). No more than a command is copied.
+    const copied = copyable(text);
+    if (copied === null) return;
+    if (e2e) testHooks.copied.push(copied);
+    else void clipboard.writeText(copied);
   });
   ipcMain.on(IPC.appClearCacheAndRestart, () => void clearCacheAndRestart(troubleshoot));
   ipcMain.on(IPC.appResetAppData, () => void resetAppData(troubleshoot));

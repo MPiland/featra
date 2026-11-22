@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { EMPTY_NEEDS, type NeedsList } from "@featra/work-format";
 import type { MenuNode } from "../src/menu.ts";
 import { buildProjectMenu } from "../src/project-menu.ts";
 
@@ -57,5 +58,25 @@ describe("STORY-19 AC1-AC3: the project switcher's menu", () => {
     const none = { current: null, projects: [], location: "" };
     expect(shape(buildProjectMenu(none, "win32", actions()))[0]).toBe("New Project… Ctrl+Shift+N");
     expect(shape(buildProjectMenu(none, "web", actions()))).toEqual(["Project Settings… Ctrl+Shift+,"]);
+  });
+});
+
+/** Each project item's marks as one line each: its text (or a ring), what it says to a screen reader, and quiet. */
+const marks = (needs: NeedsList) =>
+  buildProjectMenu(projects, "win32", actions(), needs).flatMap((n) =>
+    n.kind === "radio" ? [(n.marks ?? []).map((m) => `${m.text ?? "○"}${m.spoken}${m.quiet ? " quiet" : ""}`)] : [],
+  );
+const needsOf = (...rows: NeedsList["projects"]): NeedsList => ({ projects: rows });
+
+describe("STORY-66 AC1, AC2, AC5: each project's marks in the menu", () => {
+  it("gives a project its waiting count, its quieter review mark after it, both, or none", () => {
+    expect(marks(EMPTY_NEEDS)).toEqual([[], []]);
+    expect(
+      marks(needsOf({ dir: "/p/a", waiting: 1, review: false }, { dir: "/p/b", waiting: 0, review: true })),
+    ).toEqual([["1, 1 agent waiting"], ["○, to review quiet"]]);
+    expect(marks(needsOf({ dir: "/p/a", waiting: 4, review: true }))).toEqual([
+      ["4, 4 agents waiting", "○, to review quiet"],
+      [],
+    ]);
   });
 });

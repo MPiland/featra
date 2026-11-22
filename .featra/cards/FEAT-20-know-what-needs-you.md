@@ -2,7 +2,7 @@
 id: FEAT-20
 type: feature
 title: Know what needs you
-status: approved
+status: done
 parent: EPIC-3
 order: 20
 origin: added
@@ -17,6 +17,21 @@ history:
     field: status
     from: draft
     to: approved
+    by: user
+  - at: 2026-11-19T20:27:58Z
+    field: status
+    from: approved
+    to: active
+    by: dev-lead
+  - at: 2026-11-22T14:02:19Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-22T14:02:19Z
+    field: status
+    from: active
+    to: done
     by: user
 ---
 

@@ -13,6 +13,7 @@ import {
   serverChats,
   serverChecks,
   serverInbox,
+  serverNeeds,
   serverRoles,
   serverSetup,
   serverWork,
@@ -73,6 +74,7 @@ const bridge: FeatraBridge = {
   roles: serverRoles(server),
   checks: serverChecks(server),
   inbox: serverInbox(server),
+  needs: serverNeeds(server),
   notifications: {
     asked: (item) => ipcRenderer.send(IPC.notificationsAsked, item),
     onOpenChat: (listener) => {
@@ -91,6 +93,7 @@ const bridge: FeatraBridge = {
     toggleDevTools: () => ipcRenderer.send(IPC.appToggleDevTools),
     showLogs: () => ipcRenderer.send(IPC.appShowLogs),
     openExternal: (url: string) => ipcRenderer.send(IPC.appOpenExternal, url),
+    copyText: (text: string) => ipcRenderer.send(IPC.appCopyText, text),
     clearCacheAndRestart: () => ipcRenderer.send(IPC.appClearCacheAndRestart),
     resetAppData: () => ipcRenderer.send(IPC.appResetAppData),
     quit: () => ipcRenderer.send(IPC.appQuit),

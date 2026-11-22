@@ -22,6 +22,8 @@
  *   a stopped `task_notification`; the session's turn then finishes.
  * - "report_bug" (STORY-13): calls the Featra MCP's report_bug tool with REPORTED_BUG (fake-agent-turns.mjs), blamed on
  *   FEAT-2. The call answers once the user is asked; the user places it in the chat.
+ * - "request_action" (STORY-68): calls the Featra MCP's request_action tool with requestedAction() (fake-agent-turns.mjs)
+ *   and waits for the user's answer; the reply says the call's result. Featra must never run its commands.
  * - "slow": starts a reply and waits for interrupt().
  * - with FEATRA_E2E_STORY_TURN=slow, a story session's first message ("You are working on ...") is a slow turn that
  *   thinks first (STORY-53): it shows its thinking, then its reply, and waits for interrupt().
@@ -38,7 +40,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { callMcpTool } from "./fake-mcp-client.mjs";
-import { questionTurn, reportBugTurn, subagentTurn } from "./fake-agent-turns.mjs";
+import { questionTurn, reportBugTurn, requestActionTurn, subagentTurn } from "./fake-agent-turns.mjs";
 import { sessionLog } from "./fake-session-log.mjs";
 
 const MAIN = { parent_tool_use_id: null };
@@ -242,6 +244,8 @@ export function query({ prompt, options }) {
         yield* reportTurn(options, text);
       } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {
         yield* slow(["The worktree is clean."], "Starting the story.");
+      } else if (said.includes("request_action")) {
+        yield* requestActionTurn(helpers, options);
       } else if (said.includes("report_bug")) {
         yield* reportBugTurn(helpers, options);
       } else if (said.includes("subagent")) {

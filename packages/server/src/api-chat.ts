@@ -12,6 +12,7 @@ import {
   chatUndoParams,
   inboxParams,
   type Inbox,
+  type NeedsList,
   type ServerMethod,
   type ServerMethods,
 } from "@featra/work-format";
@@ -22,8 +23,13 @@ import type { ChatManager } from "./chat-manager.ts";
 import type { RoleRegistry } from "./role-registry.ts";
 import type { Connection } from "./api.ts";
 
-/** The methods about chats and the Inbox: a session's own requests, answered apart from the project and card ones. */
-export type ChatApiMethod = Extract<ServerMethod, `chat.${string}` | `inbox.${string}`>;
+const NEEDS_UNAVAILABLE = "Project needs aren't available.";
+
+/**
+ * The methods about chats, the Inbox and what each project needs: a session's own requests, answered apart from the
+ * project and card ones.
+ */
+export type ChatApiMethod = Extract<ServerMethod, `chat.${string}` | `inbox.${string}` | "needs.watch">;
 
 export interface ChatApiDeps {
   chats: ChatManager;
@@ -37,9 +43,20 @@ export interface ChatApiDeps {
   project: (params: unknown) => string;
   /** Why the story takes no message from the user now (STORY-12, STORY-58): it is merging or being abandoned, so its session is about to end. Null when it does. */
   busy?: (dir: string, id: string) => string | null;
+  /** Watches what every open project needs (STORY-66). Without it `needs.watch` is refused. */
+  needs?: (listener: (needs: NeedsList) => void) => Promise<{ needs: NeedsList; stop: () => void }>;
 }
 
-export function createChatApi({ chats, roles, allowed, agents, allow, project, busy = () => null }: ChatApiDeps) {
+export function createChatApi({
+  chats,
+  roles,
+  allowed,
+  agents,
+  allow,
+  project,
+  busy = () => null,
+  needs,
+}: ChatApiDeps) {
   /** A chat in an open project, by the `{ id }` its method was sent. */
   const chat = (params: unknown): string => {
     const p = chatParams(params);
@@ -163,6 +180,13 @@ export function createChatApi({ chats, roles, allowed, agents, allow, project, b
           }),
         );
         return null;
+      }
+      case "needs.watch": {
+        if (!needs) throw new ApiError(NEEDS_UNAVAILABLE);
+        await chats.ready();
+        const { needs: now, stop } = await needs((next) => connection.push("needs.list", id, next));
+        connection.keep(id, stop);
+        return now;
       }
       default:
         return assertNever(method);
