@@ -15,7 +15,7 @@ import type { OwnedCard, Resolution } from "./owner-copies.ts";
 import { burnUp, epicProgress, featureProgress, itemsOf, progressLabel, scopeSummary } from "./rollup.ts";
 import { holdOf } from "./story-hold.ts";
 import { stoppedIn } from "./story-stop.ts";
-import { featureTone, segments, stageBreakdown, stageTone, statusBreakdown } from "./work-tones.ts";
+import { featureTone, NOT_DONE_ORDER, segments, stageBreakdown, stageTone, statusBreakdown } from "./work-tones.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
 import { assertNever } from "./utils/guards.ts";
 import type {
@@ -132,6 +132,7 @@ function featureRow(
       : { done, total: tones.length, label: progressLabel(done, tones.length, "stories") },
     bar: segments(tones),
     breakdown: stageBreakdown(counted, config),
+    notDone: stageBreakdown(counted, config, NOT_DONE_ORDER),
     tasks,
     scope: {
       added: scope?.added.length ?? 0,

@@ -66,10 +66,14 @@ function stagePart(item: Card, config: ProjectConfig): StagePart | null {
  * What a feature's bar says: its items by where they stand, in bar order, e.g. "1 done · 1 needs your Accept · 2 in
  * progress · 1 not started". Cancelled items are left out, as from the counts. Empty for a feature with no items.
  */
-export function stageBreakdown(items: readonly Card[], config: ProjectConfig): string {
+export function stageBreakdown(items: readonly Card[], config: ProjectConfig, order = STAGE_ORDER): string {
   const parts = items.map((i) => stagePart(i, config)).filter((p): p is StagePart => p !== null);
-  return joined(["done", "accept", "review", "active", "idle"], STAGE_BREAKDOWN, parts);
+  return joined(order, STAGE_BREAKDOWN, parts);
 }
+
+const STAGE_ORDER: readonly StagePart[] = ["done", "accept", "review", "active", "idle"];
+/** The stages besides done, for a line that already says how many are done: "1 in progress · 1 not started". */
+export const NOT_DONE_ORDER: readonly StagePart[] = STAGE_ORDER.filter((p) => p !== "done");
 
 const FEATURE_ORDER = ["done", "active", "approved", "draft"] as const;
 type FeaturePart = (typeof FEATURE_ORDER)[number];

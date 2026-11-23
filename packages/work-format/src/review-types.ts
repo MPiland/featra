@@ -40,7 +40,7 @@ export interface FeatureReview {
   /** The feature's card: its checks and PR (once accepted) and Accept and Merge, as the card pane has them. */
   feature: CardView;
   progress: ProgressCount;
-  /** "1 done · 2 in progress"; empty with no stories. */
+  /** Its items not done yet, by stage, beside `progress` which counts the done ones: "2 in progress"; empty with none. */
   breakdown: string;
   /** Added after the scope baseline ("+3 added: 2 stories · 1 bug", empty when none), and open bugs. */
   scope: { added: number; addedBreakdown: string; openBugs: number };

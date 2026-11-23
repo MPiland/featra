@@ -154,6 +154,7 @@ describe("buildWorkList", () => {
               progress: { done: 0, total: 0, label: "" },
               bar: [{ tone: "idle", count: 0 }],
               breakdown: "",
+              notDone: "",
               tasks: { done: 0, total: 0 },
               scope: { added: 0, addedBreakdown: "", openBugs: 0 },
               stories: [],

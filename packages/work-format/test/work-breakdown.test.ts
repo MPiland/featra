@@ -9,6 +9,7 @@ import {
   buildWorkList,
   newCard,
   recordAcceptance,
+  NOT_DONE_ORDER,
   stageBreakdown,
   STAGE_BREAKDOWN,
   statusBreakdown,
@@ -58,6 +59,13 @@ describe("AC1: a feature's bar says its breakdown by stage", () => {
     const row = list([epic, feature("FEAT-1"), ...stories("FEAT-1")]).epics[0]?.features[0];
     expect(row?.progress.label).toBe("1 of 7 stories done");
     expect(row?.breakdown).toBe("1 done · 1 needs your Accept · 1 in review · 2 in progress · 2 not started");
+  });
+
+  it("has the stages besides done for a line that already counts the done ones (STORY-69 review screen)", () => {
+    const row = list([epic, feature("FEAT-1"), ...stories("FEAT-1")]).epics[0]?.features[0];
+    expect(row?.notDone).toBe("1 needs your Accept · 1 in review · 2 in progress · 2 not started");
+    expect(stageBreakdown(stories("FEAT-1"), config, NOT_DONE_ORDER)).toBe(row?.notDone);
+    expect(stageBreakdown([], config, NOT_DONE_ORDER)).toBe("");
   });
 });
 

@@ -12,6 +12,11 @@
   margin-bottom: 8px;
 }
 
+/* Back's left edge is the content column's: the action button's own margin doesn't push it in. */
+.rv-top .review-draft {
+  margin-left: 0;
+}
+
 .rv-h {
   margin: 0 0 6px;
   font-size: 18px;
@@ -43,7 +48,7 @@
 .rv-by {
   font-size: 12px;
   font-weight: 400;
-  color: var(--pur);
+  color: var(--tx2);
 }
 
 .rv-summary-text {

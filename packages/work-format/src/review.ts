@@ -48,7 +48,7 @@ export function buildFeatureReview({ row, feature, view, diff, summary, repo, ba
   return {
     feature,
     progress: row.progress,
-    breakdown: row.breakdown,
+    breakdown: row.notDone,
     scope: row.scope,
     stories: items.filter((i) => i.view.type === "story"),
     bugs: items.filter((i) => i.view.type === "bug"),

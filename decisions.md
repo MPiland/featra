@@ -3219,6 +3219,10 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   reads as the title and "Review" stays the Draft badge's word (STORY-8); in its card pane as a button that says
   Review. Not in a chat's docked card pane, which has no screen to open. The screen replaces the Work list in place;
   Back restores focus to the row's Review.
+- **The screen's header, from the screenshot review:** it counts the stories done once ("1 of 2 stories done") and
+  beside it only the stages not done (the Work row's `notDone`, "1 in progress"), not the bar's full breakdown.
+  "Written by the Dev Lead" is plain secondary text, not link-coloured. Back has no action-button left margin, so its
+  edge lines up with the title and content.
 - **Seams:** FeatureEnd's Accept and Merge are unchanged; STORY-70 puts Approve on this screen. STORY-71's "Changes
   asked" and STORY-72's evidence go in the screen's body.
 - **No new ADR:** ADR 0033 is amended for the stored run and ADR 0004 names the `ran:` event.

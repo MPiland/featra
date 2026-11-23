@@ -3,6 +3,8 @@
  * the fake server's cards (`review-server.ts`); only git's diff stats are given by the test.
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   provenEvent,
@@ -62,6 +64,11 @@ const reviewDiffs = {
   "STORY-6": { files: 1, added: 5, removed: 0 },
   "FEAT-2": { files: 4, added: 45, removed: 2 },
 };
+
+/** A shipped stylesheet: jsdom does no cascade, so looks CSS decides are checked by their rules. */
+const css = (f: string) => readFileSync(join(import.meta.dirname, "../../src/styles", f), "utf8");
+const ruleOf = (file: string, selector: string) =>
+  new RegExp(`(^|\\n)${selector.replaceAll(".", "\\.")}\\s*\\{[^}]*\\}`).exec(css(file))?.[0] ?? "";
 
 const screenOf = () => screen.findByRole("region", { name: "Review FEAT-2" });
 const item = (scope: HTMLElement, id: string) => scope.querySelector(`[data-card="${id}"]`) as HTMLElement;
@@ -166,5 +173,40 @@ describe("the review screen, live (STORY-69 AC6, AC7)", () => {
     app.pushCard(PROJECT.dir, proven(DONE, 2, "local"));
     await waitFor(() => expect(within(item(shown, "STORY-5")).getByText("Local run")).toBeTruthy());
     expect(within(item(shown, "STORY-5")).getByRole("link", { name: "CI run" })).toBeTruthy();
+  });
+});
+
+describe("the review screen's header (STORY-69, from the screenshot review)", () => {
+  it("says the stories done once, and beside it only the stages not done", async () => {
+    const app = renderApp({ cards: cards(), reviewDiffs });
+    await toWork(app);
+    await app.user.click(await screen.findByRole("button", { name: "Review FEAT-2" }));
+    const facts = (await screenOf()).querySelector(".rv-facts") as HTMLElement;
+    const parts = [...facts.children].map((c) => c.textContent);
+    expect(parts).toContain("1 of 2 stories done");
+    expect(parts).toContain("1 in progress");
+    expect(facts.textContent).not.toMatch(/\b1 done\b/);
+  });
+
+  it("marks the summary as the Dev Lead's in plain secondary text, not as a link", async () => {
+    const app = renderApp({ cards: cards(withSummary(FEATURE, "Built.", "session:chat-1", AT)), reviewDiffs });
+    await toWork(app);
+    await app.user.click(await screen.findByRole("button", { name: "Review FEAT-2" }));
+    const summary = within(await screenOf()).getByRole("region", { name: "Summary" });
+    const by = within(summary).getByText("Written by the Dev Lead");
+    expect(by.closest("a, [role=link], button")).toBeNull();
+    expect(within(summary).queryByRole("link")).toBeNull();
+    expect(ruleOf("review.css", ".rv-by")).toMatch(/color: var\(--tx2\)/);
+  });
+
+  it("lines Back up with the title and content: the action button's own left margin doesn't apply", async () => {
+    const app = renderApp({ cards: cards(), reviewDiffs });
+    await toWork(app);
+    await app.user.click(await screen.findByRole("button", { name: "Review FEAT-2" }));
+    const back = within(await screenOf()).getByRole("button", { name: "Back" });
+    expect(back.classList.contains("review-draft")).toBe(true);
+    expect(ruleOf("card-review.css", ".review-draft")).toMatch(/margin-left: 8px/);
+    expect(back.parentElement?.classList.contains("rv-top")).toBe(true);
+    expect(ruleOf("review.css", ".rv-top .review-draft")).toMatch(/margin-left: 0/);
   });
 });
