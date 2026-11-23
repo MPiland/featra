@@ -2,7 +2,7 @@
  * STORY-23: Accept and Send back on a story in Acceptance. Real repository, scanner, card lane and work-format rules;
  * only the chat manager (a platform) and the clock are fakes, and the fake keeps the real manager's refusals.
  */
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   ACCEPT_MESSAGES,
   CHAT_MESSAGES,
@@ -17,6 +17,7 @@ import { createStoryAcceptance, type StoryAcceptance } from "../src/story-accept
 import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
+import { until } from "./until.ts";
 
 let scanner: ReturnType<typeof createScanner>;
 let acceptance: StoryAcceptance;
@@ -262,7 +263,8 @@ describe("two actions at once on one story", () => {
       release = resolve;
     });
     const sending = acceptance.sendBack(repo.main, "STORY-1", "Fix it.", false);
-    await vi.waitFor(() => expect(opened).toEqual(["chat-1"]));
+    await until(() => opened.length > 0);
+    expect(opened).toEqual(["chat-1"]);
     await acceptance.accept(repo.main, "STORY-1");
     release?.();
     await expect(sending).rejects.toThrow(ACCEPT_MESSAGES.accepted("STORY-1"));

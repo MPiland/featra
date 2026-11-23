@@ -84,6 +84,7 @@ describe("the MCP bundle", () => {
         "propose_check_command",
         "request_merge",
         "report_bug",
+        "write_summary",
         "request_action",
       ]);
 

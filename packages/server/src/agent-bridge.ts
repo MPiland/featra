@@ -23,18 +23,14 @@ import {
   type KnowledgePermission,
 } from "@featra/work-format";
 import { callName, type ActionRequestService } from "./action-request.ts";
-import { createLeadCalls } from "./agent-lead.ts";
+import { createLeadCalls, type LeadCallDeps } from "./agent-lead.ts";
 import { AGENT_MESSAGES } from "./agent-messages.ts";
 import { ApiError } from "./api-error.ts";
 import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { CardReport } from "./card-report.ts";
-import type { CheckSettings } from "./check-settings.ts";
 import type { DraftWriter } from "./draft-writer.ts";
 import type { FeatureStart } from "./feature-start.ts";
-import type { BugRequest } from "./bug-request.ts";
-import type { MergeRequest } from "./merge-request.ts";
-import type { StoryMessage } from "./story-message.ts";
 import type { StorySpawn } from "./story-spawn.ts";
 import type { LogWriter } from "./log-writer.ts";
 import type { McpServerSpec } from "./provider.ts";
@@ -47,7 +43,8 @@ export { AGENT_MESSAGES } from "./agent-messages.ts";
 
 type ChatInfo = NonNullable<ReturnType<Pick<ChatManager, "info">["info"]>>;
 
-export interface AgentBridgeDeps {
+/** The Dev Lead's calls (agent-lead.ts): each one it lacks is refused. */
+export interface AgentBridgeDeps extends Omit<LeadCallDeps, "mcpRefusal"> {
   /** The MCP's script (`dist/mcp.cjs` in the app). Without it no agent gets the MCP. */
   entry: string | null;
   /** The runtime that runs it: Electron's executable in the app (as Node), Node in tests. */
@@ -69,14 +66,6 @@ export interface AgentBridgeDeps {
   spawns?: StorySpawn;
   /** Writes agents' reports on cards (STORY-10). Without it `card.update` is refused. */
   reports?: CardReport;
-  /** Sends the Dev Lead's messages to story sessions (STORY-54). Without it `session.message` is refused. */
-  messages?: StoryMessage;
-  /** Keeps the Dev Lead's check-command proposals for the user to confirm (STORY-56). Without it `checks.propose` is refused. */
-  checkSettings?: Pick<CheckSettings, "propose">;
-  /** Asks the user to merge a story for the Dev Lead (STORY-12). Without it `story.requestMerge` is refused. */
-  merges?: MergeRequest;
-  /** Asks the user to place a bug the Dev Lead reports (STORY-13). Without it `bug.report` is refused. */
-  bugs?: BugRequest;
   /** Asks the user to do something for any chat's agent (STORY-68). Without it `action.request` is refused. */
   actions?: ActionRequestService;
   newToken?: () => string;
@@ -120,12 +109,9 @@ export function createAgentBridge({
   starts,
   spawns,
   reports,
-  messages,
-  checkSettings,
-  merges,
-  bugs,
   actions,
   newToken = () => randomBytes(24).toString("base64url"),
+  ...leadDeps
 }: AgentBridgeDeps): AgentBridge {
   const byChat = new Map<string, string>();
   let port: number | null = null;
@@ -140,7 +126,7 @@ export function createAgentBridge({
     return (await enabled(dir)) ? null : AGENT_MESSAGES.mcpOff;
   }
 
-  const leads = createLeadCalls({ mcpRefusal, messages, checkSettings, merges, bugs });
+  const leads = createLeadCalls({ mcpRefusal, ...leadDeps });
 
   /**
    * Why agents may not write to the project: the MCP is off, or its knowledge setting is read-only, which keeps agents
@@ -274,6 +260,8 @@ export function createAgentBridge({
           return leads.requestMerge(chat, info.dir, info.story, params);
         case "bug.report":
           return leads.reportBug(chat, info.dir, info.story, params);
+        case "feature.summary":
+          return leads.summarize(chat, info, params);
         case "action.request":
           return requestAction(chat, info.dir, params, link);
         case "action.cancel":

@@ -10,6 +10,7 @@ import {
   CHECKS_COPY,
   checksApply,
   checksWhere,
+  LOCAL_RUN,
   toIso,
   type CardChecks,
   type CheckOutcome,
@@ -163,7 +164,9 @@ export function createStoryChecks({
     if (stale() || closed) return null;
     const passed = main.code === 0;
     const output = passed ? linked.failures : `${main.timedOut ? "Timed out.\n" : ""}${main.output}`;
-    if (!(await record(dir, id, { passed, acs: linked.acs, head: head || undefined }))) {
+    // A criterion proven here keeps that it was a local run (STORY-69): there is no page to link to.
+    const acs = linked.acs.map((a) => (a.passed ? { ...a, run: LOCAL_RUN } : a));
+    if (!(await record(dir, id, { passed, acs, head: head || undefined }))) {
       // The story left review while this ran: there is nothing to show for it.
       states.delete(keyOf(dir, id));
       return null;

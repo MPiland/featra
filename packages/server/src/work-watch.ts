@@ -29,6 +29,11 @@ export interface WorkWatches {
    * answers unless a git target fired (BUG-6); any other folder gets a full scan.
    */
   scan: (dir: string) => Promise<Scan | null>;
+  /**
+   * Something a pick reads besides the scan changed (STORY-69): every listener of `dir` hears its last scan again, with
+   * no new scan, after any scan in flight. Nothing for a folder nobody watches.
+   */
+  repush: (dir: string) => void;
   close: () => void;
 }
 
@@ -276,6 +281,15 @@ export function createWorkWatches(
       // An action needs the cards as they are now: the last good scan kept for display won't do.
       const out = await run(e);
       return out.failed ? null : out.scan;
+    },
+    repush(dir) {
+      const e = entries.get(dir);
+      if (!e) return;
+      const hear = (out: Outcome) => {
+        if (!e.closed) for (const listener of e.listeners) listener(out.scan, out.list);
+        return out;
+      };
+      e.queue = e.queue.then(hear);
     },
     close() {
       for (const e of entries.values()) end(e);

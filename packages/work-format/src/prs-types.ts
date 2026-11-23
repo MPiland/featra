@@ -67,6 +67,19 @@ export function httpsLink(raw: unknown): string | null {
   }
 }
 
+/** A GitHub PR's URL, its repository's page captured: the one pattern for PR and CI run links. */
+const GITHUB_PR = /^(https:\/\/github\.com\/[\w.-]+\/[\w.-]+)\/pull\/\d+$/;
+
+/** The repository page of the GitHub PR at `prUrl`; null when `prUrl` isn't a strict GitHub PR URL. */
+export const prRepoPage = (prUrl: string | null): string | null => GITHUB_PR.exec(prUrl ?? "")?.[1] ?? null;
+
+/** Whether `url` is a link Featra may open for a GitHub Actions run in the repository of the PR at `prUrl`. */
+export function isCiRunOf(prUrl: string | null, url: unknown): url is string {
+  const repo = prRepoPage(prUrl);
+  const link = httpsLink(url);
+  return !!repo && !!link && link.startsWith(`${repo}/actions/runs/`) && /^\d+$/.test(link.slice(repo.length + 14));
+}
+
 /** The PR number in a PR's URL, or in a `pr` recorded as the number alone (`12`, `#12`); null when it has none. */
 export function prNumber(pr: string): number | null {
   const m = /\/pull\/(\d+)(?:[/?#]|$)/.exec(pr) ?? /^#?(\d+)$/.exec(pr.trim());

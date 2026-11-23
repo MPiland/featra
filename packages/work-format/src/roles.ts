@@ -82,6 +82,9 @@ const role = (id: string, name: string, model: string, effort: Effort, prompt: s
   source: { kind: "built-in", edited: false },
 });
 
+/** The Dev Lead's role id: the one role whose chats may make the Dev Lead's own calls, such as a feature's summary. */
+export const DEV_LEAD_ROLE = "dev-lead";
+
 /** The five built-in roles, in the order the picker lists them. */
 export const BUILT_IN_ROLES: readonly Role[] = [
   role(
@@ -101,7 +104,7 @@ export const BUILT_IN_ROLES: readonly Role[] = [
       "clear acceptance criteria. Ask the questions that settle scope before you write anything down.",
   ),
   role(
-    "dev-lead",
+    DEV_LEAD_ROLE,
     "Dev Lead",
     "opus",
     "high",

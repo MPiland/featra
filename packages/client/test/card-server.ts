@@ -1,7 +1,5 @@
 // The local server's card side, as a fake: cards held in memory, edited with work-format's own rules.
 import {
-  acceptanceRefusal,
-  acceptedStory,
   applyCardEdit,
   notStartableReason,
   notSpawnableReason,
@@ -14,17 +12,8 @@ import {
   draftStories,
   type FeatureMergeState,
   isMerged,
-  isStopped,
   MAIN,
-  mergedStory,
-  mergeRefusal,
   planApproval,
-  resumedStory,
-  resumeRefusal,
-  sentBackStory,
-  stageTone,
-  stopRefusal,
-  stoppedStory,
   type StoryTurn,
   type Card,
   type CardChecks,
@@ -38,6 +27,7 @@ import {
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
 import { featureEndFakes, type FeatureActions } from "./card-server-features.ts";
 import { storyEndFakes, type StoryEndActions } from "./card-server-story-end.ts";
+import { storyFlowFakes, type StoryFlowActions } from "./card-server-story-flow.ts";
 
 /** The card actions a test can set the server's answer to; each left out, the fake does what the server does. */
 export type ReviewAnswers = Partial<
@@ -47,13 +37,9 @@ export type ReviewAnswers = Partial<
     | "reject"
     | "start"
     | "startStory"
-    | "stopStory"
-    | "resumeStory"
-    | "acceptStory"
-    | "sendBackStory"
     | "rerunChecks"
     | "createPr"
-    | "mergeStory"
+    | StoryFlowActions
     | StoryEndActions
     | FeatureActions
   >
@@ -109,6 +95,8 @@ export function fakeCardServer(
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
+  /** Who else hears a folder's cards change: the review screen's fake (STORY-69). */
+  const changes = new Set<(dir: string) => void>();
   const viewOf = (dir: string, id: string): CardView | null => {
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
@@ -135,6 +123,7 @@ export function fakeCardServer(
     // A card the folder doesn't have yet is one an agent just made (a draft).
     cardSets.set(dir, cards.some((c) => c.id === card.id) ? replace(cards, card) : [...cards, card]);
     listChanged(dir, listOf(dir) as WorkList);
+    for (const c of changes) c(dir);
     for (const [key, set] of watchers) {
       const [d, id] = JSON.parse(key) as [string, string];
       if (d === dir) for (const l of set) l({ view: viewOf(dir, id), loading: false, error: null });
@@ -147,6 +136,7 @@ export function fakeCardServer(
       (cardSets.get(dir) ?? []).filter((c) => !ids.includes(c.id)),
     );
     listChanged(dir, listOf(dir) as WorkList);
+    for (const c of changes) c(dir);
     for (const [key, set] of watchers) {
       const [d, id] = JSON.parse(key) as [string, string];
       if (d === dir) for (const l of set) l({ view: viewOf(dir, id), loading: false, error: null });
@@ -235,54 +225,6 @@ export function fakeCardServer(
       }
       return { ok: true, ...session };
     },
-    // Stop and Resume are the server's to prove (the agent, the lane): the fake records the call and applies work-format's
-    // rules to the card, as the server does once the agent has stopped or gone on.
-    stopStory: async (dir, id) => {
-      calls.push(`stopStory:${dir}:${id}`);
-      if (review.stopStory) return review.stopStory(dir, id);
-      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const tone = card ? stageTone(card.status, DEFAULT_CONFIG) : "idle";
-      // A story still queued, never started, just leaves the queue: its card is as it was.
-      if (card?.type === "story" && card.agent === null && agents.turn(dir, id).queued) {
-        agents.drop(dir, id);
-        return { ok: true };
-      }
-      const why = stopRefusal(card, tone);
-      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      changed(dir, stoppedStory(card, "user", EDIT_AT));
-      return { ok: true };
-    },
-    resumeStory: async (dir, id) => {
-      calls.push(`resumeStory:${dir}:${id}`);
-      if (review.resumeStory) return review.resumeStory(dir, id);
-      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const tone = card ? stageTone(card.status, DEFAULT_CONFIG) : "idle";
-      const why = resumeRefusal(card, tone, agents.turn(dir, id));
-      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      // Only a Stopped story has a mark to clear; an idle session that ended without finishing just goes on.
-      if (isStopped(card)) changed(dir, resumedStory(card, "user", EDIT_AT));
-      return { ok: true };
-    },
-    // Accept and Send back are the server's to prove (the lane, the session): the fake records the call and applies
-    // work-format's rules to the card, as the server does.
-    acceptStory: async (dir, id) => {
-      calls.push(`acceptStory:${dir}:${id}`);
-      if (review.acceptStory) return review.acceptStory(dir, id);
-      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const why = acceptanceRefusal(card, id, DEFAULT_CONFIG);
-      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      changed(dir, acceptedStory(card, DEFAULT_CONFIG, "user", EDIT_AT));
-      return { ok: true };
-    },
-    sendBackStory: async (dir, id, reason, addCriterion) => {
-      calls.push(`sendBackStory:${dir}:${id}:${reason}:${addCriterion}`);
-      if (review.sendBackStory) return review.sendBackStory(dir, id, reason, addCriterion);
-      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const why = acceptanceRefusal(card, id, DEFAULT_CONFIG);
-      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      changed(dir, sentBackStory(card, DEFAULT_CONFIG, reason, addCriterion, "user", EDIT_AT));
-      return { ok: true, recorded: true };
-    },
     // Re-run is the server's to prove (the run, the lane): the fake records the call.
     rerunChecks: async (dir, id) => {
       calls.push(`rerunChecks:${dir}:${id}`);
@@ -293,17 +235,16 @@ export function fakeCardServer(
       calls.push(`createPr:${dir}:${id}`);
       return review.createPr ? review.createPr(dir, id) : { ok: true };
     },
-    // Merging is the server's to prove (git, gh, the worktree): the fake refuses with work-format's rule, as the server
-    // does for a card main owns, unless the test sets the answer.
-    mergeStory: async (dir, id) => {
-      calls.push(`mergeStory:${dir}:${id}`);
-      if (review.mergeStory) return review.mergeStory(dir, id);
-      const card = (cardSets.get(dir) ?? []).find((c) => c.id === id);
-      const why = mergeRefusal(card && owned(card), id, DEFAULT_CONFIG, true);
-      if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      changed(dir, mergedStory(card, featureBranch(card), "system", EDIT_AT));
-      return { ok: true, remains: [] };
-    },
+    ...storyFlowFakes({
+      cardsIn: (dir) => cardSets.get(dir) ?? [],
+      changed,
+      calls,
+      review,
+      at: EDIT_AT,
+      owned,
+      featureBranch,
+      agents,
+    }),
     ...featureEndFakes({ cardsIn: (dir) => cardSets.get(dir) ?? [], changed, calls, review, at: EDIT_AT }),
     ...storyEndFakes({
       cardsIn: (dir) => cardSets.get(dir) ?? [],
@@ -329,6 +270,12 @@ export function fakeCardServer(
     changed,
     /** The folder's cards as the server holds them now. */
     cardsIn: (dir: string) => cardSets.get(dir) ?? [],
+    viewOf,
+    /** Calls back on each change of a folder's cards; returns the stop. */
+    onChange: (listener: (dir: string) => void) => {
+      changes.add(listener);
+      return () => void changes.delete(listener);
+    },
     /** How many card watches are open. */
     watching: () => [...watchers.values()].reduce((n, s) => n + s.size, 0),
   };

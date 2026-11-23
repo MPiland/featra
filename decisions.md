@@ -3189,3 +3189,43 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - "Not yet" needs a reason, which goes to the Dev Lead's chat and the feature's history. The screen shows "Changes asked" until the Dev Lead marks it handled through the MCP or the user dismisses it. It creates no cards, and Approve stays available.
 - STORY-25 is split: showing attached evidence is STORY-72, the design review of screenshots is STORY-73, and STORY-25 keeps the proof setting and screenshot capture.
 - Stories, in order: STORY-69 Review a feature on one screen; STORY-70 Approve merges the feature to main; STORY-71 Ask for changes before approving; STORY-72 See attached evidence next to criteria; STORY-25 Choose the project's proof and capture screenshots; STORY-73 Design review of screenshots. STORY-70, 71 and 72 depend on 69; STORY-25 on 72; STORY-73 on 25.
+
+## 2026-11-23 — STORY-69 Review a feature on one screen (developer)
+
+- **The run that proved a criterion is a card event.** `ran:<n>@<run>` sits beside `proven:<n>` in the card's
+  history, where `<run>` is `local` or a GitHub Actions run URL in the card's PR repository
+  (`https://github.com/<owner>/<repo>/actions/runs/<id>`); any other URL, as an edited card might hold, is dropped, so a
+  link labelled "CI run" never opens a foreign site. It is written with the proof through the shared evidence writer,
+  so it survives a restart and travels with the card; the SQLite index is only a cache. Whenever a passing run differs
+  from the stored one (a CI run after a local one at the same head, or a CI re-run) a new `ran:` is recorded;
+  `unproven:<n>` drops it. The CI run is the first run whose own report passes every test the criterion links, else
+  the newest run whose report holds at least one of them; with neither, no run is linked. Its URL is derived from the
+  PR's repository, with the same pattern that validates PR links.
+- **The Dev Lead's summary is the feature card's `## Summary` section**, plus a `summary` history event by
+  `session:<chat>`. Only the Dev Lead's chat writes it (any other chat is refused, story session or not), through the MCP tool `write_summary` (agent method `feature.summary`),
+  since `update_card` refuses features. It is written where the feature's branch has its card (`writeFeature`), in the
+  card lane like every card write. The screen labels it "Written by the Dev Lead"; with none, there is no heading.
+- **One server watch builds the screen.** `review.watch` composes the feature's Work row, each story's and bug's card
+  view, git's numstat and the links, and pushes again on every scan, so stage moves, checks and proof show live.
+  Cancelled stories are left out. Diffs are read in the background and cached by the commits they compare, an open story's
+  by its branch tip even without a worktree, so pushed commits refresh its counts: a merged story's from every merge
+  round's parents (Featra's subject built from `mergeCommitMessage`, GitHub's PR or git's merge subject), each file
+  counted once, an open story's from its branch against the feature's, the feature's against the base. A finished read
+  re-runs the watch's listeners against its last scan instead of scanning again. Card files count, as on GitHub's Files changed.
+- **Files changed links:** a story's PR `/files`; the feature's PR `/files`, or before it has one a GitHub compare of
+  base...branch. Links open in the OS browser.
+- **The feature's own checks** exist once it is accepted (ADR 0037); before that the screen says "No checks run yet".
+- **Where Review shows.** On the active feature's Work row as an icon, like the progress button, so the name cell still
+  reads as the title and "Review" stays the Draft badge's word (STORY-8); in its card pane as a button that says
+  Review. Not in a chat's docked card pane, which has no screen to open. The screen replaces the Work list in place;
+  Back restores focus to the row's Review.
+- **The screen's header, from the screenshot review:** it counts the stories done once ("1 of 2 stories done") and
+  beside it only the stages not done (the Work row's `notDone`, "1 in progress"), not the bar's full breakdown.
+  "Written by the Dev Lead" is plain secondary text, not link-coloured. Back has no action-button left margin, so its
+  edge lines up with the title and content.
+- **Seams:** FeatureEnd's Accept and Merge are unchanged; STORY-70 puts Approve on this screen. STORY-71's "Changes
+  asked" and STORY-72's evidence go in the screen's body.
+- **No new ADR:** ADR 0033 is amended for the stored run and ADR 0004 names the `ran:` event.
+- **BUG-39, found by the gate:** `vi.waitFor` and `vi.waitUntil` keep vitest's own 1 s default, which the hang
+  guard doesn't set. The BUG-28 wait scan now flags one left at that default; the one in story-acceptance.test.ts
+  waits with `until`.

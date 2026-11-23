@@ -1,9 +1,12 @@
 /** What the server process gives `createServices`: the platform it runs on, which tests stand in for. */
+import type { AgentBridge } from "./agent-bridge.ts";
 import type { AllowedProjects } from "./allowed-projects.ts";
+import type { Api } from "./api.ts";
 import type { ChatStore } from "./chat-store.ts";
 import type { ClaudeDeps } from "./claude-provider.ts";
 import type { Timers } from "./inbox.ts";
 import type { LogWriterDeps } from "./log-writer.ts";
+import type { ProjectNeeds } from "./project-needs.ts";
 import type { RepoGit } from "./repo-git.ts";
 import type { RoleFs } from "./role-fs.ts";
 import type { WatchFolder } from "./work-watch.ts";
@@ -43,4 +46,16 @@ export interface ServiceOptions {
   checkTimeoutMs?: number;
   /** The timers PR reads wait on (STORY-11); the real ones by default. */
   prTimers?: Timers;
+}
+
+/** What `createServices` gives the server process. `close` ends watches and indexes. */
+export interface Services {
+  api: Api;
+  /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
+  agents: AgentBridge;
+  /** What every open project needs from the user: the switcher's watch, and the host's badge (STORY-67). */
+  needs: ProjectNeeds;
+  /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
+  settingsChanged: () => void;
+  close: () => Promise<void>;
 }

@@ -1,5 +1,5 @@
 /** What a test can ask of the fake host (harness.tsx): each option stands for something the platform or the server would answer. */
-import type { Card, CardChecks, CardPr, ChecksView, FeatureMergeState, NeedsList } from "@featra/work-format";
+import type { Card, CardChecks, CardPr, ChecksView, DiffStat, FeatureMergeState, NeedsList } from "@featra/work-format";
 import type { CopyActionResult } from "@featra/work-format/protocol";
 import type { WorkList } from "@featra/work-format/work-list";
 import type { CloseToTraySupport, ProjectRef, ProjectSetup, SetupItemId, WorkOverrides } from "../src/bridge.ts";
@@ -67,6 +67,8 @@ export interface HostOptions extends ChatHost, RolesHost {
   cardPrs?: Record<string, CardPr>;
   /** Whether an accepted feature can merge to main now, and why not, by feature id (STORY-14). */
   cardMerges?: Record<string, FeatureMergeState>;
+  /** What git says each story, bug or feature changed, by id, on the review screen (STORY-69). Default: unknown. */
+  reviewDiffs?: Record<string, DiffStat>;
   /** Each folder's Checks section as the server answers it; the user's saves change it. */
   checks?: Record<string, ChecksView>;
   /** What each open project needs from the user, as the server first counts it (STORY-66). Default: nothing. */

@@ -6,6 +6,7 @@ import { Progress } from "./Bar.tsx";
 import { useCardSelection } from "./card-selection.tsx";
 import { useFeatureOpen } from "./open-features.tsx";
 import { useReviewDraft } from "./review-draft.tsx";
+import { ReviewButton } from "./ReviewButton.tsx";
 import { StaleMark } from "./stale-mark.tsx";
 import { MERGE_COPY } from "@featra/work-format/merge-copy";
 import { AcceptStory } from "./AcceptStory.tsx";
@@ -166,6 +167,7 @@ export function Feature({ feature }: { feature: FeatureRow }) {
               {WORK_COPY.openFeature}
             </button>
           )}
+          <ReviewButton id={feature.id} status={feature.status} icon />
           {feature.id && openProgress && (
             // Its progress pane (STORY-24): counts, scope, branch and each story, docked like the card pane. An icon,
             // so the name cell still reads as the feature's title.

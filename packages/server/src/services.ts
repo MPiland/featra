@@ -1,5 +1,5 @@
-import { createAgentBridge, type AgentBridge } from "./agent-bridge.ts";
-import { createApi, type Api } from "./api.ts";
+import { createAgentBridge } from "./agent-bridge.ts";
+import { createApi } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
 import { createCardReport } from "./card-report.ts";
 import { createCardLane } from "./card-lane.ts";
@@ -17,6 +17,8 @@ import { createDraftActions } from "./draft-actions.ts";
 import { createDraftReview } from "./draft-review.ts";
 import { createDraftWriter } from "./draft-writer.ts";
 import { createFeatureStart } from "./feature-start.ts";
+import { createFeatureSummary } from "./feature-summary.ts";
+import { createReviewDiffs } from "./review-diffs.ts";
 import { createStoryMessage } from "./story-message.ts";
 import { createStorySpawn } from "./story-spawn.ts";
 import { createStoryAcceptance } from "./story-acceptance.ts";
@@ -30,7 +32,7 @@ import { createBugRequest } from "./bug-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
 import { createGit } from "./git.ts";
-import { createProjectNeeds, type ProjectNeeds } from "./project-needs.ts";
+import { createProjectNeeds } from "./project-needs.ts";
 import { createLogWriter } from "./log-writer.ts";
 import { createStoryHold } from "./story-hold.ts";
 import { readAppAutoMerge, readAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
@@ -44,10 +46,10 @@ import { nodeRoleFs } from "./role-fs.ts";
 import { createRoleWatches } from "./role-watch.ts";
 import { createWorkWatches } from "./work-watch.ts";
 import { createScanner } from "./work-scan.ts";
-import type { ServiceOptions } from "./services-options.ts";
+import type { ServiceOptions, Services } from "./services-options.ts";
 import { createSettingsChanges } from "./settings-changes.ts";
 
-export type { ServiceOptions };
+export type { ServiceOptions, Services };
 
 /** The API with everything behind it, wired as the server process runs it. `close` ends watches and indexes. */
 export function createServices({
@@ -69,16 +71,7 @@ export function createServices({
   ghTimeoutMs,
   checkTimeoutMs,
   prTimers = systemTimers(),
-}: ServiceOptions): {
-  api: Api;
-  /** The agents' side of the server: their secrets, and what the agent socket answers (ADR 0019). */
-  agents: AgentBridge;
-  /** What every open project needs from the user: the switcher's watch, and the host's badge (STORY-67). */
-  needs: ProjectNeeds;
-  /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
-  settingsChanged: () => void;
-  close: () => Promise<void>;
-} {
+}: ServiceOptions): Services {
   // A scan's config carries the auto-merge setting in effect, the app default included, for Hold (STORY-61).
   const appAutoMerge = readAppAutoMerge(dataDir);
   const scanner = createScanner(repoGit, { appAutoMerge });
@@ -226,6 +219,7 @@ export function createServices({
     checkSettings,
     merges: createMergeRequest({ scan: watches.scan, chats, merge: merges.merge, log }),
     bugs: createBugRequest({ chats, bugs, log }),
+    summaries: createFeatureSummary({ scan: watches.scan, lane, now, gitCommand }),
     actions: createActionRequest({ chats }),
   });
   // A project the user closed takes its chats with it.
@@ -236,6 +230,8 @@ export function createServices({
   // What every open project needs from the user, for the project switcher (STORY-66) and the taskbar and Dock badge
   // (STORY-67); started by the first watch.
   const needs = createProjectNeeds({ allowed, watches, chats, log });
+  // What each story of a feature changed, read from git for its review screen; a read re-pushes it (STORY-69).
+  const diffs = createReviewDiffs({ changed: (dir) => watches.repush(dir), log, gitCommand });
   const api = createApi({
     git: createGit(gitCommand),
     allowed,
@@ -262,6 +258,7 @@ export function createServices({
     roleWatches,
     agents,
     needs: async (listener) => needs.watch(listener),
+    diffs,
   });
   // Saved settings that change a project's auto-merge setting in effect rescan it and re-check auto-merge (STORY-61).
   const settingsChanges = createSettingsChanges({
@@ -283,11 +280,13 @@ export function createServices({
       features.close();
       autoMerges.close();
       needs.close();
+      diffs.close();
       // A project watch still starting finishes against open watches, then stops itself.
       await prs.idle();
       await features.idle();
       await autoMerges.idle();
       await needs.ready();
+      await diffs.idle();
       await settingsChanges.idle();
       chats.close();
       await chats.flush();

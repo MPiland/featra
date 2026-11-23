@@ -14,6 +14,7 @@ import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
 import type { Inbox, InboxItem } from "./inbox.ts";
 import type { NeedsList } from "./project-needs.ts";
+import type { FeatureReview } from "./review-types.ts";
 import type { Role } from "./roles.ts";
 import type { RoleEdit, RoleEditResult, RoleList } from "./role-edit.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
@@ -56,6 +57,11 @@ export interface ServerMethods {
   "work.discardCopy": { params: { dir: string; key: string }; result: CopyActionResult };
   /** One card from its owner (null if none), then a `card.view` push on each change until `work.unwatch` (ADR 0017). */
   "card.watch": { params: { dir: string; id: string }; result: CardView | null };
+  /**
+   * A feature's review screen (STORY-69), null when it has no feature card; then a `review.view` push on each change
+   * (stories moving, checks finishing, proof arriving, git read) until `work.unwatch`.
+   */
+  "review.watch": { params: { dir: string; id: string }; result: FeatureReview | null };
   /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
   /**
@@ -247,6 +253,8 @@ export interface ServerPushes {
   "work.list": WorkList;
   /** The watched card changed: the whole new view, or null when the card is gone. */
   "card.view": CardView | null;
+  /** The watched feature's review screen changed: the whole new review, or null when the feature is gone. */
+  "review.view": FeatureReview | null;
   /** A watched chat has a new event. */
   "chat.event": ChatEvent;
   /** A role file or a provider's agent file or settings changed: the whole new list. */

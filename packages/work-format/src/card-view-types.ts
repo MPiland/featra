@@ -3,7 +3,7 @@
  * the checks for data that crosses the socket only, so the client can import it without the card parser.
  */
 import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
-import { normalizeCardPr, type CardPr } from "./prs-types.ts";
+import { isCiRunOf, normalizeCardPr, type CardPr } from "./prs-types.ts";
 import { normalizeFeatureEnd, type CardFeatureEnd } from "./feature-end-copy.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
@@ -14,11 +14,22 @@ import { isOneOf, isRecord } from "./utils/guards.ts";
 export type AcProof = "passed" | "failed" | "missing" | "linked" | "none";
 const AC_PROOFS: readonly AcProof[] = ["passed", "failed", "missing", "linked", "none"];
 
+/** A run on this computer (STORY-69): there is no page to link to. */
+export const LOCAL_RUN = "local";
+
+/**
+ * A proving run Featra keeps and shows for a card whose PR is at `pr`: `local`, or a GitHub Actions run in that PR's
+ * repository. Any other link, as an edited card might hold, is refused, so the card never offers it to open.
+ */
+export const isRun = (run: unknown, pr: string | null): run is string => run === LOCAL_RUN || isCiRunOf(pr, run);
+
 export interface CardViewAc {
   text: string;
   done: boolean;
   test: string | null;
   proof: AcProof;
+  /** The run that proved it, kept with the proof (STORY-69): a CI run's URL, or `local`; absent when not known. */
+  run?: string;
 }
 
 export interface CardViewTask {
@@ -221,6 +232,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
       done: a.done === true,
       test: textOrNull(a.test),
       proof: isOneOf(AC_PROOFS, a.proof) ? a.proof : "none",
+      ...(isRun(a.run, textOrNull(raw.pr)) ? { run: a.run } : {}),
     })),
     tasks: list(raw.tasks, (t) => ({ text: text(t.text), done: t.done === true })),
     notes: text(raw.notes),

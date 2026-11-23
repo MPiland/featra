@@ -8,13 +8,8 @@ import { SendBack } from "./SendBack.tsx";
 import { StartFeature } from "./StartFeature.tsx";
 import { StoryChecks } from "./StoryChecks.tsx";
 import { StoryPr } from "./StoryPr.tsx";
-import { AcceptStory } from "./AcceptStory.tsx";
-import { HoldStory } from "./HoldStory.tsx";
-import { MergeStory } from "./MergeStory.tsx";
 import { NotMerged } from "./NotMerged.tsx";
-import { AbandonStory } from "./AbandonStory.tsx";
-import { FeatureEnd } from "./FeatureEnd.tsx";
-import { StoryAgent } from "./story-agents.tsx";
+import { CardStageActions } from "./CardStageActions.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useAction } from "./useAction.ts";
 import { useCard } from "./useCard.ts";
@@ -175,59 +170,7 @@ export function CardPane({
               {review.error}
             </p>
           )}
-          {view.type === "story" && (
-            <div className="draft-actions card-agent">
-              <StoryAgent id={id} />
-            </div>
-          )}
-          {view.awaiting && !readOnly && (
-            <div className="draft-actions card-actions">
-              <AcceptStory
-                key={`accept-${id}`}
-                id={id}
-                actions={{
-                  accept: (story) => work.acceptStory(dir, story),
-                  sendBack: (story, reason, addCriterion) => work.sendBackStory(dir, story, reason, addCriterion),
-                }}
-              />
-            </div>
-          )}
-          {view.type === "story" && (!readOnly || view.abandonable === true) && (
-            <div className="draft-actions card-actions">
-              <MergeStory
-                key={`merge-${id}`}
-                id={id}
-                mergeable={view.mergeable === true}
-                merge={(story) => work.mergeStory(dir, story)}
-              />
-              <HoldStory
-                key={`hold-${id}`}
-                id={id}
-                held={view.held}
-                hold={(story, held) => work.holdStory(dir, story, held)}
-              />
-              <AbandonStory
-                key={`abandon-${id}`}
-                id={id}
-                abandonable={view.abandonable === true}
-                actions={{
-                  check: (story) => work.abandonCheck(dir, story),
-                  abandon: (story, keep, token) => work.abandonStory(dir, story, keep, token),
-                }}
-                onDiscarded={onClose}
-              />
-            </div>
-          )}
-          {view.type === "feature" && (
-            <div className="draft-actions card-actions">
-              <FeatureEnd
-                key={`end-${id}`}
-                id={id}
-                end={view.featureEnd}
-                actions={{ accept: () => work.acceptFeature(dir, id), merge: () => work.mergeFeature(dir, id) }}
-              />
-            </div>
-          )}
+          <CardStageActions work={work} dir={dir} id={id} view={view} readOnly={readOnly} onClose={onClose} />
           {view.startable && (
             <div className="draft-actions card-actions">
               <StartFeature

@@ -9,6 +9,7 @@ export type PushEvent = keyof ServerPushes;
 const PUSH_EVENTS: readonly PushEvent[] = [
   "work.list",
   "card.view",
+  "review.view",
   "chat.event",
   "chat.list",
   "roles.list",
@@ -39,6 +40,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "work.applyCopy",
   "work.discardCopy",
   "card.watch",
+  "review.watch",
   "card.update",
   "draft.sendBack",
   "draft.approve",

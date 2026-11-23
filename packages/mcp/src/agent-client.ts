@@ -116,6 +116,12 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       if (!isRecord(result) || result.asked !== true) throw new Error("Featra gave an unexpected answer.");
       return { asked: true };
     },
+    async summarize(input) {
+      const result = await call("feature.summary", input);
+      if (!isRecord(result) || typeof result.feature !== "string" || typeof result.message !== "string")
+        throw new Error("Featra gave an unexpected answer.");
+      return { feature: result.feature, message: result.message };
+    },
     async requestAction(input, signal) {
       // The call has a name of its own, so that when the agent's host drops it, the request it made ends with it.
       const name = `action-${++actions}`;

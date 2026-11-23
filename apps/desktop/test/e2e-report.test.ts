@@ -103,10 +103,11 @@ describe("each platform's e2e report proves criteria with the others (STORY-63)"
     const pr = { number: 1, url: "https://github.com/o/r/pull/1", head: HEAD, repo: "o/r" };
     await proven.read(gh.bin, card, config, { ...pr, status: { state: "open", checks: "failing" } });
 
+    // Each proven criterion keeps the run that proved it (STORY-69); the one that failed on macOS has none.
     expect(recorded.at(-1)?.acs).toEqual([
-      { ac: 1, passed: true },
+      { ac: 1, passed: true, run: "https://github.com/o/r/actions/runs/7" },
       { ac: 2, passed: false },
-      { ac: 3, passed: true },
+      { ac: 3, passed: true, run: "https://github.com/o/r/actions/runs/7" },
     ]);
     const proof = proven.proofOf(gh.bin, card.id);
     expect(proof?.failedAcs).toEqual([2]);

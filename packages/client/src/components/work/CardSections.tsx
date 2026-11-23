@@ -2,6 +2,7 @@ import type { CardEdit, CardView } from "../../card-pane.ts";
 import { CARD_COPY } from "../../card-pane.ts";
 import { CheckIcon, CircleIcon } from "../icons.tsx";
 import { InlineText, type InlineRefusal } from "../controls/InlineText.tsx";
+import { AcProof } from "./AcProof.tsx";
 
 /** Saves one edit; on a refusal, `pick` reads the field's value now from the card the server answered with. */
 export type SaveEdit = (edit: CardEdit, pick: (view: CardView) => string) => Promise<InlineRefusal | null>;
@@ -71,11 +72,7 @@ export function AcSection({ view, save }: SectionProps) {
                 nowLabel={CARD_COPY.now}
                 onSave={(to, from) => save({ field: "ac", index: i, from, to }, (v) => v.acs[i]?.text ?? "")}
               />
-              <div className={`proof proof-${ac.proof}`}>
-                {ac.proof === "passed" ? <CheckIcon /> : <CircleIcon />}
-                <span>{CARD_COPY.proof[ac.proof]}</span>
-                {ac.test && <code title={ac.test}>{ac.test}</code>}
-              </div>
+              <AcProof ac={ac} />
             </div>
           </li>
         ))}
