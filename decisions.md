@@ -3177,3 +3177,15 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   agent's answer and the chat's `tool-denied` event, and the reason field has that `maxLength`. The clipboard IPC
   copies at most a command's length.
 - **No ADR:** one more MCP tool and app approval on existing paths, and one IPC message.
+
+## 2026-11-23 — FEAT-9 Approval screen shaping (user and dev-lead)
+
+- The approval screen is a full view, opened by Review from any active feature's Work row or card pane, whatever stage its stories are in.
+- One Approve records the Accept and merges the feature to main. It replaces the card pane's separate Accept and Merge buttons. It is disabled, with the reason, until every story is Done or Cancelled and the merge is clear.
+- If the merge fails after Approve, the Accept stands and a "Merge to main" retry appears.
+- The change summary is built from the cards and git, at zero tokens. A Dev Lead summary written through the MCP shows too, labelled as the Dev Lead's.
+- The diff is a link to GitHub's Files changed, for the feature and for each story, until the FEAT-14 Changes pane.
+- Each criterion shows its test, its result and a link to the run that proved it. The run is stored with the proof.
+- "Not yet" needs a reason, which goes to the Dev Lead's chat and the feature's history. The screen shows "Changes asked" until the Dev Lead marks it handled through the MCP or the user dismisses it. It creates no cards, and Approve stays available.
+- STORY-25 is split: showing attached evidence is STORY-72, the design review of screenshots is STORY-73, and STORY-25 keeps the proof setting and screenshot capture.
+- Stories, in order: STORY-69 Review a feature on one screen; STORY-70 Approve merges the feature to main; STORY-71 Ask for changes before approving; STORY-72 See attached evidence next to criteria; STORY-25 Choose the project's proof and capture screenshots; STORY-73 Design review of screenshots. STORY-70, 71 and 72 depend on 69; STORY-25 on 72; STORY-73 on 25.
