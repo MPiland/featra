@@ -40,6 +40,7 @@ export interface ServerClient {
 export type WatchMethod =
   | "work.watch"
   | "card.watch"
+  | "review.watch"
   | "chat.watch"
   | "chat.list"
   | "roles.watch"

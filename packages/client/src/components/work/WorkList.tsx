@@ -1,4 +1,4 @@
-import { useCallback, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ChatSummary } from "@featra/work-format";
 import type { StoryRow } from "@featra/work-format/work-list";
 import type { ProjectRef } from "../../projects.ts";
@@ -23,6 +23,8 @@ import { NewBug } from "./NewBug.tsx";
 import { OpenFeaturesContext, useOpenFeatures } from "./open-features.tsx";
 import { ProjectBugs } from "./ProjectBugs.tsx";
 import { ReviewDraft } from "./review-draft.tsx";
+import { OpenReview } from "./review-opener.tsx";
+import { ReviewScreen } from "./ReviewScreen.tsx";
 import { StageBoard } from "./StageBoard.tsx";
 import { StoryAgentsContext, type StoryAgents } from "./story-agents.tsx";
 import { useDockedPane } from "./useDockedPane.ts";
@@ -80,6 +82,14 @@ export function WorkList(props: {
   const paneId = useId();
   const layoutName = useId();
   const listRef = useRef<HTMLElement>(null);
+  // A feature's review screen (STORY-69) in place of the list; Back puts focus on the Review button it came from.
+  const [reviewing, setReviewing] = useState<string | null>(null);
+  const reviewed = useRef<string | null>(null);
+  useEffect(() => {
+    if (reviewing !== null || !reviewed.current) return;
+    listRef.current?.querySelector<HTMLElement>(`[data-card="${reviewed.current}"] .row-review`)?.focus();
+    reviewed.current = null;
+  }, [reviewing]);
   const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
   // The list's columns (STORY-62): fewer with the pane open, and only those that fit, so no cell wraps or clips.
   const listWidth = useMeasuredWidth(listRef);
@@ -161,92 +171,105 @@ export function WorkList(props: {
       </>
     );
   }
+  if (reviewing) {
+    const back = () => {
+      reviewed.current = reviewing;
+      setReviewing(null);
+    };
+    return (
+      <div ref={splitRef} className="work-split">
+        <ReviewScreen key={reviewing} work={work} dir={project.dir} id={reviewing} onBack={back} />
+      </div>
+    );
+  }
   return (
-    <div ref={splitRef} className="work-split">
-      <section
-        ref={listRef}
-        className={layout === "board" ? "work-list on-board" : "work-list"}
-        style={grid}
-        data-columns={columns.join(" ")}
-        aria-label={WORK_COPY.region}
-        data-view="work"
-        data-project={project.dir}
-      >
-        {list && (
-          <div className="work-head">
-            <SegmentedControl
-              name={layoutName}
-              label={BOARD_COPY.layout}
-              value={layout}
-              options={LAYOUTS}
-              onChange={onLayout}
-            />
-          </div>
-        )}
-        {update?.error && (
-          <p className="work-error" role="alert">
-            {update.error}
-          </p>
-        )}
-        {list && list.problems.length > 0 && (
-          <details className="work-problems">
-            <summary>{WORK_COPY.problems}</summary>
-            <ul>
-              {list.problems.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ul>
-          </details>
-        )}
-        {list && (
-          <StaleCopies
-            stale={list.stale}
-            onApply={(key) => work.applyCopy(project.dir, key)}
-            onDiscard={(key) => work.discardCopy(project.dir, key)}
-          />
-        )}
-        {list && (
-          // The list's toolbar: its filters, and New bug at the end of the same row.
-          <div className="work-toolbar">
-            {hasWork && layout === "list" && (
-              <div className="wfilter" role="group" aria-label={WORK_COPY.filters}>
-                {LIST_FILTERS.map((f) => (
-                  <button
-                    key={f.id}
-                    type="button"
-                    className={filter === f.id ? "fchip on" : "fchip"}
-                    aria-pressed={filter === f.id}
-                    onClick={() => setFilter(f.id)}
-                  >
-                    {f.label} · {counts[f.id]}
-                  </button>
+    <OpenReview.Provider value={setReviewing}>
+      <div ref={splitRef} className="work-split">
+        <section
+          ref={listRef}
+          className={layout === "board" ? "work-list on-board" : "work-list"}
+          style={grid}
+          data-columns={columns.join(" ")}
+          aria-label={WORK_COPY.region}
+          data-view="work"
+          data-project={project.dir}
+        >
+          {list && (
+            <div className="work-head">
+              <SegmentedControl
+                name={layoutName}
+                label={BOARD_COPY.layout}
+                value={layout}
+                options={LAYOUTS}
+                onChange={onLayout}
+              />
+            </div>
+          )}
+          {update?.error && (
+            <p className="work-error" role="alert">
+              {update.error}
+            </p>
+          )}
+          {list && list.problems.length > 0 && (
+            <details className="work-problems">
+              <summary>{WORK_COPY.problems}</summary>
+              <ul>
+                {list.problems.map((p) => (
+                  <li key={p}>{p}</li>
                 ))}
-              </div>
-            )}
-            <NewBug bugs={work} dir={project.dir} list={list} />
-          </div>
+              </ul>
+            </details>
+          )}
+          {list && (
+            <StaleCopies
+              stale={list.stale}
+              onApply={(key) => work.applyCopy(project.dir, key)}
+              onDiscard={(key) => work.discardCopy(project.dir, key)}
+            />
+          )}
+          {list && (
+            // The list's toolbar: its filters, and New bug at the end of the same row.
+            <div className="work-toolbar">
+              {hasWork && layout === "list" && (
+                <div className="wfilter" role="group" aria-label={WORK_COPY.filters}>
+                  {LIST_FILTERS.map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className={filter === f.id ? "fchip on" : "fchip"}
+                      aria-pressed={filter === f.id}
+                      onClick={() => setFilter(f.id)}
+                    >
+                      {f.label} · {counts[f.id]}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <NewBug bugs={work} dir={project.dir} list={list} />
+            </div>
+          )}
+          <SelectedCard.Provider value={selection}>
+            <WorkColumnsContext.Provider value={columns}>{body}</WorkColumnsContext.Provider>
+          </SelectedCard.Provider>
+        </section>
+        {docked && (
+          <StoryAgentsContext.Provider value={storyAgents}>
+            <SidePane
+              docked={docked}
+              onDock={setDocked}
+              onClose={close}
+              work={work}
+              dir={project.dir}
+              layout={{ split, width, onMove, choose }}
+              paneId={paneId}
+              list={list}
+              chats={chats}
+              onOpenChat={onOpenChat}
+              hasChat={hasChat}
+            />
+          </StoryAgentsContext.Provider>
         )}
-        <SelectedCard.Provider value={selection}>
-          <WorkColumnsContext.Provider value={columns}>{body}</WorkColumnsContext.Provider>
-        </SelectedCard.Provider>
-      </section>
-      {docked && (
-        <StoryAgentsContext.Provider value={storyAgents}>
-          <SidePane
-            docked={docked}
-            onDock={setDocked}
-            onClose={close}
-            work={work}
-            dir={project.dir}
-            layout={{ split, width, onMove, choose }}
-            paneId={paneId}
-            list={list}
-            chats={chats}
-            onOpenChat={onOpenChat}
-            hasChat={hasChat}
-          />
-        </StoryAgentsContext.Provider>
-      )}
-    </div>
+      </div>
+    </OpenReview.Provider>
   );
 }

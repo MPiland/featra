@@ -17,6 +17,8 @@ import {
   VERIFIED,
 } from "./evidence.ts";
 import { recordEvidence } from "./history.ts";
+import { isRun } from "./card-view-types.ts";
+import { ranEvent } from "./proof-run.ts";
 import type { ChecksWhere, GithubDetection } from "./checks-types.ts";
 import { isRecord } from "./utils/guards.ts";
 import type { Card, ProjectConfig } from "./types.ts";
@@ -72,8 +74,11 @@ export function checksApply(card: Card, config: ProjectConfig): boolean {
 export interface CheckOutcome {
   /** Null when the check command wasn't run, so Verified stays as it was. */
   passed: boolean | null;
-  /** AC number (1-based) and whether every test linked to it passed. */
-  acs: readonly { ac: number; passed: boolean }[];
+  /**
+   * AC number (1-based) and whether every test linked to it passed; `run` is the run that proved it, a CI run's URL or
+   * `local` (STORY-69), recorded with the proof.
+   */
+  acs: readonly { ac: number; passed: boolean; run?: string }[];
   /** The commit the verdict is for (STORY-12): recorded as `checked:<commit>` when the check command ran on it, and
    * with each criterion it proves (`proven:<n>@<commit>`, STORY-59). */
   head?: string;
@@ -95,12 +100,15 @@ export function withCheckEvidence(card: Card, config: ProjectConfig, outcome: Ch
   if (outcome.passed === true && !before.verified) next = recordEvidence(next, VERIFIED, by, at);
   if (outcome.passed === false && before.verified) next = recordEvidence(next, UNVERIFIED, by, at);
   const commits = provenCommits(card);
-  for (const { ac, passed } of outcome.acs) {
+  for (const { ac, passed, run } of outcome.acs) {
     if (ac < 1 || ac > card.acs.length) continue;
     const proven = before.provenAcs.includes(ac);
     // Proof for a new commit is recorded with it, so what was proven at an older commit isn't taken for this one.
     const fresh = !!outcome.head && commits.get(ac) !== outcome.head;
-    if (passed && (!proven || fresh)) next = recordEvidence(next, provenEvent(ac, outcome.head), by, at);
+    if (passed && (!proven || fresh)) {
+      next = recordEvidence(next, provenEvent(ac, outcome.head), by, at);
+      if (run && isRun(run)) next = recordEvidence(next, ranEvent(ac, run), by, at);
+    }
     if (!passed && proven) next = recordEvidence(next, unprovenEvent(ac), by, at);
   }
   return next === card ? card : settleDone(next, config, by, at);

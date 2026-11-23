@@ -36,7 +36,8 @@
     "./bug-copy": "./src/bug-copy.ts",
     "./action-request": "./src/action-request.ts",
     "./app-calls": "./src/app-calls.ts",
-    "./feature-end-copy": "./src/feature-end-copy.ts"
+    "./feature-end-copy": "./src/feature-end-copy.ts",
+    "./review": "./src/review-types.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

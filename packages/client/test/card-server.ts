@@ -109,6 +109,8 @@ export function fakeCardServer(
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
+  /** Who else hears a folder's cards change: the review screen's fake (STORY-69). */
+  const changes = new Set<(dir: string) => void>();
   const viewOf = (dir: string, id: string): CardView | null => {
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
@@ -135,6 +137,7 @@ export function fakeCardServer(
     // A card the folder doesn't have yet is one an agent just made (a draft).
     cardSets.set(dir, cards.some((c) => c.id === card.id) ? replace(cards, card) : [...cards, card]);
     listChanged(dir, listOf(dir) as WorkList);
+    for (const c of changes) c(dir);
     for (const [key, set] of watchers) {
       const [d, id] = JSON.parse(key) as [string, string];
       if (d === dir) for (const l of set) l({ view: viewOf(dir, id), loading: false, error: null });
@@ -147,6 +150,7 @@ export function fakeCardServer(
       (cardSets.get(dir) ?? []).filter((c) => !ids.includes(c.id)),
     );
     listChanged(dir, listOf(dir) as WorkList);
+    for (const c of changes) c(dir);
     for (const [key, set] of watchers) {
       const [d, id] = JSON.parse(key) as [string, string];
       if (d === dir) for (const l of set) l({ view: viewOf(dir, id), loading: false, error: null });
@@ -329,6 +333,12 @@ export function fakeCardServer(
     changed,
     /** The folder's cards as the server holds them now. */
     cardsIn: (dir: string) => cardSets.get(dir) ?? [],
+    viewOf,
+    /** Calls back on each change of a folder's cards; returns the stop. */
+    onChange: (listener: (dir: string) => void) => {
+      changes.add(listener);
+      return () => void changes.delete(listener);
+    },
     /** How many card watches are open. */
     watching: () => [...watchers.values()].reduce((n, s) => n + s.size, 0),
   };

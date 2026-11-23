@@ -25,4 +25,7 @@ export const AGENT_MESSAGES = {
   noAction: "Asking the user to do something isn't available.",
   /** A story session tells its Dev Lead what it found; the Dev Lead proposes where the bug goes. */
   sessionBug: "A story session can't report bugs. Tell the Dev Lead what you found.",
+  noSummary: "Writing a feature's summary isn't available.",
+  /** The summary is the Dev Lead's account of the whole feature; a story session reports on its own story. */
+  sessionSummary: "A story session can't write a feature's summary. Report to the Dev Lead.",
 } as const;

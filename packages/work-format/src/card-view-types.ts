@@ -14,11 +14,20 @@ import { isOneOf, isRecord } from "./utils/guards.ts";
 export type AcProof = "passed" | "failed" | "missing" | "linked" | "none";
 const AC_PROOFS: readonly AcProof[] = ["passed", "failed", "missing", "linked", "none"];
 
+/** A run on this computer (STORY-69): there is no page to link to. */
+export const LOCAL_RUN = "local";
+
+/** A proving run as history may hold it: `local`, or an https link with no spaces or quotes. */
+export const isRun = (run: unknown): run is string =>
+  typeof run === "string" && (run === LOCAL_RUN || /^https:\/\/[^\s"'<>]+$/.test(run));
+
 export interface CardViewAc {
   text: string;
   done: boolean;
   test: string | null;
   proof: AcProof;
+  /** The run that proved it, kept with the proof (STORY-69): a CI run's URL, or `local`; absent when not known. */
+  run?: string;
 }
 
 export interface CardViewTask {
@@ -221,6 +230,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
       done: a.done === true,
       test: textOrNull(a.test),
       proof: isOneOf(AC_PROOFS, a.proof) ? a.proof : "none",
+      ...(isRun(a.run) ? { run: a.run } : {}),
     })),
     tasks: list(raw.tasks, (t) => ({ text: text(t.text), done: t.done === true })),
     notes: text(raw.notes),

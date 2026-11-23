@@ -14,6 +14,7 @@ import { MergeStory } from "./MergeStory.tsx";
 import { NotMerged } from "./NotMerged.tsx";
 import { AbandonStory } from "./AbandonStory.tsx";
 import { FeatureEnd } from "./FeatureEnd.tsx";
+import { ReviewButton } from "./ReviewButton.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 import { StoriesSection } from "./StoriesSection.tsx";
 import { useAction } from "./useAction.ts";
@@ -226,6 +227,7 @@ export function CardPane({
                 end={view.featureEnd}
                 actions={{ accept: () => work.acceptFeature(dir, id), merge: () => work.mergeFeature(dir, id) }}
               />
+              <ReviewButton id={id} status={view.status} />
             </div>
           )}
           {view.startable && (

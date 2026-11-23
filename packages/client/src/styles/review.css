@@ -1,0 +1,111 @@
+/* A feature's review screen (STORY-69): the whole feature on one screen, in place of the Work list. */
+
+.review-screen {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.rv-top {
+  margin-bottom: 8px;
+}
+
+.rv-h {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.rv-h:focus {
+  outline: none;
+}
+
+.rv-h:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.rv-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--tx2);
+}
+
+.rv-facts {
+  margin-bottom: 8px;
+}
+
+.rv-by {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--pur);
+}
+
+.rv-summary-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rv-items {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-item {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rv-item:last-child {
+  border-bottom: 0;
+}
+
+.rv-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.rv-name .card-id {
+  color: var(--tx3);
+  font-size: 12px;
+}
+
+.rv-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rv-story {
+  margin: 0;
+  color: var(--tx2);
+}
+
+.rv-acs {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.proof-run {
+  flex: 0 0 auto;
+}
+
+/* Beside Accept or Merge in the card pane, Review sits a little apart. */
+.card-actions .row-review {
+  margin-left: 8px;
+}

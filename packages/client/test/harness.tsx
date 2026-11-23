@@ -28,6 +28,7 @@ import type { HostOptions } from "./harness-options.ts";
 import { fakeChecksServer } from "./checks-server.ts";
 import { fakeNeedsServer } from "./needs-server.ts";
 import { fakeRolesServer } from "./roles-server.ts";
+import { fakeReviewServer } from "./review-server.ts";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
 /** Where New Project… suggests a folder by default. */
@@ -189,6 +190,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       refreshPrs: () => void calls.push("refreshPrs"),
       ...fakeBugServer(calls, host),
       ...cards.bridge,
+      ...fakeReviewServer(cards, host.reviewDiffs),
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.
     chats: chats.bridge,

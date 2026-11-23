@@ -36,6 +36,10 @@ agent tokens.
   failed in none. A test skipped everywhere is missing.
 - **Evidence through the shared writer.** Each linked criterion gets `proven:<n>` or `unproven:<n>` by `system` through
   the same path as every check (ADR 0004), and only when it changes. Criteria that link no test are left alone.
+- **The proving run is kept (STORY-69).** With each `proven:<n>` the writer records `ran:<n>@<run>`: the URL of the
+  first CI run whose own report passes every test the criterion links (else the first run with a report), or `local`
+  for a local run. It is part of the card, so the review screen's "CI run" link survives a restart; `unproven:<n>`
+  drops it.
 - **The card says why.** A criterion not proven shows "Test failed" or "Not in the report". The PR section lists the
   reason for each, and a note when there was no report to read. This is kept in memory with the PR's state, not written
   to the card.

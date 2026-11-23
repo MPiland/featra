@@ -7,13 +7,15 @@
  */
 import {
   ciProof,
+  ciRunUrl,
+  provingRuns,
   unprovenLinked,
   type Card,
   type CheckOutcome,
   type CiProof,
   type ProjectConfig,
 } from "@featra/work-format";
-import { readCiReports, type CiReportDeps } from "./ci-report.ts";
+import { readCiRunReports, type CiReportDeps } from "./ci-report.ts";
 import type { FoundPr } from "./github-prs.ts";
 import { headIsStale } from "./pr-ci.ts";
 import { keyOf } from "./story-prs-seen.ts";
@@ -62,11 +64,25 @@ export function createCiProven(deps: CiProvenDeps) {
     // Checks running again on the same head (a re-run) mean a new report once they finish.
     if (pr.status.checks === "pending") known.read = false;
     if (stale || known.read || pr.status.checks === "pending" || pr.status.checks === "none") return dropped;
-    const found = await readCiReports(dir, pr.head, { artifact, files: config.testReportFiles }, deps);
+    const found = await readCiRunReports(dir, pr.head, { artifact, files: config.testReportFiles }, deps);
     if (!found || found.kind === "running" || heads.get(key) !== known) return dropped;
-    const { acs, proof } = ciProof(card, found.reports.flat(), found.note);
+    const { acs, proof } = ciProof(
+      card,
+      found.reports.flatMap((r) => r.cases),
+      found.note,
+    );
+    // Each proof keeps the run that made it (STORY-69), so its link outlives this read.
+    const runs = provingRuns(
+      card,
+      found.reports,
+      acs.filter((a) => a.passed).map((a) => a.ac),
+    );
+    const linked = acs.map((a) => {
+      const run = ciRunUrl(pr.url, runs.get(a.ac) ?? 0);
+      return a.passed && run ? { ac: a.ac, passed: a.passed, run } : a;
+    });
     // Proof is recorded with the commit the report ran on (STORY-59): auto-merge merges only what is proven at its tip.
-    if (!(await deps.record(dir, card.id, { passed: null, acs, head: pr.head }))) return dropped;
+    if (!(await deps.record(dir, card.id, { passed: null, acs: linked, head: pr.head }))) return dropped;
     known.read = true;
     known.proof = proof;
     return true;

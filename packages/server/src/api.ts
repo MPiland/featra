@@ -23,8 +23,9 @@ import { createStoryEndApi } from "./api-story-end.ts";
 import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
 import { createProjectApi } from "./api-project.ts";
 import { createRoleApi } from "./api-roles.ts";
+import { createWatchApi, type WatchApiDeps } from "./api-watch.ts";
 import type { BugFiling } from "./bug-filing.ts";
-import { cardViewIn, type CardActions } from "./card-actions.ts";
+import type { CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
 import type { DraftActions } from "./draft-actions.ts";
@@ -79,6 +80,8 @@ export interface ApiDeps {
   /** Takes back what an agent logged; without it there is nothing to take back. */
   agents?: Pick<AgentBridge, "undo">;
   needs?: ChatApiDeps["needs"];
+  /** What each story of a feature changed, for its review screen (STORY-69). */
+  diffs?: WatchApiDeps["diffs"];
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -127,6 +130,7 @@ export function createApi({
   roleWatches,
   agents,
   needs,
+  diffs,
 }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
@@ -154,6 +158,7 @@ export function createApi({
   const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
   const bugApi = createBugApi({ bugs, allow });
   const featureApi = createFeatureApi({ features, card });
+  const watchApi = createWatchApi({ watches, allowed, checks, prs, features, diffs, card });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, needs, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
@@ -192,27 +197,10 @@ export function createApi({
         const p = copy(params);
         return copies.discard(p.dir, p.key);
       }
-      case "card.watch": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        const dir = allow(p.dir);
-        const { value, stop } = await watches.observe(
-          dir,
-          (scan) =>
-            cardViewIn(
-              scan,
-              p.id,
-              checks.checksFor(dir, p.id) ?? features?.checksFor(dir, p.id),
-              prs.prState(dir, p.id) ?? features?.prState(dir, p.id),
-              features?.mergeState(dir, p.id),
-            ),
-          (next) => {
-            if (allowed.has(dir)) connection.push("card.view", id, next);
-          },
-        );
-        connection.keep(id, stop);
-        return value;
-      }
+      case "card.watch":
+      case "review.watch":
+        return watchApi(method, params, id, connection);
+
       case "card.update": {
         const p = cardUpdateParams(params);
         if (!p) throw new ApiError("Expected { dir, id, edit }.");
