@@ -132,13 +132,14 @@ export interface ServerMethods {
    */
   "story.rerunChecks": { params: { dir: string; id: string }; result: null };
   /**
-   * Accepts a feature in progress once every story and bug under it is Done or Cancelled (STORY-14): with "Open feature
-   * PRs automatically" on and GitHub usable, its branch is pushed and its PR to the base opened first. The user's only.
+   * The review screen's Approve (STORY-70): accepts a feature in progress whose stories and bugs are all Done or
+   * Cancelled and merges it into the base, in one click, once nothing stops the merge. Refused with why otherwise; when
+   * the merge fails, the Accept stands and why is thrown, and `feature.merge` retries. The user's only.
    */
-  "feature.accept": { params: { dir: string; id: string }; result: null };
-  /** Pushes an accepted feature's branch and opens (or adopts) its PR to the base (STORY-14). Refused in local mode. */
+  "feature.approve": { params: { dir: string; id: string }; result: { remains: string[] } };
+  /** Pushes a finished feature's branch and opens (or adopts) its PR to the base (STORY-14). Refused in local mode. */
   "feature.createPr": { params: { dir: string; id: string }; result: null };
-  /** Runs an accepted feature's checks on this computer again, at the commit its branch is at (STORY-14). */
+  /** Runs a finished feature's checks on this computer again, at the commit its branch is at (STORY-14). */
   "feature.rerunChecks": { params: { dir: string; id: string }; result: null };
   /**
    * Merges an accepted feature into the base with a merge commit (STORY-14): through its PR when the project uses

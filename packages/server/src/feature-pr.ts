@@ -1,5 +1,5 @@
 /**
- * An accepted feature's PR to the base branch (STORY-14, ADR 0037), through the same `gh` and git steps a story's PR
+ * A finished feature's PR to the base branch (STORY-14, STORY-70, ADR 0037), through the same `gh` and git steps a story's PR
  * takes (github-prs.ts): the feature branch is pushed, never forced, and its open PR into the base is adopted or one is
  * opened. The PR is recorded on the feature's card by `system`. Why a try failed shows on the card, and Create PR
  * tries again.
@@ -21,7 +21,8 @@ export interface FeaturePrDeps extends GithubPrDeps {
 
 /** What the card pane needs of a feature to show its PR. */
 export interface PrShown {
-  accepted: boolean;
+  /** Accepted, or every story and bug under it Done or Cancelled (STORY-70): Create PR applies. */
+  finished: boolean;
   pr: string | null;
   usable: boolean;
 }
@@ -95,7 +96,7 @@ export function createFeaturePrs(deps: FeaturePrDeps) {
       const last = read.get(key);
       const status = shown.pr && last?.url === shown.pr ? last.status : null;
       const isOpening = opening.has(key);
-      const create = shown.usable && shown.accepted && !shown.pr && !isOpening;
+      const create = shown.usable && shown.finished && !shown.pr && !isOpening;
       const note = shown.pr ? null : (notes.get(key) ?? null);
       if (!status && !create && !isOpening && !note) return undefined;
       return { status, create, opening: isOpening, note };

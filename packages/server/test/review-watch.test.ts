@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   appendHistory,
   DEFAULT_CONFIG,
+  FEATURE_END_MESSAGES,
   mergeCommitMessage,
   newCard,
   provenEvent,
@@ -237,6 +238,14 @@ describe("a feature's review screen (STORY-69)", () => {
     await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
     await until(() => item(review(), "STORY-1")?.diff != null);
     expect(item(review(), "STORY-1")?.diff).toEqual({ files: 2, added: 5, removed: 0 });
+  });
+
+  it("carries Approve, off with the unfinished items first, and refuses it (STORY-70 AC2)", async () => {
+    await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
+    await until(() => review()?.approval != null);
+    const reason = FEATURE_END_MESSAGES.unfinished("FEAT-1", 2);
+    expect(review()?.approval).toEqual({ step: "approve", ready: false, reason, base: "main" });
+    await expect(ask("feature.approve", { dir: repo.main, id: "FEAT-1" })).rejects.toThrow(reason);
   });
 
   it("is null for an id that isn't a feature", async () => {

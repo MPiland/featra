@@ -271,6 +271,8 @@ export function fakeCardServer(
     /** The folder's cards as the server holds them now. */
     cardsIn: (dir: string) => cardSets.get(dir) ?? [],
     viewOf,
+    /** What the server finds stops a feature's merge, as the test sets it (STORY-14, STORY-70). */
+    mergeOf,
     /** Calls back on each change of a folder's cards; returns the stop. */
     onChange: (listener: (dir: string) => void) => {
       changes.add(listener);

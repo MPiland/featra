@@ -49,10 +49,19 @@ describe("the feature's PR (AC2)", () => {
     expect((await w.gh.load()).prs[0]).toMatchObject({ head: FEATURE_BRANCH, base: "main" });
   });
 
-  it("isn't offered before Accept", async () => {
-    await w.start({ ...ci, yaml: "openFeaturePrs: false\n" });
-    await expect(w.features.createPr(dir(), ID)).rejects.toThrow(FEATURE_END_MESSAGES.notAccepted(ID));
+  // STORY-70 moved this from "before Accept" to "before the feature is finished": its PR's CI runs before Approve.
+  it("isn't offered before the feature is finished", async () => {
+    await w.start({ ...ci, yaml: "openFeaturePrs: false\n", story2: "In Progress" });
+    await expect(w.features.createPr(dir(), ID)).rejects.toThrow(FEATURE_END_MESSAGES.unfinished(ID, 1));
     expect(w.features.prState(dir(), ID)).toBeUndefined();
+  });
+
+  it("is offered once the feature is finished, before any Accept (STORY-70)", async () => {
+    await w.start({ ...ci, yaml: "openFeaturePrs: false\n" });
+    expect(w.features.prState(dir(), ID)).toMatchObject({ create: true, opening: false });
+    await expect(w.features.createPr(dir(), ID)).resolves.toBeNull();
+    expect(w.onFeature().pr).toBe(PR);
+    expect(evidenceState(w.onFeature()).accepted).toBe(false);
   });
 });
 

@@ -171,9 +171,12 @@ describe("the Dev Lead's notice (review Should-fix 4)", () => {
 
 describe("what a failure leaves (review Should-fix 5)", () => {
   it("lets Accept be tried again after its PR opened and its card write failed, adopting that PR", async () => {
-    // While GitHub opens the PR, the feature branch can't be read, so Accept's card write fails.
-    await w.start(ci);
+    // STORY-70 opens a finished feature's PR on its own, before Accept; Accept opens it only when that failed. So it
+    // fails once here, and then, while GitHub opens the PR, the feature branch can't be read: Accept's card write fails.
+    await w.start({ ...ci, gh: { ...ci.gh, createFails: "GitHub is down" } });
+    expect(w.features.prState(dir(), ID)?.note).toMatch(/GitHub is down/);
     await w.gh.change((s) => {
+      s.createFails = undefined;
       s.whileCreating = { file: ref(), text: `${"0".repeat(40)}\n` };
     });
     const tip = w.tip(FEATURE_BRANCH);

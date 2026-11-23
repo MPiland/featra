@@ -2,12 +2,13 @@ import { useEffect, useRef } from "react";
 import { REVIEW_COPY, type FeatureReview, type ReviewItem } from "@featra/work-format/review";
 import { CARD_COPY } from "../../card-pane.ts";
 import type { WorkBridge } from "../../work-list.ts";
+import { FeatureEnd } from "./FeatureEnd.tsx";
 import { DiffLine, ExternalLink, ReviewItemCard } from "./ReviewItem.tsx";
 import { StoryChecks } from "./StoryChecks.tsx";
 import { StoryPr } from "./StoryPr.tsx";
 import { useReview } from "./useReview.ts";
 
-type Actions = Pick<WorkBridge, "rerunFeatureChecks" | "createFeaturePr">;
+type Actions = Pick<WorkBridge, "rerunFeatureChecks" | "createFeaturePr" | "approveFeature" | "mergeFeature">;
 
 function Items({ title, items, empty }: { title: string; items: ReviewItem[]; empty?: string }) {
   if (items.length === 0 && !empty) return null;
@@ -49,6 +50,11 @@ function ReviewBody({ review, dir, work }: { review: FeatureReview; dir: string;
           />
         )}
       </div>
+      <FeatureEnd
+        id={id}
+        approval={review.approval}
+        actions={{ approve: () => work.approveFeature(dir, id), merge: () => work.mergeFeature(dir, id) }}
+      />
       {summary && (
         // Only when the Dev Lead wrote one: no heading stands empty.
         <section className="card-sec rv-summary" aria-label={REVIEW_COPY.summary}>
@@ -78,7 +84,8 @@ function ReviewBody({ review, dir, work }: { review: FeatureReview; dir: string;
 
 /**
  * A feature's review screen (STORY-69): the whole feature on one screen, built by the server from its cards and git
- * at no token cost, and live while open. Back returns to the Work list.
+ * at no token cost, and live while open, with Approve, which accepts and merges it (STORY-70). Back returns to the Work
+ * list.
  */
 export function ReviewScreen({
   work,

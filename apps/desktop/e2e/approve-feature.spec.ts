@@ -1,25 +1,27 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { delimiter, join } from "node:path";
 import { expect, test, type ElectronApplication } from "./fixtures.ts";
-import { newCard, parseCard, serializeCard, setStatus } from "@featra/work-format";
+import { evidenceState, FEATURE_END_MESSAGES, newCard, parseCard, serializeCard, setStatus } from "@featra/work-format";
 import { checkRun, fakeGh } from "../../../packages/server/test/fake-gh.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude, tempDir } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
-import { pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
+import { atReviewSize, uxShot } from "./ux-shot.ts";
 
 const FEATURE = "feature/2-ship";
 const PR = "https://github.com/acme/app/pull/1";
 const AT = "2026-11-12T09:00:00Z";
 
 /**
- * STORY-14: accepting a feature and merging it to main. The real app, its real local server and real git; only the
- * platform, the agent (agent.ts) and GitHub are faked: `gh` is a stand-in on the PATH (fake-gh.cjs) and the remote is
- * a bare repository on disk whose path names github.com. FEAT-2 is in progress on its branch with its one story Done.
- * Accept on its card opens its PR to main; once CI passes on the branch's commit, Merge to main merges the PR with a
- * merge commit, and main has the feature Done.
+ * STORY-70: Approve on a feature's review screen records the user's Accept and merges the feature to main in one
+ * click (it replaces STORY-14's Accept and Merge on the card pane). The real app, its real local server and real git;
+ * only the platform, the agent (agent.ts) and GitHub are faked: `gh` is a stand-in on the PATH (fake-gh.cjs) and the
+ * remote is a bare repository on disk whose path names github.com. FEAT-2 is in progress on its branch with its one
+ * story Done, so its PR opens and its CI runs before Approve. Approve is off, saying why, until CI passes on the
+ * branch's commit; then one click merges the PR with a merge commit, main has the feature Done with the Accept, and
+ * the screen shows it merged.
  */
-test("Accept a feature: its PR to main opens, and once CI passes Merge to main merges it with a merge commit", async () => {
+test("Approve a feature on its review screen: off until CI passes, then one click merges it to main", async () => {
   const userData = await tempUserData();
   const repo = await project("version: 1\nchecksWhere: ci\n");
   const github = await tempDir("featra-github-");
@@ -63,50 +65,53 @@ test("Accept a feature: its PR to main opens, and once CI passes Merge to main m
       [PATH_KEY]: [gh.bin, bin.path].join(delimiter),
     });
     running = app;
+    await atReviewSize(app, page);
     await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Work" }).click();
+    await page.getByRole("button", { name: "Review FEAT-2" }).click();
+    const screen = page.getByRole("region", { name: "Review FEAT-2" });
+    await expect(screen.getByRole("heading", { name: "Review FEAT-2: Ship" })).toBeVisible();
 
-    // AC1: every story is Done, so the feature's card opens from its row and offers Accept, with no confirmation.
-    await page.getByRole("button", { name: "Open FEAT-2" }).click();
-    const card = pane(page, "FEAT-2");
-    await card.getByRole("button", { name: "Accept FEAT-2" }).click();
-    await expect(page.getByRole("alertdialog")).toHaveCount(0);
+    // Every story is finished, so the feature's PR to main opens on its own, before any Accept: its CI runs first.
+    await expect.poll(async () => (await gh.load()).prs[0]?.url, { timeout: 30_000 }).toBe(PR);
+    expect((await gh.load()).prs[0]).toMatchObject({ head: FEATURE, base: "main", state: "OPEN" });
 
-    // AC2: accepting pushes the feature branch and opens its PR to main.
-    const section = card.getByRole("region", { name: "PR" });
-    await expect(section.getByRole("link", { name: "#1", exact: true })).toBeVisible({ timeout: 30_000 });
-    const [opened] = (await gh.load()).prs;
-    expect(opened).toMatchObject({ url: PR, head: FEATURE, base: "main", state: "OPEN" });
-    expect(parseCard(git(repo.dir, "show", `${FEATURE}:.featra/cards/FEAT-2-ship.md`)).pr).toBe(PR);
+    // AC2: Approve is off, with the reason beside it, while CI hasn't passed at the branch's commit.
+    const approve = screen.getByRole("button", { name: "Approve FEAT-2" });
+    await expect(approve).toBeDisabled({ timeout: 30_000 });
+    await expect(screen.getByRole("group", { name: "Approve" })).toContainText(FEATURE_END_MESSAGES.pending, {
+      timeout: 30_000,
+    });
+    await uxShot(page, "feat9-approve-waiting", approve);
 
-    // AC3: Merge to main shows once accepted, off with the reason while CI hasn't passed at the branch's commit.
-    const merge = card.getByRole("button", { name: "Merge FEAT-2 to main" });
-    await expect(merge).toBeDisabled({ timeout: 30_000 });
-    await expect(card).toContainText("Checks haven't passed on its latest commit yet.", { timeout: 30_000 });
-
-    // CI passes on the PR, and the window regaining focus reads it again: Merge to main is on.
+    // CI passes on the PR, and the window regaining focus reads it again: Approve is on.
     await gh.change((s) => {
       for (const pr of s.prs) pr.checks = [checkRun("SUCCESS")];
     });
     await page.evaluate(() => window.dispatchEvent(new Event("focus")));
-    await expect(merge).toBeEnabled({ timeout: 30_000 });
+    await expect(approve).toBeEnabled({ timeout: 30_000 });
+    await uxShot(page, "feat9-approve-ready", approve);
     const tip = git(repo.dir, "rev-parse", FEATURE);
     const base = git(remote, "rev-parse", "main");
 
-    // AC3: the merge is the PR's, with a merge commit, at the commit CI passed on.
-    await merge.click();
+    // AC1: one click, no confirmation, merges the PR with a merge commit at the commit CI passed on.
+    await approve.click();
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
     await expect.poll(async () => (await gh.load()).prs[0]?.state, { timeout: 30_000 }).toBe("MERGED");
     const merged = (await gh.calls()).find((c) => c.args.slice(0, 2).join(" ") === "pr merge");
     expect(merged?.args).toEqual(["pr", "merge", PR, "--merge", "--match-head-commit", tip]);
     expect(git(remote, "log", "-1", "--format=%P", "main").split(" ")).toEqual([base, tip]);
 
-    // AC5: main has the feature's work and its cards, and the feature is Done there; its branch is kept.
+    // AC5: main has the feature's work, and the feature Done with the user's Accept; the screen shows it merged.
     await expect
       .poll(() => parseCard(git(repo.dir, "show", "main:.featra/cards/FEAT-2-ship.md")).status, { timeout: 30_000 })
       .toBe("done");
+    const done = parseCard(git(repo.dir, "show", "main:.featra/cards/FEAT-2-ship.md"));
+    expect(evidenceState(done).accepted).toBe(true);
     expect(git(repo.dir, "show", "main:feature.txt")).toBe("the feature's work");
-    expect(git(repo.dir, "branch", "--list", FEATURE)).toContain(FEATURE);
-    await expect(card.getByRole("button", { name: "Merge FEAT-2 to main" })).toHaveCount(0, { timeout: 30_000 });
-    await expect(card.getByRole("alert")).toHaveCount(0);
+    await expect(screen.getByRole("status").filter({ hasText: "Merged to main" })).toBeVisible({ timeout: 30_000 });
+    await expect(approve).toHaveCount(0);
+    await expect(screen.getByRole("alert")).toHaveCount(0);
+    await uxShot(page, "feat9-approve-merged", screen.getByRole("group", { name: "Approve" }));
     await app.close();
   } finally {
     // Close the app first: a failing step must fail on its own, not hang the cleanup on files the app still holds.

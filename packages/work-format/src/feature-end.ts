@@ -7,7 +7,12 @@
  */
 import { stageCategory } from "./config.ts";
 import { evidenceState } from "./evidence.ts";
-import { FEATURE_END_MESSAGES, type CardFeatureEnd, type FeatureMergeState } from "./feature-end-copy.ts";
+import {
+  FEATURE_END_MESSAGES,
+  type CardFeatureEnd,
+  type FeatureApproval,
+  type FeatureMergeState,
+} from "./feature-end-copy.ts";
 import { appendHistory, recordAcceptance, setPr, setStatus } from "./history.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
 
@@ -108,6 +113,33 @@ export function featureEndOf(
   if (!state)
     return { acceptable: false, accepted: true, mergeable: false, blocked: FEATURE_END_MESSAGES.checking, base };
   return { acceptable: false, accepted: true, mergeable: state.mergeable, blocked: state.blocked, base };
+}
+
+/** Whether `card` is a feature in progress that the user accepted or could approve now: the server reads its merge. */
+export const finishedFeature = (card: Card, cards: readonly Card[], config: ProjectConfig): boolean =>
+  acceptedFeature(card) || featureAcceptRefusal(card, card.id, cards, config) === null;
+
+/**
+ * The review screen's Approve (STORY-70): one click that accepts and merges, off with the first reason that stops it
+ * (unfinished stories, then the merge's own reasons in ADR 0037's order); once accepted without the merge, Merge to
+ * main again; once merged, Merged. Null for a feature not in progress nor merged.
+ */
+export function featureApprovalOf(
+  card: Card,
+  cards: readonly Card[],
+  config: ProjectConfig,
+  state: FeatureMergeState | undefined,
+): FeatureApproval | null {
+  const base = config.baseBranch;
+  if (card.type === "feature" && card.status === "done" && card.history.some((e) => e.field === "merged")) {
+    return { step: "merged", ready: false, reason: null, base };
+  }
+  const end = featureEndOf(card, cards, config, state);
+  if (!end) return null;
+  if (end.accepted) return { step: "merge", ready: end.mergeable, reason: end.blocked, base };
+  const stories = featureAcceptRefusal(card, card.id, cards, config);
+  const reason = stories ?? (state ? state.blocked : FEATURE_END_MESSAGES.checking);
+  return { step: "approve", ready: reason === null, reason, base };
 }
 
 /** How many conflicting files the Dev Lead's notice names before it says how many more there are. */

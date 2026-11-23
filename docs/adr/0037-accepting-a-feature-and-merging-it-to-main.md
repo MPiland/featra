@@ -67,3 +67,18 @@ on while the feature waits, and only an agent working on the feature branch shou
   merges. A notice counts as sent only once it is posted, so a failed post is tried again on the next read.
 - Check verdicts are kept per commit and check command, and each run prunes stale worktrees first and removes its own
   however it ends.
+
+## Amendment — Approve (STORY-70, 2026-11-23)
+
+- **Accept and Merge to main are one click, Approve, on the feature's review screen.** Approve merges a finished
+  feature by the rules above, with the user's `accepted` carried in the Done card, so nothing is committed to the
+  feature branch between judging the merge and making it. Approve is off until the feature is finished and nothing
+  stops the merge; its reason is the unfinished stories first, then the merge's reasons in the order above.
+- **When the merge fails after Approve, the Accept stands:** it is recorded on the feature branch as Accept was, the
+  screen says why, and Merge to main is the retry. The feature's card pane no longer has Accept or Merge to main; it
+  links to the review screen.
+- **The feature's PR opens once the feature is finished**, not on Accept, so its CI runs before Approve; Create PR and
+  Re-run are offered for a finished feature. The facts above are read for every finished feature, accepted or not.
+- **A PR merged on GitHub outside Featra settles only once the user accepted or approved it.** One merged before that
+  isn't settled. One merged by Approve whose Done card couldn't reach main then settles on a later read, with the
+  Accept.

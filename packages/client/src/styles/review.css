@@ -110,9 +110,35 @@
   flex: 0 0 auto;
 }
 
-/* Beside Accept or Merge in the card pane, Review sits a little apart. */
-.card-actions .row-review {
-  margin-left: 8px;
+/* Approve (STORY-70): the screen's one decision, under its facts, with why it waits beside it. Its button is the card
+   actions' size; the reason and a failure wrap under it on a narrow window. */
+.rv-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 12px;
+}
+
+.rv-end .btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rv-end .meta,
+.rv-end .card-error {
+  font-size: 12px;
+}
+
+.rv-merged {
+  color: var(--ok);
+  font-weight: 600;
 }
 
 /* Its sections spaced as the card pane spaces them. */

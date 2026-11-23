@@ -6,6 +6,7 @@
  * the socket only, so the client can import it without the card parser.
  */
 import { LOCAL_RUN, normalizeCardView, type CardView } from "./card-view-types.ts";
+import { normalizeFeatureApproval, type FeatureApproval } from "./feature-end-copy.ts";
 import { httpsLink } from "./prs-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 import { TONES, type ProgressCount, type Tone } from "./work-list-types.ts";
@@ -52,6 +53,8 @@ export interface FeatureReview {
   diff: DiffStat | null;
   /** The feature's Files changed on GitHub: its PR's, else a compare against the base; null when not on GitHub. */
   files: string | null;
+  /** Approve, Merge to main again, or Merged (STORY-70); null for a feature not in progress nor merged. */
+  approval: FeatureApproval | null;
 }
 
 export const REVIEW_COPY = {
@@ -120,5 +123,6 @@ export function normalizeFeatureReview(raw: unknown): FeatureReview | null {
     summary: summary ? { text: text(summary.text), at: typeof summary.at === "string" ? summary.at : null } : null,
     diff: diffOf(raw.diff),
     files: link(raw.files),
+    approval: normalizeFeatureApproval(raw.approval),
   };
 }

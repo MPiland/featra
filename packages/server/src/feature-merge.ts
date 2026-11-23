@@ -1,6 +1,7 @@
 /**
- * Merge to main (STORY-14, ADR 0037): an accepted feature merges into the base branch with a merge commit, by the
- * user's click only, once nothing stops it (feature-end.ts). It shares STORY-12's merge path: on GitHub its PR merges
+ * Merge to main (STORY-14, STORY-70, ADR 0037): an accepted feature merges into the base branch with a merge commit, by
+ * the user's click only, once nothing stops it (feature-end.ts). Approve merges a finished feature not accepted yet the
+ * same way, with the user's Accept carried in the Done card. It shares STORY-12's merge path: on GitHub its PR merges
  * with `gh pr merge --merge --match-head-commit` at the commit its checks passed on, and the Done card is then
  * committed onto the base as GitHub has it (merge-settle's `cardOnBranch`); else the merge commit is made by plumbing
  * with the Done card in it and published to the base. The merge goes ahead, in the card lane, only while the feature
@@ -14,6 +15,7 @@ import {
   acceptedFeature,
   doneFeature,
   evidenceState,
+  featureAcceptRefusal,
   FEATURE_END_MESSAGES,
   GITHUB_COPY,
   mergeCommitMessage,
@@ -21,6 +23,7 @@ import {
   parseCard,
   serializeCard,
   toIso,
+  withFeatureAccepted,
 } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
 import type { CardLane } from "./card-lane.ts";
@@ -62,17 +65,23 @@ export function createFeatureMerge(deps: FeatureMergeDeps) {
   const { scan: scanDir, git, lane, now } = deps;
   const merging = new Set<string>();
 
-  /** The feature read fresh: accepted, in progress, with its branch; throws why not. */
-  async function ready(dir: string, id: string): Promise<FeatureLook> {
+  /**
+   * The feature read fresh: in progress with its branch, and accepted, or for Approve finished and not accepted yet
+   * (`approve`); throws why not.
+   */
+  async function ready(dir: string, id: string, approve: boolean): Promise<FeatureLook> {
     const look = await lookAt(git, await scanDir(dir), id);
     if (!look) throw new ApiError(FEATURE_END_MESSAGES.noBranch(id));
-    if (!acceptedFeature(look.card)) throw new ApiError(FEATURE_END_MESSAGES.notAccepted(id));
+    if (!approve && !acceptedFeature(look.card)) throw new ApiError(FEATURE_END_MESSAGES.notAccepted(id));
+    const cards = look.scan.resolution.cards.map((c) => c.card);
+    const why = approve ? featureAcceptRefusal(look.card, id, cards, look.config) : null;
+    if (why !== null) throw new ApiError(why);
     return look;
   }
 
   /** The feature read fresh in the lane, refused unless its branch is still at the commit it was judged at. */
-  async function unmoved(dir: string, id: string, judged: Judged): Promise<FeatureLook> {
-    const look = await ready(dir, id);
+  async function unmoved(dir: string, id: string, judged: Judged, approve: boolean): Promise<FeatureLook> {
+    const look = await ready(dir, id, approve);
     if (look.tip !== judged.tip) throw new ApiError(FEATURE_END_MESSAGES.moved(look.branch));
     return look;
   }
@@ -84,13 +93,17 @@ export function createFeatureMerge(deps: FeatureMergeDeps) {
     }
   }
 
-  const done = (look: FeatureLook, pr: string | null) =>
-    serializeCard(doneFeature(look.card, look.branch, look.base, pr ?? look.card.pr, "system", toIso(now())));
+  /** The Done card, with the user's Accept in it first when the merge is their Approve (STORY-70). */
+  const done = (look: FeatureLook, pr: string | null, approve: boolean) => {
+    const at = toIso(now());
+    const card = approve ? withFeatureAccepted(look.card, "user", at) : look.card;
+    return serializeCard(doneFeature(card, look.branch, look.base, pr ?? look.card.pr, "system", at));
+  };
 
   /** The merge commit into the base, with the Done card in it, made and published in the lane. */
-  const mergeLocally = (dir: string, id: string, judged: Judged) =>
+  const mergeLocally = (dir: string, id: string, judged: Judged, approve: boolean) =>
     lane.exclusive(async () => {
-      const look = await unmoved(dir, id, judged);
+      const look = await unmoved(dir, id, judged, approve);
       const old = await git.commitOf(look.top, `refs/heads/${look.base}`);
       if (!old) throw new ApiError(MERGE_NOTES.failed);
       if (old !== judged.baseTip) throw new ApiError(FEATURE_END_MESSAGES.moved(look.base));
@@ -100,7 +113,7 @@ export function createFeatureMerge(deps: FeatureMergeDeps) {
       const made = await git.mergeCommit(look.top, {
         parents: [old, look.tip],
         path: look.path,
-        text: done(look, null),
+        text: done(look, null, approve),
         message,
       });
       if ("conflicts" in made) throw new ApiError(FEATURE_END_MESSAGES.conflicts(look.base));
@@ -123,11 +136,15 @@ export function createFeatureMerge(deps: FeatureMergeDeps) {
     }
   }
 
-  /** The Done card committed onto the base as GitHub has it, after its PR merged there; what stays to do. */
-  async function settleNow(dir: string, id: string, remote: GithubRemote, pr: string | null) {
+  /**
+   * The Done card committed onto the base as GitHub has it, after its PR merged there; what stays to do. Only for a
+   * feature the user accepted, or is approving (`approve`).
+   */
+  async function settleNow(dir: string, id: string, remote: GithubRemote, pr: string | null, approve: boolean) {
     const look = await lookAt(git, await scanDir(dir), id);
-    if (!look || !evidenceState(look.card).accepted || (await settledAlready(look))) return { remains: [] };
-    const card = { path: look.path, text: done(look, pr), id };
+    if (!look || !(approve || evidenceState(look.card).accepted) || (await settledAlready(look)))
+      return { remains: [] };
+    const card = { path: look.path, text: done(look, pr, approve), id };
     const local = await git.commitOf(look.top, `refs/heads/${look.base}`);
     const made = await cardOnBranch(git, look.top, remote.name, look.base, card);
     if (typeof made === "string") {
@@ -140,9 +157,9 @@ export function createFeatureMerge(deps: FeatureMergeDeps) {
   }
 
   /** The feature's PR merged on GitHub, at the commit its checks passed on, in the lane; what stays to do. */
-  const mergeOnGithub = (dir: string, id: string, judged: Judged) =>
+  const mergeOnGithub = (dir: string, id: string, judged: Judged, approve: boolean) =>
     lane.exclusive(async () => {
-      const look = await unmoved(dir, id, judged);
+      const look = await unmoved(dir, id, judged, approve);
       if (!look.card.pr) throw new ApiError(FEATURE_END_MESSAGES.noPr);
       const remote = await githubRemote(dir, deps.gitCommand);
       if (!remote) throw new ApiError(GITHUB_COPY.noRemote);
@@ -150,7 +167,7 @@ export function createFeatureMerge(deps: FeatureMergeDeps) {
       if (!pr) throw new ApiError(MERGE_NOTES.failed);
       if (pr.status.state === "closed") throw new ApiError(FEATURE_END_MESSAGES.prClosed);
       if (pr.head !== judged.tip) throw new ApiError(FEATURE_END_MESSAGES.moved(look.branch));
-      if (pr.status.state === "merged") return settleNow(dir, id, remote, pr.url);
+      if (pr.status.state === "merged") return settleNow(dir, id, remote, pr.url, approve);
       const local = await git.commitOf(look.top, `refs/heads/${look.base}`);
       if (!local) throw new ApiError(MERGE_NOTES.failed);
       await baseReady(look, local, [judged.tip, ...(judged.baseTip ? [judged.baseTip] : [])]);
@@ -161,7 +178,7 @@ export function createFeatureMerge(deps: FeatureMergeDeps) {
       if (outcome !== null) {
         throw new ApiError("error" in outcome ? outcome.error : FEATURE_END_MESSAGES.conflicts(look.base));
       }
-      return settleNow(dir, id, remote, pr.url);
+      return settleNow(dir, id, remote, pr.url, approve);
     });
 
   /** Runs `work` for feature `id` unless a merge of it already runs. */
@@ -177,21 +194,29 @@ export function createFeatureMerge(deps: FeatureMergeDeps) {
   }
 
   return {
-    /** Merges feature `id` to the base, once nothing stops it: on GitHub when it is usable here, else with git. */
-    merge: (dir: string, id: string): Promise<{ remains: string[] }> =>
+    /**
+     * Merges feature `id` to the base, once nothing stops it: on GitHub when it is usable here, else with git. For
+     * Approve (`approve`, STORY-70) the feature is finished but not accepted yet, and the Done card carries the
+     * user's Accept: nothing is committed to its branch first, so the merge stays at the commit its checks passed on.
+     */
+    merge: (dir: string, id: string, approve = false): Promise<{ remains: string[] }> =>
       once(dir, id, async () => {
-        const judged = await deps.check(dir, await ready(dir, id));
+        const judged = await deps.check(dir, await ready(dir, id, approve));
         const state = mergeStateOf(judged.facts);
         if (!state.mergeable) throw new ApiError(state.blocked ?? MERGE_NOTES.failed);
-        return (await deps.github(dir)) ? mergeOnGithub(dir, id, judged) : mergeLocally(dir, id, judged);
+        const github = await deps.github(dir);
+        return github ? mergeOnGithub(dir, id, judged, approve) : mergeLocally(dir, id, judged, approve);
       }),
 
-    /** Feature `id`'s PR was merged on GitHub outside Featra, at the commit its branch is at: it settles as Featra's. */
-    async merged(dir: string, id: string, url: string): Promise<string[]> {
+    /**
+     * Feature `id`'s PR was merged on GitHub outside Featra, at the commit its branch is at: it settles as Featra's,
+     * with the user's Accept when it is one they approved (`approve`) whose settling failed.
+     */
+    async merged(dir: string, id: string, url: string, approve = false): Promise<string[]> {
       if (merging.has(keyOf(dir, id))) return [];
       const remote = await githubRemote(dir, deps.gitCommand);
       if (!remote) return [];
-      return (await once(dir, id, () => lane.exclusive(() => settleNow(dir, id, remote, url)))).remains;
+      return (await once(dir, id, () => lane.exclusive(() => settleNow(dir, id, remote, url, approve)))).remains;
     },
 
     /** Whether feature `id` is merging now. */

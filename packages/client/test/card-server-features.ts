@@ -1,8 +1,9 @@
-// The fake card server's feature end (STORY-14): Accept, Create PR, Run again and Merge to main, with work-format's rules.
+// The fake card server's feature end (STORY-14, STORY-70): Approve, Create PR, Run again and Merge to main, with
+// work-format's rules.
 import { DEFAULT_CONFIG, doneFeature, featureAcceptRefusal, withFeatureAccepted, type Card } from "@featra/work-format";
 import type { CardBridge } from "../src/card-pane.ts";
 
-export type FeatureActions = "acceptFeature" | "createFeaturePr" | "rerunFeatureChecks" | "mergeFeature";
+export type FeatureActions = "approveFeature" | "createFeaturePr" | "rerunFeatureChecks" | "mergeFeature";
 
 export interface FeatureFakeContext {
   /** The folder's cards as the fake server holds them now. */
@@ -24,17 +25,17 @@ export function featureEndFakes({
   at,
 }: FeatureFakeContext): Pick<CardBridge, FeatureActions> {
   return {
-    // Accepting a feature is the server's to prove (the lane, its PR): the fake applies work-format's rule and records
-    // Accepted, as the server does, unless the test sets the answer.
-    acceptFeature: async (dir, id) => {
-      calls.push(`acceptFeature:${dir}:${id}`);
-      if (review.acceptFeature) return review.acceptFeature(dir, id);
+    // Approving a feature is the server's to prove (the lane, git, gh): the fake applies work-format's Accept rule and
+    // makes the feature Done with the user's Accept in it, as the server does, unless the test sets the answer.
+    approveFeature: async (dir, id) => {
+      calls.push(`approveFeature:${dir}:${id}`);
+      if (review.approveFeature) return review.approveFeature(dir, id);
       const cards = cardsIn(dir);
       const card = cards.find((c) => c.id === id);
       const why = featureAcceptRefusal(card, id, cards, DEFAULT_CONFIG);
       if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
-      changed(dir, withFeatureAccepted(card, "user", at));
-      return { ok: true };
+      changed(dir, doneFeature(withFeatureAccepted(card, "user", at), `feature/${id}`, "main", null, "system", at));
+      return { ok: true, remains: [] };
     },
     createFeaturePr: async (dir, id) => {
       calls.push(`createFeaturePr:${dir}:${id}`);

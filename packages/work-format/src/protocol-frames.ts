@@ -54,7 +54,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "story.abandonCheck",
   "story.abandon",
   "story.rerunChecks",
-  "feature.accept",
+  "feature.approve",
   "feature.createPr",
   "feature.rerunChecks",
   "feature.merge",
