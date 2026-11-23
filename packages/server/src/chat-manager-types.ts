@@ -123,6 +123,8 @@ export interface ChatManager {
     /** The folder its agent works in: its worktree for a story session, else `dir`. */
     cwd?: string;
     session: string;
+    /** Its role's id: `DEV_LEAD_ROLE` for the Dev Lead's chat. */
+    role?: string;
     story?: boolean;
     storyId?: string;
     /** A story session's Dev Lead: the chat it nests under. */

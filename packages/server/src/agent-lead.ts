@@ -5,7 +5,13 @@
  * writes a card, the feature's own; only the MCP's off switch applies (the read-only setting withholds the whole MCP at
  * `attach` anyway).
  */
-import { parseBugReport, parseMessageInput, parseRequestMergeInput, parseSummaryInput } from "@featra/work-format";
+import {
+  DEV_LEAD_ROLE,
+  parseBugReport,
+  parseMessageInput,
+  parseRequestMergeInput,
+  parseSummaryInput,
+} from "@featra/work-format";
 import { AGENT_MESSAGES } from "./agent-messages.ts";
 import { ApiError } from "./api-error.ts";
 import type { BugRequest } from "./bug-request.ts";
@@ -69,8 +75,14 @@ export function createLeadCalls({ mcpRefusal, messages, checkSettings, merges, b
       return bugs.report(dir, input.value, chat);
     },
 
-    async summarize(chat: string, dir: string, story: boolean | undefined, params: unknown) {
+    /** The summary reads as written by the Dev Lead, so only the Dev Lead's chat may write it (STORY-69). */
+    async summarize(
+      chat: string,
+      { dir, story, role }: { dir: string; story?: boolean; role?: string },
+      params: unknown,
+    ) {
       await lead(dir, story, AGENT_MESSAGES.sessionSummary);
+      if (role !== DEV_LEAD_ROLE) throw new ApiError(AGENT_MESSAGES.notLeadSummary);
       if (!summaries) throw new ApiError(AGENT_MESSAGES.noSummary);
       const input = parseSummaryInput(params);
       if (!input.ok) throw new ApiError(input.error);

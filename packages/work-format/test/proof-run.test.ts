@@ -19,8 +19,10 @@ import {
 import { at, config, feature, story } from "./fixtures.ts";
 
 const A = "packages/app/test/a.test.ts";
+const PR = "https://github.com/acme/app/pull/7";
 const card: Card = {
   ...story("STORY-1", "FEAT-1", { status: "In Review" }),
+  pr: PR,
   acs: [
     { text: "Opens", done: false, test: `${A}::a > opens` },
     { text: "Saves", done: false, test: `${A}::a > saves` },
@@ -66,10 +68,20 @@ describe("the proving run kept with the proof (AC4)", () => {
     expect(viewOf(again).acs[0]).toEqual(expect.objectContaining({ proof: "passed", run: RUN_11 }));
   });
 
-  it("adds nothing when the criterion is already proven at that commit", () => {
+  it("adds nothing when the criterion is already proven at that commit by the same run", () => {
     const once = prove(card, [{ ac: 1, passed: true, run: RUN_11 }]);
-    expect(prove(once, [{ ac: 1, passed: true, run: RUN_12 }], HEAD, 9)).toBe(once);
+    expect(prove(once, [{ ac: 1, passed: true, run: RUN_11 }], HEAD, 9)).toBe(once);
     expect(provenRuns(once).get(1)).toBe(RUN_11);
+  });
+
+  it("records the newer run when another run proves the criterion again at the same commit", () => {
+    const local = prove(card, [{ ac: 1, passed: true, run: LOCAL_RUN }]);
+    const ci = prove(local, [{ ac: 1, passed: true, run: RUN_11 }], HEAD, 9);
+    expect(ci.history.slice(-1).map((e) => e.to)).toEqual([`ran:1@${RUN_11}`]);
+    expect(provenRuns(ci).get(1)).toBe(RUN_11);
+    const rerun = prove(ci, [{ ac: 1, passed: true, run: RUN_12 }], HEAD, 12);
+    expect(provenRuns(rerun).get(1)).toBe(RUN_12);
+    expect(rerun.history.filter((e) => e.to?.startsWith("proven:"))).toHaveLength(1);
   });
 
   it("forgets the run when the criterion is proven again without one, or stops being proven", () => {
@@ -104,6 +116,30 @@ describe("the proving run kept with the proof (AC4)", () => {
     };
     expect([...provenRuns(forged)]).toEqual([]);
   });
+
+  it("refuses a run on another host or in another repository than the card's PR, as an edited card might hold", () => {
+    const EVIL = "https://evil.example/login";
+    const OTHER = "https://github.com/other/app/actions/runs/5";
+    const ALIKE = "https://github.com/acme/app2/actions/runs/5";
+    for (const run of [EVIL, OTHER, ALIKE, `${RUN_11}/jobs/1`]) {
+      const written = prove(card, [{ ac: 1, passed: true, run }]);
+      expect(written.history.some((e) => e.to?.startsWith("ran:"))).toBe(false);
+      const edited: Card = {
+        ...prove(card, [{ ac: 1, passed: true }]),
+        history: [
+          ...prove(card, [{ ac: 1, passed: true }]).history,
+          { at: at(6), field: "evidence", from: null, to: `ran:1@${run}`, by: "user" },
+        ],
+      };
+      expect([...provenRuns(edited)]).toEqual([]);
+      const view = viewOf(prove(card, [{ ac: 1, passed: true, run: RUN_11 }]));
+      expect(normalizeCardView({ ...view, acs: [{ ...view.acs[0], run }] })?.acs[0]).not.toHaveProperty("run");
+    }
+    expect([...provenRuns(prove({ ...card, pr: null }, [{ ac: 1, passed: true, run: RUN_11 }]))]).toEqual([]);
+    expect([...provenRuns(prove({ ...card, pr: null }, [{ ac: 1, passed: true, run: LOCAL_RUN }]))]).toEqual([
+      [1, LOCAL_RUN],
+    ]);
+  });
 });
 
 describe("the card view's run beside each criterion (AC3)", () => {
@@ -137,7 +173,7 @@ const cases = (opens: "passed" | "failed" | "skipped", saves: "passed" | "failed
 ];
 
 describe("which CI run proved a criterion", () => {
-  it("is the first run whose own report passes every test the criterion links, else the first run with a report", () => {
+  it("is the first run whose own report passes every test the criterion links, else the newest run holding one", () => {
     const runs = [
       { run: 10, cases: [] },
       { run: 11, cases: cases("passed", "skipped") },
@@ -152,8 +188,18 @@ describe("which CI run proved a criterion", () => {
       { run: 21, cases: [cases("passed", "passed")[0]!] },
       { run: 22, cases: [cases("passed", "passed")[1]!] },
     ];
-    expect([...provingRuns(split, halves, [1])]).toEqual([[1, 21]]);
+    expect([...provingRuns(split, halves, [1])]).toEqual([[1, 22]]);
+    expect([...provingRuns(split, halves.toReversed(), [1])]).toEqual([[1, 22]]);
     expect([...provingRuns(card, [], [1])]).toEqual([]);
+  });
+
+  it("links no run when no run's report holds any test the criterion links", () => {
+    const split = { ...card, acs: [{ text: "Both", done: false, test: `${A}::a > opens; ${A}::a > saves` }] };
+    const unrelated = [
+      { run: 31, cases: [{ classname: "packages/app/test/b.test.ts", name: "b other", status: "passed" as const }] },
+      { run: 30, cases: [] },
+    ];
+    expect([...provingRuns(split, unrelated, [1])]).toEqual([]);
   });
 
   it("links to the run's page in the PR's repository, and to nothing for a PR that isn't on GitHub", () => {

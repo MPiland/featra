@@ -140,7 +140,15 @@ const VITEST_WAITS = /(?<![\w$])vi\s*\.\s*(?:waitFor|waitUntil)\s*\(/g;
 export const VITEST_WAIT_KIND = "vitest's own 1 s wait";
 
 /** Product calls that run `gh`. A test's must say how long the fake may take, or it gets the product's 15 s kill. */
-const GH_CALLS = ["detectGithub", "detectGithubUse", "repoIsPublic", "runGh", "ghJson", "readCiReports"];
+const GH_CALLS = [
+  "detectGithub",
+  "detectGithubUse",
+  "repoIsPublic",
+  "runGh",
+  "ghJson",
+  "readCiReports",
+  "readCiRunReports",
+];
 export const GH_KIND = "a gh with the product's 15 s limit";
 
 /** The index past a string, comment or bracketed span that starts at `i`; `i` itself when none starts there. */

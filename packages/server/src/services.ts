@@ -231,7 +231,7 @@ export function createServices({
   // (STORY-67); started by the first watch.
   const needs = createProjectNeeds({ allowed, watches, chats, log });
   // What each story of a feature changed, read from git for its review screen; a read re-pushes it (STORY-69).
-  const diffs = createReviewDiffs({ changed: (dir) => void watches.scan(dir).catch(() => null), log, gitCommand });
+  const diffs = createReviewDiffs({ changed: (dir) => watches.repush(dir), log, gitCommand });
   const api = createApi({
     git: createGit(gitCommand),
     allowed,

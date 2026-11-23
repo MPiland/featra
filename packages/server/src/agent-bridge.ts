@@ -261,7 +261,7 @@ export function createAgentBridge({
         case "bug.report":
           return leads.reportBug(chat, info.dir, info.story, params);
         case "feature.summary":
-          return leads.summarize(chat, info.dir, info.story, params);
+          return leads.summarize(chat, info, params);
         case "action.request":
           return requestAction(chat, info.dir, params, link);
         case "action.cancel":

@@ -1,6 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { SETUP_ITEM_IDS } from "@featra/work-format/setup-plan";
 import { App } from "../src/App.tsx";
 import { act } from "react";
 import {
@@ -11,7 +10,6 @@ import {
   type AppSettings,
   type FeatraBridge,
   type ProjectRef,
-  type ProjectSetup,
   type ProjectsResult,
   type ProjectsSnapshot,
   type SettingsSnapshot,
@@ -29,6 +27,7 @@ import { fakeChecksServer } from "./checks-server.ts";
 import { fakeNeedsServer } from "./needs-server.ts";
 import { fakeRolesServer } from "./roles-server.ts";
 import { fakeReviewServer } from "./review-server.ts";
+import { fakeAppHost, fakeSetupServer } from "./host-fakes.ts";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
 /** Where New Project… suggests a folder by default. */
@@ -70,9 +69,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   let releaseWrites: () => void = noop;
   let openChat: (chat: string, project?: string) => void = noop;
   const writesReleased = new Promise<void>((r) => (releaseWrites = r));
-  // The project folders on disk, as the server sees them: git init and Featra init move a folder to the next state.
-  const setupOnDisk = new Map(Object.entries(host.setup ?? {}));
-  const setupOf = (dir: string): ProjectSetup => setupOnDisk.get(dir) ?? { state: "ready" };
+
   // The server's Work list per folder, and who is watching it.
   const workLists = new Map(Object.entries(host.work ?? {}));
   const watchers = new Map<string, Set<(u: WorkUpdate) => void>>();
@@ -150,26 +147,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
         return makeCurrent(`${location}/${name.trim()}`);
       },
     },
-    setup: {
-      status: async (dir) => setupOf(dir),
-      plan: async (dir) => {
-        const failure = host.planFailures?.[dir];
-        if (failure) return { ok: false, error: failure };
-        const existing = new Set(host.existing?.[dir] ?? []);
-        return {
-          ok: true,
-          git: setupOf(dir).state !== "no-git",
-          items: SETUP_ITEM_IDS.map((id) => ({ id, exists: existing.has(id) })),
-        };
-      },
-      run: async (dir, items) => {
-        calls.push(`setup:${dir}:${items.join(",")}`);
-        const failure = host.initFailures?.[dir];
-        if (failure) return { ok: false, error: failure };
-        setupOnDisk.set(dir, { state: "ready" });
-        return { ok: true, ...(host.initResults?.[dir] ?? { created: [".featra/config.yaml"], kept: [] }) };
-      },
-    },
+    setup: fakeSetupServer(host, calls),
     work: {
       watch: (dir, listener) => {
         const set = watchers.get(dir) ?? new Set();
@@ -206,17 +184,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       },
     },
     edit: (command) => void calls.push(`edit:${command}:${(document.activeElement as HTMLElement | null)?.id ?? ""}`),
-    app: {
-      info: async () => ({ name: "Featra", version: "1.2.3" }),
-      reload: () => void calls.push("reload"),
-      toggleDevTools: () => void calls.push("toggleDevTools"),
-      showLogs: () => void calls.push("showLogs"),
-      openExternal: (url) => void calls.push(`openExternal:${url}`),
-      copyText: (text) => void calls.push(`copyText:${text}`),
-      clearCacheAndRestart: () => void calls.push("clearCacheAndRestart"),
-      resetAppData: () => void calls.push("resetAppData"),
-      quit: () => void calls.push("quit"),
-    },
+    app: fakeAppHost(calls),
   };
   /** What the host does when the window changes (the OS, F11 or the button): report the new state. */
   const setWindowState = (s: Partial<WindowState>) =>

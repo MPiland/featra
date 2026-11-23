@@ -6,12 +6,13 @@ import { describe, expect, it } from "vitest";
 import {
   compareUrl,
   MERGE_LOG_FORMAT,
+  mergeCommitMessage,
   normalizeFeatureReview,
   parseNumstat,
   prFilesUrl,
   REVIEW_COPY,
   runLabel,
-  storyMergeIn,
+  storyMergesIn,
 } from "../src/index.ts";
 
 const SEP = "\u001f";
@@ -43,6 +44,14 @@ describe("git's diff counts (STORY-69 AC2)", () => {
     });
     expect(parseNumstat("")).toEqual({ files: 0, added: 0, removed: 0 });
   });
+
+  it("count a file changed in more than one round once, and every round's lines", () => {
+    expect(parseNumstat("1\t0\tsrc/a.ts\n4\t2\tsrc/b.ts\n2\t1\tsrc/a.ts\n")).toEqual({
+      files: 2,
+      added: 7,
+      removed: 3,
+    });
+  });
 });
 
 const line = (parents: string, subject: string) => `${parents}${SEP}${subject}`;
@@ -60,19 +69,30 @@ describe("a story's merge into its feature (STORY-69 AC2)", () => {
       line("a2 b2", "Merge pull request #12 from acme/featra/story-9"),
       line("a3 b3", "Merge STORY-9: Older"),
     ].join("\n");
-    expect(storyMergeIn(log, story)).toEqual(["a2", "b2"]);
-    expect(storyMergeIn(line("c d", "Merge STORY-9: Title"), { ...story, pr: null })).toEqual(["c", "d"]);
-    expect(storyMergeIn(line("e f", "Merge branch 'featra/story-9' into x"), { ...story, pr: null })).toEqual([
-      "e",
-      "f",
+    expect(storyMergesIn(log, story)[0]).toEqual(["a2", "b2"]);
+    expect(storyMergesIn(line("c d", "Merge STORY-9: Title"), { ...story, pr: null })).toEqual([["c", "d"]]);
+    expect(storyMergesIn(line("e f", "Merge branch 'featra/story-9' into x"), { ...story, pr: null })).toEqual([
+      ["e", "f"],
+    ]);
+  });
+
+  it("is every round of a story merged, sent back and merged again, the newest first", () => {
+    const log = [
+      line("a3 b3", mergeCommitMessage({ id: "STORY-9", title: "Renamed since" })),
+      line("a2 b2", "Merge STORY-8: Other"),
+      line("a1 b1", "Merge pull request #12 from acme/featra/story-9"),
+    ].join("\n");
+    expect(storyMergesIn(log, story)).toEqual([
+      ["a3", "b3"],
+      ["a1", "b1"],
     ]);
   });
 
   it("is none for another story, a PR with a longer number, or a commit with one parent", () => {
-    expect(storyMergeIn(line("a b", "Merge STORY-90: Other"), story)).toBeNull();
-    expect(storyMergeIn(line("a b", "Merge pull request #123 from x"), story)).toBeNull();
-    expect(storyMergeIn(line("a", "Merge STORY-9: One parent"), story)).toBeNull();
-    expect(storyMergeIn("", story)).toBeNull();
+    expect(storyMergesIn(line("a b", "Merge STORY-90: Other"), story)).toEqual([]);
+    expect(storyMergesIn(line("a b", "Merge pull request #123 from x"), story)).toEqual([]);
+    expect(storyMergesIn(line("a", "Merge STORY-9: One parent"), story)).toEqual([]);
+    expect(storyMergesIn("", story)).toEqual([]);
   });
 });
 

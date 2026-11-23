@@ -4,6 +4,7 @@
  * and the Dev Lead's summary from the feature's card. Pure; no tokens are spent on any of it.
  */
 import type { CardView } from "./card-view-types.ts";
+import { mergeCommitMessage } from "./merge.ts";
 import { githubPrUrl, safeBranch } from "./prs.ts";
 import type { DiffStat, FeatureReview, ReviewItem, ReviewSummary } from "./review-types.ts";
 import type { FeatureRow } from "./work-list-types.ts";
@@ -57,15 +58,21 @@ export function buildFeatureReview({ row, feature, view, diff, summary, repo, ba
   };
 }
 
-/** What `git diff --numstat` says, summed: a binary file (`-` for its lines) counts as a file with no lines. */
+/**
+ * What `git diff --numstat` says, summed: a binary file (`-` for its lines) counts as a file with no lines. Several
+ * diffs' output together (a story's merge rounds) count each file once, and every round's lines.
+ */
 export function parseNumstat(out: string): DiffStat {
   const stat: DiffStat = { files: 0, added: 0, removed: 0 };
+  const seen = new Set<string>();
   for (const line of out.split("\n")) {
-    const m = /^(\d+|-)\t(\d+|-)\t./.exec(line);
+    const m = /^(\d+|-)\t(\d+|-)\t(.+)$/.exec(line);
     if (!m) continue;
-    stat.files += 1;
-    stat.added += m[1] === "-" ? 0 : Number(m[1]);
-    stat.removed += m[2] === "-" ? 0 : Number(m[2]);
+    const [, added = "-", removed = "-", path = ""] = m;
+    if (!seen.has(path)) stat.files += 1;
+    seen.add(path);
+    stat.added += added === "-" ? 0 : Number(added);
+    stat.removed += removed === "-" ? 0 : Number(removed);
   }
   return stat;
 }
@@ -76,23 +83,24 @@ const SEP = "\u001f";
 export const MERGE_LOG_FORMAT = "%P%x1f%s";
 
 /**
- * The two parents of the merge that brought a story into its feature, from `git log --first-parent --merges` of the
- * feature branch in `MERGE_LOG_FORMAT`: Featra's own merge ("Merge STORY-9: …"), its PR's merge on GitHub ("Merge pull
- * request #12 from …"), or git's ("Merge branch 'story-9'"). The newest wins; null when none is there.
+ * The two parents of each merge that brought a story into its feature, newest first, from `git log --first-parent
+ * --merges` of the feature branch in `MERGE_LOG_FORMAT`: Featra's own merge (`mergeCommitMessage`, whatever the title
+ * was then), its PR's merge on GitHub ("Merge pull request #12 from …"), or git's ("Merge branch 'story-9'"). A story
+ * merged, sent back and merged again has a merge for each round; none when it has none.
  */
-export function storyMergeIn(
+export function storyMergesIn(
   log: string,
   story: { id: string; pr: string | null; branch: string | null },
-): [string, string] | null {
+): [string, string][] {
   const pr = /\/pull\/(\d+)$/.exec(story.pr ?? "")?.[1];
+  const featra = mergeCommitMessage({ id: story.id, title: "" });
   const ours = (subject: string) =>
-    subject.startsWith(`Merge ${story.id}: `) ||
+    subject.startsWith(featra) ||
     (pr !== undefined && subject.startsWith(`Merge pull request #${pr} from `)) ||
     (story.branch !== null && subject.startsWith(`Merge branch '${story.branch}'`));
-  for (const line of log.split("\n")) {
+  return log.split("\n").flatMap((line): [string, string][] => {
     const [parents = "", subject = ""] = line.split(SEP);
     const [first, second] = parents.trim().split(" ");
-    if (first && second && ours(subject)) return [first, second];
-  }
-  return null;
+    return first && second && ours(subject) ? [[first, second]] : [];
+  });
 }

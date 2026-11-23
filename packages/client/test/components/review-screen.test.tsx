@@ -4,7 +4,15 @@
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { provenEvent, ranEvent, recordEvidence, setStatus, withSummary, type Card } from "@featra/work-format";
+import {
+  provenEvent,
+  ranEvent,
+  recordEvidence,
+  setStatus,
+  withSummary,
+  type Card,
+  type CardChecks,
+} from "@featra/work-format";
 import { PROJECT, renderApp } from "../harness.tsx";
 import { cardOf } from "../work-fixtures.ts";
 
@@ -116,6 +124,28 @@ describe("the review screen (STORY-69 AC2, AC3, AC5)", () => {
     // The feature's own checks: none before it is accepted. No summary was written, so no heading for one.
     expect(within(shown).getByRole("region", { name: "Checks" }).textContent).toContain("No checks run yet");
     expect(within(shown).queryByRole("region", { name: "Summary" })).toBeNull();
+  });
+});
+
+describe("the feature's checks on the review screen (STORY-69 AC5)", () => {
+  it("shows the feature's last run, its failing output and Re-run, once its checks have run", async () => {
+    const checks: CardChecks = {
+      running: false,
+      idle: null,
+      last: { passed: false, command: "pnpm check", at: AT, output: "FAIL review.test.ts" },
+      failedAcs: [],
+      note: null,
+    };
+    const app = renderApp({ cards: cards(), reviewDiffs, cardChecks: { "FEAT-2": checks } });
+    await toWork(app);
+    await app.user.click(await screen.findByRole("button", { name: "Review FEAT-2" }));
+    const section = within(await screenOf()).getByRole("region", { name: "Checks" });
+    expect(within(section).getByRole("status").textContent).toContain("Checks failed");
+    expect(within(section).getByRole("status").textContent).toContain("pnpm check");
+    expect(within(section).getByLabelText("Failing output").textContent).toBe("FAIL review.test.ts");
+    expect(section.textContent).not.toContain("No checks run yet");
+    await app.user.click(within(section).getByRole("button", { name: "Re-run" }));
+    await waitFor(() => expect(app.calls).toContain(`rerunFeatureChecks:${PROJECT.dir}:FEAT-2`));
   });
 });
 

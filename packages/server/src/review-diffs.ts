@@ -1,15 +1,16 @@
 /**
  * What each story of a feature changed, from git (STORY-69): files and lines, for the review screen. A story still on
- * its own branch is that branch against the feature's (`feature...story`); a merged one is its merge into the feature
- * branch (`first...second` parent); the feature is its branch against the base. Read in the background, once per
- * set of branch tips, so the screen's watch stays synchronous; when a read finishes, `changed` re-pushes the watch.
+ * its own branch is that branch against the feature's (`feature...story`); a merged one is each merge that brought it
+ * into the feature branch (`first...second` parent), every round counted; the feature is its branch against the base.
+ * Read in the background, once per set of branch tips, so the screen's watch stays synchronous; when a read finishes,
+ * `changed` has the watch's listeners hear its last scan again.
  */
 import {
   isMerged,
   MERGE_LOG_FORMAT,
   parseNumstat,
   safeBranch,
-  storyMergeIn,
+  storyMergesIn,
   type Card,
   type DiffStat,
 } from "@featra/work-format";
@@ -53,9 +54,12 @@ function planOf(scan: Scan, id: string): Plan | null {
       const wt = state.worktrees[card.id];
       return { card, branch: isMerged(card) ? null : wt && !wt.merged ? wt.branch : card.branch };
     });
+  // Each open story's tip: its worktree's HEAD, else its branch's, so a commit pushed to it is read again.
+  const branchTip = (b: string) => git.branches.find((x) => x.name === b)?.head ?? "";
   const parts = items.map(({ card, branch: b }) => {
     const wt = state.worktrees[card.id];
-    return `${card.id}:${b ?? "merged"}:${wt ? tip({ kind: "worktree", ...wt }) : ""}`;
+    const at = wt && !wt.merged ? tip({ kind: "worktree", ...wt }) : b ? branchTip(b) : "";
+    return `${card.id}:${b ?? "merged"}:${at}`;
   });
   const key = [tip({ kind: "feature", branch }), tip({ kind: "main" }), ...parts].join("|");
   return { key, top: paths.top, base: git.baseBranch, branch, items };
@@ -67,9 +71,15 @@ export function createReviewDiffs({ changed, log, gitCommand = "git", gitRun = r
   const repos = new Map<string, string | null>();
   let closed = false;
 
-  const numstat = async (top: string, range: string): Promise<DiffStat | null> => {
-    const r = await gitRun(gitCommand, top, ["diff", "--numstat", "--no-renames", range]);
-    return r.code === 0 ? parseNumstat(r.stdout) : null;
+  /** What the ranges changed together; null when git can't say for one of them. */
+  const numstat = async (top: string, ...ranges: string[]): Promise<DiffStat | null> => {
+    let out = "";
+    for (const range of ranges) {
+      const r = await gitRun(gitCommand, top, ["diff", "--numstat", "--no-renames", range]);
+      if (r.code !== 0) return null;
+      out += `${r.stdout}\n`;
+    }
+    return parseNumstat(out);
   };
 
   async function readPlan(plan: Plan): Promise<Map<string, DiffStat | null>> {
@@ -89,8 +99,10 @@ export function createReviewDiffs({ changed, log, gitCommand = "git", gitRun = r
         stats.set(card.id, safeBranch(branch) ? await numstat(plan.top, `${feature}...refs/heads/${branch}`) : null);
         continue;
       }
-      const parents = merges?.code === 0 ? storyMergeIn(merges.stdout, card) : null;
-      stats.set(card.id, parents ? await numstat(plan.top, `${parents[0]}...${parents[1]}`) : null);
+      // Every round it was merged in: sent back and merged again, each round's change counts.
+      const rounds = merges?.code === 0 ? storyMergesIn(merges.stdout, card) : [];
+      const ranges = rounds.map(([first, second]) => `${first}...${second}`);
+      stats.set(card.id, ranges.length > 0 ? await numstat(plan.top, ...ranges) : null);
     }
     stats.set("", await numstat(plan.top, `refs/heads/${plan.base}...${feature}`));
     return stats;

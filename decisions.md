@@ -3193,19 +3193,25 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 ## 2026-11-23 — STORY-69 Review a feature on one screen (developer)
 
 - **The run that proved a criterion is a card event.** `ran:<n>@<run>` sits beside `proven:<n>` in the card's
-  history, where `<run>` is the CI run's https URL or `local`. It is written with the proof through the shared evidence
-  writer, so it survives a restart and travels with the card; the SQLite index is only a cache. A criterion proven
-  again replaces its run; `unproven:<n>` drops it. The CI run is the first run whose own report passes every test the
-  criterion links (else the first run with a report), and its URL is derived from the PR's repository.
+  history, where `<run>` is `local` or a GitHub Actions run URL in the card's PR repository
+  (`https://github.com/<owner>/<repo>/actions/runs/<id>`); any other URL, as an edited card might hold, is dropped, so a
+  link labelled "CI run" never opens a foreign site. It is written with the proof through the shared evidence writer,
+  so it survives a restart and travels with the card; the SQLite index is only a cache. Whenever a passing run differs
+  from the stored one (a CI run after a local one at the same head, or a CI re-run) a new `ran:` is recorded;
+  `unproven:<n>` drops it. The CI run is the first run whose own report passes every test the criterion links, else
+  the newest run whose report holds at least one of them; with neither, no run is linked. Its URL is derived from the
+  PR's repository, with the same pattern that validates PR links.
 - **The Dev Lead's summary is the feature card's `## Summary` section**, plus a `summary` history event by
-  `session:<chat>`. Only a lead chat writes it, through the MCP tool `write_summary` (agent method `feature.summary`),
+  `session:<chat>`. Only the Dev Lead's chat writes it (any other chat is refused, story session or not), through the MCP tool `write_summary` (agent method `feature.summary`),
   since `update_card` refuses features. It is written where the feature's branch has its card (`writeFeature`), in the
   card lane like every card write. The screen labels it "Written by the Dev Lead"; with none, there is no heading.
 - **One server watch builds the screen.** `review.watch` composes the feature's Work row, each story's and bug's card
   view, git's numstat and the links, and pushes again on every scan, so stage moves, checks and proof show live.
-  Cancelled stories are left out. Diffs are read in the background and cached by the commits they compare: a merged
-  story's from its merge commit's parents (Featra's, GitHub's PR or git's merge subject), an open story's from its
-  branch against the feature's, the feature's against the base. Card files count, as on GitHub's Files changed.
+  Cancelled stories are left out. Diffs are read in the background and cached by the commits they compare, an open story's
+  by its branch tip even without a worktree, so pushed commits refresh its counts: a merged story's from every merge
+  round's parents (Featra's subject built from `mergeCommitMessage`, GitHub's PR or git's merge subject), each file
+  counted once, an open story's from its branch against the feature's, the feature's against the base. A finished read
+  re-runs the watch's listeners against its last scan instead of scanning again. Card files count, as on GitHub's Files changed.
 - **Files changed links:** a story's PR `/files`; the feature's PR `/files`, or before it has one a GitHub compare of
   base...branch. Links open in the OS browser.
 - **The feature's own checks** exist once it is accepted (ADR 0037); before that the screen says "No checks run yet".

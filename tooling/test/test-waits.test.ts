@@ -103,6 +103,15 @@ describe("no unit test relies on a fixed wall-clock wait (BUG-28)", () => {
     ).toEqual([GH_KIND, GH_KIND, GH_KIND]);
   });
 
+  it("finds a CI run report read without a time for its gh (STORY-69)", () => {
+    expect(
+      kinds([
+        "await readCiRunReports(dir, head, report, { gh: gh.command });",
+        "await readCiRunReports(dir, head, report, { gh: gh.command, timeoutMs: FAKE_GH_TIMEOUT_MS });",
+      ]),
+    ).toEqual([GH_KIND]);
+  });
+
   it("finds none in the unit tests, outside the waits allowed for their reason", () => {
     const files = testFiles();
     expect(files.length).toBeGreaterThan(100);

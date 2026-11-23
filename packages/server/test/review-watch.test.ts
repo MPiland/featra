@@ -9,12 +9,15 @@ import { join, resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   appendHistory,
+  DEFAULT_CONFIG,
+  mergeCommitMessage,
   newCard,
   provenEvent,
   ranEvent,
   recordEvidence,
   setStatus,
   toIso,
+  withCheckEvidence,
   type Card,
   type FeatureReview,
 } from "@featra/work-format";
@@ -33,6 +36,7 @@ const FEATURE = "feature/1-review";
 const DONE = "featra/story-1-done";
 const WIP = "featra/story-2-wip";
 const CI_RUN = "https://github.com/acme/app/actions/runs/99";
+const CI_RUN_2 = "https://github.com/acme/app/actions/runs/100";
 const AT = "2026-11-02T00:00:00Z";
 
 let repo: CardRepo;
@@ -198,6 +202,41 @@ describe("a feature's review screen (STORY-69)", () => {
     await repo.write(wip, wipStory("In Review"));
     await until(() => item(review(), "STORY-2")?.view.status === "In Review");
     expect(review()?.summary?.text).toBe("Ready for review.");
+  });
+
+  it("pushes a story's new proof and its run, as the evidence writer records them, without reopening (AC7)", async () => {
+    // STORY-2's card in its worktree, which owns it, with a second criterion its PR's CI hasn't proven yet.
+    const linked = { text: "Shows the run", done: false, test: "test/b.test.ts::proof > run" };
+    const before = { ...wipStory(), pr: "https://github.com/acme/app/pull/8", acs: [...wipStory().acs, linked] };
+    await repo.write(wip, before);
+    await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
+    await until(() => item(review(), "STORY-2")?.view.acs[1]?.proof === "linked");
+    const head = repo.git(wip, "rev-parse", "HEAD");
+    const outcome = { passed: null, acs: [{ ac: 2, passed: true, run: CI_RUN_2 }], head };
+    await repo.write(wip, withCheckEvidence(before, DEFAULT_CONFIG, outcome, "system", AT));
+    await until(() => item(review(), "STORY-2")?.view.acs[1]?.proof === "passed");
+    expect(item(review(), "STORY-2")?.view.acs[1]).toEqual({ ...linked, proof: "passed", run: CI_RUN_2 });
+  });
+  it("counts a commit pushed to an open story's branch that no worktree has checked out (AC2)", async () => {
+    const OPEN = "featra/story-3-open";
+    await repo.write(repo.main, story("STORY-3", "Count a push", "In Progress", { branch: OPEN }));
+    repo.commit(repo.main, "story 3");
+    repo.git(repo.main, "branch", OPEN, FEATURE);
+    await repo.commitOn(OPEN, (tree) => writeFile(join(tree, "src", "c.ts"), "c\n"), "STORY-3: c");
+    await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
+    await until(() => item(review(), "STORY-3")?.diff != null);
+    expect(item(review(), "STORY-3")?.diff).toEqual({ files: 1, added: 1, removed: 0 });
+    await repo.commitOn(OPEN, (tree) => writeFile(join(tree, "src", "d.ts"), "d\nd\n"), "STORY-3: d");
+    await until(() => item(review(), "STORY-3")?.diff?.files === 2);
+    expect(item(review(), "STORY-3")?.diff).toEqual({ files: 2, added: 3, removed: 0 });
+  });
+
+  it("counts every round of a story merged, sent back and merged again (AC2)", async () => {
+    await repo.commitOn(DONE, (tree) => writeFile(join(tree, "src", "e.ts"), "e\ne\n"), "STORY-1: e");
+    mergeInto(FEATURE, DONE, mergeCommitMessage({ id: "STORY-1", title: "See the summary" }));
+    await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
+    await until(() => item(review(), "STORY-1")?.diff != null);
+    expect(item(review(), "STORY-1")?.diff).toEqual({ files: 2, added: 5, removed: 0 });
   });
 
   it("is null for an id that isn't a feature", async () => {

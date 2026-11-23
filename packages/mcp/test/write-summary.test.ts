@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { newCard, parseCard, serializeCard, setStatus, summaryOf } from "@featra/work-format";
+import { DEV_LEAD_ROLE, newCard, parseCard, serializeCard, setStatus, summaryOf } from "@featra/work-format";
 import {
   createAgentBridge,
   createAllowedProjects,
@@ -30,6 +30,7 @@ import { TOOLS } from "../src/index.ts";
 const MAIN = fileURLToPath(new URL("../src/main.ts", import.meta.url));
 const LEAD = "chat-1";
 const WORKER = "chat-2";
+const RESEARCHER = "chat-3";
 const NOW = new Date("2026-11-10T09:00:00Z");
 const now = () => NOW;
 const CARD = ".featra/cards/FEAT-1-card.md";
@@ -91,10 +92,12 @@ beforeAll(async () => {
     chats: {
       info: (id) =>
         id === LEAD
-          ? { dir: project, session: "Dev Lead chat 1a2b3c4d" }
+          ? { dir: project, session: "Dev Lead chat 1a2b3c4d", role: DEV_LEAD_ROLE }
           : id === WORKER
-            ? { dir: project, session: "STORY-1 session", story: true }
-            : null,
+            ? { dir: project, session: "STORY-1 session", story: true, role: "developer" }
+            : id === RESEARCHER
+              ? { dir: project, session: "Researcher chat 5e6f7a8b", role: "researcher" }
+              : null,
       report: () => {},
       retitle: () => {},
     },
@@ -155,11 +158,15 @@ describe("write_summary through the Featra MCP (STORY-69 AC6)", () => {
     expect(git(project, "symbolic-ref", "HEAD")).toBe("refs/heads/main");
   });
 
-  it("refuses a story session, a feature not in progress, bad input and a project with the MCP off", async () => {
+  it("refuses a story session, any other chat that isn't the Dev Lead, a feature not in progress, bad input and a project with the MCP off", async () => {
     const before = git(project, "rev-parse", BRANCH);
     const worker = await call(await agent(WORKER), { feature: "FEAT-1", summary: "Mine." });
     expect(isError(worker)).toBe(true);
     expect(text(worker)).toBe("Not written. A story session can't write a feature's summary. Report to the Dev Lead.");
+    // It reads as written by the Dev Lead, so no other chat may write it either.
+    const researcher = await call(await agent(RESEARCHER), { feature: "FEAT-1", summary: "Mine too." });
+    expect(isError(researcher)).toBe(true);
+    expect(text(researcher)).toBe("Not written. Only the Dev Lead writes a feature's summary.");
     const lead = await agent();
     const later = await call(lead, { feature: "FEAT-2", summary: "Soon." });
     expect(text(later)).toBe("Not written. FEAT-2 isn't a feature in progress.");

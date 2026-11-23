@@ -18,7 +18,7 @@ import {
 } from "./evidence.ts";
 import { recordEvidence } from "./history.ts";
 import { isRun } from "./card-view-types.ts";
-import { ranEvent } from "./proof-run.ts";
+import { provenRuns, ranEvent } from "./proof-run.ts";
 import type { ChecksWhere, GithubDetection } from "./checks-types.ts";
 import { isRecord } from "./utils/guards.ts";
 import type { Card, ProjectConfig } from "./types.ts";
@@ -100,15 +100,17 @@ export function withCheckEvidence(card: Card, config: ProjectConfig, outcome: Ch
   if (outcome.passed === true && !before.verified) next = recordEvidence(next, VERIFIED, by, at);
   if (outcome.passed === false && before.verified) next = recordEvidence(next, UNVERIFIED, by, at);
   const commits = provenCommits(card);
+  const runs = provenRuns(card);
   for (const { ac, passed, run } of outcome.acs) {
     if (ac < 1 || ac > card.acs.length) continue;
     const proven = before.provenAcs.includes(ac);
     // Proof for a new commit is recorded with it, so what was proven at an older commit isn't taken for this one.
     const fresh = !!outcome.head && commits.get(ac) !== outcome.head;
-    if (passed && (!proven || fresh)) {
-      next = recordEvidence(next, provenEvent(ac, outcome.head), by, at);
-      if (run && isRun(run)) next = recordEvidence(next, ranEvent(ac, run), by, at);
-    }
+    const reproved = passed && (!proven || fresh);
+    if (reproved) next = recordEvidence(next, provenEvent(ac, outcome.head), by, at);
+    // The run is kept whenever it isn't the one already kept: a CI run after a local one, or a re-run, at one commit.
+    const kept = reproved ? undefined : runs.get(ac);
+    if (passed && isRun(run, card.pr) && run !== kept) next = recordEvidence(next, ranEvent(ac, run), by, at);
     if (!passed && proven) next = recordEvidence(next, unprovenEvent(ac), by, at);
   }
   return next === card ? card : settleDone(next, config, by, at);
