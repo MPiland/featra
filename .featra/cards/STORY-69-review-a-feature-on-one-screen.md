@@ -2,7 +2,7 @@
 id: STORY-69
 type: story
 title: Review a feature on one screen
-status: New
+status: In Progress
 parent: FEAT-9
 order: 2
 origin: planned
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-69-review-screen
 pr: null
 created: 2026-11-23T12:00:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-23T15:34:42Z
+    field: status
+    from: New
+    to: In Progress
+    by: dev-lead
 ---
 
 ## Description

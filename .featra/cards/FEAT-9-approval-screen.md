@@ -2,7 +2,7 @@
 id: FEAT-9
 type: feature
 title: Approval screen
-status: approved
+status: active
 parent: EPIC-2
 order: 9
 origin: planned
@@ -18,6 +18,11 @@ history:
     from: draft
     to: approved
     by: user
+  - at: 2026-11-23T15:34:42Z
+    field: status
+    from: approved
+    to: active
+    by: dev-lead
 ---
 
 ## Description
