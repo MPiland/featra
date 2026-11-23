@@ -1,10 +1,10 @@
 ---
 id: STORY-25
 type: story
-title: Acceptance proof setting and screenshots
+title: Choose the project's proof and capture screenshots
 status: New
 parent: FEAT-9
-order: 1
+order: 6
 origin: planned
 role: developer
 agent: claude
@@ -28,14 +28,20 @@ As a builder, I choose once how I want to check stories before accepting them, a
 
 ## Acceptance criteria
 
-- [ ] When the first feature is shaped, the Dev Lead asks once for the project's proof: screenshots, a Preview button, both, or neither
+- [ ] When the first feature is shaped, the Dev Lead asks once for the project's proof: screenshots, a Preview button, both, or neither; the answer is a project setting I can change later
 - [ ] Featra captures screenshots with Electron's built-in Chromium; no browser download or extra dependency
 - [ ] Screenshots produced by the project's own tests are attached to the matching criteria when present
 - [ ] Capturing screenshots spends no agent tokens
-- [ ] Before a story moves to Acceptance, the reviewing agent checks its screenshots for layout and design and sends any findings to the story's session
+- [ ] Captured and attached screenshots show next to their criteria, as STORY-72 shows evidence
 
 ## Tasks
 
 - [ ] Break down when picked up
 
 ## Notes
+
+Reshaped with the user on 2026-11-23: the design review of screenshots moved to STORY-73, and showing evidence to STORY-72.
+
+## Depends on
+
+- STORY-72 See attached evidence next to criteria
