@@ -2,7 +2,7 @@
 id: BUG-39
 type: bug
 title: A vitest wait keeps its own 1 s deadline under load
-status: New
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,13 +12,18 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-69-review-screen
-pr: null
+pr: https://github.com/MPiland/featra/pull/83
 created: 2026-11-23T19:30:00Z
 history:
   - at: 2026-11-23T19:30:00Z
     field: status
     from: null
     to: New
+    by: session:story-69
+  - at: 2026-11-23T20:30:00Z
+    field: status
+    from: New
+    to: In Review
     by: session:story-69
 ---
 

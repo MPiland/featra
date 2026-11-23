@@ -2,7 +2,7 @@
 id: STORY-69
 type: story
 title: Review a feature on one screen
-status: In Progress
+status: In Review
 parent: FEAT-9
 order: 2
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-69-review-screen
-pr: null
+pr: https://github.com/MPiland/featra/pull/83
 created: 2026-11-23T12:00:00Z
 history:
   - at: 2026-11-23T12:00:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-23T20:30:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-69
 ---
 
 ## Description
