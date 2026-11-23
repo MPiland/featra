@@ -2,7 +2,7 @@
 id: STORY-69
 type: story
 title: Review a feature on one screen
-status: In Review
+status: Done
 parent: FEAT-9
 order: 2
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:story-69
+  - at: 2026-11-23T21:16:09Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-23T21:16:09Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
