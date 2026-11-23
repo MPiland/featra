@@ -2,7 +2,7 @@
 id: STORY-70
 type: story
 title: Approve merges the feature to main
-status: In Progress
+status: In Review
 parent: FEAT-9
 order: 3
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-70-approve-merges
-pr: null
+pr: https://github.com/MPiland/featra/pull/85
 created: 2026-11-23T12:00:00Z
 history:
   - at: 2026-11-23T12:00:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-23T23:52:31Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-70
 ---
 
 ## Description
