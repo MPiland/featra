@@ -109,3 +109,34 @@
 .card-actions .row-review {
   margin-left: 8px;
 }
+
+/* Its sections spaced as the card pane spaces them. */
+.review-screen .card-sec {
+  margin-top: 20px;
+}
+
+.review-screen .card-sec p {
+  margin: 0;
+}
+
+/* Links in the app's accent, underlined on hover, as the card pane's are. */
+.review-screen a {
+  color: var(--acc);
+  text-decoration: none;
+}
+
+.review-screen a:hover {
+  text-decoration: underline;
+}
+
+.review-screen a:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* Who wrote the summary sits beside its heading. */
+.rv-summary .sh {
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 8px;
+}
