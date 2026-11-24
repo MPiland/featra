@@ -71,6 +71,16 @@ describe("the dev server and the tests' screenshots", () => {
     expect(save.disabled).toBe(true);
   });
 
+  it("keeps a field being typed when the proof's own save answers", async () => {
+    const { section, calls } = await open(SET);
+    fireEvent.click(mode(section, "Screenshots"));
+    fireEvent.change(input(section, COPY.command), { target: { value: "node serve.mjs {port}" } });
+    await waitFor(() => expect(calls).toContain(`proof.set:${PROJECT.dir}:{"proof":"screenshots"}`));
+    await waitFor(() => expect(mode(section, "Screenshots").checked).toBe(true));
+    expect(input(section, COPY.command).value).toBe("node serve.mjs {port}");
+    expect(within(section).getByRole<HTMLButtonElement>("button", { name: COPY.save }).disabled).toBe(false);
+  });
+
   it("asks to confirm a command changed outside Featra, which doesn't run until then", async () => {
     const { section, user, calls } = await open({ ...SET, devServerCommand: "npm run dev", unconfirmed: true });
     expect(within(section).getByText(`${COPY.changed}:`)).toBeTruthy();

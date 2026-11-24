@@ -26,9 +26,11 @@ export function ProjectProof({ checks, dir }: { checks: ChecksBridge; dir: strin
   const [saved, setSaved] = useState(false);
   const view = loaded && loaded.dir === dir ? loaded.view : null;
 
-  const show = (next: ProofView) => {
+  /** Shows a save's answer; only the fields that save sent take the saved value, so one being typed is kept. */
+  const show = (next: ProofView, sent: ProofPatch) => {
     setLoaded({ dir, view: next });
-    setDraft(draftOf(next));
+    const stored = draftOf(next);
+    setDraft((now) => ({ ...now, ...Object.fromEntries(FIELDS.filter((f) => f in sent).map((f) => [f, stored[f]])) }));
   };
   useEffect(() => {
     let live = true;
@@ -47,7 +49,7 @@ export function ProjectProof({ checks, dir }: { checks: ChecksBridge; dir: strin
   const change = async (patch: ProofPatch) => {
     setSaved(false);
     const next = await checks.setProof(dir, patch);
-    show(next);
+    show(next, patch);
     setSaved(next.error === null);
   };
   const dirty = FIELDS.filter((f) => draft[f].trim() !== (view[f] ?? ""));
