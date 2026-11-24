@@ -68,9 +68,9 @@ export type ChatEvent =
   /**
    * The agent asks the user to choose (STORY-46): the chat waits until it is answered. `id` is the call's, so the
    * question shows on the call's own row. `subagent` is set when a subagent the session spawned asks (STORY-55): its
-   * label.
+   * label. `subject` is set when the app itself asks (STORY-25): what it is about, and it outlives the turn.
    */
-  | { type: "question"; id: string; name: string; questions: Question[]; subagent?: string }
+  | { type: "question"; id: string; name: string; questions: Question[]; subject?: string; subagent?: string }
   /** The user answered a question; the agent goes on with the answers. */
   | { type: "question-answered"; id: string; answers: Answers }
   /** A request (an approval or a question) ended unanswered: Stop, the chat closing, or the agent no longer waiting. */
@@ -168,6 +168,7 @@ export function normalizeChatEvent(raw: unknown): ChatEvent | null {
             id: raw.id,
             name: raw.name,
             questions,
+            ...(nonEmpty(raw.subject) ? { subject: raw.subject } : {}),
             ...(nonEmpty(raw.subagent) ? { subagent: raw.subagent } : {}),
           }
         : null;

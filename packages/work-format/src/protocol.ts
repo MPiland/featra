@@ -9,6 +9,7 @@ import type { ApprovalChoice } from "./approvals.ts";
 import type { BugPlacements } from "./bug-copy.ts";
 import type { Answers } from "./questions.ts";
 import type { ChecksPatch, ChecksView } from "./checks-types.ts";
+import type { ProofPatch, ProofView } from "./proof-types.ts";
 import type { EvidenceFile } from "./evidence-link.ts";
 import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
@@ -180,6 +181,15 @@ export interface ServerMethods {
   "checks.load": { params: { dir: string }; result: ChecksView };
   /** Changes the Checks settings in the project's config (`null` clears one); answers with the section as it is after. */
   "checks.set": { params: { dir: string; patch: ChecksPatch }; result: ChecksView };
+  /** Project settings' Proof section (STORY-25): the project's proof, its dev server, and its tests' screenshot folder. */
+  "proof.load": { params: { dir: string }; result: ProofView };
+  /** Changes the Proof settings in the project's config (`null` clears one); answers with the section as it is after. */
+  "proof.set": { params: { dir: string; patch: ProofPatch }; result: ProofView };
+  /**
+   * Preview (STORY-25): starts the story's dev server in its worktree, or reuses the one running, and answers with its
+   * URL for the host to open in a window. Refused with why when it has none or it didn't start.
+   */
+  "preview.start": { params: { dir: string; id: string }; result: { url: string } };
   /**
    * Sends a story in Acceptance back to its session with the user's reason, as the user's message (STORY-23): logged in
    * history, the story In Progress again, and with `addCriterion` the reason a new acceptance criterion. Refused

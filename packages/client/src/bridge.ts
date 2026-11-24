@@ -148,6 +148,8 @@ export interface FeatraBridge {
     openExternal: (url: string) => void;
     /** Opens the server's copy of an evidence file with the OS (STORY-72); anything else is ignored. */
     openEvidence: (file: string) => void;
+    /** Opens a story's dev server, on this computer, in a Featra window (STORY-25); anything else is ignored. */
+    openPreview: (url: string, title: string) => void;
     /** Puts text on the clipboard (STORY-68's Copy on a command); nothing runs it. */
     copyText: (text: string) => void;
     /** Clears Chromium's HTTP cache, then restarts the app. */
@@ -177,6 +179,7 @@ export const IPC = {
   appShowLogs: "app:show-logs",
   appOpenExternal: "app:open-external",
   appOpenEvidence: "app:open-evidence",
+  appOpenPreview: "app:open-preview",
   appCopyText: "app:copy-text",
   appClearCacheAndRestart: "app:clear-cache-and-restart",
   appResetAppData: "app:reset-app-data",
@@ -282,6 +285,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
         if (link) window.open(link, "_blank", "noopener,noreferrer");
       },
       openEvidence() {},
+      openPreview() {},
       copyText: (text) => {
         navigator.clipboard?.writeText(text).catch(() => {});
       },

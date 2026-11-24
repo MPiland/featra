@@ -11,6 +11,7 @@ import type {
   ModeInfo,
   Notice,
   ProviderInfo,
+  Question,
   SettingsChange,
   TitleBy,
 } from "@featra/work-format";
@@ -31,6 +32,9 @@ export interface McpAttach {
  * A request the app asks the user for an agent: the row it shows as, and what it is about: the `story` to merge, or
  * the `subject` of anything else, such as the bug reported (STORY-13). Either keeps it open past the turn that asked.
  */
+/** A question the app asks the user itself (STORY-25): the row it shows as, and what it is about. */
+export type AppQuestion = { id: string; name: string; questions: Question[]; subject: string };
+
 export type AppApproval = { id: string; name: string; input: Record<string, unknown> } & (
   | { story: string; subject?: never }
   | { subject: string; story?: never }
@@ -75,6 +79,11 @@ export interface ChatManager {
    * Done or Can't do it. Null when the request ended unanswered: `signal` (the call dropped), or the chat's agent ending.
    */
   askAction: (id: string, request: AppApproval, signal: AbortSignal) => Promise<ActionOutcome | null>;
+  /**
+   * Asks the user the app's own question in chat `id` (STORY-25's proof question), on the question card agents use. It
+   * outlives the turn. The answers; null when the chat's agent ends first.
+   */
+  askQuestion: (id: string, request: AppQuestion) => Promise<Answers | null>;
   /** Puts a notice in the Dev Lead's chat `id`, as story sessions' notices are (STORY-12: how a merge it asked for went). */
   notify: (id: string, notice: Notice) => void;
   /** Takes a story session that is queued and has never started out of the queue, and forgets it. False if it isn't one. */

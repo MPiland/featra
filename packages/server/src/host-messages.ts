@@ -3,7 +3,8 @@
  * The host starts the server with the token, keeps its list of open projects current and says when the app's settings
  * are saved; the server says where it
  * listens, acknowledges each list, forwards failures for the host's log and tells how many agents wait on the user
- * across the open projects, for the taskbar and Dock badge (STORY-67).
+ * across the open projects, for the taskbar and Dock badge (STORY-67). The server also asks the host to capture a page of a
+ * story's dev server (`capture`), which Electron's own Chromium does, and the host answers `captured` (STORY-25).
  */
 import { isRecord } from "@featra/work-format";
 
@@ -11,14 +12,21 @@ import { isRecord } from "@featra/work-format";
 export type HostMessage =
   | { type: "start"; token: string }
   | { type: "projects"; seq: number; dirs: string[] }
-  | { type: "settings" };
+  | { type: "settings" }
+  /** The page captured, as base64 png or jpg; or `error` when it couldn't be (it didn't load). */
+  | { type: "captured"; seq: number; data: string; ext: "png" | "jpg" }
+  | { type: "captured"; seq: number; error: string };
 
 export type ServerMessage =
   | { type: "listening"; port: number }
   | { type: "projects-ack"; seq: number }
   | { type: "log"; message: string }
   | { type: "failed"; error: string }
-  | { type: "waiting"; count: number };
+  | { type: "waiting"; count: number }
+  | { type: "capture"; seq: number; url: string };
+
+/** True for a whole number JavaScript holds exactly, narrowing it to a number. */
+const wholeNumber = (value: unknown): value is number => Number.isSafeInteger(value);
 
 const strings = (raw: unknown): raw is string[] => Array.isArray(raw) && raw.every((s) => typeof s === "string");
 
@@ -29,11 +37,14 @@ export function parseHostMessage(raw: unknown): HostMessage | null {
     return { type: "projects", seq: raw.seq, dirs: raw.dirs };
   }
   if (raw.type === "settings") return { type: "settings" };
+  if (raw.type === "captured" && wholeNumber(raw.seq)) {
+    if (typeof raw.error === "string") return { type: "captured", seq: raw.seq, error: raw.error };
+    if (typeof raw.data === "string" && raw.data && (raw.ext === "png" || raw.ext === "jpg")) {
+      return { type: "captured", seq: raw.seq, data: raw.data, ext: raw.ext };
+    }
+  }
   return null;
 }
-
-/** True for a whole number JavaScript holds exactly, narrowing it to a number. */
-const wholeNumber = (value: unknown): value is number => Number.isSafeInteger(value);
 
 export function parseServerMessage(raw: unknown): ServerMessage | null {
   if (!isRecord(raw)) return null;
@@ -43,6 +54,9 @@ export function parseServerMessage(raw: unknown): ServerMessage | null {
   if (raw.type === "failed" && typeof raw.error === "string") return { type: "failed", error: raw.error };
   if (raw.type === "waiting" && wholeNumber(raw.count) && raw.count >= 0) {
     return { type: "waiting", count: raw.count };
+  }
+  if (raw.type === "capture" && wholeNumber(raw.seq) && typeof raw.url === "string") {
+    return { type: "capture", seq: raw.seq, url: raw.url };
   }
   return null;
 }

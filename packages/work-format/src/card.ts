@@ -10,6 +10,7 @@ import {
   type Origin,
 } from "./types.ts";
 import { errorMessage, isOneOf, isRecord, toText } from "./utils/guards.ts";
+import { formatAcLine, parseAcLine } from "./ac-line.ts";
 
 const KNOWN_KEYS = [
   "id",
@@ -138,7 +139,7 @@ export function serializeCard(card: Card): string {
   const yaml = stringify(fm, { lineWidth: 0, nullStr: "null" }).trimEnd();
   const parts = ["---", yaml, "---", "", `## ${H_DESCRIPTION}`, "", card.description.trim(), ""];
   if (isWorkItem(card.type) || card.acs.length || card.tasks.length) {
-    parts.push(`## ${H_ACS}`, "", ...card.acs.map(formatAc), "");
+    parts.push(`## ${H_ACS}`, "", ...card.acs.map(formatAcLine), "");
     parts.push(`## ${H_TASKS}`, "", ...card.tasks.map((t) => `- [${t.done ? "x" : " "}] ${t.text}`), "");
     parts.push(`## ${H_NOTES}`, "", ...(card.notes.trim() ? [card.notes.trim(), ""] : []));
   } else if (card.notes.trim()) {
@@ -147,10 +148,6 @@ export function serializeCard(card: Card): string {
   for (const s of card.extraSections)
     parts.push(`## ${s.heading}`, "", ...(s.content.trim() ? [s.content.trim(), ""] : []));
   return collapseBlankRuns(parts.join("\n")).replace(/\n*$/, "\n");
-}
-
-function formatAc(ac: AcceptanceCriterion): string {
-  return `- [${ac.done ? "x" : " "}] ${ac.text}${ac.test ? ` (test: ${ac.test})` : ""}${ac.evidence ? ` (evidence: ${ac.evidence})` : ""}`;
 }
 
 interface ParsedBody {
@@ -181,7 +178,7 @@ function parseBody(body: string): ParsedBody {
   const desc = get(H_DESCRIPTION).trim();
   return {
     description: [pre, desc].filter(Boolean).join("\n\n"),
-    acs: parseChecklist(get(H_ACS)).map(splitTestRef),
+    acs: parseChecklist(get(H_ACS)).map(parseAcLine),
     tasks: parseChecklist(get(H_TASKS)),
     notes: get(H_NOTES).trim(),
     extra: sections
@@ -206,17 +203,6 @@ function parseChecklist(content: string): ChecklistItem[] {
     }
   }
   return items;
-}
-
-/**
- * An AC's trailing references: `(test: <ref>)`, then `(evidence: <path>)`, each optional. A ref may hold balanced
- * parentheses, one deep, as test names do ("Accept (AC1) > ..."; BUG-20).
- */
-function splitTestRef(item: ChecklistItem): AcceptanceCriterion {
-  const m = /^(.*?)(?:\s*\(test: ((?:[^()]|\([^()]*\))+)\))?(?:\s*\(evidence: ([^)]+)\))?\s*$/.exec(item.text);
-  const [, text, test, evidence] = m ?? [];
-  if (text === undefined || (!test && !evidence)) return { ...item, test: null };
-  return { ...item, text, test: test?.trim() || null, ...(evidence?.trim() ? { evidence: evidence.trim() } : {}) };
 }
 
 function parseHistory(raw: unknown, source?: string): HistoryEvent[] {

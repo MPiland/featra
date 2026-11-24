@@ -68,6 +68,8 @@ export interface AcceptanceCriterion extends ChecklistItem {
   test: string | null;
   /** The evidence file an agent linked for this AC, inside the story's evidence folder (STORY-10). Absent when none. */
   evidence?: string;
+  /** The page (a route on the dev server) the story's agent listed for Featra to capture (STORY-25). Absent when none. */
+  page?: string;
 }
 
 export interface BodySection {
@@ -144,4 +146,12 @@ export interface ProjectConfig {
   testReportArtifact: string | null;
   /** The report files inside the artifact, a glob; null reads every `.xml` file in it. */
   testReportFiles: string | null;
+  /** How stories show they work (STORY-25): screenshots, Preview, both or none; null until the user chooses. */
+  proof: "screenshots" | "preview" | "both" | "none" | null;
+  /** The command that starts the project's dev server, with an optional `{port}`; null until the user confirms one. */
+  devServerCommand: string | null;
+  /** Where the dev server answers: http://localhost:<port> or http://127.0.0.1:<port>. */
+  devServerUrl: string | null;
+  /** The folder, relative to the project, where its own tests write screenshots (STORY-25); null when none. */
+  testScreenshots: string | null;
 }

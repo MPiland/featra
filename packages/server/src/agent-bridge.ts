@@ -30,6 +30,7 @@ import type { McpAttach } from "./chat-manager-types.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { CardReport } from "./card-report.ts";
 import type { DraftWriter } from "./draft-writer.ts";
+import type { ProofQuestion } from "./proof-question.ts";
 import type { FeatureStart } from "./feature-start.ts";
 import type { StorySpawn } from "./story-spawn.ts";
 import type { LogWriter } from "./log-writer.ts";
@@ -60,6 +61,8 @@ export interface AgentBridgeDeps extends Omit<LeadCallDeps, "mcpRefusal"> {
   writer: LogWriter;
   /** Writes the cards agents draft (STORY-8). Without it `cards.draft` is refused. */
   drafts?: DraftWriter;
+  /** Asks the proof question once a chat shapes the project's first feature (STORY-25). */
+  proofQuestion?: Pick<ProofQuestion, "shaped">;
   /** Starts approved features (STORY-52). Without it `feature.start` is refused. */
   starts?: FeatureStart;
   /** Starts story sessions (STORY-9). Without it `story.spawn` is refused. */
@@ -106,6 +109,7 @@ export function createAgentBridge({
   chats,
   writer,
   drafts,
+  proofQuestion,
   starts,
   spawns,
   reports,
@@ -171,6 +175,7 @@ export function createAgentBridge({
     } catch (error) {
       log(`Couldn't rename chat ${chat} after its draft: ${error instanceof Error ? error.message : String(error)}`);
     }
+    await proofQuestion?.shaped(dir, chat);
     return result;
   }
 

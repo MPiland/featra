@@ -7,6 +7,7 @@ import { Dropdown } from "../controls/Dropdown.tsx";
 import { PageHeader } from "./PageHeader.tsx";
 import { ProjectChecks } from "./ProjectChecks.tsx";
 import { ProjectPrs } from "./ProjectPrs.tsx";
+import { ProjectProof } from "./ProjectProof.tsx";
 import { ProjectWorkGroups } from "./ProjectWorkGroups.tsx";
 
 export interface ProjectPageProps {
@@ -96,6 +97,7 @@ export function ProjectPage({ bridge, snapshot, projects, title, onSetUp }: Proj
       />
       <ProjectChecks checks={bridge.checks} dir={dir} />
       <ProjectPrs checks={bridge.checks} dir={dir} />
+      <ProjectProof checks={bridge.checks} dir={dir} />
     </div>
   );
 }

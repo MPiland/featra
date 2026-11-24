@@ -143,7 +143,7 @@ const isAnswer = (
 export function nextAsks(asks: readonly Ask[], event: ChatEvent): readonly Ask[] {
   if (event.type === "approval" || event.type === "question") {
     const story = event.type === "approval" && event.story ? { story: event.story } : {};
-    const subject = event.type === "approval" && event.subject ? { subject: event.subject } : {};
+    const subject = event.subject ? { subject: event.subject } : {};
     const ask = { id: event.id, reason: event.type, ...story, ...subject };
     return asks.some((a) => a.id === event.id) ? asks : [...asks, ask];
   }

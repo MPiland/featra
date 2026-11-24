@@ -4,11 +4,13 @@
  */
 import { errorMessage } from "@featra/work-format/guards";
 import { normalizeChecksView, type ChecksPatch, type ChecksView } from "@featra/work-format/checks";
+import { noProof, serverProof, type ProofSettingsBridge } from "./proof-bridge.ts";
 import type { ServerClient } from "./server-client.ts";
 
 export type { ChecksPatch, ChecksView };
 
-export interface ChecksBridge {
+/** The checks, and the project's proof (STORY-25), which Project settings show beside them. */
+export interface ChecksBridge extends ProofSettingsBridge {
   /** Where checks run for the project, its two commands and the commands proposed to it. */
   load: (dir: string) => Promise<ChecksView>;
   /** Saves the user's confirmed values; answers with the section as it is after, or why not (`error`). */
@@ -22,6 +24,7 @@ const read = (call: Promise<unknown>) => call.then(normalizeChecksView, (err: un
 /** The bridge's checks methods over the server client. */
 export function serverChecks(server: ServerClient): ChecksBridge {
   return {
+    ...serverProof(server),
     load: (dir) => read(server.call("checks.load", { dir })),
     set: (dir, patch) => read(server.call("checks.set", { dir, patch })),
   };
@@ -29,7 +32,7 @@ export function serverChecks(server: ServerClient): ChecksBridge {
 
 /** A browser tab has no folders, so no checks. */
 export function noChecks(error: string): ChecksBridge {
-  return { load: async () => failed(error), set: async () => failed(error) };
+  return { ...noProof(error), load: async () => failed(error), set: async () => failed(error) };
 }
 
 export const CHECKS_PAGE_COPY = {

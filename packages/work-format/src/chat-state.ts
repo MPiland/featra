@@ -26,7 +26,7 @@ export type ToolApproval =
 
 /** Where a question stands: waiting on the user, or answered with what they chose. */
 export type ToolQuestion =
-  | { status: "pending"; questions: Question[]; subagent?: string }
+  | { status: "pending"; questions: Question[]; subject?: string; subagent?: string }
   | { status: "answered"; questions: Question[]; answers: Answers };
 
 export type ChatItem =
@@ -150,6 +150,7 @@ const endTools = (state: ChatState, stopped: boolean): ChatState => ({
     if (item.kind !== "tool" || item.result !== null || item.denied) return item;
     // A story session's request shown here belongs to the session's turn, not this one; an app request outlives it too.
     if (item.approval?.status === "pending" && (item.approval.story || item.approval.subject)) return item;
+    if (item.question?.status === "pending" && item.question.subject) return item;
     const open = unasked(item);
     return stopped ? { ...item, ...open, stopped: true } : { ...item, ...open, cancelled: !item.stopped };
   }),
@@ -185,6 +186,7 @@ export function reduceChat(state: ChatState, event: ChatEvent): ChatState {
         question: {
           status: "pending",
           questions: event.questions,
+          ...(event.subject ? { subject: event.subject } : {}),
           ...(event.subagent ? { subagent: event.subagent } : {}),
         },
       }));

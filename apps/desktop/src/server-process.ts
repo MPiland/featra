@@ -38,7 +38,12 @@ export interface ServerProcessDeps {
    * server that stops takes its agents with it, so its count goes back to 0.
    */
   waiting?: (count: number) => void;
+  /** Captures a page of a story's dev server when the server asks (STORY-25): Electron's Chromium in the app. */
+  capture?: (url: string) => Promise<HostCapture>;
 }
+
+/** A captured page, base64, or why it wasn't. */
+export type HostCapture = { data: string; ext: "png" | "jpg" } | { error: string };
 
 const START_TIMEOUT_MS = 15_000;
 
@@ -87,6 +92,7 @@ export function createServerProcess({
   dataDir,
   mcpEntry,
   waiting = () => {},
+  capture = async () => ({ error: "Featra can't capture pages here." }),
 }: ServerProcessDeps): ServerProcess {
   let running: Running | null = null;
   let dirs: string[] = [];
@@ -139,6 +145,11 @@ export function createServerProcess({
           case "waiting":
             // A server main has stopped or replaced no longer speaks for the agents.
             return running?.child === child ? waiting(message.count) : undefined;
+          case "capture":
+            void capture(message.url)
+              .catch((err: unknown) => ({ error: err instanceof Error ? err.message : String(err) }))
+              .then((shot) => send(child, { type: "captured", seq: message.seq, ...shot }));
+            return;
           default:
             return message satisfies never;
         }

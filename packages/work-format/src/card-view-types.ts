@@ -4,6 +4,7 @@
  */
 import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
 import { isCiRunOf, normalizeCardPr, type CardPr } from "./prs-types.ts";
+import { normalizeProofNote, type ProofNote } from "./proof-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /**
@@ -31,6 +32,8 @@ export interface CardViewAc {
   run?: string;
   /** The evidence file linked to it (STORY-72), a path in the card's evidence folder; absent when none is. */
   evidence?: string;
+  /** Why Featra has no screenshot for it (STORY-25): the dev server or the page failed; absent otherwise. */
+  proofNote?: ProofNote;
 }
 
 export interface CardViewTask {
@@ -104,6 +107,8 @@ export interface CardView {
   held?: boolean;
   /** Why a story didn't merge on its own, while that stands (STORY-60); absent otherwise. */
   notMerged?: string;
+  /** True on a story with a worktree in a project that offers Preview (STORY-25); absent otherwise. */
+  preview?: true;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -228,6 +233,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
       proof: isOneOf(AC_PROOFS, a.proof) ? a.proof : "none",
       ...(isRun(a.run, textOrNull(raw.pr)) ? { run: a.run } : {}),
       ...(typeof a.evidence === "string" && a.evidence ? { evidence: a.evidence } : {}),
+      ...normalizeProofNote(a.proofNote),
     })),
     tasks: list(raw.tasks, (t) => ({ text: text(t.text), done: t.done === true })),
     notes: text(raw.notes),
@@ -244,6 +250,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(raw.mergeable === true ? { mergeable: true as const } : {}),
     ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
+    ...(raw.preview === true ? { preview: true as const } : {}),
     ...(typeof raw.mergedInto === "string" && raw.mergedInto ? { mergedInto: raw.mergedInto } : {}),
     ...(typeof raw.held === "boolean" ? { held: raw.held } : {}),
     ...(typeof raw.notMerged === "string" && raw.notMerged ? { notMerged: raw.notMerged } : {}),

@@ -25,6 +25,8 @@ export const UPDATE_CARD: Tool = {
     ".featra/evidence/<FEAT-N>/<STORY-M>/ (your feature's and your story's ids), then link it in `criteria` as `evidence`;",
     "a link anywhere else is refused, and so is one that leads out of that folder. Keep evidence as small as the story allows: one screenshot per criterion at most,",
     `each under ${REPORT_LIMITS.evidenceBytes / 1_000_000} MB, and none when a test already proves it.`,
+    "When the project takes screenshots, you can list a page instead: give the criterion a `page`, the route on the project's dev server that shows it, such as /settings.",
+    "When the story moves to review, Featra starts the dev server in your worktree, captures each listed page and links it as that criterion's evidence, at no cost to you; the result says where, so commit those files too.",
     "This does not commit: commit the card and its evidence with your work. The input is checked, and a call that is refused changes nothing.",
   ].join(" "),
   inputSchema: {
@@ -47,6 +49,11 @@ export const UPDATE_CARD: Tool = {
             evidence: {
               type: "string",
               description: "A file you wrote under .featra/evidence/<FEAT-N>/<STORY-M>/ that shows it works.",
+            },
+            page: {
+              type: "string",
+              description:
+                "The route on the dev server that shows it works, such as /settings: Featra captures it when the story moves to review.",
             },
           },
           required: ["criterion"],

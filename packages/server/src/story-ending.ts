@@ -1,6 +1,8 @@
 /**
  * The stories being ended now (STORY-12, STORY-58): merged into their feature or abandoned. Their session is about to
- * end, so it takes no message, Send back or Resume meanwhile, and one ending refuses the other.
+ * end, so it takes no message, Send back or Resume meanwhile, and one ending refuses the other. As one starts, `onEnding`
+ * hears of it before the story's worktree can go: its dev server stops there (STORY-25), and starts again on demand if
+ * the ending fails.
  */
 import { ABANDON_MESSAGES, MERGE_MESSAGES } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
@@ -16,7 +18,7 @@ const busyMessage = (kind: Ending, id: string) =>
 const runningMessage = (kind: Ending, id: string) =>
   kind === "merge" ? MERGE_MESSAGES.merging(id) : ABANDON_MESSAGES.abandoning(id);
 
-export function createStoryEnding() {
+export function createStoryEnding(onEnding: (dir: string, id: string) => void = () => {}) {
   const ending = new Map<string, Ending>();
 
   /** Runs `work` as story `id`'s `kind` of ending; refused while another ending of it runs. */
@@ -28,6 +30,7 @@ export function createStoryEnding() {
     }
     ending.set(key, kind);
     try {
+      onEnding(dir, id);
       return await work();
     } finally {
       ending.delete(key);

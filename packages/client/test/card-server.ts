@@ -22,6 +22,7 @@ import {
   type CardView,
   type OwnedCard,
   type OwnerLocation,
+  type ProofNotes,
   type WorkList,
 } from "@featra/work-format";
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
@@ -39,11 +40,18 @@ export type ReviewAnswers = Partial<
     | "startStory"
     | "rerunChecks"
     | "createPr"
+    | "previewStory"
     | StoryFlowActions
     | StoryEndActions
     | FeatureActions
   >
 >;
+
+/** What the server adds to a story's card from its proof (STORY-25). */
+export interface CardProof {
+  notes?: ProofNotes;
+  preview?: boolean;
+}
 
 /** The time the fake server stamps on a card edit. */
 export const EDIT_AT = "2026-11-05T12:00:00Z";
@@ -92,6 +100,8 @@ export function fakeCardServer(
   prOf: (dir: string, id: string) => CardPr | undefined = () => undefined,
   /** Whether the server finds an accepted feature can merge to main now, and why not (STORY-14). */
   mergeOf: (dir: string, id: string) => FeatureMergeState | undefined = () => undefined,
+  /** What the server adds to a story's card from its proof (STORY-25): why screenshots weren't taken, and Preview. */
+  proofOf: (dir: string, id: string) => CardProof | undefined = () => undefined,
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -100,9 +110,20 @@ export function fakeCardServer(
   const viewOf = (dir: string, id: string): CardView | null => {
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
-    return card
-      ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id), prOf(dir, id))
-      : null;
+    if (!card) return null;
+    const view = buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id), prOf(dir, id));
+    const proof = proofOf(dir, id);
+    if (!proof) return view;
+    const acs = [...view.acs];
+    for (const [i, note] of Object.entries(proof.notes ?? {})) {
+      const ac = acs[Number(i)];
+      if (ac) acs[Number(i)] = { ...ac, proofNote: note };
+    }
+    return {
+      ...view,
+      acs,
+      ...(proof.preview ? { preview: true as const } : {}),
+    };
   };
   const listOf = (dir: string): WorkList | null => {
     const cards = cardSets.get(dir);
@@ -227,6 +248,11 @@ export function fakeCardServer(
     createPr: async (dir, id) => {
       calls.push(`createPr:${dir}:${id}`);
       return review.createPr ? review.createPr(dir, id) : { ok: true };
+    },
+    // Preview is the server's to prove (the dev server, its port): the fake records the call and answers a local URL.
+    previewStory: async (dir, id) => {
+      calls.push(`previewStory:${dir}:${id}`);
+      return review.previewStory ? review.previewStory(dir, id) : { ok: true, url: "http://localhost:5173" };
     },
     ...storyFlowFakes({
       cardsIn: (dir) => cardSets.get(dir) ?? [],

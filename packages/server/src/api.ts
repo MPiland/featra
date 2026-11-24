@@ -20,6 +20,7 @@ import { ApiError } from "./api-error.ts";
 import { createChatApi, type ChatApiDeps } from "./api-chat.ts";
 import { createBugApi } from "./api-bugs.ts";
 import { createEvidenceApi, type EvidenceApiDeps } from "./api-evidence.ts";
+import { createProofApi, type ProofApiDeps } from "./api-proof.ts";
 import { createStoryEndApi } from "./api-story-end.ts";
 import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
 import { createProjectApi } from "./api-project.ts";
@@ -87,6 +88,8 @@ export interface ApiDeps {
   diffs?: WatchApiDeps["diffs"];
   /** Evidence files read back to show next to their criteria (STORY-72). */
   evidence?: EvidenceApiDeps["evidence"];
+  /** The project's proof (STORY-25): its settings, Preview, and the notes and Preview a card shows. */
+  proof?: ProofApiDeps["proof"] & { capture: WatchApiDeps["proof"] };
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -138,6 +141,7 @@ export function createApi({
   needs,
   diffs,
   evidence,
+  proof,
 }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
@@ -166,7 +170,8 @@ export function createApi({
   const bugApi = createBugApi({ bugs, allow });
   const featureApi = createFeatureApi({ features, changes, card });
   const evidenceApi = createEvidenceApi({ evidence, allow });
-  const watchApi = createWatchApi({ watches, allowed, checks, prs, features, diffs, card });
+  const proofApi = createProofApi({ proof, allow });
+  const watchApi = createWatchApi({ watches, allowed, checks, prs, features, diffs, card, proof: proof?.capture });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, needs, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
@@ -257,6 +262,10 @@ export function createApi({
         prs.focus();
         features?.focus();
         return null;
+      case "proof.load":
+      case "proof.set":
+      case "preview.start":
+        return proofApi(method, params);
       case "checks.load":
         return checkSettings.load(project(params));
       case "checks.set": {

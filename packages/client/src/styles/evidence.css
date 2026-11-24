@@ -45,6 +45,20 @@
   color: var(--warn);
 }
 
+/* Why a screenshot wasn't attached (STORY-25), with the dev server's last output folded away. */
+.proof-note summary {
+  cursor: pointer;
+}
+
+.proof-note pre {
+  margin: 4px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
 /* The full-size screenshot: as wide as the window allows, and scrolled inside the dialog when taller. */
 .evidence-viewer .dialog {
   width: min(960px, calc(100vw - 32px));
@@ -56,4 +70,9 @@
   max-height: calc(100vh - 180px);
   margin: 0 auto;
   object-fit: contain;
+}
+
+/* A dev server that didn't start for Preview (STORY-25): its last output keeps its lines. */
+.proof-error {
+  white-space: pre-wrap;
 }

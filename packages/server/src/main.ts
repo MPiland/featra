@@ -1,10 +1,12 @@
 /**
  * The server process (ADR 0015). The desktop host forks it on Electron's own Node (`ELECTRON_RUN_AS_NODE=1`) with an
  * IPC channel, sends `start` with the token, and keeps the open-project list current. The server tells it how many
- * agents wait on the user, for the taskbar and Dock badge (STORY-67). When the host goes, so does the server.
+ * agents wait on the user, for the taskbar and Dock badge (STORY-67), and asks it to capture dev-server pages (STORY-25).
+ * When the host goes, so does the server.
  */
 import { errorMessage } from "@featra/work-format";
 import { createAllowedProjects } from "./allowed-projects.ts";
+import { createHostCapture } from "./host-capture.ts";
 import { parseHostMessage, type ServerMessage } from "./host-messages.ts";
 import { watchWaitingTotal } from "./project-needs.ts";
 import { nodeRoleFs } from "./role-fs.ts";
@@ -15,6 +17,8 @@ const send = (message: ServerMessage) => process.send?.(message);
 const log = (message: string) => send({ type: "log", message });
 
 const allowed = createAllowedProjects();
+// The host's Chromium captures the pages a story moving to review lists (STORY-25, ADR 0044).
+const capture = createHostCapture(process.send ? send : null);
 // The host names the app's data folder, where chats are saved (STORY-44).
 const services = createServices({
   allowed,
@@ -23,6 +27,7 @@ const services = createServices({
   roleFs: nodeRoleFs(),
   // The host names the Featra MCP's script, and runs it with the same runtime as this process (STORY-47).
   mcpEntry: process.env.FEATRA_MCP_ENTRY || undefined,
+  capturePage: capture.capture,
 });
 const { api, agents } = services;
 let server: RunningServer | undefined;
@@ -54,11 +59,15 @@ process.on("message", (raw) => {
     case "settings":
       services.settingsChanged();
       return;
+    case "captured":
+      capture.settle(message);
+      return;
     default:
       message satisfies never;
   }
 });
 
 process.on("disconnect", () => {
+  capture.close();
   void (server?.close() ?? Promise.resolve()).then(() => services.close()).finally(() => process.exit(0));
 });

@@ -87,6 +87,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     (_dir, id) => host.cardChecks?.[id],
     (_dir, id) => host.cardPrs?.[id],
     (_dir, id) => host.cardMerges?.[id],
+    (_dir, id) => host.cardProof?.[id],
   );
   const chats: ReturnType<typeof fakeChatServer> = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
@@ -175,7 +176,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     // Records which element had focus when the command reached the host: that is the field it acts on.
     chats: chats.bridge,
     roles: roles.bridge,
-    checks: fakeChecksServer(host.checks ?? {}, calls),
+    checks: fakeChecksServer(host.checks ?? {}, calls, host.proofs),
     inbox: chats.inbox.bridge,
     needs: needs.bridge,
     notifications: {

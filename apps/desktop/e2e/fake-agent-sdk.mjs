@@ -15,7 +15,8 @@
  * - "report" (STORY-10): only with FEATRA_E2E_REPORT set, for a story session's first message ("You are working on
  *   STORY-N"). Writes a small evidence file into the story's folder in its worktree, then calls the Featra MCP's
  *   update_card tool: ticks the drafted task and criterion with that evidence, adds a task, moves the story to In
- *   Review and notes it. The tool call is real; only the agent is faked. "evidence": fake-agent-evidence.mjs.
+ *   Review and notes it. The tool call is real; only the agent is faked. "evidence": fake-agent-evidence.mjs; "proof":
+ *   fake-agent-proof.mjs.
  * - "subagent" (STORY-55): the agent spawns a background subagent (an Agent call, `task_started`, and the subagent's own
  *   messages, tagged as the SDK tags them). The subagent says something, then asks to run a Bash `npm test` through
  *   canUseTool as itself (`agentID`), and when that is answered says more and waits for `stopTask`, which ends it with
@@ -45,6 +46,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { callMcpTool } from "./fake-mcp-client.mjs";
 import { draftCriteria, evidenceTurn } from "./fake-agent-evidence.mjs";
+import { proofTurn } from "./fake-agent-proof.mjs";
 import {
   markChangesHandledTurn,
   questionTurn,
@@ -254,6 +256,8 @@ export function query({ prompt, options }) {
       const said = brief ? "" : text;
       if (brief && process.env.FEATRA_E2E_REPORT === "evidence") {
         yield* evidenceTurn(helpers, options, text);
+      } else if (brief && process.env.FEATRA_E2E_REPORT === "proof") {
+        yield* proofTurn(helpers, options, text);
       } else if (brief && process.env.FEATRA_E2E_REPORT) {
         yield* reportTurn(options, text);
       } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {

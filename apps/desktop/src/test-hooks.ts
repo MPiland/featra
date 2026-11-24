@@ -17,6 +17,8 @@ export interface TestHooks {
   copied: string[];
   /** Evidence copies Featra gave the OS (STORY-72): opened, or shown in their folder. */
   openedFiles: EvidenceOpening[];
+  /** The Preview windows Featra opened (STORY-25): the dev server's URL and the window's title. */
+  previews: { url: string; title: string }[];
   /** Folders the next folder dialogs return, in order; an empty queue is a cancelled dialog. */
   folderPicks: string[];
   /** Titles of the folder dialogs Featra opened. */
@@ -67,6 +69,7 @@ export const testHooks: TestHooks = {
   openedExternal: [],
   copied: [],
   openedFiles: [],
+  previews: [],
   folderPicks: [],
   folderDialogs: [],
   notifications: [],
