@@ -3,7 +3,7 @@
  * asked when its first feature was shaped, and changes it; it sets the dev server Featra starts and where the tests
  * write screenshots, and confirms a dev-server command changed through git.
  */
-import { cleanup, waitFor, within } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { ProofView } from "@featra/work-format";
 import { PROOF_PAGE_COPY as COPY } from "../../../src/proof-bridge.ts";
@@ -38,6 +38,14 @@ describe("AC1: the project's proof is a setting", () => {
     await user.click(mode(section, "Screenshots"));
     await waitFor(() => expect(calls).toContain(`proof.set:${PROJECT.dir}:{"proof":"screenshots"}`));
     expect(mode(section, "Screenshots").checked).toBe(true);
+  });
+
+  it("shows the chosen proof at once, before the save answers", async () => {
+    const { section, calls } = await open(SET);
+    fireEvent.click(mode(section, "Preview"));
+    expect(mode(section, "Preview").checked).toBe(true);
+    await waitFor(() => expect(calls).toContain(`proof.set:${PROJECT.dir}:{"proof":"preview"}`));
+    expect(mode(section, "Preview").checked).toBe(true);
   });
 
   it("says it isn't chosen until the question is answered", async () => {

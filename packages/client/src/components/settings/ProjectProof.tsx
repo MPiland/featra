@@ -104,7 +104,11 @@ export function ProjectProof({ checks, dir }: { checks: ChecksBridge; dir: strin
               options={COPY.modes}
               labelledBy={aria.labelledBy}
               describedBy={aria.describedBy}
-              onChange={(proof) => void change({ proof: proof || null })}
+              onChange={(proof) => {
+                // The choice shows at once; the saved view replaces it (or puts it back, with why).
+                setLoaded({ dir, view: { ...view, proof: proof || null } });
+                void change({ proof: proof || null });
+              }}
             />
           )}
         </SettingRow>
