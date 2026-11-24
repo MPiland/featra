@@ -217,3 +217,28 @@ describe("AC3: the feature's card pane", () => {
     await waitFor(() => expect(calls).toContain(`rerunFeatureChecks:${PROJECT.dir}:${ID}`));
   });
 });
+
+describe("the review screen's PR and checks (from the screenshot review)", () => {
+  const PR = "https://github.com/acme/app/pull/1";
+  const withPr = () => ready().map((c) => (c.id === ID ? Object.assign(c, { pr: PR }) : c));
+  const read: CardPr = { status: { state: "open", checks: "passing" }, create: false, opening: false, note: null };
+
+  it("doesn't say no checks ran beside the PR's own checks: the PR carries them", async () => {
+    const { shown } = await openReview(withPr(), { cardMerges: { [ID]: CLEAR }, cardPrs: { [ID]: read } });
+    const pr = await within(shown).findByRole("region", { name: "PR" });
+    expect(pr.textContent).toContain("Checks passing");
+    expect(within(shown).queryByRole("region", { name: "Checks" })).toBeNull();
+    expect(shown.textContent).not.toContain("No checks run yet");
+  });
+
+  it("says the PR merged once Approve merged the feature, as it says Open before", async () => {
+    const app = await openReview(withPr(), { cardMerges: { [ID]: CLEAR }, cardPrs: { [ID]: read } });
+    const pr = await within(app.shown).findByRole("region", { name: "PR" });
+    expect(within(pr).getByText("Open")).toBeTruthy();
+    await app.user.click(await waitFor(() => approve(app.shown) as HTMLButtonElement));
+    await within(app.shown).findByText(FEATURE_END_COPY.merged("main"));
+    const after = within(app.shown).getByRole("region", { name: "PR" });
+    expect(within(after).getByText("Merged")).toBeTruthy();
+    expect(within(after).queryByText("Open")).toBeNull();
+  });
+});

@@ -3282,6 +3282,12 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   a merged PR before whether main has the branch, so a user's pull of GitHub's merge doesn't skip the settle.
   After such a pull main owns the feature's card (its branch is in main's history and not checked out), so the read and
   the settle also look at a feature whose card on main isn't Done yet (server `lookAtLanded`).
+- **One source of truth for a feature's checks on the review screen (from the screenshot review).** A feature with a
+  PR shows its checks on the PR line only; the empty "No checks run yet" Checks section is hidden then, rather than
+  mirroring the PR's checks into a second place. Checks run here still show their own section. Without a PR the
+  empty section stays.
+- **A merged feature's PR reads Merged.** The server stops reading a merged feature's PR, so the review screen shows
+  the PR as Merged from the card's own merge record (the approval's `merged` step), as it shows Open before.
 - **Merge to main waits for the stories as Approve does.** The retry is off, and refused, while a story or bug under
   the feature isn't Done or Cancelled, with that reason first.
 - **The server's separate Accept is gone.** `features.accept`, its PR-opening path and the card pane's unused
