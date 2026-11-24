@@ -1,6 +1,7 @@
 import { expect, test, type ElectronApplication } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, previews, tempUserData } from "./app.ts";
+import { watchQuit } from "./diag-procs.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
 import { freePort, setProof } from "./proof-setup.ts";
@@ -57,6 +58,7 @@ test("Preview: the story's dev server starts in its worktree and opens in a Feat
     await expect(window.getByRole("heading", { name: "Draft a feature" })).toBeVisible();
     await uxShot(window, "feat9-proof-preview");
 
+    await watchQuit(app);
     // Quitting stops the dev server Featra started.
     await app.close();
     await expect
