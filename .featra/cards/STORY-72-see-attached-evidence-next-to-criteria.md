@@ -2,7 +2,7 @@
 id: STORY-72
 type: story
 title: See attached evidence next to criteria
-status: In Review
+status: Done
 parent: FEAT-9
 order: 5
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-24T16:23:43Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-24T16:23:43Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
