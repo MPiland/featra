@@ -56,7 +56,17 @@ test("Preview: the story's dev server starts in its worktree and opens in a Feat
     const window = shown()!;
     await expect(window.getByRole("heading", { name: "Draft a feature" })).toBeVisible();
     await uxShot(window, "feat9-proof-preview");
+
+    // Quitting stops the dev server Featra started.
     await app.close();
+    await expect
+      .poll(() =>
+        fetch(url).then(
+          () => "answers",
+          () => "stopped",
+        ),
+      )
+      .toBe("stopped");
   } finally {
     await running?.close().catch(() => {});
     await userData.dispose();

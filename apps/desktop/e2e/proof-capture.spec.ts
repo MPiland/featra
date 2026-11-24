@@ -70,7 +70,23 @@ test("Screenshots: a story moved to review gets its page captured from the dev s
     await expect(viewer.getByRole("img", { name: "ac1-page.png" })).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(viewer).toHaveCount(0);
+
+    // The capture is done before update_card answers: the agent's turn ends with that answer, and the Dev Lead hears it.
+    await page.getByRole("region", { name: "Chats" }).locator(".chat-row").first().click();
+    const log = page.getByRole("log", { name: "Chat" });
+    await expect(log).toContainText(`${id} ended: Tool said:`, { timeout: 30_000 });
+    await expect(log).toContainText("You said: [Featra notice");
+
+    // Quitting stops the dev server Featra started.
     await app.close();
+    await expect
+      .poll(() =>
+        fetch(url).then(
+          () => "answers",
+          () => "stopped",
+        ),
+      )
+      .toBe("stopped");
   } finally {
     await running?.close().catch(() => {});
     await userData.dispose();
