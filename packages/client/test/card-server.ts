@@ -101,14 +101,7 @@ export function fakeCardServer(
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
     return card
-      ? buildCardView(
-          owned(card),
-          true,
-          { config: DEFAULT_CONFIG, cards },
-          checksOf(dir, id),
-          prOf(dir, id),
-          mergeOf(dir, id),
-        )
+      ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id), prOf(dir, id))
       : null;
   };
   const listOf = (dir: string): WorkList | null => {

@@ -34,14 +34,17 @@ export function seenOf(scan: Scan | null): { minutes: number; base: string | nul
 export const unfinished = (look: FeatureLook): string | null =>
   acceptedFeature(look.card) ? null : acceptRefusal(look.scan, look.card.id);
 
-/** Facts of a feature whose PR merged on GitHub without the commit its branch is at here: it waits, saying so. */
-export const mergedBehind = (look: FeatureLook): FeatureMergeFacts => ({
+/**
+ * Facts of a feature whose PR merged on GitHub: at the commit its branch is at here (`atTip`), it landed, and the click
+ * finishes it; else it waits, saying it merged without this computer's latest commits.
+ */
+export const mergedFacts = (look: FeatureLook, atTip: boolean): FeatureMergeFacts => ({
   base: look.base,
   branch: look.branch,
   behind: false,
   conflicts: false,
-  pr: "merged",
+  pr: atTip ? "landed" : "merged",
   remoteAhead: false,
   baseBusy: false,
-  checks: "pending",
+  checks: atTip ? "passed" : "pending",
 });

@@ -14,8 +14,6 @@ import type { CardPr } from "./prs-types.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { notStartableReason } from "./card-start.ts";
 import { evidenceState } from "./evidence.ts";
-import type { FeatureMergeState } from "./feature-end-copy.ts";
-import { featureEndOf } from "./feature-end.ts";
 import { locationLabel, sameLocation } from "./ownership.ts";
 import { provenRuns } from "./proof-run.ts";
 import type { OwnedCard } from "./owner-copies.ts";
@@ -58,7 +56,7 @@ const storiesOf = (card: Card, cards: readonly Card[]) =>
 /**
  * The pane's view of `owned`; `checkedOut` says whether the owner's location has a working tree. `checks` is what the
  * server knows of the story's checks on this computer (STORY-56), which the card itself doesn't keep; `prState` what it
- * knows of the story's PR (STORY-11), or the feature's; `merge` whether an accepted feature can merge to main (STORY-14).
+ * knows of the story's PR (STORY-11), or the feature's.
  */
 export function buildCardView(
   owned: OwnedCard,
@@ -66,7 +64,6 @@ export function buildCardView(
   ctx: CardEditContext,
   checks?: CardChecks,
   prState?: CardPr,
-  merge?: FeatureMergeState,
 ): CardView {
   const { card } = owned;
   const ev = evidenceState(card);
@@ -74,7 +71,6 @@ export function buildCardView(
   const runs = provenRuns(card);
   const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   const readOnly = readOnlyReason(owned, checkedOut, ctx.config.baseBranch);
-  const featureEnd = featureEndOf(card, ctx.cards, ctx.config, merge);
   const held = holdOf(owned, ctx.config, readOnly === null);
   const notMerged = card.type === "story" ? notMergedOf(card) : null;
   const mergedInto = card.history.findLast((e) => e.field === "merged")?.to ?? null;
@@ -108,7 +104,6 @@ export function buildCardView(
     ...(mergedInto && card.type === "story" ? { mergedInto } : {}),
     ...(held === undefined ? {} : { held }),
     ...(notMerged ? { notMerged: notMerged.reason } : {}),
-    ...(featureEnd ? { featureEnd } : {}),
     ...(draftChat === null
       ? {}
       : { draftChat, draftStories: ctx.cards.filter((c) => c.type === "story" && c.parent === card.id).length }),

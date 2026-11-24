@@ -1,24 +1,31 @@
 /**
- * Ending a feature (STORY-14, ADR 0037): pure rules over its card. Accept applies to a feature in progress once every
- * story and bug under it is Done or Cancelled, and it is the user's alone. Accepted is a fact in the card's history, as
- * for a story; it gates Merge to main, which also waits for the feature's checks on the commit its branch is at, and
- * for main to be in that commit's history without conflicts. Only the merge makes the feature Done, by `system`, with
- * the merge in its history.
+ * Ending a feature (STORY-14, STORY-70, ADR 0037): pure rules over its card. Approve applies to a feature in progress
+ * once every story and bug under it is Done or Cancelled, and it is the user's alone: it records Accept, a fact in the
+ * card's history as for a story, and merges. Merge to main, the retry once accepted, waits for the same: the stories,
+ * the feature's checks on the commit its branch is at, and main in that commit's history without conflicts. Only the
+ * merge makes the feature Done, by `system`, with the merge in its history.
  */
 import { stageCategory } from "./config.ts";
 import { evidenceState } from "./evidence.ts";
-import {
-  FEATURE_END_MESSAGES,
-  type CardFeatureEnd,
-  type FeatureApproval,
-  type FeatureMergeState,
-} from "./feature-end-copy.ts";
+import { FEATURE_END_MESSAGES, type FeatureApproval, type FeatureMergeState } from "./feature-end-copy.ts";
 import { appendHistory, recordAcceptance, setPr, setStatus } from "./history.ts";
 import { CANCELLED, type Card, type ProjectConfig } from "./types.ts";
 
 /** The stories and bugs under feature `id`. */
 const itemsOf = (id: string, cards: readonly Card[]) =>
   cards.filter((c) => (c.type === "story" || c.type === "bug") && c.parent === id);
+
+/**
+ * Why feature `id` isn't finished: a story or bug under it isn't Done or Cancelled, or none is Done. Null once it is.
+ * Approve and Merge to main both wait for it, first (ADR 0037).
+ */
+export function featureItemsRefusal(id: string, cards: readonly Card[], config: ProjectConfig): string | null {
+  const items = itemsOf(id, cards);
+  const done = items.filter((c) => stageCategory(c.status, config) === "done");
+  const open = items.filter((c) => c.status !== CANCELLED && stageCategory(c.status, config) !== "done");
+  if (open.length > 0) return FEATURE_END_MESSAGES.unfinished(id, open.length);
+  return done.length === 0 ? FEATURE_END_MESSAGES.empty(id) : null;
+}
 
 /** Why feature `id` can't be accepted, or null when it can. */
 export function featureAcceptRefusal(
@@ -31,11 +38,7 @@ export function featureAcceptRefusal(
   if (card.type !== "feature") return FEATURE_END_MESSAGES.notFeature(id);
   if (card.status !== "active") return FEATURE_END_MESSAGES.notActive(id);
   if (evidenceState(card).accepted) return FEATURE_END_MESSAGES.accepted(id);
-  const items = itemsOf(card.id, cards);
-  const done = items.filter((c) => stageCategory(c.status, config) === "done");
-  const open = items.filter((c) => c.status !== CANCELLED && stageCategory(c.status, config) !== "done");
-  if (open.length > 0) return FEATURE_END_MESSAGES.unfinished(id, open.length);
-  return done.length === 0 ? FEATURE_END_MESSAGES.empty(id) : null;
+  return featureItemsRefusal(card.id, cards, config);
 }
 
 /** Whether `card` is a feature in progress that the user has accepted: what Merge to main and its checks wait for. */
@@ -58,7 +61,7 @@ export function doneFeature(card: Card, from: string, into: string, pr: string |
 /** Where a feature's checks stand for the commit its branch is at. */
 export type FeatureChecks = "passed" | "failed" | "running" | "pending" | "no-command";
 
-/** What the server found of an accepted feature, which Merge to main waits on. */
+/** What the server found of a finished feature, which Approve and Merge to main wait on. */
 export interface FeatureMergeFacts {
   base: string;
   branch: string;
@@ -67,10 +70,10 @@ export interface FeatureMergeFacts {
   /** Merging the feature into the base conflicts. */
   conflicts: boolean;
   /**
-   * Its PR on GitHub: none yet, open, closed, or merged there without the commit the local branch is at (one merged at
-   * that commit settles instead); null in local mode.
+   * Its PR on GitHub: none yet, open, closed, merged there without the commit the local branch is at, or `landed`:
+   * merged at that commit, and not settled yet (Featra settles it once the user approved it). Null in local mode.
    */
-  pr: "none" | "open" | "closed" | "merged" | null;
+  pr: "none" | "open" | "closed" | "merged" | "landed" | null;
   /** The feature branch on GitHub has commits the local one doesn't. */
   remoteAhead: boolean;
   /** The base's checkout has local changes the merge would overwrite, so it can't take the merge. */
@@ -81,6 +84,8 @@ export interface FeatureMergeFacts {
 /** Why Merge to main waits, or null when it can go. */
 export function featureMergeBlock(f: FeatureMergeFacts): string | null {
   const m = FEATURE_END_MESSAGES;
+  // Merged on GitHub at the branch's commit: nothing else counts, the click only settles it.
+  if (f.pr === "landed") return null;
   if (f.pr === "merged") return m.prMergedBehind;
   if (f.conflicts) return m.conflicts(f.base);
   if (f.behind) return m.behind(f.base);
@@ -95,34 +100,18 @@ export function featureMergeBlock(f: FeatureMergeFacts): string | null {
 
 export const mergeStateOf = (facts: FeatureMergeFacts): FeatureMergeState => {
   const blocked = featureMergeBlock(facts);
-  return { mergeable: blocked === null, blocked };
+  return { mergeable: blocked === null, blocked, ...(facts.pr === "landed" ? { landed: true as const } : {}) };
 };
-
-/** The card pane's view of a feature's end; undefined for anything but a feature in progress. */
-export function featureEndOf(
-  card: Card,
-  cards: readonly Card[],
-  config: ProjectConfig,
-  state: FeatureMergeState | undefined,
-): CardFeatureEnd | undefined {
-  if (card.type !== "feature" || card.status !== "active") return undefined;
-  const base = config.baseBranch;
-  const acceptable = featureAcceptRefusal(card, card.id, cards, config) === null;
-  if (!evidenceState(card).accepted) return { acceptable, accepted: false, mergeable: false, blocked: null, base };
-  // Before the server's first read of it, Merge to main waits with a reason, never silently.
-  if (!state)
-    return { acceptable: false, accepted: true, mergeable: false, blocked: FEATURE_END_MESSAGES.checking, base };
-  return { acceptable: false, accepted: true, mergeable: state.mergeable, blocked: state.blocked, base };
-}
 
 /** Whether `card` is a feature in progress that the user accepted or could approve now: the server reads its merge. */
 export const finishedFeature = (card: Card, cards: readonly Card[], config: ProjectConfig): boolean =>
   acceptedFeature(card) || featureAcceptRefusal(card, card.id, cards, config) === null;
 
 /**
- * The review screen's Approve (STORY-70): one click that accepts and merges, off with the first reason that stops it
- * (unfinished stories, then the merge's own reasons in ADR 0037's order); once accepted without the merge, Merge to
- * main again; once merged, Merged. Null for a feature not in progress nor merged.
+ * The review screen's Approve (STORY-70): one click that accepts and merges; once accepted without the merge, Merge to
+ * main again; once merged, Merged. Either button is off with the first reason that stops it: unfinished stories, then
+ * the merge's own reasons in ADR 0037's order, or "Checking…" before the server's first read. A PR merged on GitHub at
+ * the branch's commit says so beside the button that finishes it. Null for a feature not in progress nor merged.
  */
 export function featureApprovalOf(
   card: Card,
@@ -131,15 +120,16 @@ export function featureApprovalOf(
   state: FeatureMergeState | undefined,
 ): FeatureApproval | null {
   const base = config.baseBranch;
-  if (card.type === "feature" && card.status === "done" && card.history.some((e) => e.field === "merged")) {
+  if (card.type !== "feature") return null;
+  if (card.status === "done" && card.history.some((e) => e.field === "merged")) {
     return { step: "merged", ready: false, reason: null, base };
   }
-  const end = featureEndOf(card, cards, config, state);
-  if (!end) return null;
-  if (end.accepted) return { step: "merge", ready: end.mergeable, reason: end.blocked, base };
-  const stories = featureAcceptRefusal(card, card.id, cards, config);
-  const reason = stories ?? (state ? state.blocked : FEATURE_END_MESSAGES.checking);
-  return { step: "approve", ready: reason === null, reason, base };
+  if (card.status !== "active") return null;
+  const step = evidenceState(card).accepted ? "merge" : "approve";
+  const reason = featureItemsRefusal(card.id, cards, config) ?? (state ? state.blocked : FEATURE_END_MESSAGES.checking);
+  const m = FEATURE_END_MESSAGES;
+  const note = reason === null && state?.landed ? (step === "approve" ? m.landed : m.settleLater(base)) : null;
+  return { step, ready: reason === null, reason, base, ...(note ? { note } : {}) };
 }
 
 /** How many conflicting files the Dev Lead's notice names before it says how many more there are. */

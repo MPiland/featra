@@ -124,6 +124,54 @@ describe("Merge to main, the retry after a failed merge (AC4)", () => {
     });
     expect(approvalOf(accepted())?.reason).toBe(m.checking);
   });
+
+  it("waits for every story or bug to be Done or Cancelled again, first, as Approve does (review item 5)", () => {
+    const cards = [...accepted(), doing("STORY-2")];
+    expect(approvalOf(cards, {})).toEqual({ step: "merge", ready: false, reason: m.unfinished(ID, 1), base: "main" });
+    expect(approvalOf(cards, { conflicts: true, behind: true, checks: "failed" })?.reason).toBe(m.unfinished(ID, 1));
+    expect(approvalOf(cards)?.reason).toBe(m.unfinished(ID, 1));
+    const none = [withFeatureAccepted(feature(ID), "user", at(5)), moves(story("STORY-1", ID), [1, "Cancelled"])];
+    expect(approvalOf(none, {})?.reason).toBe(m.empty(ID));
+  });
+});
+
+describe("a PR merged on GitHub at the branch's commit before Approve (review item 1)", () => {
+  it("leaves Approve on, saying the click finishes it, whatever else the facts say", () => {
+    const landed = { pr: "landed", behind: true, conflicts: true, checks: "pending" } as const;
+    expect(mergeStateOf(facts(landed))).toEqual({ mergeable: true, blocked: null, landed: true });
+    expect(approvalOf(ready(), landed)).toEqual({
+      step: "approve",
+      ready: true,
+      reason: null,
+      base: "main",
+      note: m.landed,
+    });
+  });
+
+  it("says Featra finishes it once accepted, with Merge to main on as the retry", () => {
+    expect(approvalOf(accepted(), { pr: "landed" })).toEqual({
+      step: "merge",
+      ready: true,
+      reason: null,
+      base: "main",
+      note: m.settleLater("main"),
+    });
+  });
+
+  it("names unfinished stories first, with no note", () => {
+    expect(approvalOf([...ready(), doing("STORY-2")], { pr: "landed" })).toEqual({
+      step: "approve",
+      ready: false,
+      reason: m.unfinished(ID, 1),
+      base: "main",
+    });
+  });
+
+  it("keeps the note across the socket, never beside a reason", () => {
+    const raw = JSON.parse(JSON.stringify(approvalOf(ready(), { pr: "landed" })));
+    expect(normalizeFeatureApproval(raw)?.note).toBe(m.landed);
+    expect(normalizeFeatureApproval({ step: "approve", reason: m.pending, note: m.landed })).not.toHaveProperty("note");
+  });
 });
 
 describe("Merged (AC5)", () => {

@@ -1,13 +1,11 @@
 /**
- * Ending a feature (STORY-14, STORY-70, ADR 0037): Approve (Accept and Merge to main in one click), Accept, its PR to
- * the base, the facts the merge waits on, and the merge. A feature is finished once every story and bug under it is
- * Done or Cancelled; with "Open feature PRs automatically" on and GitHub usable, its PR then opens (or is adopted), so
- * its CI runs before the user approves. Each project's finished features are read again on the PR interval, on focus,
- * and when their branch or the base moves: whether the base is in the feature's history, whether they conflict, its
- * PR, and its checks at the commit its branch is at (CI on the PR, or the check command here). When the base has moved
- * on, the Dev Lead who leads the feature is told once per base commit to merge it in, never rebase. A PR merged on
- * GitHub outside Featra settles as Featra's own when the user accepted it and it merged at the commit the branch is at
- * here, and its Dev Lead is told what stays to do; else it waits, saying why.
+ * Ending a feature (STORY-14, STORY-70, ADR 0037): Approve (Accept and Merge to main in one click), its PR to the base,
+ * the facts the merge waits on, and the merge. A feature is finished once every story and bug under it is Done or
+ * Cancelled; with "Open feature PRs automatically" on and GitHub usable, its PR then opens (or is adopted), so its CI
+ * runs before the user approves. Each project's finished features are read again on the PR interval, on focus, and when
+ * their branch or the base moves (feature-refresh.ts). A PR merged on GitHub at the commit the branch is at here settles
+ * as Featra's own once the user accepted or approved it (feature-approvals.ts), and its Dev Lead is told what stays to
+ * do; else it waits, saying why.
  */
 import {
   FEATURE_END_MESSAGES,
@@ -24,12 +22,14 @@ import type { CardLane } from "./card-lane.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import { createFeatureAccept } from "./feature-accept.ts";
+import { createFeatureApprovals } from "./feature-approvals.ts";
 import { createFeatureChecks } from "./feature-checks.ts";
 import { createFeatureFacts } from "./feature-facts.ts";
 import { lookAt, type FeatureLook } from "./feature-look.ts";
 import { createFeatureMerge } from "./feature-merge.ts";
 import { createFeaturePrs } from "./feature-pr.ts";
-import { mergedBehind, seenOf, unfinished } from "./feature-seen.ts";
+import { createFeatureRefresh, keyOf, waitingIn } from "./feature-refresh.ts";
+import { seenOf, unfinished } from "./feature-seen.ts";
 import type { GithubPrDeps } from "./github-prs.ts";
 import type { Timers } from "./inbox.ts";
 import { createMergeGit } from "./merge-git.ts";
@@ -56,16 +56,14 @@ export interface FeatureEndDeps extends GithubPrDeps {
 
 export const FEATURE_PR_REFUSALS = { hasPr: "This feature already has a PR." } as const;
 
-const keyOf = (dir: string, id: string) => `${dir}\0${id}`;
-
 export function createFeatureEnd(deps: FeatureEndDeps) {
   const { scan: scanDir, observe, allowed, settings, now, timers, log } = deps;
   const git = createMergeGit(deps.gitCommand, deps.gitRun);
   const facts = new Map<string, FeatureMergeFacts>();
   const seen = new Map<string, ReturnType<typeof seenOf>>();
   const usable = new Map<string, boolean>();
-  /** The features approved here whose PR merged on GitHub: they settle with the user's Accept if settling failed. */
-  const approved = new Set<string>();
+  /** The user's Approves not on their feature's branch yet: a PR merged on GitHub settles with them, after a restart too. */
+  const approvals = createFeatureApprovals(log);
   let closed = false;
 
   const push = (dir: string) => (closed ? Promise.resolve(null) : scanDir(dir).catch(() => null));
@@ -92,69 +90,22 @@ export function createFeatureEnd(deps: FeatureEndDeps) {
   const accepts = createFeatureAccept({
     ...deps,
     git,
-    prs,
     merges,
-    approving: (dir, id) => approved.add(keyOf(dir, id)),
+    approving: (dir, scan, id) => approvals.add(dir, scan, id),
   });
 
-  /** Settles feature `id`, whose PR merged on GitHub outside Featra; its Dev Lead is told what stays to do. */
-  async function settleOutside(dir: string, look: FeatureLook, url: string, approve: boolean) {
-    const remains = await merges.merged(dir, look.card.id, url, approve);
-    if (remains.length === 0) return;
-    for (const note of remains) log(`${look.card.id} merged on GitHub: ${note}`);
-    read.tell(dir, look, { outcome: "merged", summary: remains.join(" ") });
-  }
-
-  /** Opens the PR of a finished feature that has none, when that is on: its CI runs before Approve (STORY-70). */
-  async function openPr(dir: string, look: FeatureLook): Promise<FeatureLook> {
-    if (look.card.pr || !look.config.openFeaturePrs || prs.noteOf(dir, look.card.id) !== null) return look;
-    const url = await prs.open(dir, look);
-    // Closed meanwhile: nothing more is read or written (a scan now would open the project's index again).
-    if (url === null || closed) return look;
-    await prs.record(dir, look.card.id, url);
-    if (closed) return look;
-    return (await lookAt(git, await scanDir(dir), look.card.id)) ?? look;
-  }
-
-  /** Reads `dir`'s finished features again; a PR merged outside Featra settles once the user accepted it. */
-  async function refresh(dir: string) {
-    const use = (await settings.githubUse(dir)).usable;
-    usable.set(dir, use);
-    const scan = await scanDir(dir);
-    if (!scan || closed) return;
-    let changed = false;
-    for (const { id, accepted } of seenOf(scan).features) {
-      const found = await lookAt(git, scan, id);
-      if (!found || merges.isMerging(dir, id) || closed) continue;
-      const key = keyOf(dir, id);
-      // Merged already, with its branch still checked out: its cards stay there until it isn't (merge's note).
-      if (await git.isAncestor(found.top, found.tip, `refs/heads/${found.base}`)) {
-        changed ||= facts.delete(key);
-        continue;
-      }
-      const look = use ? await openPr(dir, found) : found;
-      if (closed) return;
-      if (use && look.card.pr) {
-        const pr = await prs.readNow(dir, id, look.card.pr);
-        if (pr?.status.state === "merged") {
-          const approve = !accepted && approved.has(key);
-          // Merged on GitHub before the user accepted it: Featra doesn't settle what the user hasn't approved.
-          if (!accepted && !approve) facts.delete(key);
-          // Merged at another commit: settling would leave the branch's later commits out of the base, every time.
-          else if (pr.head === look.tip) await settleOutside(dir, look, pr.url, approve);
-          else facts.set(key, mergedBehind(look));
-          changed = true;
-          continue;
-        }
-      }
-      if (use) await read.pushBehind(dir, look);
-      const next = (await read.factsOf(dir, look, use)).facts;
-      changed ||= JSON.stringify(facts.get(key)) !== JSON.stringify(next);
-      facts.set(key, next);
-    }
-    if (changed) await push(dir);
-  }
-
+  const refresh = createFeatureRefresh({
+    ...deps,
+    git,
+    merges,
+    prs,
+    read,
+    approvals,
+    facts,
+    usable,
+    closed: () => closed,
+    push,
+  });
   const poller = createPrPoller({
     timers,
     refresh,
@@ -183,6 +134,7 @@ export function createFeatureEnd(deps: FeatureEndDeps) {
       usable.delete(dir);
       prs.forget(dir);
       read.forget(dir);
+      approvals.forget(dir);
       for (const key of facts.keys()) if (key.startsWith(keyOf(dir, ""))) facts.delete(key);
     };
   }
@@ -197,14 +149,6 @@ export function createFeatureEnd(deps: FeatureEndDeps) {
   }
 
   return {
-    /** The user's Accept: the feature's PR opens first when that is on, then Accept is recorded with it. */
-    async accept(dir: string, id: string): Promise<null> {
-      await accepts.accept(dir, id);
-      await push(dir);
-      if (!closed) void poller.now(dir);
-      return null;
-    },
-
     /**
      * The review screen's Approve (STORY-70): Accept and Merge to main in one click, once nothing stops either; what
      * stays to do. When the merge fails, the Accept stands and why is thrown: Merge to main is then the retry.
@@ -214,7 +158,9 @@ export function createFeatureEnd(deps: FeatureEndDeps) {
         return await accepts.approve(dir, id);
       } finally {
         facts.delete(keyOf(dir, id));
-        await push(dir);
+        const scan = await push(dir);
+        // Settled, or its Accept recorded on the branch: the approval isn't needed any more.
+        if (scan) await approvals.prune(dir, scan, waitingIn(scan));
         if (!closed) void poller.now(dir);
       }
     },
@@ -231,8 +177,10 @@ export function createFeatureEnd(deps: FeatureEndDeps) {
       const url = await prs.open(dir, look);
       await push(dir);
       if (url === null) throw new ApiError(prs.noteOf(dir, id) ?? FEATURE_END_MESSAGES.noPr);
-      await prs.record(dir, id, url);
+      const recorded = await prs.record(dir, id, url);
       await push(dir);
+      // The PR opened, but the feature's branch couldn't be read to record it: a later read adopts it.
+      if (!recorded) throw new ApiError(FEATURE_END_MESSAGES.noBranch(id));
       if (!closed) void poller.now(dir);
       return null;
     },

@@ -4,24 +4,12 @@
  */
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
-/** A feature's end as its card shows it: Accept, Merge to main, and why Merge to main waits. */
-export interface CardFeatureEnd {
-  /** Every story and bug under it is Done or Cancelled, and it isn't accepted yet: Accept applies. */
-  acceptable: boolean;
-  /** The user accepted it: Merge to main shows, on or off. */
-  accepted: boolean;
-  /** Accepted, and nothing stops Merge to main now. */
-  mergeable: boolean;
-  /** Why Merge to main waits, once accepted; null when it doesn't. */
-  blocked: string | null;
-  /** The branch it merges into: the project's base branch. */
-  base: string;
-}
-
-/** What the server knows of an accepted feature beyond its card: whether it can merge, and why not. */
+/** What the server knows of a finished feature beyond its card: whether it can merge, and why not. */
 export interface FeatureMergeState {
   mergeable: boolean;
   blocked: string | null;
+  /** Its PR merged on GitHub at the commit its branch is at, and the feature isn't Done yet: the click finishes it. */
+  landed?: true;
 }
 
 /**
@@ -40,6 +28,8 @@ export interface FeatureApproval {
   reason: string | null;
   /** The branch it merges into: the project's base branch. */
   base: string;
+  /** What the screen says beside the button while it is on: its PR merged on GitHub, and the click finishes it. */
+  note?: string;
 }
 
 export function normalizeFeatureApproval(raw: unknown): FeatureApproval | null {
@@ -50,17 +40,7 @@ export function normalizeFeatureApproval(raw: unknown): FeatureApproval | null {
     ready: raw.ready === true && reason === null,
     reason,
     base: typeof raw.base === "string" && raw.base ? raw.base : "main",
-  };
-}
-
-export function normalizeFeatureEnd(raw: unknown): CardFeatureEnd | undefined {
-  if (!isRecord(raw)) return undefined;
-  return {
-    acceptable: raw.acceptable === true,
-    accepted: raw.accepted === true,
-    mergeable: raw.mergeable === true,
-    blocked: typeof raw.blocked === "string" && raw.blocked ? raw.blocked : null,
-    base: typeof raw.base === "string" && raw.base ? raw.base : "main",
+    ...(reason === null && typeof raw.note === "string" && raw.note ? { note: raw.note } : {}),
   };
 }
 
@@ -88,6 +68,8 @@ export const FEATURE_END_MESSAGES = {
   noPr: "Open its PR first.",
   checking: "Checking…",
   prMergedBehind: "Its PR merged without this computer's latest commits.",
+  landed: "Merged on GitHub. Approve to finish.",
+  settleLater: (base: string) => `Merged. Featra will mark it Done on ${base}.`,
   prClosed: "Its PR is closed.",
   remoteAhead: (branch: string) => `${branch} has commits on GitHub that this computer doesn't. Pull it.`,
   running: "Checks are running.",

@@ -47,6 +47,36 @@ export async function lookAt(git: MergeGit, scan: Scan | null, id: string): Prom
   };
 }
 
+/**
+ * Feature `id` in `scan`, or one whose branch the base has in its history already but whose card there isn't Done:
+ * GitHub merged its PR and the user pulled that merge before Featra settled it (STORY-70). Its card is then the base's,
+ * and its branch isn't checked out. Null otherwise.
+ */
+export async function lookAtLanded(git: MergeGit, scan: Scan | null, id: string): Promise<FeatureLook | null> {
+  const look = await lookAt(git, scan, id);
+  if (look || !scan) return look;
+  const found = ownedIn(scan, id);
+  const feature = scan.collected.state.features[id];
+  const card = found?.owned.card;
+  if (!found || !feature?.merged || card?.type !== "feature" || card.status === "done") return null;
+  if (found.owned.owner.kind !== "main") return null;
+  const top = scan.collected.paths.top;
+  const tip = await git.commitOf(top, `refs/heads/${feature.branch}`);
+  if (!tip) return null;
+  const base = scan.collected.git.baseBranch;
+  return {
+    scan,
+    config: scan.collected.config,
+    card,
+    path: found.owned.path,
+    root: null,
+    branch: feature.branch,
+    base,
+    top,
+    tip,
+  };
+}
+
 /** Writes `text` as the feature's card, as `look` read it; throws, with nothing changed, when the branch can't take it. */
 export async function writeFeature(git: MergeGit, look: FeatureLook, text: string, message: string): Promise<void> {
   if (look.root) return writeAtomic(fileIn(look.root, look.path), text);

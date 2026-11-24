@@ -105,6 +105,14 @@ describe("AC2: Approve waits, with the reason beside it", () => {
     expect(describedBy(button)).toBe(FEATURE_END_MESSAGES.behind("main"));
   });
 
+  it("says a PR merged on GitHub waits for Approve, which is on to finish it", async () => {
+    const landed: FeatureMergeState = { ...CLEAR, landed: true };
+    const { shown } = await openReview(ready(), { cardMerges: { [ID]: landed } });
+    const button = await waitFor(() => approve(shown) as HTMLButtonElement);
+    expect(button.disabled).toBe(false);
+    expect(describedBy(button)).toBe(FEATURE_END_MESSAGES.landed);
+  });
+
   it("waits with a reason before the server's first read of the merge", async () => {
     const { shown } = await openReview();
     const button = await waitFor(() => approve(shown) as HTMLButtonElement);
@@ -122,6 +130,24 @@ describe("AC4: a merge that fails after the Accept", () => {
     });
     await user.click(await waitFor(() => approve(shown) as HTMLButtonElement));
     expect((await within(shown).findByRole("alert")).textContent).toBe(error);
+  });
+
+  it("turns a failed Approve into Merge to main once the server records the Accept", async () => {
+    const error = FEATURE_END_MESSAGES.behind("main");
+    const app = await openReview(ready(), {
+      cardMerges: { [ID]: CLEAR },
+      review: { approveFeature: async () => ({ ok: false, error }) },
+    });
+    await app.user.click(await waitFor(() => approve(app.shown) as HTMLButtonElement));
+    expect((await within(app.shown).findByRole("alert")).textContent).toBe(error);
+    // The server records the user's Accept on the feature's branch when the merge fails, and pushes the card.
+    app.pushCard(PROJECT.dir, acceptedCards()[0] as Card);
+    const retry = await waitFor(() => merge(app.shown) as HTMLButtonElement);
+    expect(approve(app.shown)).toBeNull();
+    expect(retry.disabled).toBe(false);
+    await app.user.click(retry);
+    await waitFor(() => expect(app.calls).toContain(`mergeFeature:${PROJECT.dir}:${ID}`));
+    expect(await within(app.shown).findByText(FEATURE_END_COPY.merged("main"))).toBeTruthy();
   });
 
   it("offers Merge to main as the retry once accepted, which merges with no confirmation", async () => {

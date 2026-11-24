@@ -8,9 +8,10 @@ import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { evidenceState, FEATURE_END_MESSAGES } from "@featra/work-format";
+import { evidenceState, FEATURE_END_MESSAGES, featureApprovalOf, serializeCard } from "@featra/work-format";
 import { ownedIn } from "../src/card-actions.ts";
 import { SETTLE_NOTES } from "../src/merge-settle.ts";
+import { card, cardPath } from "./card-repo.ts";
 import { checkRun } from "./fake-gh.ts";
 import { FEATURE_BRANCH, featureWorld, LEAD, PR } from "./feature-end-world.ts";
 
@@ -24,7 +25,30 @@ const passing = () =>
   w.gh.change((s) => {
     for (const pr of s.prs) pr.checks = [checkRun("SUCCESS")];
   });
-const accepts = (card = w.onFeature()) => card.history.filter((e) => e.field === "accepted");
+const accepts = (feature = w.onFeature()) => feature.history.filter((e) => e.field === "accepted");
+const m = FEATURE_END_MESSAGES;
+
+/** Where FEAT-1's approval stands on its review screen, as the server builds it. */
+async function approval() {
+  const scan = await w.watches.scan(dir());
+  const feature = ownedIn(scan, ID)?.owned.card;
+  if (!scan || !feature) return null;
+  return featureApprovalOf(
+    feature,
+    scan.resolution.cards.map((c) => c.card),
+    scan.collected.config,
+    state(),
+  );
+}
+
+/** GitHub can't be fetched from once the merge is under way (the network drops): main can't take the Done card. */
+function dropsGithubAtTheMerge() {
+  const gone = join(w.repo.root, "gone", "github.com", "acme", "app.git").replace(/\\/g, "/");
+  w.beforeLane = async () => void w.repo.git(dir(), "remote", "set-url", "origin", gone);
+}
+
+/** GitHub can be fetched from again. */
+const githubBack = () => void w.repo.git(dir(), "remote", "set-url", "origin", w.remote);
 
 /** A commit on main, which is checked out. */
 async function onMain(file: string, text: string) {
@@ -118,6 +142,21 @@ describe("a merge that fails after the Accept (AC4)", () => {
     expect(accepts(done)).toHaveLength(1);
   });
 
+  it("is refused while a story under it is reopened, as Approve is, and main is untouched (review item 5)", async () => {
+    await w.start({ remote: false });
+    await w.acceptOnBranch();
+    await w.settle();
+    expect(state()).toEqual({ mergeable: true, blocked: null });
+    const reopened = card("STORY-2", "story", ID, "In Progress");
+    await w.commitOn(FEATURE_BRANCH, cardPath("STORY-2"), serializeCard(reopened));
+    await w.settle();
+    expect(await approval()).toEqual({ step: "merge", ready: false, reason: m.unfinished(ID, 1), base: "main" });
+    const main = w.tip("main");
+    await expect(w.features.merge(dir(), ID)).rejects.toThrow(m.unfinished(ID, 1));
+    expect(w.tip("main")).toBe(main);
+    expect(w.onMain().status).toBe("active");
+  });
+
   it("keeps the Accept when the checks failed by the click (a screen that hadn't heard yet)", async () => {
     await w.start({ remote: false });
     await w.commitOn(FEATURE_BRANCH, "verdict.txt", "fail\n");
@@ -182,7 +221,7 @@ describe("Approve through the feature's PR (AC1, AC2, AC5)", () => {
     await passing();
     await w.poll();
     expect(state()).toEqual({ mergeable: true, blocked: null });
-    await expect(w.features.merge(dir(), ID)).resolves.toBeTruthy();
+    await expect(w.features.merge(dir(), ID)).resolves.toEqual({ remains: [SETTLE_NOTES.ahead("main", 1)] });
     expect(w.onMain().status).toBe("done");
     expect(accepts(w.onMain())).toHaveLength(1);
   });
@@ -191,14 +230,13 @@ describe("Approve through the feature's PR (AC1, AC2, AC5)", () => {
     await w.start(ci);
     await passing();
     await w.poll();
-    // GitHub can't be fetched from once the merge is under way (the network drops): main can't take the Done card.
-    const gone = join(w.repo.root, "gone", "github.com", "acme", "app.git").replace(/\\/g, "/");
-    w.beforeLane = async () => void w.repo.git(dir(), "remote", "set-url", "origin", gone);
-    await expect(approve()).resolves.toEqual({ remains: [SETTLE_NOTES.feature("main")] });
+    dropsGithubAtTheMerge();
+    // Review item 6 (a spec change): the note says Featra finishes it, as it does; the screen offers no pull.
+    await expect(approve()).resolves.toEqual({ remains: [m.settleLater("main")] });
     expect((await w.gh.load()).prs[0]?.state).toBe("MERGED");
     expect(w.onMain().status).not.toBe("done");
     expect(evidenceState(w.onFeature()).accepted).toBe(false);
-    w.repo.git(dir(), "remote", "set-url", "origin", w.remote);
+    githubBack();
     await w.poll();
     const done = w.onMain();
     expect(done.status).toBe("done");
@@ -207,17 +245,72 @@ describe("Approve through the feature's PR (AC1, AC2, AC5)", () => {
 
   it("doesn't settle a PR merged on GitHub before the user approved it", async () => {
     await w.start(ci);
-    const base = w.remoteGit("rev-parse", "main");
-    const head = w.remoteGit("rev-parse", FEATURE_BRANCH);
-    const tree = w.remoteGit("merge-tree", "--write-tree", base, head).split("\n")[0]!;
-    const merge = w.remoteGit("commit-tree", tree, "-p", base, "-p", head, "-m", "Merge pull request #1");
-    w.remoteGit("update-ref", "refs/heads/main", merge, base);
-    await w.gh.change((s) => {
-      s.prs[0]!.state = "MERGED";
-    });
+    await w.mergedOnGithub();
     await w.poll();
     expect(w.onMain().status).not.toBe("done");
     expect(evidenceState(w.onFeature()).accepted).toBe(false);
-    expect(state()).toBeUndefined();
+    // Review item 1 (a spec change): it was undefined, which the screen showed as "Checking…" forever. Now the state
+    // says the PR landed, and Approve, the user's own click, finishes it (next test).
+    expect(state()).toEqual({ mergeable: true, blocked: null, landed: true });
+  });
+
+  it("says so when the PR merged on GitHub at the branch's commit before Approve, and Approve finishes it (review item 1)", async () => {
+    await w.start(ci);
+    const merge = await w.mergedOnGithub();
+    await w.poll();
+    expect(await approval()).toEqual({ step: "approve", ready: true, reason: null, base: "main", note: m.landed });
+    await expect(approve()).resolves.toEqual({ remains: [SETTLE_NOTES.ahead("main", 1)] });
+    expect(await w.callsOf("pr merge")).toEqual([]);
+    expect(w.parents(dir(), "main")).toEqual([merge]);
+    const done = w.onMain();
+    expect(done.status).toBe("done");
+    expect(done.pr).toBe(PR);
+    expect(accepts(done)).toEqual([expect.objectContaining({ by: "user" })]);
+    expect((await approval())?.step).toBe("merged");
+  });
+
+  it("settles with the Accept after Featra restarts, when main couldn't take the Done card before (review item 1)", async () => {
+    await w.start(ci);
+    await passing();
+    await w.poll();
+    dropsGithubAtTheMerge();
+    await expect(approve()).resolves.toEqual({ remains: [m.settleLater("main")] });
+    await w.restart();
+    githubBack();
+    await w.poll();
+    const done = w.onMain();
+    expect(done.status).toBe("done");
+    expect(accepts(done)).toEqual([expect.objectContaining({ by: "user" })]);
+    expect(evidenceState(w.onFeature()).accepted).toBe(false);
+  });
+
+  it("settles when GitHub merged but gh failed after it, committing nothing to the branch (review item 2)", async () => {
+    await w.start(ci);
+    await passing();
+    await w.poll();
+    await w.gh.change((s) => {
+      s.mergeLost = "connection reset by peer";
+    });
+    const tip = w.tip(FEATURE_BRANCH);
+    await expect(approve()).resolves.toEqual({ remains: [SETTLE_NOTES.ahead("main", 1)] });
+    expect((await w.gh.load()).prs[0]?.state).toBe("MERGED");
+    expect(w.tip(FEATURE_BRANCH)).toBe(tip);
+    const done = w.onMain();
+    expect(done.status).toBe("done");
+    expect(accepts(done)).toEqual([expect.objectContaining({ by: "user" })]);
+  });
+
+  it("still settles once the user pulled GitHub's merge into main first (review item 6)", async () => {
+    await w.start(ci);
+    await passing();
+    await w.poll();
+    dropsGithubAtTheMerge();
+    await expect(approve()).resolves.toEqual({ remains: [m.settleLater("main")] });
+    githubBack();
+    w.repo.git(dir(), "pull", "-q", "--ff-only", "origin", "main");
+    await w.poll();
+    const done = w.onMain();
+    expect(done.status).toBe("done");
+    expect(accepts(done)).toEqual([expect.objectContaining({ by: "user" })]);
   });
 });

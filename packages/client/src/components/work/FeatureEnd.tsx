@@ -11,8 +11,9 @@ export interface FeatureEndActions {
 /**
  * A feature's end on its review screen (STORY-70): Approve accepts it and merges it to main in one click, off with the
  * first reason that stops it beside it, and as its description. Once accepted without the merge (it failed), Merge to
- * main is the retry, with the same reasons. Both are the user's own action, with no confirmation. A failure shows in
- * one sentence; once merged, the screen says so, with what stays to do.
+ * main is the retry, with the same reasons. A PR merged on GitHub that the click finishes says so in the reason's place.
+ * Both are the user's own action, with no confirmation. A failure shows in one sentence; once merged, the screen says
+ * so, with what stays to do.
  */
 export function FeatureEnd({
   id,
@@ -33,7 +34,7 @@ export function FeatureEnd({
   };
   if (!approval) return null;
   const { step, base } = approval;
-  const reason = step !== "merged" && !action.busy ? approval.reason : null;
+  const reason = step !== "merged" && !action.busy ? (approval.reason ?? approval.note ?? null) : null;
   const approving = step === "approve";
   return (
     <div className="rv-end" role="group" aria-label={FEATURE_END_COPY.approve}>

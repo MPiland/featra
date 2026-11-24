@@ -66,13 +66,18 @@ export function createFeaturePrs(deps: FeaturePrDeps) {
     return typeof pr === "string" ? null : pr.url;
   }
 
-  /** Records `url` as feature `id`'s PR, read fresh in the lane, unless it has another one: that one stands. */
+  /**
+   * Records `url` as feature `id`'s PR, read fresh in the lane, unless it has another one: that one stands. False when
+   * the feature's branch can't be read, so nothing was recorded.
+   */
   const record = (dir: string, id: string, url: string) =>
     lane.exclusive(async () => {
       const look = await lookAt(git, await scanDir(dir), id);
-      if (!look || (look.card.pr && look.card.pr !== url)) return;
+      if (!look) return false;
+      if (look.card.pr && look.card.pr !== url) return true;
       const next = setPr(look.card, url, "system", toIso(now()));
       if (next !== look.card) await writeFeature(git, look, serializeCard(next), prMessage(id));
+      return true;
     });
 
   /** The PR at `url` as GitHub has it now, kept for the card; null when `gh` couldn't read it. */

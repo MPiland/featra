@@ -21,6 +21,7 @@ import type { CheckSettings } from "./check-settings.ts";
 import { baseInTheWay } from "./feature-base.ts";
 import type { FeatureChecksRunner } from "./feature-checks.ts";
 import type { FeatureLook } from "./feature-look.ts";
+import { mergedFacts } from "./feature-seen.ts";
 import type { FeaturePrs } from "./feature-pr.ts";
 import { githubRemote } from "./github-detect.ts";
 import type { FoundPr, GithubPrDeps } from "./github-prs.ts";
@@ -46,10 +47,11 @@ export interface Judged {
 
 const keyOf = (dir: string, id: string) => `${dir}\0${id}`;
 
-/** The PR fact: closed, merged without the commit the branch is at here, else open (one merged at it settles). */
-function prState(pr: FoundPr | null, tip: string): "open" | "closed" | "merged" {
+/** The PR fact: closed, merged at the commit the branch is at here (landed) or without it (merged), else open. */
+function prState(pr: FoundPr | null, tip: string): "open" | "closed" | "merged" | "landed" {
   if (pr?.status.state === "closed") return "closed";
-  return pr?.status.state === "merged" && pr.head !== tip ? "merged" : "open";
+  if (pr?.status.state === "merged") return pr.head === tip ? "landed" : "merged";
+  return "open";
 }
 
 export function createFeatureFacts(deps: FeatureFactsDeps) {
@@ -104,7 +106,11 @@ export function createFeatureFacts(deps: FeatureFactsDeps) {
     /** What Merge to main waits on, read fresh, with GitHub when `use` says it is usable. Pushes nothing. */
     async factsOf(dir: string, look: FeatureLook, use: boolean): Promise<Judged> {
       const remote = use ? await githubRemote(dir, deps.gitCommand) : null;
+      const pr = remote && look.card.pr ? await prs.readNow(dir, look.card.id, look.card.pr) : null;
+      const prFact = !remote ? null : !look.card.pr ? "none" : prState(pr, look.tip);
       const local = await git.commitOf(look.top, `refs/heads/${look.base}`);
+      // Merged on GitHub at the branch's commit: the base has it, and nothing else counts (no notice to merge it in).
+      if (prFact === "landed") return { facts: mergedFacts(look, true), tip: look.tip, baseTip: local };
       const baseTip = (remote ? await git.fetchTip(look.top, remote.name, look.base) : null) ?? local;
       const behind = baseTip !== null && !(await git.isAncestor(look.top, baseTip, look.tip));
       const tree = behind && baseTip ? await git.mergeTree(look.top, baseTip, look.tip) : { tree: "" };
@@ -112,8 +118,6 @@ export function createFeatureFacts(deps: FeatureFactsDeps) {
       if (behind && baseTip) tellBehind(dir, look, baseTip, conflicts ? tree.conflicts : []);
       const there = remote ? await git.fetchTip(look.top, remote.name, look.branch) : null;
       const remoteAhead = there !== null && there !== look.tip && !(await git.isAncestor(look.top, there, look.tip));
-      const pr = remote && look.card.pr ? await prs.readNow(dir, look.card.id, look.card.pr) : null;
-      const prFact = !remote ? null : !look.card.pr ? "none" : prState(pr, look.tip);
       const busy = local ? await baseInTheWay(git, look, local, [look.tip, ...(baseTip ? [baseTip] : [])]) : [];
       const ci = remote !== null && checksWhere(look.config, await settings.github(dir)) === "ci";
       const facts: FeatureMergeFacts = {

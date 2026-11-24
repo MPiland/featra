@@ -43,7 +43,6 @@ export function createWatchApi({ watches, allowed, checks, prs, features, diffs,
       id,
       checks.checksFor(dir, id) ?? features?.checksFor(dir, id),
       prs.prState(dir, id) ?? features?.prState(dir, id),
-      features?.mergeState(dir, id),
     );
 
   /** Feature `id`'s review screen, with where its approval stands; null when `id` isn't a feature with a Work row. */

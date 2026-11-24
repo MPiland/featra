@@ -74,6 +74,10 @@ test("Approve a feature on its review screen: off until CI passes, then one clic
     // Every story is finished, so the feature's PR to main opens on its own, before any Accept: its CI runs first.
     await expect.poll(async () => (await gh.load()).prs[0]?.url, { timeout: 30_000 }).toBe(PR);
     expect((await gh.load()).prs[0]).toMatchObject({ head: FEATURE, base: "main", state: "OPEN" });
+    // The card's PR is set to it, on the feature branch.
+    await expect
+      .poll(() => parseCard(git(repo.dir, "show", `${FEATURE}:.featra/cards/FEAT-2-ship.md`)).pr, { timeout: 30_000 })
+      .toBe(PR);
 
     // AC2: Approve is off, with the reason beside it, while CI hasn't passed at the branch's commit.
     const approve = screen.getByRole("button", { name: "Approve FEAT-2" });
@@ -107,7 +111,10 @@ test("Approve a feature on its review screen: off until CI passes, then one clic
       .toBe("done");
     const done = parseCard(git(repo.dir, "show", "main:.featra/cards/FEAT-2-ship.md"));
     expect(evidenceState(done).accepted).toBe(true);
+    expect(done.pr).toBe(PR);
     expect(git(repo.dir, "show", "main:feature.txt")).toBe("the feature's work");
+    // The feature branch is kept after the merge.
+    expect(git(repo.dir, "branch", "--list", FEATURE)).toContain(FEATURE);
     await expect(screen.getByRole("status").filter({ hasText: "Merged to main" })).toBeVisible({ timeout: 30_000 });
     await expect(approve).toHaveCount(0);
     await expect(screen.getByRole("alert")).toHaveCount(0);

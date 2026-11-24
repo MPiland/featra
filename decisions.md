@@ -3263,3 +3263,29 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   closed and then scanning, which reopened the project's index and held its files (the test's cleanup hung on
   Windows). `openPr` and `refresh` now stop when closed; the test is its regression.
 - **ADR 0037 is amended** for Approve, the PR opening at finish and the settle rule.
+
+## 2026-11-23 — STORY-70 review fixes (developer)
+
+- **A PR merged on GitHub at the branch's commit before Approve no longer waits forever.** Its facts say `landed`
+  (`FeatureMergeFacts.pr`), which nothing else outranks: Approve stays on, and the screen says "Merged on GitHub.
+  Approve to finish." Approve then settles it with the user's Accept in the Done card; `gh pr merge` isn't called. This
+  supersedes "its facts are dropped" above; a PR merged at another commit still waits, saying so.
+- **Approvals are durable.** The user's Approve is recorded before its merge starts in
+  `<git common dir>/featra/approved.json` (server `feature-approvals.ts`), beside the card index, so every checkout
+  shares it and nothing is committed. A PR merged by Approve whose Done card couldn't be committed then settles on a
+  later read, after a restart too. An approval is dropped once its feature is no longer finished and unaccepted
+  (settled, or its Accept recorded on the branch); what was read is forgotten on unwatch.
+- **GitHub's word decides after a `gh` failure.** When `gh pr merge` fails, the PR is read again; merged at the judged
+  tip, it settles as Featra's instead of recording the Accept on the branch.
+- **A Done card main can't take now says Featra will finish it.** The merge's note is "Merged. Featra will mark it Done
+  on main." (`FEATURE_END_MESSAGES.settleLater`), also beside Merge to main for a landed, accepted feature. A read checks
+  a merged PR before whether main has the branch, so a user's pull of GitHub's merge doesn't skip the settle.
+  After such a pull main owns the feature's card (its branch is in main's history and not checked out), so the read and
+  the settle also look at a feature whose card on main isn't Done yet (server `lookAtLanded`).
+- **Merge to main waits for the stories as Approve does.** The retry is off, and refused, while a story or bug under
+  the feature isn't Done or Cancelled, with that reason first.
+- **The server's separate Accept is gone.** `features.accept`, its PR-opening path and the card pane's unused
+  `CardView.featureEnd` are removed; their tests were ported to Approve, Merge to main after the Accept on the branch,
+  and Create PR's retry (review Should-fix 5 now proves the PR's record is retried, adopting the PR GitHub has).
+- **Tests changed by the spec, not weakened:** "doesn't settle a PR merged on GitHub before the user approved it" now
+  expects the landed state instead of no facts, and "settles later" expects the new note.

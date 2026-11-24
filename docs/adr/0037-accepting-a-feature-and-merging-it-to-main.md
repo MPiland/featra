@@ -79,6 +79,8 @@ on while the feature waits, and only an agent working on the feature branch shou
   links to the review screen.
 - **The feature's PR opens once the feature is finished**, not on Accept, so its CI runs before Approve; Create PR and
   Re-run are offered for a finished feature. The facts above are read for every finished feature, accepted or not.
-- **A PR merged on GitHub outside Featra settles only once the user accepted or approved it.** One merged before that
-  isn't settled. One merged by Approve whose Done card couldn't reach main then settles on a later read, with the
-  Accept.
+- **A PR merged on GitHub outside Featra settles only once the user accepted or approved it.** One merged at the
+  branch's commit before that waits for Approve, which stays on and says so, and settles it with the Accept. One merged
+  by Approve whose Done card couldn't reach main then settles on a later read, with the Accept: the approval is kept
+  in the repository's git directory until then, so a restart doesn't lose it. When `gh` fails after GitHub merged, the
+  PR is read again and its merge settles. Merge to main, the retry, waits for the stories as Approve does.
