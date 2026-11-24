@@ -3319,9 +3319,19 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   only, story sessions refused, taught in its description that a chat reply alone doesn't clear "Changes asked". Its
   reply is logged as `changes-handled` by `session:<chat>` and shown as "Changes made", "Written by the Dev Lead".
 - **Handled and Dismiss only while changes are asked**, checked inside the card lane: of a reply and a Dismiss made at
-  once exactly one is kept; the late one is refused ("No changes are asked on FEAT-n: the user may have dismissed
-  them.").
+  once exactly one is kept; the late one is refused ("No changes are asked on FEAT-n: the user dismissed them, or their
+  ask wasn't recorded.", which also covers a reason the chat got but the history write lost).
 - **Approve is untouched**: `featureApprovalOf` ignores these events, so Approve stays as it was while changes are asked.
 - **ADR 0042** names the three events (`changes-asked`, `changes-handled`, `changes-dismissed`).
 - **The fake Dev Lead's MCP turns share one helper** (`leadToolTurn` in fake-agent-turns.mjs), for `write_summary` and
   `mark_changes_handled`.
+- **Review fixes (PR #86):**
+  - A merged feature drops "Changes asked" and its Dismiss (its approval step is `merged`); the history keeps the round.
+    The watch payload is unchanged: the screen decides.
+  - Only the feature's own Dev Lead (`leadOf`) may mark its changes handled or write its summary; another Dev Lead chat
+    is refused with "You don't lead FEAT-n." The check lives in the writers (server `feature-lead.ts` `mustLead`), in
+    the card lane, so the MCP and any later caller get it alike. The STORY-69 e2e's summary chat now leads FEAT-2 (its
+    `drafted-by`), as the drafting chat would.
+  - The reason is kept with plain newlines, as the reply is, and both limits read "2,000 characters".
+  - `dirParams` and `unwatchParams` moved to protocol-frames.ts (re-exported) to keep protocol.ts under 300 lines;
+    services.ts shares the GitHub options as one `gh` object.

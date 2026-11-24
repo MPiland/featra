@@ -76,7 +76,7 @@ export function fakeReviewServer(cards: ReviewSource, options: ReviewFakeOptions
       calls.push(`askChanges:${dir}:${id}:${reason}`);
       const why = askRefusal ?? checkReason(reason);
       const card = cardOf(dir, id);
-      if (why !== null || !card) return { ok: false, error: why ?? CHANGES_REFUSALS.gone };
+      if (why !== null || !card) return { ok: false, error: why ?? CHANGES_REFUSALS.notActive(id) };
       cards.changed(dir, recordChangesAsked(card, reason, "user", at));
       return { ok: true, recorded: true };
     },

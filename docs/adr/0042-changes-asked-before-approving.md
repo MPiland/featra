@@ -30,10 +30,13 @@ is advice to the Dev Lead, not a gate. STORY-72 (evidence), STORY-25 and STORY-7
   the user can start a Dev Lead chat and say it there.
 - **Only the Dev Lead ends a round, through the MCP tool `mark_changes_handled`** (agent method
   `feature.changesHandled`), following `write_summary`: Dev Lead chats only, story sessions refused, taught in the
-  tool's description. A chat reply alone doesn't clear "Changes asked".
+  tool's description. A chat reply alone doesn't clear "Changes asked". Only the feature's own Dev Lead (found as
+  above) may: any other Dev Lead chat is refused ("You don't lead FEAT-n."), and `write_summary` checks the same.
 - **Handled and Dismiss are recorded only while changes are asked**, checked again inside the card lane, so of a reply
   and a Dismiss made at once exactly one is kept; the other is refused.
 - **"Not yet" creates no cards** and doesn't touch the approval: `featureApprovalOf` ignores these events.
+- **A merged feature shows no "Changes asked"**: once its approval step is `merged`, the screen drops the section and its
+  Dismiss, since the feature takes no more changes. Its history keeps the round as it was.
 
 ## Consequences
 
@@ -41,3 +44,7 @@ is advice to the Dev Lead, not a gate. STORY-72 (evidence), STORY-25 and STORY-7
 - Each ask, reply and dismissal is one commit on the feature branch (`FEAT-n: changes asked`, `… changes handled by the
   Dev Lead`, `… changes dismissed`).
 - A feature with no live Dev Lead chat can't be sent back from the review screen; the refusal says why.
+- When the record fails after the send (git refuses the commit, or the feature's branch went meanwhile), the Dev Lead's
+  chat has the reason but the screen shows no round. Its `mark_changes_handled` is then refused, and the refusal says
+  the ask may not have been recorded and to answer the user in the chat (or that the feature isn't in progress, when
+  its branch went).

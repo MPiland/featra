@@ -21,6 +21,17 @@ export function NotYet({ onSend }: { onSend: (reason: string) => Promise<SendBac
   );
 }
 
+/** Each reason with a key that can't clash: one asked again alike, at the same moment, counts the ones before it. */
+function noteKeys(notes: Changes["asked"]): { note: Changes["asked"][number]; key: string }[] {
+  const seen = new Map<string, number>();
+  return notes.map((note) => {
+    const base = `${note.at}|${note.text}`;
+    const count = seen.get(base) ?? 0;
+    seen.set(base, count + 1);
+    return { note, key: `${base}|${count}` };
+  });
+}
+
 /**
  * What the user asked to change before approving (STORY-71): "Changes asked" with each reason and Dismiss while the
  * Dev Lead hasn't replied; its reply once it marked them handled, and "Changes asked" gone. Nothing when none are asked.
@@ -55,9 +66,9 @@ export function ChangesAsked({
         </button>
       </h3>
       <ul className="rv-asked-list">
-        {changes.asked.map((n) => (
-          <li key={`${n.at}-${n.text}`} className="rv-summary-text">
-            {n.text}
+        {noteKeys(changes.asked).map(({ note, key }) => (
+          <li key={key} className="rv-summary-text">
+            {note.text}
           </li>
         ))}
       </ul>

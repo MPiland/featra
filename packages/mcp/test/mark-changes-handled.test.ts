@@ -14,6 +14,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
   changesOf,
   DEV_LEAD_ROLE,
+  DRAFTED_BY,
   MARK_CHANGES_HANDLED_TOOL,
   newCard,
   parseCard,
@@ -40,6 +41,8 @@ const MAIN = fileURLToPath(new URL("../src/main.ts", import.meta.url));
 const LEAD = "chat-1";
 const WORKER = "chat-2";
 const RESEARCHER = "chat-3";
+/** A second Dev Lead chat, which leads no feature here. */
+const OTHER_LEAD = "chat-4";
 const NOW = new Date("2026-11-10T09:00:00Z");
 const now = () => NOW;
 const CARD = ".featra/cards/FEAT-1-card.md";
@@ -96,9 +99,9 @@ beforeAll(async () => {
   git(project, "config", "user.email", "test@example.invalid");
   git(project, "config", "commit.gpgsign", "false");
   await writeFile(join(project, ".featra", "config.yaml"), "version: 1\n");
-  // FEAT-1 has changes asked (as "Not yet" records them); FEAT-2 isn't in progress.
+  // FEAT-1, drafted by the Dev Lead chat LEAD, has changes asked (as "Not yet" records them); FEAT-2 isn't in progress.
   const asked = recordChangesAsked(
-    feature("FEAT-1", "Review", "approved"),
+    { ...feature("FEAT-1", "Review", "approved"), extra: { [DRAFTED_BY]: LEAD } },
     "Rename Save.",
     "user",
     "2026-11-10T08:40:00Z",
@@ -122,7 +125,9 @@ beforeAll(async () => {
             ? { dir: project, session: "STORY-1 session", story: true, role: "developer" }
             : id === RESEARCHER
               ? { dir: project, session: "Researcher chat 5e6f7a8b", role: "researcher" }
-              : null,
+              : id === OTHER_LEAD
+                ? { dir: project, session: "Dev Lead chat 9c8d7e6f", role: DEV_LEAD_ROLE }
+                : null,
       report: () => {},
       retitle: () => {},
     },
@@ -181,6 +186,10 @@ describe("mark_changes_handled through the Featra MCP (STORY-71 AC3)", () => {
     );
     const researcher = await call(await agent(RESEARCHER), { feature: "FEAT-1", reply: "Mine too." });
     expect(text(researcher)).toBe("Not marked. Only the Dev Lead marks a feature's changes handled.");
+    // The reply reads as written by the feature's own Dev Lead, so another Dev Lead chat can't give it.
+    const other = await call(await agent(OTHER_LEAD), { feature: "FEAT-1", reply: "Not mine." });
+    expect(isError(other)).toBe(true);
+    expect(text(other)).toBe("Not marked. You don't lead FEAT-1.");
     const lead = await agent();
     expect(text(await call(lead, { feature: "FEAT-2", reply: "Soon." }))).toBe(
       "Not marked. FEAT-2 isn't a feature in progress.",
@@ -213,7 +222,7 @@ describe("mark_changes_handled through the Featra MCP (STORY-71 AC3)", () => {
     expect(git(project, "symbolic-ref", "HEAD")).toBe("refs/heads/main");
     const again = await call(lead, { feature: "FEAT-1", reply: "Again." });
     expect(text(again)).toBe(
-      "Not marked. No changes are asked on FEAT-1: the user may have dismissed them. Nothing was recorded.",
+      "Not marked. No changes are asked on FEAT-1: the user dismissed them, or their ask wasn't recorded. Nothing was recorded; answer the user in the chat.",
     );
   });
 });

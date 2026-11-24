@@ -108,6 +108,20 @@ describe("the reason (AC1)", () => {
   it("reaches the Dev Lead's chat naming the feature", () => {
     expect(changesMessage("FEAT-9", " Rename it. ")).toBe("Changes asked on FEAT-9: Rename it.");
   });
+
+  it("keeps its line breaks as plain newlines, as the reply does, and counts them so", () => {
+    const crlf = "Rename Save.\r\nThen Cancel.";
+    expect(changesMessage("FEAT-9", crlf)).toBe("Changes asked on FEAT-9: Rename Save.\nThen Cancel.");
+    expect(recordChangesAsked(feature("FEAT-9"), crlf, "user", at(1)).history.at(-1)?.to).toBe(
+      "Rename Save.\nThen Cancel.",
+    );
+    expect(checkReason(`${"x".repeat(CHANGES_MAX - 2)}\r\ny`)).toBeNull();
+  });
+
+  it("says its limit as the reply's does", () => {
+    expect(CHANGES_REFUSALS.tooLong).toBe("Keep it under 2,000 characters.");
+    expect(CHANGES_MESSAGES.tooLong).toBe("Keep the reply under 2,000 characters.");
+  });
 });
 
 describe("a mark_changes_handled call (AC3)", () => {

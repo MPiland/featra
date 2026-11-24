@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   appendHistory,
   DEFAULT_CONFIG,
+  DRAFTED_BY,
   FEATURE_END_MESSAGES,
   mergeCommitMessage,
   newCard,
@@ -17,6 +18,7 @@ import {
   ranEvent,
   recordEvidence,
   setStatus,
+  SUMMARY_MESSAGES,
   toIso,
   withCheckEvidence,
   type Card,
@@ -39,6 +41,9 @@ const WIP = "featra/story-2-wip";
 const CI_RUN = "https://github.com/acme/app/actions/runs/99";
 const CI_RUN_2 = "https://github.com/acme/app/actions/runs/100";
 const AT = "2026-11-02T00:00:00Z";
+const LEAD = "chat-1";
+/** FEAT-1 names its Dev Lead (`drafted-by`), so the writer needs no chat list. */
+const noChats = { list: () => [] };
 
 let repo: CardRepo;
 let gh: FakeGh;
@@ -101,7 +106,8 @@ beforeEach(async () => {
   repo = await cardRepo();
   repo.git(repo.main, "config", "user.name", "Test");
   repo.git(repo.main, "config", "user.email", "test@example.invalid");
-  await repo.write(repo.main, card("FEAT-1", "feature", null, "active"));
+  // Drafted by the Dev Lead chat chat-1, which leads it.
+  await repo.write(repo.main, card("FEAT-1", "feature", null, "active", { extra: { [DRAFTED_BY]: LEAD } }));
   // The cards as the stories left them; each story's branch then changes code only, so git's counts are known.
   await repo.write(repo.main, doneStory());
   await repo.write(repo.main, wipStory());
@@ -196,13 +202,21 @@ describe("a feature's review screen (STORY-69)", () => {
   it("shows the Dev Lead's summary once written, and updates live as a story moves (AC6, AC7)", async () => {
     const first = (await ask("review.watch", { dir: repo.main, id: "FEAT-1" })) as FeatureReview;
     expect(first.summary).toBeNull();
-    const writer = createFeatureSummary({ scan: scanner.scan, now: clock.now });
-    await writer.write(repo.main, { feature: "FEAT-1", summary: "Ready for review." }, "chat-1");
+    const writer = createFeatureSummary({ scan: scanner.scan, now: clock.now, chats: noChats });
+    await writer.write(repo.main, { feature: "FEAT-1", summary: "Ready for review." }, LEAD);
     await until(() => review()?.summary != null);
     expect(review()?.summary).toEqual({ text: "Ready for review.", at: toIso(clock.now()) });
     await repo.write(wip, wipStory("In Review"));
     await until(() => item(review(), "STORY-2")?.view.status === "In Review");
     expect(review()?.summary?.text).toBe("Ready for review.");
+  });
+
+  it("refuses a summary from a Dev Lead chat that doesn't lead the feature (AC6)", async () => {
+    await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
+    const writer = createFeatureSummary({ scan: scanner.scan, now: clock.now, chats: noChats });
+    const input = { feature: "FEAT-1", summary: "Not mine to write." };
+    await expect(writer.write(repo.main, input, "chat-2")).rejects.toThrow(SUMMARY_MESSAGES.notLead("FEAT-1"));
+    expect(repo.git(repo.main, "log", "-1", "--format=%s", FEATURE)).not.toBe("FEAT-1: summary by the Dev Lead");
   });
 
   it("pushes a story's new proof and its run, as the evidence writer records them, without reopening (AC7)", async () => {

@@ -73,7 +73,10 @@ function ReviewBody({ review, dir, work }: { review: FeatureReview; dir: string;
       >
         <NotYet onSend={(reason) => work.askChanges(dir, id, reason)} />
       </FeatureEnd>
-      <ChangesAsked changes={review.changes} onDismiss={() => work.dismissChanges(dir, id)} />
+      {review.approval?.step !== "merged" && (
+        // A merged feature takes no changes: its history keeps the round, the screen stops asking.
+        <ChangesAsked changes={review.changes} onDismiss={() => work.dismissChanges(dir, id)} />
+      )}
       {summary && (
         // Only when the Dev Lead wrote one: no heading stands empty.
         <section className="card-sec rv-summary" aria-label={REVIEW_COPY.summary}>

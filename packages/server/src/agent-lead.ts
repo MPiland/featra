@@ -56,8 +56,7 @@ export function createLeadCalls(deps: LeadCallDeps) {
     if (off !== null) throw new ApiError(off);
   }
 
-  /** Refuses as lead does, and any chat but the Dev Lead's with 
-otLead. */
+  /** Refuses as lead does, and any chat but a Dev Lead's with `notLead`. */
   async function devLead({ dir, story, role }: Caller, sessionRefusal: string, notLead: string) {
     await lead(dir, story, sessionRefusal);
     if (role !== DEV_LEAD_ROLE) throw new ApiError(notLead);
@@ -94,7 +93,7 @@ otLead. */
       return bugs.report(dir, input.value, chat);
     },
 
-    /** The summary reads as written by the Dev Lead, so only the Dev Lead's chat may write it (STORY-69). */
+    /** The summary reads as written by the Dev Lead, so only the feature's Dev Lead may write it (STORY-69). */
     async summarize(chat: string, caller: Caller, params: unknown) {
       const { dir } = caller;
       await devLead(caller, AGENT_MESSAGES.sessionSummary, AGENT_MESSAGES.notLeadSummary);
@@ -104,7 +103,7 @@ otLead. */
       return summaries.write(dir, input.value, chat);
     },
 
-    /** The reply reads as written by the Dev Lead, so only the Dev Lead's chat marks changes handled (STORY-71). */
+    /** The reply reads as written by the Dev Lead, so only the feature's Dev Lead marks its changes handled (STORY-71). */
     async changesHandled(chat: string, caller: Caller, params: unknown) {
       await devLead(caller, AGENT_MESSAGES.sessionChanges, AGENT_MESSAGES.notLeadChanges);
       if (!changes) throw new ApiError(AGENT_MESSAGES.noChanges);

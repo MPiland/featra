@@ -13,7 +13,7 @@ export interface FeatureEndActions {
  * first reason that stops it beside it, and as its description. Once accepted without the merge (it failed), Merge to
  * main is the retry, with the same reasons. A PR merged on GitHub that the click finishes says so in the reason's place.
  * Both are the user's own action, with no confirmation. A failure shows in one sentence; once merged, the screen says
- * so, with what stays to do. children ("Not yet", STORY-71) sit beside the button until the feature is merged.
+ * so, with what stays to do. `children` ("Not yet", STORY-71) sit beside the button until the feature is merged.
  */
 export function FeatureEnd({
   id,

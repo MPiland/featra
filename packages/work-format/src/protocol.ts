@@ -18,8 +18,6 @@ import type { FeatureReview } from "./review-types.ts";
 import type { Role } from "./roles.ts";
 import type { RoleEdit, RoleEditResult, RoleList } from "./role-edit.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
-import { isRecord } from "./utils/guards.ts";
-import { isId } from "./protocol-frames.ts";
 import type { InitResult, ProjectSetup } from "./protocol-setup.ts";
 import type { WorkList } from "./work-list-types.ts";
 
@@ -148,10 +146,9 @@ export interface ServerMethods {
    */
   "feature.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
   /**
-   * The review screen's "Not yet" (STORY-71): sends `reason` to the feature's Dev Lead chat as the user's message, then
-   * records it as changes asked in the feature's history. Refused with nothing recorded when the reason is empty, the
-   * feature has no Dev Lead chat open here, or the chat refuses the message. `recorded` is false when the chat has it
-   * but the history write failed. The user's only.
+   * The review screen's "Not yet" (STORY-71): sends `reason` to the feature's Dev Lead chat, then records it as changes
+   * asked in its history. Refused, recording nothing, without a reason or a Dev Lead chat that takes it; `recorded` is
+   * false when the chat has it but the history write failed. The user's only.
    */
   "feature.askChanges": { params: { dir: string; id: string; reason: string }; result: { recorded: boolean } };
   /** Dismisses the changes asked on a feature (STORY-71), recorded in its history; refused when none are asked. */
@@ -279,20 +276,11 @@ export interface ServerPushes {
   "needs.list": NeedsList;
 }
 
-/** The `{ dir }` params every project method takes, or null. */
-export function dirParams(params: unknown): { dir: string } | null {
-  return isRecord(params) && typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
-}
-
-/** The `{ watch }` params of `work.unwatch`, or null. */
-export function unwatchParams(params: unknown): { watch: number } | null {
-  return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
-}
-
-// The framing lives in protocol-frames.ts and the setup shapes in protocol-setup.ts; both are part of this module's
-// surface.
+// The framing and the shared params live in protocol-frames.ts and the setup shapes in protocol-setup.ts; both are
+// part of this module's surface.
 export { normalizeInitResult, normalizeProjectSetup, type InitResult, type ProjectSetup } from "./protocol-setup.ts";
 export {
+  dirParams,
   parsePush,
   parseRequest,
   parseResponse,
@@ -302,4 +290,5 @@ export {
   type ServerPush,
   type ServerRequest,
   type ServerResponse,
+  unwatchParams,
 } from "./protocol-frames.ts";

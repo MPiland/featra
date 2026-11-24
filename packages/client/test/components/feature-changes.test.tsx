@@ -5,7 +5,7 @@
  * work-format's own rules; sending the reason to the Dev Lead's chat and the MCP call are proved by the server's tests.
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   CHANGES_COPY,
   CHANGES_REFUSALS,
@@ -27,6 +27,8 @@ const ready = (feature?: (c: Card) => Card) => [
   ((c: Card) => (feature ? feature(c) : c))(cardOf({ id: ID, type: "feature", status: "active", title: "Delegation" })),
   cardOf({ id: "STORY-5", type: "story", parent: ID, status: "Done", title: "Spawn five" }),
 ];
+/** The same reason asked twice at the same moment. */
+const twice = (c: Card) => recordChangesAsked(recordChangesAsked(c, "Same.", "user", AT), "Same.", "user", AT);
 const CLEAR: FeatureMergeState = { mergeable: true, blocked: null };
 type Host = Parameters<typeof renderApp>[0];
 type App = ReturnType<typeof renderApp>;
@@ -99,6 +101,19 @@ describe("AC1, AC2: Not yet takes a reason, and the screen shows Changes asked w
     );
   });
 
+  it("lists the same reason asked twice at once as two, without a clash", async () => {
+    const errors = vi.spyOn(console, "error");
+    const app = await openReview(ready(twice));
+    const section = await waitFor(() => asked(app.shown) as HTMLElement);
+    expect(
+      within(section)
+        .getAllByRole("listitem")
+        .map((li) => li.textContent),
+    ).toEqual(["Same.", "Same."]);
+    expect(errors.mock.calls.filter((c) => String(c[0]).includes("same key"))).toEqual([]);
+    errors.mockRestore();
+  });
+
   it("shows the server's refusal with the reason kept, and logs nothing", async () => {
     const app = await openReview(ready(), { askChangesRefusal: CHANGES_REFUSALS.noLead });
     const form = await notYet(app, "Rename it.");
@@ -144,5 +159,15 @@ describe("AC5: Approve stays available while changes are asked", () => {
     expect(button.disabled).toBe(false);
     await app.user.click(button);
     await waitFor(() => expect(feature(app).status).toBe("done"));
+  });
+
+  it("drops Changes asked and its Dismiss once the feature merged, and the history keeps the round", async () => {
+    const app = await openReview(ready((c) => recordChangesAsked(c, "Rename Save to Keep.", "user", AT)));
+    await waitFor(() => expect(asked(app.shown)).not.toBeNull());
+    await app.user.click(approve(app.shown));
+    await within(app.shown).findByText(FEATURE_END_COPY.merged("main"));
+    expect(asked(app.shown)).toBeNull();
+    expect(within(app.shown).queryByRole("button", { name: CHANGES_COPY.dismiss })).toBeNull();
+    expect(changesOf(feature(app))).toEqual({ asked: [{ text: "Rename Save to Keep.", at: AT }], reply: null });
   });
 });

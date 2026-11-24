@@ -20,6 +20,7 @@ import { createChatManager, type ChatManager } from "../src/chat-manager.ts";
 import { createClaudeProvider } from "../src/claude-provider.ts";
 import { createFeatureChanges } from "../src/feature-changes.ts";
 import { createFeatureStart } from "../src/feature-start.ts";
+import { runGit } from "../src/git-run.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createRoleRegistry } from "../src/role-registry.ts";
 import { createScanner } from "../src/work-scan.ts";
@@ -36,6 +37,12 @@ let lead = "";
 let branch = "";
 let events: ChatEvent[];
 let changes: ReturnType<typeof createFeatureChanges>;
+
+/** A busy git: the branch can't take a commit, so a record fails after the chat took the message. */
+const busy: typeof runGit = (command, dir, args, options) =>
+  args[0] === "update-ref"
+    ? Promise.resolve({ code: 1, stdout: "", stderr: "busy" })
+    : runGit(command, dir, args, options);
 
 /** A feature started on its branch, drafted by `drafter` (or by nobody), with STORY-1 under it. */
 async function started(drafter: string | null) {
@@ -132,6 +139,45 @@ describe("Not yet (STORY-71 AC1, AC2)", () => {
     expect(onBranch().history).toEqual(before);
   });
 
+  it("answers not recorded when the feature's branch goes between the send and the record: the chat has the reason once", async () => {
+    // The branch is deleted once the chat took the message, before the record reads the card.
+    const send: ChatManager["send"] = (id, text) => {
+      manager.send(id, text);
+      repo.git(repo.main, "branch", "-D", branch);
+    };
+    const racing = createFeatureChanges({
+      scan: scanner.scan,
+      now: () => new Date(NOW),
+      chats: { list: manager.list, dirOf: manager.dirOf, open: manager.open, send },
+    });
+    expect(await racing.ask(repo.main, "FEAT-1", "Rename Save to Keep.")).toEqual({ recorded: false });
+    expect(userTexts()).toEqual(["Changes asked on FEAT-1: Rename Save to Keep."]);
+    expect(repo.git(repo.main, "branch", "--list", branch)).toBe("");
+    const onMain = parseCard(repo.show(repo.main, "main", "FEAT-1"));
+    expect(onMain.history.some((e) => e.field === "changes-asked")).toBe(false);
+    // The screen shows no round, so the Dev Lead's reply is refused, saying why.
+    await expect(changes.handled(repo.main, { feature: "FEAT-1", reply: "Renamed it." }, lead)).rejects.toThrow(
+      CHANGES_REFUSALS.notActive("FEAT-1"),
+    );
+  });
+
+  it("answers not recorded when git refuses the record after the send, and the Dev Lead's reply is told why", async () => {
+    const refusing = createFeatureChanges({
+      scan: scanner.scan,
+      now: () => new Date(NOW),
+      chats: manager,
+      gitRun: busy,
+    });
+    const before = onBranch().history;
+    expect(await refusing.ask(repo.main, "FEAT-1", "Rename Save to Keep.")).toEqual({ recorded: false });
+    expect(userTexts()).toEqual(["Changes asked on FEAT-1: Rename Save to Keep."]);
+    expect(onBranch().history).toEqual(before);
+    await expect(changes.handled(repo.main, { feature: "FEAT-1", reply: "Renamed it." }, lead)).rejects.toThrow(
+      CHANGES_MESSAGES.nothingAsked("FEAT-1"),
+    );
+    expect(CHANGES_MESSAGES.nothingAsked("FEAT-1")).toContain("wasn't recorded");
+  });
+
   it("is refused for a feature that isn't in progress", async () => {
     await expect(changes.ask(repo.main, "FEAT-9", "Rename it.")).rejects.toThrow(CHANGES_REFUSALS.notActive("FEAT-9"));
   });
@@ -187,6 +233,15 @@ describe("handled and dismissed (STORY-71 AC3, AC4)", () => {
     await changes.ask(repo.main, "FEAT-1", "Again.");
     await changes.handled(repo.main, { feature: "FEAT-1", reply: "Done." }, lead);
     await expect(changes.dismiss(repo.main, "FEAT-1")).rejects.toThrow(CHANGES_REFUSALS.nothingAsked);
+  });
+
+  it("refuses the reply of a Dev Lead chat that doesn't lead the feature: nothing is logged", async () => {
+    const other = await manager.start(repo.main, "dev-lead");
+    const before = onBranch().history;
+    await expect(changes.handled(repo.main, { feature: "FEAT-1", reply: "Mine." }, other)).rejects.toThrow(
+      CHANGES_MESSAGES.notLead("FEAT-1"),
+    );
+    expect(onBranch().history).toEqual(before);
   });
 
   it("keeps exactly one of a reply and a Dismiss made at once", async () => {

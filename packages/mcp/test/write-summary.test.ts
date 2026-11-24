@@ -11,7 +11,15 @@ import { fileURLToPath } from "node:url";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { DEV_LEAD_ROLE, newCard, parseCard, serializeCard, setStatus, summaryOf } from "@featra/work-format";
+import {
+  DEV_LEAD_ROLE,
+  DRAFTED_BY,
+  newCard,
+  parseCard,
+  serializeCard,
+  setStatus,
+  summaryOf,
+} from "@featra/work-format";
 import {
   createAgentBridge,
   createAllowedProjects,
@@ -31,6 +39,8 @@ const MAIN = fileURLToPath(new URL("../src/main.ts", import.meta.url));
 const LEAD = "chat-1";
 const WORKER = "chat-2";
 const RESEARCHER = "chat-3";
+/** A second Dev Lead chat, which leads no feature here. */
+const OTHER_LEAD = "chat-4";
 const NOW = new Date("2026-11-10T09:00:00Z");
 const now = () => NOW;
 const CARD = ".featra/cards/FEAT-1-card.md";
@@ -77,7 +87,9 @@ beforeAll(async () => {
   git(project, "config", "user.email", "test@example.invalid");
   git(project, "config", "commit.gpgsign", "false");
   await writeFile(join(project, ".featra", "config.yaml"), "version: 1\n");
-  for (const c of [feature("FEAT-1", "Review", "approved"), feature("FEAT-2", "Later", "approved")]) {
+  // FEAT-1 is drafted by the Dev Lead chat LEAD, which leads it.
+  const led = { ...feature("FEAT-1", "Review", "approved"), extra: { [DRAFTED_BY]: LEAD } };
+  for (const c of [led, feature("FEAT-2", "Later", "approved")]) {
     await writeFile(join(project, ".featra", "cards", `${c.id}-card.md`), serializeCard(c));
   }
   git(project, "add", "-A");
@@ -97,12 +109,14 @@ beforeAll(async () => {
             ? { dir: project, session: "STORY-1 session", story: true, role: "developer" }
             : id === RESEARCHER
               ? { dir: project, session: "Researcher chat 5e6f7a8b", role: "researcher" }
-              : null,
+              : id === OTHER_LEAD
+                ? { dir: project, session: "Dev Lead chat 9c8d7e6f", role: DEV_LEAD_ROLE }
+                : null,
       report: () => {},
       retitle: () => {},
     },
     writer: createLogWriter({ fs: { read: async () => null, write: async () => {} }, now }),
-    summaries: createFeatureSummary({ scan: scanner.scan, now }),
+    summaries: createFeatureSummary({ scan: scanner.scan, now, chats: { list: () => [] } }),
   });
   services = createServices({ allowed: createAllowedProjects(), log: () => {} });
   server = await startServer({ token: "window-token-0123456789", api: services.api, agents: bridge, log: () => {} });
@@ -167,6 +181,10 @@ describe("write_summary through the Featra MCP (STORY-69 AC6)", () => {
     const researcher = await call(await agent(RESEARCHER), { feature: "FEAT-1", summary: "Mine too." });
     expect(isError(researcher)).toBe(true);
     expect(text(researcher)).toBe("Not written. Only the Dev Lead writes a feature's summary.");
+    // It reads as written by the feature's own Dev Lead, so another Dev Lead chat can't write it.
+    const other = await call(await agent(OTHER_LEAD), { feature: "FEAT-1", summary: "Not mine." });
+    expect(isError(other)).toBe(true);
+    expect(text(other)).toBe("Not written. You don't lead FEAT-1.");
     const lead = await agent();
     const later = await call(lead, { feature: "FEAT-2", summary: "Soon." });
     expect(text(later)).toBe("Not written. FEAT-2 isn't a feature in progress.");
