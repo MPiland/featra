@@ -26,7 +26,7 @@ import {
 import { normalizeZoom } from "@featra/client/zoom";
 import { httpsLink, isOneOf, toText } from "@featra/work-format";
 import { copyable } from "./copy-text.ts";
-import { evidenceOpening } from "./evidence-open.ts";
+import { openEvidenceFile, type EvidenceShell } from "./evidence-open.ts";
 import { pickFolder } from "./folder-dialog.ts";
 import { closeToTraySupport, type Lifecycle } from "./lifecycle.ts";
 import type { Log } from "./log.ts";
@@ -37,6 +37,12 @@ import { readProjectSettings, writeProjectValue, type SettingsStore } from "./se
 import { e2e, testHooks } from "./test-hooks.ts";
 import { clearCacheAndRestart, resetAppData, type TroubleshootDeps } from "./troubleshoot.ts";
 import type { UiStateStore } from "./ui-state-store.ts";
+
+/** In E2E runs an evidence file given to the OS is recorded, by how, instead (STORY-72). */
+const recordedShell: EvidenceShell = {
+  openPath: async (file) => (testHooks.openedFiles.push({ how: "open", file }), ""),
+  showItemInFolder: (file) => void testHooks.openedFiles.push({ how: "show", file }),
+};
 import { windowState } from "./window.ts";
 
 export interface MainDeps {
@@ -159,13 +165,7 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
   });
   ipcMain.on(IPC.appOpenEvidence, (_e, file: unknown) => {
     // Only the server's copy of an evidence file, in the data folder, reaches the OS (STORY-72, ADR 0043).
-    void evidenceOpening(app.getPath("userData"), file).then(async (opening) => {
-      if (!opening) return log.info("Evidence not opened: not a copy in the data folder");
-      if (e2e) return void testHooks.openedFiles.push(opening);
-      if (opening.how === "show") return shell.showItemInFolder(opening.file);
-      const failed = await shell.openPath(opening.file);
-      if (failed) log.info(`Can't open evidence: ${failed}`);
-    });
+    void openEvidenceFile(app.getPath("userData"), file, e2e ? recordedShell : shell, (m) => log.info(m));
   });
   ipcMain.on(IPC.appCopyText, (_e, text: unknown) => {
     // Only put on the clipboard: Featra never runs what it copies (STORY-68). No more than a command is copied.

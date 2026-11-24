@@ -69,7 +69,7 @@ export function CardPane({
   const review = useAction();
   const reviewAlert = useRef<HTMLParagraphElement>(null);
   const { view, setView } = card;
-  const evidence = useMemo(() => ({ dir, work }), [dir, work]);
+  const evidence = useMemo(() => ({ dir, work, revision: view }), [dir, work, view]);
   // A failure that comes when the buttons are gone (the card isn't a draft just now) takes focus itself, in the commit
   // that shows it.
   useLayoutEffect(() => {

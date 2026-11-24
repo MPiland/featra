@@ -27,6 +27,7 @@ import { evidenceInGit } from "./evidence-git.ts";
 import type { Scan } from "./work-scan.ts";
 
 export interface EvidenceFilesDeps {
+  /** The cards as shown: the watch's last good scan, so reading a file never rescans every card. */
   scan: (dir: string) => Promise<Scan | null>;
   /** The git to run; the one on the PATH by default. */
   gitCommand?: string;

@@ -2,7 +2,7 @@
  * The evidence bridge (STORY-72, ADR 0043): an evidence file a criterion links, read through the server, which reads
  * only that card's own evidence folder; and a file opened with the OS, which the server copies for the host to open.
  */
-import { normalizeEvidenceFile, type EvidenceFile } from "@featra/work-format/evidence-link";
+import { EVIDENCE_COPY, normalizeEvidenceFile, type EvidenceFile } from "@featra/work-format/evidence-link";
 import { errorMessage, isRecord } from "@featra/work-format/guards";
 import type { ServerClient } from "./server-client.ts";
 
@@ -27,7 +27,7 @@ export function serverEvidence(server: ServerClient): EvidenceBridge {
         (r): EvidenceOpenResult =>
           isRecord(r) && typeof r.file === "string" && r.file
             ? { ok: true, file: r.file }
-            : { ok: false, error: "Something went wrong." },
+            : { ok: false, error: EVIDENCE_COPY.failed },
         (err: unknown): EvidenceOpenResult => ({ ok: false, error: errorMessage(err) }),
       ),
   };

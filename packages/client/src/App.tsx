@@ -25,9 +25,7 @@ import { useShortcuts } from "./components/useShortcuts.tsx";
 import { useWindowSync } from "./components/useWindowSync.ts";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
-import { ExternalLinkContext } from "./components/work/PrChip.tsx";
-import { OpenFileContext } from "./components/work/AcEvidence.tsx";
-import { CopyTextContext } from "./components/chat/ActionRequestPrompt.tsx";
+import { HostProviders } from "./components/HostProviders.tsx";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import { canGoBack, canGoForward, currentView, entryChat, entryView, initialNav, leaveChats } from "./navigation.ts";
 import { useAppNav } from "./use-app-nav.ts";
@@ -188,118 +186,114 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   }, [title]);
 
   return (
-    <ExternalLinkContext.Provider value={bridge.app.openExternal}>
-      <OpenFileContext.Provider value={bridge.app.openEvidence}>
-        <CopyTextContext.Provider value={bridge.app.copyText}>
-          <div className="shell" inert={dialog !== null || projectDialog !== null}>
-            <TitleBar
-              bridge={bridge}
-              title={title}
-              project={projects.current?.name}
-              sidebarCollapsed={collapsed}
-              onToggleSidebar={toggleSidebar}
-              canGoBack={canGoBack(nav)}
-              canGoForward={canGoForward(nav)}
-              onBack={back}
-              onForward={forward}
-              menu={menu}
-              windowState={windowState}
-            />
-            <div className={collapsed ? "app collapsed" : "app"}>
-              <Sidebar
-                collapsed={collapsed}
-                current={chatId === null ? view.id : null}
-                onOpen={open}
-                project={projects.current}
-                platform={bridge.platform}
-                onNewChat={() => setDialog("newChat")}
-                chats={
-                  <ChatList
-                    list={chatList}
-                    current={chatId}
-                    onOpen={openChat}
-                    onArchive={(id) => void bridge.chats.archive(id)}
-                  />
-                }
-                counts={{ inbox: inbox.items.length }}
-                switcher={
-                  <ProjectSwitcher
-                    projects={projects}
-                    platform={bridge.platform}
-                    actions={projectActions}
-                    needs={inbox.needs}
-                  />
-                }
+    <HostProviders app={bridge.app}>
+      <div className="shell" inert={dialog !== null || projectDialog !== null}>
+        <TitleBar
+          bridge={bridge}
+          title={title}
+          project={projects.current?.name}
+          sidebarCollapsed={collapsed}
+          onToggleSidebar={toggleSidebar}
+          canGoBack={canGoBack(nav)}
+          canGoForward={canGoForward(nav)}
+          onBack={back}
+          onForward={forward}
+          menu={menu}
+          windowState={windowState}
+        />
+        <div className={collapsed ? "app collapsed" : "app"}>
+          <Sidebar
+            collapsed={collapsed}
+            current={chatId === null ? view.id : null}
+            onOpen={open}
+            project={projects.current}
+            platform={bridge.platform}
+            onNewChat={() => setDialog("newChat")}
+            chats={
+              <ChatList
+                list={chatList}
+                current={chatId}
+                onOpen={openChat}
+                onArchive={(id) => void bridge.chats.archive(id)}
               />
-              <main aria-labelledby="view-title">
-                {chatId !== null ? (
-                  <ChatPane
-                    bridge={bridge}
-                    paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
-                    review={reviewChat === chatId ? reviewed : null}
-                    chat={chat}
-                    dir={projectDir ?? ""}
-                    onStarted={startedChat}
-                    chatList={chatList.chats}
-                    onOpenChat={openChat}
-                  />
-                ) : view.id === "settings" ? (
-                  <SettingsView
-                    bridge={bridge}
-                    snapshot={settings}
-                    projects={projects}
-                    projectKey={`${projects.current?.dir ?? ""}:${projectSettingsOpened}`}
-                    page={settingsPage}
-                    onPage={setSettingsPage}
-                    onAppChange={changeAppSettings}
-                    shortcuts={shortcuts}
-                    onSetUp={reopenSetup}
-                    version={info?.version}
-                  />
-                ) : view.id === "work" ? (
-                  <WorkView
-                    projects={projects}
-                    platform={bridge.platform}
-                    actions={projectActions}
-                    work={bridge.work}
-                    paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
-                    layout={{ of: (dir) => workLayoutOf(ui, dir), choose: setWorkLayout }}
-                    onReviewDraft={reviewDraft}
-                    hasChat={(id) => chatList.chats.some((c) => c.id === id)}
-                    chats={chatList.chats}
-                    onOpenChat={openChat}
-                    setupPage={setupPage}
-                  />
-                ) : view.id === "inbox" ? (
-                  <InboxView
-                    items={inbox.items}
-                    projects={projects.projects}
-                    chats={bridge.chats}
-                    onOpenChat={inbox.openChatIn}
-                  />
-                ) : (
-                  <ViewPlaceholder view={view} />
-                )}
-              </main>
-            </div>
-          </div>
-          {projectDialog}
-          {dialog === "newChat" && projects.current && (
-            <NewChatDialog
-              chats={bridge.chats}
-              dir={projects.current.dir}
-              onClose={() => setDialog(null)}
-              onStarted={startedChat}
-            />
-          )}
-          <AppDialogs
-            dialog={dialog}
-            info={info}
-            onClose={() => setDialog(null)}
-            onReset={() => bridge.app.resetAppData()}
+            }
+            counts={{ inbox: inbox.items.length }}
+            switcher={
+              <ProjectSwitcher
+                projects={projects}
+                platform={bridge.platform}
+                actions={projectActions}
+                needs={inbox.needs}
+              />
+            }
           />
-        </CopyTextContext.Provider>
-      </OpenFileContext.Provider>
-    </ExternalLinkContext.Provider>
+          <main aria-labelledby="view-title">
+            {chatId !== null ? (
+              <ChatPane
+                bridge={bridge}
+                paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
+                review={reviewChat === chatId ? reviewed : null}
+                chat={chat}
+                dir={projectDir ?? ""}
+                onStarted={startedChat}
+                chatList={chatList.chats}
+                onOpenChat={openChat}
+              />
+            ) : view.id === "settings" ? (
+              <SettingsView
+                bridge={bridge}
+                snapshot={settings}
+                projects={projects}
+                projectKey={`${projects.current?.dir ?? ""}:${projectSettingsOpened}`}
+                page={settingsPage}
+                onPage={setSettingsPage}
+                onAppChange={changeAppSettings}
+                shortcuts={shortcuts}
+                onSetUp={reopenSetup}
+                version={info?.version}
+              />
+            ) : view.id === "work" ? (
+              <WorkView
+                projects={projects}
+                platform={bridge.platform}
+                actions={projectActions}
+                work={bridge.work}
+                paneWidth={{ chosen: ui.cardPaneWidth, choose: setPaneWidth }}
+                layout={{ of: (dir) => workLayoutOf(ui, dir), choose: setWorkLayout }}
+                onReviewDraft={reviewDraft}
+                hasChat={(id) => chatList.chats.some((c) => c.id === id)}
+                chats={chatList.chats}
+                onOpenChat={openChat}
+                setupPage={setupPage}
+              />
+            ) : view.id === "inbox" ? (
+              <InboxView
+                items={inbox.items}
+                projects={projects.projects}
+                chats={bridge.chats}
+                onOpenChat={inbox.openChatIn}
+              />
+            ) : (
+              <ViewPlaceholder view={view} />
+            )}
+          </main>
+        </div>
+      </div>
+      {projectDialog}
+      {dialog === "newChat" && projects.current && (
+        <NewChatDialog
+          chats={bridge.chats}
+          dir={projects.current.dir}
+          onClose={() => setDialog(null)}
+          onStarted={startedChat}
+        />
+      )}
+      <AppDialogs
+        dialog={dialog}
+        info={info}
+        onClose={() => setDialog(null)}
+        onReset={() => bridge.app.resetAppData()}
+      />
+    </HostProviders>
   );
 }

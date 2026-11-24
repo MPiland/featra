@@ -13,6 +13,13 @@ export interface EvidenceOpening {
   file: string;
 }
 
+/** The OS side of opening: Electron's `shell`, or what an E2E run or a test records instead. */
+export interface EvidenceShell {
+  /** Opens the file with its app; an error message, or "" when it opened. */
+  openPath: (file: string) => Promise<string>;
+  showItemInFolder: (file: string) => void;
+}
+
 /** How the evidence copy `file` is given to the OS, or null when it isn't a copy in `dataDir`'s evidence folder. */
 export async function evidenceOpening(dataDir: string, file: unknown): Promise<EvidenceOpening | null> {
   if (typeof file !== "string" || !isAbsolute(file)) return null;
@@ -24,4 +31,26 @@ export async function evidenceOpening(dataDir: string, file: unknown): Promise<E
   } catch {
     return null;
   }
+}
+
+/**
+ * Gives the evidence copy `file` to the OS as `evidenceOpening` decides: a document or image opened with `os.openPath`,
+ * anything else only shown in its folder, never opened; nothing at all for a path that isn't such a copy.
+ */
+export async function openEvidenceFile(
+  dataDir: string,
+  file: unknown,
+  os: EvidenceShell,
+  log: (message: string) => void,
+): Promise<EvidenceOpening | null> {
+  const opening = await evidenceOpening(dataDir, file);
+  if (!opening) {
+    log("Evidence not opened: not a copy in the data folder");
+  } else if (opening.how === "show") {
+    os.showItemInFolder(opening.file);
+  } else {
+    const failed = await os.openPath(opening.file);
+    if (failed) log(`Can't open evidence: ${failed}`);
+  }
+  return opening;
 }

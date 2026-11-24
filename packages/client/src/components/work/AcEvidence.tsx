@@ -4,17 +4,29 @@ import { EVIDENCE_COPY, evidenceName, type EvidenceFile } from "@featra/work-for
 import type { EvidenceBridge } from "../../evidence.ts";
 import { EvidenceViewer } from "./EvidenceViewer.tsx";
 
-/** Where evidence is read from: the project, and the server's evidence methods. The card pane and review screen give it. */
-export const EvidenceContext = createContext<{ dir: string; work: EvidenceBridge } | null>(null);
+/**
+ * Where evidence is read from: the project and the server's evidence methods, given by the card pane and the review
+ * screen; and what they show (the card's view, the review), whose every new revision has the evidence read again.
+ */
+export interface EvidenceSource {
+  dir: string;
+  work: EvidenceBridge;
+  revision: unknown;
+}
+export const EvidenceContext = createContext<EvidenceSource | null>(null);
 
 /** Opens the server's copy of an evidence file with the OS (the host's `app.openEvidence`); App provides it. */
 export const OpenFileContext = createContext<(file: string) => void>(() => {});
 
-/** Reads the evidence file once per card and path; null until it is read. */
+/**
+ * Reads the evidence file, and again with each new revision of what is shown, so a file attached since, or one a read
+ * couldn't get for a moment, shows once the card changes; what was read stays shown meanwhile. Null until it is read.
+ */
 function useEvidence(card: string, path: string): EvidenceFile | null {
   const source = useContext(EvidenceContext);
   const [file, setFile] = useState<{ key: string; file: EvidenceFile } | null>(null);
   const key = `${source?.dir}\n${card}\n${path}`;
+  // `source` is new with each revision of what is shown, so the file is read again then.
   useEffect(() => {
     if (!source) return undefined;
     let live = true;

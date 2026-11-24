@@ -22,8 +22,9 @@ const folderOf = (path: string): string[] => path.split("/").slice(0, 4);
 
 /**
  * The evidence file at `path` (relative to `root`), or why it can't be used. Every part must be a real directory entry
- * by exactly that name (case and trailing dots included), the file a plain one, and its real path inside both the root
- * and the evidence folder (no link may lead out). The size is advisory: the file can change after this looks.
+ * by exactly that name (case and trailing dots included) and no part a link or junction (a linked `.featra`, `evidence`,
+ * feature or story folder would lead anywhere in the checkout), the file a plain one, and its real path inside both the
+ * root and the evidence folder. The size is advisory: the file can change after this looks.
  */
 export async function evidenceOnDisk(root: string, path: string): Promise<DiskEvidence> {
   try {
@@ -31,10 +32,11 @@ export async function evidenceOnDisk(root: string, path: string): Promise<DiskEv
     for (const part of path.split("/")) {
       if (!(await readdir(dir)).includes(part)) return { ok: false, problem: "missing" };
       dir = join(dir, part);
+      if ((await lstat(dir)).isSymbolicLink()) return { ok: false, problem: "outside" };
     }
     const file = fileIn(root, path);
     const stat = await lstat(file);
-    if (!stat.isFile()) return { ok: false, problem: stat.isSymbolicLink() ? "outside" : "notFile" };
+    if (!stat.isFile()) return { ok: false, problem: "notFile" };
     const [real, realRoot, realFolder] = await Promise.all([
       realpath(file),
       realpath(root),

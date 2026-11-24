@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { EVIDENCE_OPEN_DIR } from "@featra/work-format/evidence-link";
-import { evidenceOpening } from "../src/evidence-open.ts";
+import { evidenceOpening, openEvidenceFile, type EvidenceShell } from "../src/evidence-open.ts";
 
 let data: string;
 let copies: string;
@@ -37,6 +37,8 @@ describe("evidenceOpening", () => {
   it.each([
     ["a file outside the evidence folder", () => join(data, "outside.txt")],
     ["a path that climbs out of it", () => at("a1", "..", "..", "outside.txt")],
+    // Written by hand, as the page could send it: path.join would have taken the `..` out already.
+    ["a raw path that climbs out of it", () => `${copies}/a1/../../outside.txt`],
     ["the folder itself", () => copies],
     ["a folder in it", () => at("a1")],
     ["a file that isn't there", () => at("a1", "gone.txt")],
@@ -57,5 +59,45 @@ describe("evidenceOpening", () => {
       skip("this machine can't make symbolic links");
     }
     expect(await evidenceOpening(data, at("a1", "link.txt"))).toBeNull();
+  });
+});
+
+/** The OS side, recording each call by how it was made. */
+function recording() {
+  const calls: string[] = [];
+  const os: EvidenceShell = {
+    openPath: async (file) => (calls.push(`open:${file}`), ""),
+    showItemInFolder: (file) => void calls.push(`show:${file}`),
+  };
+  return { os, calls };
+}
+
+describe("openEvidenceFile", () => {
+  it("shows a program in its folder and never opens it", async () => {
+    const { os, calls } = recording();
+    const opening = await openEvidenceFile(data, at("a1", "run.exe"), os, () => {});
+    expect(calls).toEqual([`show:${opening?.file}`]);
+    expect(calls.some((c) => c.startsWith("open:"))).toBe(false);
+  });
+
+  it("opens a document with its app", async () => {
+    const { os, calls } = recording();
+    const opening = await openEvidenceFile(data, at("a1", "notes.txt"), os, () => {});
+    expect(calls).toEqual([`open:${opening?.file}`]);
+  });
+
+  it("gives the OS nothing for a path that isn't a copy, and says so in the log", async () => {
+    const { os, calls } = recording();
+    const logged: string[] = [];
+    expect(await openEvidenceFile(data, join(data, "outside.txt"), os, (m) => logged.push(m))).toBeNull();
+    expect(calls).toEqual([]);
+    expect(logged).toEqual(["Evidence not opened: not a copy in the data folder"]);
+  });
+
+  it("logs a file the OS couldn't open", async () => {
+    const logged: string[] = [];
+    const os: EvidenceShell = { openPath: async () => "No app for it", showItemInFolder: () => {} };
+    await openEvidenceFile(data, at("a1", "notes.txt"), os, (m) => logged.push(m));
+    expect(logged).toEqual(["Can't open evidence: No app for it"]);
   });
 });

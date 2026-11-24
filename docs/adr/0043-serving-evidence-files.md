@@ -22,10 +22,13 @@ branch nobody checks out, or main, and a merged story's evidence may exist only 
   same rules `update_card` applies when it links one (`evidenceLinkError`, now in work-format `evidence-link.ts`): a
   relative path inside the card's own evidence folder, no `..`, no absolute path. Anything else is `unreadable`, so the
   API can't be used to read other files in the project.
-- **It is read from the copy whose criteria are shown** (`shownFrom`, normally the owner). If that copy is checked out
+- **It is read from the cards as shown**: the watch's last good scan (`WorkWatches.shown`), after any scan in flight,
+  never a new scan; only a folder nobody watches gets a full scan. Then from the copy whose criteria are shown
+  (`shownFrom`, normally the owner). If that copy is checked out
   (a story worktree, or main), the file is read from disk with `update_card`'s disk rules (`evidenceOnDisk`, shared
-  with the report check): each part of the path matched by exact name, no symbolic links on the way, the real path still
-  inside the evidence folder, a plain file, at most 1 MB (`EVIDENCE_BYTES`). If it isn't checked out (a feature branch, a
+  with the report check): each part of the path matched by exact name and checked with `lstat` as it is walked, so no
+  part (`.featra`, `evidence`, the feature's or story's folder, the file) may be a symbolic link or junction, the real
+  path still inside the evidence folder, a plain file, at most 1 MB (`EVIDENCE_BYTES`). If it isn't checked out (a feature branch, a
   merged story), it is read from git at that copy's revision: `ls-tree` finds the exact entry, which must be a plain
   blob (mode 100644 or 100755, never a link 120000), at most 1 MB, then `cat-file blob` reads it.
 - **Screenshots are png, jpg, gif and webp**, judged by the file's extension. Anything else is a file to open.
@@ -41,7 +44,11 @@ branch nobody checks out, or main, and a merged story's evidence may exist only 
 
 - The app shows evidence for every owner the card can have, including a story already merged, without checking out
   anything.
-- Each thumbnail is read once per card and path while the card is shown; at 1 MB a file, the socket carries at most a
+- A read costs one file read (or one `ls-tree` and `cat-file` for git), never a rescan of every card: a review
+  screen with 20 screenshots would otherwise queue 20 full rescans, each heard by every listener. The scan may be a
+  moment behind the disk, so a file attached since shows once the watch rescans and the card changes.
+- Each thumbnail is read again whenever the card or review shown changes, so a file attached since, or one a read
+  couldn't get for a moment, doesn't stay as its note; at 1 MB a file, the socket carries at most a
   few MB for a story with several screenshots. Larger files say "Can't open evidence".
 - The open copies in the data folder are temporary: they live until the next run clears them.
 - STORY-25 shows captured screenshots next to their criteria the same way: it links them as `evidence` and the shared

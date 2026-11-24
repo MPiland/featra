@@ -89,6 +89,8 @@ export type EvidenceFile =
 export const EVIDENCE_COPY = {
   missing: "Evidence missing",
   unreadable: "Can't open evidence",
+  /** The server answered an open with something that isn't a file. */
+  failed: "Something went wrong.",
   open: (name: string) => `Open ${name}`,
   viewer: (name: string) => `Screenshot ${name}`,
   close: "Close",

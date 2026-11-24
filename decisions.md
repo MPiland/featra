@@ -3362,3 +3362,18 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   the missing note.
 - **STORY-25 seam**: captured screenshots linked as a criterion's `evidence` show through the same `AcEvidence`, with
   nothing new to build on the screen.
+- **Review fixes (PR #87):**
+  - No part of an evidence path may be a link or junction: `evidenceOnDisk` checks each part with `lstat` as it walks.
+    Before, only the file itself was checked, and a junctioned story folder let `evidence.read` serve any file in the
+    checkout. The same check guards `update_card`'s links.
+  - Evidence is read from the watch's last good scan (`WorkWatches.shown`), not `watches.scan`, so a read never queues
+    a rescan of every card. ADR 0043 notes the cost.
+  - `AcEvidence` reads again with each new revision of what is shown (the card's view, the review): a file attached
+    since, or one a read couldn't get, shows once the card changes, and what was read stays shown meanwhile.
+  - The host's contexts moved to `HostProviders`, which brings App.tsx back under 300 lines. The open copy's fallback
+    error is `EVIDENCE_COPY.failed`.
+  - Desktop: `openEvidenceFile` makes the open-or-show call against an `EvidenceShell` (Electron's `shell`, or a
+    recording one in E2E runs), and a test proves a program is only shown in its folder.
+  - CONTEXT.md defines **Evidence file**, as distinct from **Evidence state**.
+  - E2E (Windows) failed once at `chat-list.spec.ts:34`, waiting for the provider group. The page snapshot shows the
+    group arrived just after the 5 s wait, and nothing in this change touches it. Filed as BUG-40, with one rerun.

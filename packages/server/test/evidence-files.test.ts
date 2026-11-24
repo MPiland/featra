@@ -5,7 +5,7 @@
  */
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { EVIDENCE_BYTES, EVIDENCE_OPEN_DIR, type Card } from "@featra/work-format";
 import { createEvidenceApi } from "../src/api-evidence.ts";
@@ -13,10 +13,13 @@ import { cardViewIn } from "../src/card-actions.ts";
 import { createEvidenceFiles } from "../src/evidence-files.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
+import { createWorkWatches } from "../src/work-watch.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 
 const ONE = ".featra/evidence/FEAT-1/STORY-1/";
 const THREE = ".featra/evidence/FEAT-1/STORY-3/";
+/** STORY-4's evidence folder is a junction to the checkout's `src` (STORY-72 review). */
+const FOUR = ".featra/evidence/FEAT-1/STORY-4/";
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 1, 2, 3]);
 
 let repo: CardRepo;
@@ -69,6 +72,9 @@ beforeAll(async () => {
   await put(tree, `${ONE}big.png`, Buffer.alloc(EVIDENCE_BYTES + 1, 1));
   await mkdir(join(tree, ...`${ONE}folder`.split("/")), { recursive: true });
   await put(tree, "secret.png", PNG);
+  await repo.write(tree, withLinks(card("STORY-4", "story", "FEAT-1", "In Progress"), [`${FOUR}secret.txt`]));
+  await put(tree, "src/secret.txt", "secret");
+  await symlink(join(tree, "src"), join(tree, ...FOUR.slice(0, -1).split("/")), "junction");
   try {
     await symlink(join(tree, "secret.png"), join(tree, ...`${ONE}link.png`.split("/")), "file");
   } catch {
@@ -120,7 +126,9 @@ describe("AC3: any other file reads back as a file to open", () => {
 
   it("opens a copy in the app's data folder, never the original", async () => {
     const { file } = await files.open(repo.main, "STORY-1", `${ONE}notes.txt`);
-    expect(relative(join(data, EVIDENCE_OPEN_DIR), file).startsWith("..")).toBe(false);
+    const rel = relative(join(data, EVIDENCE_OPEN_DIR), file);
+    expect(rel.startsWith("..")).toBe(false);
+    expect(isAbsolute(rel)).toBe(false);
     expect(file.endsWith("notes.txt")).toBe(true);
     expect(await readFile(file, "utf8")).toBe("All green.\n");
   });
@@ -150,6 +158,11 @@ describe("AC4: evidence that can't be shown says why, and nothing else is read",
     expect(await files.read(repo.main, "STORY-1", `${ONE}link.png`)).toEqual({ ok: false, problem: "unreadable" });
   });
 
+  it("refuses a story folder that is a junction into the checkout, for reading and opening", async () => {
+    expect(await files.read(repo.main, "STORY-4", `${FOUR}secret.txt`)).toEqual({ ok: false, problem: "unreadable" });
+    await expect(files.open(repo.main, "STORY-4", `${FOUR}secret.txt`)).rejects.toThrow("Can't open evidence");
+  });
+
   it("refuses a symbolic link git has for a merged story", async ({ skip }) => {
     const mode = repo.git(repo.main, "ls-tree", "feature/1", "--", `${THREE}link.png`).split(" ")[0];
     if (mode !== "120000") skip("this machine's git didn't store a symbolic link");
@@ -163,6 +176,30 @@ describe("AC4: evidence that can't be shown says why, and nothing else is read",
 
   it("says a card that isn't there is gone", async () => {
     await expect(files.read(repo.main, "STORY-9", `${ONE}shot.png`)).rejects.toThrow("That card is gone.");
+  });
+});
+
+describe("reading evidence while the card is shown", () => {
+  it("reads from the watch's last scan, so a screen of screenshots doesn't rescan every card", async () => {
+    let scans = 0;
+    const counted = {
+      ...scanner,
+      scan: (...args: Parameters<typeof scanner.scan>) => (scans++, scanner.scan(...args)),
+    };
+    const watches = createWorkWatches(counted, () => {});
+    const { stop } = await watches.watch(repo.main, () => {});
+    try {
+      const shown = createEvidenceFiles({ scan: watches.shown, dataDir: data, log: () => {} });
+      const before = scans;
+      for (const path of [`${ONE}shot.png`, `${ONE}notes.txt`, `${ONE}gone.png`])
+        await shown.read(repo.main, "STORY-1", path);
+      expect(await shown.read(repo.main, "STORY-1", `${ONE}shot.png`)).toMatchObject({ ok: true, kind: "image" });
+      await shown.open(repo.main, "STORY-1", `${ONE}notes.txt`);
+      expect(scans).toBe(before);
+    } finally {
+      stop();
+      watches.close();
+    }
   });
 });
 

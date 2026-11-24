@@ -127,7 +127,7 @@ export function ReviewScreen({
   const { review, loading, error } = useReview(work, dir, id);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
-  const evidence = useMemo(() => ({ dir, work }), [dir, work]);
+  const evidence = useMemo(() => ({ dir, work, revision: review }), [dir, work, review]);
   return (
     <EvidenceContext.Provider value={evidence}>
       <section className="review-screen" aria-label={REVIEW_COPY.reviewOf(id)} data-view="review">

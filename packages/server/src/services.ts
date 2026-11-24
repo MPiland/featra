@@ -258,7 +258,7 @@ export function createServices({
     agents,
     needs: async (listener) => needs.watch(listener),
     diffs,
-    evidence: createEvidenceFiles({ scan: watches.scan, gitCommand, dataDir, log }),
+    evidence: createEvidenceFiles({ scan: watches.shown, gitCommand, dataDir, log }),
   });
   // Saved settings that change a project's auto-merge setting in effect rescan it and re-check auto-merge (STORY-61).
   const settingsChanges = createSettingsChanges({

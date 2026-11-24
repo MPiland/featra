@@ -138,6 +138,36 @@ describe("evidence that is missing or unreadable says so (STORY-72 AC4)", () => 
   });
 });
 
+/** The story's card after an agent's report ticks a criterion: a new revision the server pushes. */
+const reported = (from: Card[]): Card => {
+  const story = from.find((c) => c.id === STORY);
+  if (!story) throw new Error(`No ${STORY}`);
+  const acs = [...story.acs];
+  const third = acs[2];
+  if (!third) throw new Error(`No third criterion on ${STORY}`);
+  acs[2] = { ...third, done: true };
+  return { ...story, acs };
+};
+
+describe("evidence is read again when the card changes (STORY-72 AC1, AC4)", () => {
+  it("shows a file attached since, and a file a read couldn't get before, once the card changes", async () => {
+    const disk = { ...files };
+    const app = await openPane(disk);
+    expect(await within(criterion(app.pane, ACS[2])).findByText("Evidence missing")).toBeTruthy();
+    expect(within(criterion(app.pane, ACS[3])).getByText("Can't open evidence")).toBeTruthy();
+    // The agent attaches the missing file, and the server can read the other again (its scan had failed).
+    disk[GONE] = { ok: true, kind: "image", name: "gone.png", mime: "image/png", data: PNG };
+    disk[BROKEN] = { ok: true, kind: "file", name: "broken.png" };
+    app.pushCard(PROJECT.dir, reported(cards()));
+    expect(await within(criterion(app.pane, ACS[2])).findByRole("button", { name: "Open gone.png" })).toBeTruthy();
+    expect(await within(criterion(app.pane, ACS[3])).findByRole("link", { name: "broken.png" })).toBeTruthy();
+    expect(within(app.pane).queryByText("Evidence missing")).toBeNull();
+    expect(within(app.pane).queryByText("Can't open evidence")).toBeNull();
+    // The screenshot read before stays shown while it is read again.
+    expect(within(criterion(app.pane, ACS[0])).getByRole("button", { name: "Open open.png" })).toBeTruthy();
+  });
+});
+
 describe("the review screen shows the same evidence (STORY-72 AC1, AC2, AC3, AC4)", () => {
   const FEATURE = cardOf({ id: "FEAT-2", type: "feature", status: "active", title: "Folders" });
   const story = withEvidence(cardOf({ id: STORY, type: "story", parent: "FEAT-2", status: "In Progress" }));
