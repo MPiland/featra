@@ -85,7 +85,6 @@ export function createServices({
     lane,
     checks: (dir, id) => checks.checksFor(dir, id) ?? features.checksFor(dir, id),
     prState: (dir, id) => prs.prState(dir, id) ?? features.prState(dir, id),
-    merge: (dir, id) => features.mergeState(dir, id),
   });
   const checkSettings = createCheckSettings({ scan: watches.scan, now, dataDir, gitCommand, ghCommand, ghTimeoutMs });
   const checks = createStoryChecks({

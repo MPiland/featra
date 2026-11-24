@@ -9,7 +9,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, beforeEach } from "vitest";
-import { parseCard, type Card, type Notice } from "@featra/work-format";
+import { parseCard, serializeCard, toIso, withFeatureAccepted, type Card, type Notice } from "@featra/work-format";
 import { createAllowedProjects, type AllowedProjects } from "../src/allowed-projects.ts";
 import { createCardLane } from "../src/card-lane.ts";
 import type { ChatManager } from "../src/chat-manager-types.ts";
@@ -18,7 +18,7 @@ import { createFeatureEnd, type FeatureEnd } from "../src/feature-end.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createScanner } from "../src/work-scan.ts";
 import { createWorkWatches, type WorkWatches } from "../src/work-watch.ts";
-import { card, cardRepo, type CardRepo } from "./card-repo.ts";
+import { card, cardPath, cardRepo, type CardRepo } from "./card-repo.ts";
 import { FAKE_GH_TIMEOUT_MS, fakeGh, type FakeGh, type FakeGhState } from "./fake-gh.ts";
 import { manualClock, MINUTE } from "./manual-clock.ts";
 import { TEST_PROCESS_LIMIT_MS } from "./until.ts";
@@ -75,6 +75,15 @@ export interface FeatureWorld {
   onMain: () => Card;
   /** A commit of `file` on `branch`, which isn't checked out. */
   commitOn: (branch: string, file: string, text: string) => Promise<void>;
+  /**
+   * The user's Accept committed onto the feature branch, as a failed Approve leaves it (STORY-70): Merge to main is then
+   * the retry. Written with work-format's own rules.
+   */
+  acceptOnBranch: () => Promise<void>;
+  /** Featra quits and starts again: a new feature end over the same project, its memory gone. */
+  restart: () => Promise<void>;
+  /** The feature's PR merged on GitHub by someone else, at the branch's tip there; the merge commit. */
+  mergedOnGithub: () => Promise<string>;
   tip: (branch: string) => string;
   parents: (cwd: string, rev: string) => string[];
   remoteGit: (...args: string[]) => string;
@@ -109,6 +118,23 @@ export function featureWorld(): FeatureWorld {
       }),
   };
 
+  let checkTimeoutMs = TEST_PROCESS_LIMIT_MS;
+  const build = () =>
+    createFeatureEnd({
+      scan: w.watches.scan,
+      observe: w.watches.observe,
+      allowed: w.allowed,
+      settings: w.settings,
+      chats,
+      now: w.clock.now,
+      timers: w.clock.timers,
+      lane,
+      log: () => {},
+      ghCommand: w.gh.command,
+      ghTimeoutMs: FAKE_GH_TIMEOUT_MS,
+      checkTimeoutMs,
+    });
+
   w.settle = async () => {
     await w.watches.scan(w.repo.main);
     await w.features.idle();
@@ -123,6 +149,21 @@ export function featureWorld(): FeatureWorld {
   w.onMain = () => parseCard(w.repo.show(w.repo.main, "main", "FEAT-1"));
   w.commitOn = (branch, file, text) =>
     w.repo.commitOn(branch, (tree) => writeFile(join(tree, file), text), `${branch}: ${file}`);
+  w.mergedOnGithub = async () => {
+    const base = w.remoteGit("rev-parse", "main");
+    const head = w.remoteGit("rev-parse", FEATURE_BRANCH);
+    const tree = w.remoteGit("merge-tree", "--write-tree", base, head).split("\n")[0]!;
+    const merge = w.remoteGit("commit-tree", tree, "-p", base, "-p", head, "-m", "Merge pull request #1");
+    w.remoteGit("update-ref", "refs/heads/main", merge, base);
+    await w.gh.change((s) => {
+      s.prs[0]!.state = "MERGED";
+    });
+    return merge;
+  };
+  w.acceptOnBranch = () => {
+    const accepted = withFeatureAccepted(w.onFeature(), "user", toIso(w.clock.now()));
+    return w.commitOn(FEATURE_BRANCH, cardPath("FEAT-1"), serializeCard(accepted));
+  };
   w.tip = (branch) => w.repo.git(w.repo.main, "rev-parse", `refs/heads/${branch}`).trim();
   w.parents = (cwd, rev) => w.repo.git(cwd, "log", "-1", "--format=%P", rev).trim().split(" ").filter(Boolean);
   w.remoteGit = (...args) => w.repo.git(w.remote, ...args).trim();
@@ -158,21 +199,15 @@ export function featureWorld(): FeatureWorld {
     });
     await w.settings.set(repo.main, { confirm: ["command"] });
     w.allowed.set([repo.main]);
-    w.features = createFeatureEnd({
-      scan: w.watches.scan,
-      observe: w.watches.observe,
-      allowed: w.allowed,
-      settings: w.settings,
-      chats,
-      now: w.clock.now,
-      timers: w.clock.timers,
-      lane,
-      log: () => {},
-      ghCommand: w.gh.command,
-      ghTimeoutMs: FAKE_GH_TIMEOUT_MS,
-      checkTimeoutMs: options.checkTimeoutMs ?? TEST_PROCESS_LIMIT_MS,
-    });
+    checkTimeoutMs = options.checkTimeoutMs ?? TEST_PROCESS_LIMIT_MS;
+    w.features = build();
     await w.watches.watch(repo.main, () => {});
+    await w.settle();
+  };
+  w.restart = async () => {
+    w.features.close();
+    await w.features.idle();
+    w.features = build();
     await w.settle();
   };
 

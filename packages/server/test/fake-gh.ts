@@ -42,6 +42,11 @@ export interface FakeGhState {
   next: number;
   /** When set, merging a PR fails with this message, as a branch rule would make it (STORY-12). */
   mergeFails?: string;
+  /**
+   * When set, GitHub merges the PR but `gh` then fails with this message, as when the connection drops before GitHub's
+   * answer arrives (STORY-70 review).
+   */
+  mergeLost?: string;
   /** When set, closing a PR fails with this message (STORY-58). */
   closeFails?: string;
   /** When set, opening a PR fails with this message. */

@@ -3,7 +3,6 @@ import { AcceptStory } from "./AcceptStory.tsx";
 import { HoldStory } from "./HoldStory.tsx";
 import { MergeStory } from "./MergeStory.tsx";
 import { AbandonStory } from "./AbandonStory.tsx";
-import { FeatureEnd } from "./FeatureEnd.tsx";
 import { ReviewButton } from "./ReviewButton.tsx";
 import { StoryAgent } from "./story-agents.tsx";
 
@@ -19,7 +18,7 @@ export interface CardStageActionsProps {
 
 /**
  * What the card pane offers for where a story or feature is in its flow: a story's agent, Accept and Send back,
- * Merge, Hold and Abandon; a feature's end and its review screen (STORY-69).
+ * Merge, Hold and Abandon; a feature's review screen (STORY-69), where it is approved and merged (STORY-70).
  */
 export function CardStageActions({ work, dir, id, view, readOnly, onClose }: CardStageActionsProps) {
   return (
@@ -68,13 +67,8 @@ export function CardStageActions({ work, dir, id, view, readOnly, onClose }: Car
         </div>
       )}
       {view.type === "feature" && (
+        // A feature is approved and merged on its review screen (STORY-70): its card links there.
         <div className="draft-actions card-actions">
-          <FeatureEnd
-            key={`end-${id}`}
-            id={id}
-            end={view.featureEnd}
-            actions={{ accept: () => work.acceptFeature(dir, id), merge: () => work.mergeFeature(dir, id) }}
-          />
           <ReviewButton id={id} status={view.status} />
         </div>
       )}

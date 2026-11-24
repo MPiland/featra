@@ -231,7 +231,7 @@ export function createApi({
       case "bug.propose":
       case "bug.file":
         return bugApi(method, params);
-      case "feature.accept":
+      case "feature.approve":
       case "feature.createPr":
       case "feature.rerunChecks":
       case "feature.merge":

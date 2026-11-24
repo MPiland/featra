@@ -3,7 +3,14 @@
  * (STORY-69). Both are picks over the project's scan, so each pushes again whenever the scan changes: a story moving,
  * a check finishing or proof arriving (both rescan), a PR read, or git's diff stats read for the review.
  */
-import { buildFeatureReview, featureRowOf, summaryOf, type FeatureReview, type WorkList } from "@featra/work-format";
+import {
+  buildFeatureReview,
+  featureApprovalOf,
+  featureRowOf,
+  summaryOf,
+  type FeatureReview,
+  type WorkList,
+} from "@featra/work-format";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import type { Connection } from "./api.ts";
 import { cardViewIn, ownedIn } from "./card-actions.ts";
@@ -36,10 +43,9 @@ export function createWatchApi({ watches, allowed, checks, prs, features, diffs,
       id,
       checks.checksFor(dir, id) ?? features?.checksFor(dir, id),
       prs.prState(dir, id) ?? features?.prState(dir, id),
-      features?.mergeState(dir, id),
     );
 
-  /** Feature `id`'s review screen; null when `id` isn't a feature with a Work row. */
+  /** Feature `id`'s review screen, with where its approval stands; null when `id` isn't a feature with a Work row. */
   function reviewIn(dir: string, scan: Scan | null, list: WorkList, id: string): FeatureReview | null {
     const view = viewIn(dir, scan);
     const feature = view(id);
@@ -54,6 +60,12 @@ export function createWatchApi({ watches, allowed, checks, prs, features, diffs,
       summary: summaryOf(owned),
       repo: diffs?.repo(dir) ?? null,
       base: scan.collected.git.baseBranch,
+      approval: featureApprovalOf(
+        owned,
+        scan.resolution.cards.map((c) => c.card),
+        scan.collected.config,
+        features?.mergeState(dir, id),
+      ),
     });
   }
 

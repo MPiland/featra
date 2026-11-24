@@ -3229,3 +3229,73 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - **BUG-39, found by the gate:** `vi.waitFor` and `vi.waitUntil` keep vitest's own 1 s default, which the hang
   guard doesn't set. The BUG-28 wait scan now flags one left at that default; the one in story-acceptance.test.ts
   waits with `until`.
+
+## 2026-11-23 — STORY-70 Approve merges the feature to main (developer)
+
+- **Approve is one click: Accept and Merge to main together.** It merges a finished feature (every story and bug Done
+  or Cancelled, at least one Done) through FeatureEnd's own merge path (ADR 0037): the facts are judged, the merge goes
+  ahead only at the judged tips, a merge commit, never a rebase, with the same reasons in the same order. The user's
+  Accept is carried in the Done card (`accepted` by `user`, then `merged` and Done by `system`). Nothing is committed to
+  the feature branch first, so the merge is at the commit whose checks passed.
+- **A merge that fails after Approve keeps the Accept.** Any refusal or failure of the merge records the Accept on the
+  feature branch, as Accept did, and the error is shown in one sentence. The screen's button is then "Merge to main",
+  with the same reasons beside it: it is the retry. When main moved, the Dev Lead is told to merge main in, as before.
+- **The feature's PR opens once it is finished, not on Accept.** With GitHub usable and `openFeaturePrs` on, the
+  server opens (or adopts) the PR as soon as the feature is finished, so CI has run before the user approves. Create
+  PR and Re-run are offered for a finished feature too. Facts and checks are read for finished features, not only
+  accepted ones. A PR that fails to open leaves its note and isn't retried on every read.
+- **A PR merged on GitHub settles only with the user's yes.** A finished feature whose PR merged on GitHub before the
+  user approved or accepted it isn't settled; its facts are dropped. A PR merged by Approve whose Done card couldn't be
+  committed onto main then (for example GitHub couldn't be fetched) settles on a later read with the Accept: the
+  server remembers, in memory, that the user approved it.
+- **The approval is part of the review.** `review.watch` carries `approval` (step `approve`, `merge` or `merged`;
+  `ready`; `reason`; `base`), built by work-format's `featureApprovalOf`: the unfinished stories first, then the merge's
+  reason, or "Checking…" before the first read. Once merged, the screen says "Merged to main" with any leftover notes.
+- **The card pane has no Accept or Merge.** A feature's card pane keeps Review, its link to the screen; its PR and
+  Checks sections stay. The socket method `feature.accept` is replaced by `feature.approve`.
+- **Tests changed by the spec, not weakened:** the card pane's Accept and Merge tests moved to the review screen
+  (feature-end.test.tsx), the e2e `merge-feature.spec.ts` became `approve-feature.spec.ts`, and the server's "Create PR
+  isn't offered before Accept" became "isn't offered before the feature is finished" plus "is offered once finished,
+  before any Accept".
+- **"Accept opens the PR when it fails to write" now starts from a failed auto-open.** The review test (Should-fix 5)
+  kept its assertions; its PR's first open fails (`createFails`), so Accept is still the one that opens it.
+- **A read that opens the PR stops once FeatureEnd closes.** That test exposed a read opening the PR as the server
+  closed and then scanning, which reopened the project's index and held its files (the test's cleanup hung on
+  Windows). `openPr` and `refresh` now stop when closed; the test is its regression.
+- **ADR 0037 is amended** for Approve, the PR opening at finish and the settle rule.
+
+## 2026-11-23 — STORY-70 review fixes (developer)
+
+- **A PR merged on GitHub at the branch's commit before Approve no longer waits forever.** Its facts say `landed`
+  (`FeatureMergeFacts.pr`), which nothing else outranks: Approve stays on, and the screen says "Merged on GitHub.
+  Approve to finish." Approve then settles it with the user's Accept in the Done card; `gh pr merge` isn't called. This
+  supersedes "its facts are dropped" above; a PR merged at another commit still waits, saying so.
+- **Approvals are durable.** The user's Approve is recorded before its merge starts in
+  `<git common dir>/featra/approved.json` (server `feature-approvals.ts`), beside the card index, so every checkout
+  shares it and nothing is committed. A PR merged by Approve whose Done card couldn't be committed then settles on a
+  later read, after a restart too. An approval is dropped once its feature is no longer finished and unaccepted
+  (settled, or its Accept recorded on the branch); what was read is forgotten on unwatch.
+- **GitHub's word decides after a `gh` failure.** When `gh pr merge` fails, the PR is read again; merged at the judged
+  tip, it settles as Featra's instead of recording the Accept on the branch.
+- **A Done card main can't take now says Featra will finish it.** The merge's note is "Merged. Featra will mark it Done
+  on main." (`FEATURE_END_MESSAGES.settleLater`), also beside Merge to main for a landed, accepted feature. A read checks
+  a merged PR before whether main has the branch, so a user's pull of GitHub's merge doesn't skip the settle.
+  After such a pull main owns the feature's card (its branch is in main's history and not checked out), so the read and
+  the settle also look at a feature whose card on main isn't Done yet (server `lookAtLanded`).
+- **One source of truth for a feature's checks on the review screen (from the screenshot review).** A feature with a
+  PR shows its checks on the PR line only; the empty "No checks run yet" Checks section is hidden then, rather than
+  mirroring the PR's checks into a second place. Checks run here still show their own section. Without a PR the
+  empty section stays.
+- **A merged feature's PR reads Merged.** The server stops reading a merged feature's PR, so the review screen shows
+  the PR as Merged from the card's own merge record (the approval's `merged` step), as it shows Open before.
+- **A merged feature's stat stays what it merged.** The feature's files and lines were its branch against the base
+  (`base...feature`), which is empty once the base has the feature. Once it does, the range starts at the first parent
+  of the base's merge of the feature's tip (server `review-diffs.ts`), so later commits on main stay out. A feature
+  that reached the base without a merge commit keeps the old range.
+- **Merge to main waits for the stories as Approve does.** The retry is off, and refused, while a story or bug under
+  the feature isn't Done or Cancelled, with that reason first.
+- **The server's separate Accept is gone.** `features.accept`, its PR-opening path and the card pane's unused
+  `CardView.featureEnd` are removed; their tests were ported to Approve, Merge to main after the Accept on the branch,
+  and Create PR's retry (review Should-fix 5 now proves the PR's record is retried, adopting the PR GitHub has).
+- **Tests changed by the spec, not weakened:** "doesn't settle a PR merged on GitHub before the user approved it" now
+  expects the landed state instead of no facts, and "settles later" expects the new note.

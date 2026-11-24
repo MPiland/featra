@@ -1,7 +1,7 @@
 /**
- * STORY-14 with GitHub usable: Accept opens the feature's PR to main when "Open feature PRs automatically" is on, Create
- * PR does when it is off, Merge to main merges the PR with a merge commit once CI passes at the branch's commit, and a
- * PR merged on GitHub outside Featra is noticed. Real feature end, PRs, merge, settle, poller, scanner, card lane and
+ * STORY-14 and STORY-70 with GitHub usable: a finished feature's PR to main opens on its own when "Open feature PRs
+ * automatically" is on, Create PR opens it when it is off, Merge to main merges the PR with a merge commit once CI
+ * passes at the branch's commit, and a PR merged on GitHub outside Featra is noticed. Real feature end, PRs, merge, settle, poller, scanner, card lane and
  * work-format rules on a real repository; GitHub is the fake `gh` over a bare remote, and the clock and the chat
  * manager are faked.
  */
@@ -23,22 +23,24 @@ const passing = async () =>
   });
 
 describe("the feature's PR (AC2)", () => {
-  it("opens to main as Accept pushes the feature branch, when feature PRs open automatically", async () => {
+  // STORY-70 moved this from Accept to the feature being finished: its PR's CI runs before Approve.
+  it("opens to main once the feature is finished, pushing its branch, when feature PRs open automatically", async () => {
     await w.start(ci);
-    await w.features.accept(dir(), ID);
     const [pr] = (await w.gh.load()).prs;
     expect(pr).toMatchObject({ url: PR, head: FEATURE_BRANCH, base: "main", state: "OPEN" });
     const card = w.onFeature();
     expect(card.pr).toBe(PR);
-    expect(evidenceState(card).accepted).toBe(true);
-    await w.settle();
+    expect(evidenceState(card).accepted).toBe(false);
+    await w.acceptOnBranch();
+    await w.poll();
+    expect(evidenceState(w.onFeature()).accepted).toBe(true);
     // The accept's own commit is pushed too: GitHub's branch is where the local one is.
     expect(w.remoteGit("rev-parse", FEATURE_BRANCH)).toBe(w.tip(FEATURE_BRANCH));
   });
 
   it("isn't opened when that is off: the feature offers Create PR, which opens it", async () => {
     await w.start({ ...ci, yaml: "openFeaturePrs: false\n" });
-    await w.features.accept(dir(), ID);
+    await w.acceptOnBranch();
     await w.settle();
     expect((await w.gh.load()).prs).toEqual([]);
     expect(w.onFeature().pr).toBeNull();
@@ -49,17 +51,26 @@ describe("the feature's PR (AC2)", () => {
     expect((await w.gh.load()).prs[0]).toMatchObject({ head: FEATURE_BRANCH, base: "main" });
   });
 
-  it("isn't offered before Accept", async () => {
-    await w.start({ ...ci, yaml: "openFeaturePrs: false\n" });
-    await expect(w.features.createPr(dir(), ID)).rejects.toThrow(FEATURE_END_MESSAGES.notAccepted(ID));
+  // STORY-70 moved this from "before Accept" to "before the feature is finished": its PR's CI runs before Approve.
+  it("isn't offered before the feature is finished", async () => {
+    await w.start({ ...ci, yaml: "openFeaturePrs: false\n", story2: "In Progress" });
+    await expect(w.features.createPr(dir(), ID)).rejects.toThrow(FEATURE_END_MESSAGES.unfinished(ID, 1));
     expect(w.features.prState(dir(), ID)).toBeUndefined();
+  });
+
+  it("is offered once the feature is finished, before any Accept (STORY-70)", async () => {
+    await w.start({ ...ci, yaml: "openFeaturePrs: false\n" });
+    expect(w.features.prState(dir(), ID)).toMatchObject({ create: true, opening: false });
+    await expect(w.features.createPr(dir(), ID)).resolves.toBeNull();
+    expect(w.onFeature().pr).toBe(PR);
+    expect(evidenceState(w.onFeature()).accepted).toBe(false);
   });
 });
 
 describe("Merge to main through the PR (AC3, AC5)", () => {
   it("waits for CI at the branch's commit, then merges the PR with a merge commit and makes the feature Done", async () => {
     await w.start(ci);
-    await w.features.accept(dir(), ID);
+    await w.acceptOnBranch();
     await w.settle();
     expect(state()).toEqual({ mergeable: false, blocked: FEATURE_END_MESSAGES.pending });
     await passing();
@@ -84,7 +95,7 @@ describe("Merge to main through the PR (AC3, AC5)", () => {
 
   it("stays off while CI fails", async () => {
     await w.start(ci);
-    await w.features.accept(dir(), ID);
+    await w.acceptOnBranch();
     await w.gh.change((s) => {
       for (const pr of s.prs) pr.checks = [checkRun("FAILURE")];
     });
@@ -96,16 +107,9 @@ describe("Merge to main through the PR (AC3, AC5)", () => {
 
   it("notices a PR merged on GitHub outside Featra, and settles it the same way", async () => {
     await w.start(ci);
-    await w.features.accept(dir(), ID);
-    await w.settle();
-    const base = w.remoteGit("rev-parse", "main");
-    const head = w.remoteGit("rev-parse", FEATURE_BRANCH);
-    const tree = w.remoteGit("merge-tree", "--write-tree", base, head).split("\n")[0]!;
-    const merge = w.remoteGit("commit-tree", tree, "-p", base, "-p", head, "-m", "Merge pull request #1");
-    w.remoteGit("update-ref", "refs/heads/main", merge, base);
-    await w.gh.change((s) => {
-      s.prs[0]!.state = "MERGED";
-    });
+    await w.acceptOnBranch();
+    await w.poll();
+    const merge = await w.mergedOnGithub();
     await w.poll();
     expect(await w.callsOf("pr merge")).toEqual([]);
     expect(w.parents(dir(), "main")).toEqual([merge]);

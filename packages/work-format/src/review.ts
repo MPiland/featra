@@ -4,6 +4,7 @@
  * and the Dev Lead's summary from the feature's card. Pure; no tokens are spent on any of it.
  */
 import type { CardView } from "./card-view-types.ts";
+import type { FeatureApproval } from "./feature-end-copy.ts";
 import { mergeCommitMessage } from "./merge.ts";
 import { githubPrUrl, safeBranch } from "./prs.ts";
 import type { DiffStat, FeatureReview, ReviewItem, ReviewSummary } from "./review-types.ts";
@@ -37,9 +38,12 @@ export interface ReviewInputs {
   /** The project's GitHub repository (`owner/name`); null when it has none. */
   repo: string | null;
   base: string;
+  /** Where the feature's approval stands (`featureApprovalOf`). */
+  approval: FeatureApproval | null;
 }
 
-export function buildFeatureReview({ row, feature, view, diff, summary, repo, base }: ReviewInputs): FeatureReview {
+export function buildFeatureReview(inputs: ReviewInputs): FeatureReview {
+  const { row, feature, view, diff, summary, repo, base, approval } = inputs;
   const items = row.stories.flatMap((s): ReviewItem[] => {
     const v = s.tone === "cancelled" ? null : view(s.id);
     if (!v) return [];
@@ -55,6 +59,7 @@ export function buildFeatureReview({ row, feature, view, diff, summary, repo, ba
     summary,
     diff: diff(feature.id),
     files: prFilesUrl(feature.pr) ?? compareUrl(repo, base, row.branch ?? null),
+    approval,
   };
 }
 

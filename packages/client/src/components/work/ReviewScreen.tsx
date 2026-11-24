@@ -1,13 +1,14 @@
 import { useEffect, useRef } from "react";
 import { REVIEW_COPY, type FeatureReview, type ReviewItem } from "@featra/work-format/review";
-import { CARD_COPY } from "../../card-pane.ts";
+import { CARD_COPY, type CardView } from "../../card-pane.ts";
 import type { WorkBridge } from "../../work-list.ts";
+import { FeatureEnd } from "./FeatureEnd.tsx";
 import { DiffLine, ExternalLink, ReviewItemCard } from "./ReviewItem.tsx";
 import { StoryChecks } from "./StoryChecks.tsx";
 import { StoryPr } from "./StoryPr.tsx";
 import { useReview } from "./useReview.ts";
 
-type Actions = Pick<WorkBridge, "rerunFeatureChecks" | "createFeaturePr">;
+type Actions = Pick<WorkBridge, "rerunFeatureChecks" | "createFeaturePr" | "approveFeature" | "mergeFeature">;
 
 function Items({ title, items, empty }: { title: string; items: ReviewItem[]; empty?: string }) {
   if (items.length === 0 && !empty) return null;
@@ -29,10 +30,22 @@ function Items({ title, items, empty }: { title: string; items: ReviewItem[]; em
   );
 }
 
+/**
+ * The feature as its PR section shows it: once the feature merged, its PR reads Merged, as the card's merge record says,
+ * since the server stops reading the PR of a merged feature.
+ */
+function prView(review: FeatureReview): CardView {
+  const { feature, approval } = review;
+  if (approval?.step !== "merged" || !feature.pr) return feature;
+  const pr = feature.prState ?? { status: null, create: false, opening: false, note: null };
+  return { ...feature, prState: { ...pr, status: { state: "merged", checks: pr.status?.checks ?? "none" } } };
+}
+
 /** The whole review, below its title. */
 function ReviewBody({ review, dir, work }: { review: FeatureReview; dir: string; work: Actions }) {
   const { feature, progress, breakdown, scope, summary } = review;
   const id = feature.id;
+  const pr = prView(review);
   return (
     <>
       <div className="rv-meta rv-facts">
@@ -49,6 +62,11 @@ function ReviewBody({ review, dir, work }: { review: FeatureReview; dir: string;
           />
         )}
       </div>
+      <FeatureEnd
+        id={id}
+        approval={review.approval}
+        actions={{ approve: () => work.approveFeature(dir, id), merge: () => work.mergeFeature(dir, id) }}
+      />
       {summary && (
         // Only when the Dev Lead wrote one: no heading stands empty.
         <section className="card-sec rv-summary" aria-label={REVIEW_COPY.summary}>
@@ -62,14 +80,17 @@ function ReviewBody({ review, dir, work }: { review: FeatureReview; dir: string;
       {feature.checks ? (
         <StoryChecks checks={feature.checks} readOnly={false} onRerun={() => work.rerunFeatureChecks(dir, id)} />
       ) : (
-        <section className="card-sec" aria-label={CARD_COPY.checks.title}>
-          <h3 className="sh">
-            <span>{CARD_COPY.checks.title}</span>
-          </h3>
-          <p className="checks-status meta">{CARD_COPY.checks.none}</p>
-        </section>
+        // With a PR, its checks are the feature's checks, on the PR line: no empty Checks section contradicts them.
+        !feature.pr && (
+          <section className="card-sec" aria-label={CARD_COPY.checks.title}>
+            <h3 className="sh">
+              <span>{CARD_COPY.checks.title}</span>
+            </h3>
+            <p className="checks-status meta">{CARD_COPY.checks.none}</p>
+          </section>
+        )
       )}
-      {(feature.pr || feature.prState) && <StoryPr view={feature} onCreate={() => work.createFeaturePr(dir, id)} />}
+      {(feature.pr || feature.prState) && <StoryPr view={pr} onCreate={() => work.createFeaturePr(dir, id)} />}
       <Items title={REVIEW_COPY.stories} items={review.stories} empty={REVIEW_COPY.noStories} />
       <Items title={REVIEW_COPY.bugs} items={review.bugs} />
     </>
@@ -78,7 +99,8 @@ function ReviewBody({ review, dir, work }: { review: FeatureReview; dir: string;
 
 /**
  * A feature's review screen (STORY-69): the whole feature on one screen, built by the server from its cards and git
- * at no token cost, and live while open. Back returns to the Work list.
+ * at no token cost, and live while open, with Approve, which accepts and merges it (STORY-70). Back returns to the Work
+ * list.
  */
 export function ReviewScreen({
   work,

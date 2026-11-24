@@ -127,7 +127,7 @@ export interface ProjectConfig {
   linkedTestCommand: string | null;
   /** Whether a story's PR is opened when it moves to review (STORY-11); off, the card offers Create PR. */
   openStoryPrs: boolean;
-  /** Whether an accepted feature's PR to main is opened (STORY-14); off, the feature offers Create PR. */
+  /** Whether a feature's PR to main opens once it is finished (STORY-14, STORY-70); off, it offers Create PR. */
   openFeaturePrs: boolean;
   /** How often open PRs are read again, in minutes (STORY-11). */
   prRefreshMinutes: number;

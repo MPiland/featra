@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   appendHistory,
   DEFAULT_CONFIG,
+  FEATURE_END_MESSAGES,
   mergeCommitMessage,
   newCard,
   provenEvent,
@@ -237,6 +238,24 @@ describe("a feature's review screen (STORY-69)", () => {
     await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
     await until(() => item(review(), "STORY-1")?.diff != null);
     expect(item(review(), "STORY-1")?.diff).toEqual({ files: 2, added: 5, removed: 0 });
+  });
+
+  it("still counts what the feature merged once main has it, with main's later commits left out (STORY-70 AC5)", async () => {
+    // GitHub's merge of the feature's PR, pulled into main, then a card commit on main after it, as settling makes.
+    repo.git(repo.main, "merge", "-q", "--no-ff", "-m", "Merge pull request #1 from acme/feature/1-review", FEATURE);
+    await writeFile(join(repo.main, "later.txt"), "later\n");
+    repo.commit(repo.main, "FEAT-1: merged into main");
+    await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
+    await until(() => review()?.diff != null);
+    expect(review()?.diff).toEqual({ files: 1, added: 3, removed: 0 });
+  });
+
+  it("carries Approve, off with the unfinished items first, and refuses it (STORY-70 AC2)", async () => {
+    await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
+    await until(() => review()?.approval != null);
+    const reason = FEATURE_END_MESSAGES.unfinished("FEAT-1", 2);
+    expect(review()?.approval).toEqual({ step: "approve", ready: false, reason, base: "main" });
+    await expect(ask("feature.approve", { dir: repo.main, id: "FEAT-1" })).rejects.toThrow(reason);
   });
 
   it("is null for an id that isn't a feature", async () => {
