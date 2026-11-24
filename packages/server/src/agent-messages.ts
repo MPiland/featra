@@ -30,4 +30,9 @@ export const AGENT_MESSAGES = {
   sessionSummary: "A story session can't write a feature's summary. Report to the Dev Lead.",
   /** It reads as written by the Dev Lead, so no other chat writes it. */
   notLeadSummary: "Only the Dev Lead writes a feature's summary.",
+  noChanges: "Marking changes handled isn't available.",
+  /** The user asked the feature's Dev Lead for the changes; a story session reports its part to it. */
+  sessionChanges: "A story session can't mark a feature's changes handled. Report to the Dev Lead.",
+  /** The reply reads as written by the Dev Lead, so no other chat writes it. */
+  notLeadChanges: "Only the Dev Lead marks a feature's changes handled.",
 } as const;

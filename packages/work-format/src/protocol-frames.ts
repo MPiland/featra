@@ -58,6 +58,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "feature.createPr",
   "feature.rerunChecks",
   "feature.merge",
+  "feature.askChanges",
+  "feature.dismissChanges",
   "bug.propose",
   "bug.file",
   "story.createPr",

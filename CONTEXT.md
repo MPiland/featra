@@ -34,6 +34,10 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   It names the chat that drafted it (`drafted-by`) and shows in Work with a **Review** badge until it is approved or
   rejected. A later call from that chat updates it in place (ADR 0021). It opens as a card pane docked in that chat,
   and the chat is named for it (ADR 0022).
+- **Changes asked** — what the user asked the Dev Lead to change with "Not yet" on a feature's review screen, before
+  approving it. Each reason is sent to the feature's Dev Lead chat and logged on the feature card (`changes-asked`); the
+  round ends when the Dev Lead marks it handled with `mark_changes_handled` (its reply shows) or the user dismisses it.
+  It never blocks Approve (ADR 0042).
 
 ## Progress
 

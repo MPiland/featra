@@ -11,6 +11,7 @@ import type { DraftInput, DraftResult } from "./card-draft-input.ts";
 import type { LogFile, LogInput } from "./knowledge-log.ts";
 import type { ReportInput } from "./card-report.ts";
 import type { SummaryInput } from "./feature-summary.ts";
+import type { ChangesHandledInput } from "./feature-changes.ts";
 import type { RequestMergeInput } from "./merge.ts";
 import type { MessageInput } from "./story-notice.ts";
 import type { SpawnInput } from "./story-start.ts";
@@ -46,6 +47,8 @@ export interface AgentMethods {
   "bug.report": { params: BugReport; result: { asked: true } };
   /** The Dev Lead writes a feature's summary (STORY-69): shown on its review screen as written by the Dev Lead. */
   "feature.summary": { params: SummaryInput; result: { feature: string; message: string } };
+  /** The Dev Lead marks the changes the user asked on a feature handled, saying what it did (STORY-71). */
+  "feature.changesHandled": { params: ChangesHandledInput; result: { feature: string; message: string } };
   /**
    * An agent asks the user to do something only they can do (STORY-68); answers once the user says Done or Can't do it.
    * `call` names the call on its connection, so `action.cancel` can end it when the agent's host drops the call.
@@ -66,6 +69,7 @@ export const AGENT_METHODS = [
   "story.requestMerge",
   "bug.report",
   "feature.summary",
+  "feature.changesHandled",
   "action.request",
   "action.cancel",
 ] as const satisfies readonly AgentMethod[];

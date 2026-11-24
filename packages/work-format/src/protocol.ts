@@ -147,6 +147,15 @@ export interface ServerMethods {
    * cards; `remains` says what was left to do.
    */
   "feature.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
+  /**
+   * The review screen's "Not yet" (STORY-71): sends `reason` to the feature's Dev Lead chat as the user's message, then
+   * records it as changes asked in the feature's history. Refused with nothing recorded when the reason is empty, the
+   * feature has no Dev Lead chat open here, or the chat refuses the message. `recorded` is false when the chat has it
+   * but the history write failed. The user's only.
+   */
+  "feature.askChanges": { params: { dir: string; id: string; reason: string }; result: { recorded: boolean } };
+  /** Dismisses the changes asked on a feature (STORY-71), recorded in its history; refused when none are asked. */
+  "feature.dismissChanges": { params: { dir: string; id: string }; result: null };
   /** Where a bug believed to come from `cause` (or null) would go (STORY-13): the proposal and every place it can go. */
   "bug.propose": { params: { dir: string; cause: string | null }; result: BugPlacements };
   /**

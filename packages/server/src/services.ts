@@ -17,6 +17,7 @@ import { createDraftActions } from "./draft-actions.ts";
 import { createDraftReview } from "./draft-review.ts";
 import { createDraftWriter } from "./draft-writer.ts";
 import { createFeatureStart } from "./feature-start.ts";
+import { createFeatureChanges } from "./feature-changes.ts";
 import { createFeatureSummary } from "./feature-summary.ts";
 import { createReviewDiffs } from "./review-diffs.ts";
 import { createStoryMessage } from "./story-message.ts";
@@ -194,6 +195,8 @@ export function createServices({
     checkTimeoutMs,
   });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
+  // "Not yet" on a feature's review screen and the Dev Lead's reply to it (STORY-71).
+  const changes = createFeatureChanges({ scan: watches.scan, now, lane, chats, gitCommand });
   const bugs = createBugFiling({ scan: watches.scan, now, lane, gitCommand });
   const reports = createCardReport({
     scan: watches.scan,
@@ -219,6 +222,7 @@ export function createServices({
     merges: createMergeRequest({ scan: watches.scan, chats, merge: merges.merge, log }),
     bugs: createBugRequest({ chats, bugs, log }),
     summaries: createFeatureSummary({ scan: watches.scan, lane, now, gitCommand }),
+    changes,
     actions: createActionRequest({ chats }),
   });
   // A project the user closed takes its chats with it.
@@ -247,6 +251,7 @@ export function createServices({
     abandons,
     holds,
     features,
+    changes,
     bugs,
     busy,
     checks,

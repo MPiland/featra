@@ -13,6 +13,7 @@ import type {
   RequestMergeInput,
   SpawnInput,
   SummaryInput,
+  ChangesHandledInput,
 } from "@featra/work-format";
 
 /** What the tools reach the server through. */
@@ -37,6 +38,8 @@ export interface FeatraHost {
   reportBug: (input: BugReport) => Promise<{ asked: true }>;
   /** The Dev Lead writes a feature's summary, shown on its review screen (STORY-69). */
   summarize: (input: SummaryInput) => Promise<{ feature: string; message: string }>;
+  /** The Dev Lead marks the changes the user asked on a feature handled, with its reply (STORY-71). */
+  changesHandled: (input: ChangesHandledInput) => Promise<{ feature: string; message: string }>;
   /**
    * Asks the user to do something only they can do; answers once they say Done or Can't do it (STORY-68). `signal`
    * is the call's: when the agent's host drops the call, the request ends as cancelled.
