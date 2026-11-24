@@ -17,6 +17,7 @@ import { createDraftActions } from "./draft-actions.ts";
 import { createDraftReview } from "./draft-review.ts";
 import { createDraftWriter } from "./draft-writer.ts";
 import { createFeatureStart } from "./feature-start.ts";
+import { createFeatureChanges } from "./feature-changes.ts";
 import { createFeatureSummary } from "./feature-summary.ts";
 import { createReviewDiffs } from "./review-diffs.ts";
 import { createStoryMessage } from "./story-message.ts";
@@ -78,6 +79,8 @@ export function createServices({
   const watches = createWorkWatches(scanner, log);
   // One lane for every card write: a draft that allocates IDs and a card edit never interleave (ADR 0002).
   const lane = createCardLane();
+  // How the services that reach GitHub run git and `gh`.
+  const gh = { gitCommand, ghCommand, ghTimeoutMs };
   const copies = createCopyActions({ git: repoGit, scan: watches.scan, now, lane });
   const cards = createCardActions({
     scan: watches.scan,
@@ -106,9 +109,7 @@ export function createServices({
     timers: prTimers,
     lane,
     log,
-    gitCommand,
-    ghCommand,
-    ghTimeoutMs,
+    ...gh,
     onMerged: (dir, id) => merges.merged(dir, id),
   });
   const roles = createRoleRegistry({
@@ -151,9 +152,7 @@ export function createServices({
     settings: checkSettings,
     chats,
     checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
-    gitCommand,
-    ghCommand,
-    ghTimeoutMs,
+    ...gh,
     ending,
     onGithubMerge: (dir) => prs.refresh(dir),
   });
@@ -173,9 +172,7 @@ export function createServices({
     lane,
     settings: checkSettings,
     chats,
-    gitCommand,
-    ghCommand,
-    ghTimeoutMs,
+    ...gh,
     ending,
   });
   const features = createFeatureEnd({
@@ -188,12 +185,12 @@ export function createServices({
     timers: prTimers,
     lane,
     log,
-    gitCommand,
-    ghCommand,
-    ghTimeoutMs,
+    ...gh,
     checkTimeoutMs,
   });
   const drafts = createDraftActions({ scan: watches.scan, now, lane, chats });
+  // "Not yet" on a feature's review screen and the Dev Lead's reply to it (STORY-71).
+  const changes = createFeatureChanges({ scan: watches.scan, now, lane, chats, gitCommand });
   const bugs = createBugFiling({ scan: watches.scan, now, lane, gitCommand });
   const reports = createCardReport({
     scan: watches.scan,
@@ -218,7 +215,8 @@ export function createServices({
     checkSettings,
     merges: createMergeRequest({ scan: watches.scan, chats, merge: merges.merge, log }),
     bugs: createBugRequest({ chats, bugs, log }),
-    summaries: createFeatureSummary({ scan: watches.scan, lane, now, gitCommand }),
+    summaries: createFeatureSummary({ scan: watches.scan, lane, now, chats, gitCommand }),
+    changes,
     actions: createActionRequest({ chats }),
   });
   // A project the user closed takes its chats with it.
@@ -247,6 +245,7 @@ export function createServices({
     abandons,
     holds,
     features,
+    changes,
     bugs,
     busy,
     checks,

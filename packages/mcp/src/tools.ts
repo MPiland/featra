@@ -25,6 +25,7 @@ import { REQUEST_ACTION } from "./request-action.ts";
 import { PROPOSE_CHECK_COMMAND } from "./propose-check-command.ts";
 import { UPDATE_CARD } from "./update-card.ts";
 import { WRITE_SUMMARY } from "./write-summary.ts";
+import { MARK_CHANGES_HANDLED } from "./mark-changes-handled.ts";
 
 export { ToolRefusal, type FeatraHost, type Tool } from "./tool-types.ts";
 
@@ -235,5 +236,6 @@ export const TOOLS: readonly Tool[] = [
   REQUEST_MERGE,
   REPORT_BUG,
   WRITE_SUMMARY,
+  MARK_CHANGES_HANDLED,
   REQUEST_ACTION,
 ];

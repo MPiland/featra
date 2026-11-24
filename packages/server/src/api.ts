@@ -67,6 +67,8 @@ export interface ApiDeps {
   holds?: Pick<StoryHold, "hold">;
   /** Accepts and merges features (STORY-14). Without it the `feature.*` ending methods are refused. */
   features?: FeatureApiDeps["features"];
+  /** Asks for changes on features before Approve (STORY-71). Without it `feature.askChanges` is refused. */
+  changes?: FeatureApiDeps["changes"];
   /** Files bugs from Work's New bug (STORY-13). Without it `bug.propose` and `bug.file` are refused. */
   bugs?: Pick<BugFiling, "propose" | "file">;
   /** Why a story's session takes no message from the user now: it is merging or being abandoned. */
@@ -120,6 +122,7 @@ export function createApi({
   abandons,
   holds,
   features,
+  changes,
   bugs,
   busy,
   checks,
@@ -157,7 +160,7 @@ export function createApi({
   const roleApi = createRoleApi({ roles, roleWatches, allowed, allow, project });
   const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
   const bugApi = createBugApi({ bugs, allow });
-  const featureApi = createFeatureApi({ features, card });
+  const featureApi = createFeatureApi({ features, changes, card });
   const watchApi = createWatchApi({ watches, allowed, checks, prs, features, diffs, card });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, needs, ...(busy ? { busy } : {}) });
 
@@ -235,6 +238,8 @@ export function createApi({
       case "feature.createPr":
       case "feature.rerunChecks":
       case "feature.merge":
+      case "feature.askChanges":
+      case "feature.dismissChanges":
         return featureApi(method, params);
       case "story.rerunChecks":
         return checks.rerun(...card(params));

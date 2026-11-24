@@ -69,6 +69,11 @@ export interface HostOptions extends ChatHost, RolesHost {
   cardMerges?: Record<string, FeatureMergeState>;
   /** What git says each story, bug or feature changed, by id, on the review screen (STORY-69). Default: unknown. */
   reviewDiffs?: Record<string, DiffStat>;
+  /**
+   * What "Not yet" answers when the server refuses it, as the server words it (STORY-71): no Dev Lead chat, a busy one.
+   * Default: sent and logged in the feature's history.
+   */
+  askChangesRefusal?: string;
   /** Each folder's Checks section as the server answers it; the user's saves change it. */
   checks?: Record<string, ChecksView>;
   /** What each open project needs from the user, as the server first counts it (STORY-66). Default: nothing. */

@@ -78,5 +78,7 @@ export * from "./prs.ts";
 export * from "./feature-end.ts";
 export * from "./feature-end-copy.ts";
 export * from "./feature-summary.ts";
+export * from "./changes-types.ts";
+export * from "./feature-changes.ts";
 export * from "./review-types.ts";
 export * from "./review.ts";

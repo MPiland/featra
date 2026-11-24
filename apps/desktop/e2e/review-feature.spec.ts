@@ -145,6 +145,18 @@ test("Review a feature: summary, proof and run links, Files changed, then the De
     await picker.getByRole("button", { name: /^Dev Lead/ }).click();
     await expect(picker).toBeHidden({ timeout: 20_000 });
     await expect(composer(page)).toBeEditable();
+    // Only the feature's Dev Lead writes its summary: this chat leads FEAT-2, as the chat that drafted it does.
+    const lead = await page.locator("section.chat[data-chat]").getAttribute("data-chat");
+    expect(lead).toBeTruthy();
+    const led = `${repo.dir}-lead`;
+    git(repo.dir, "worktree", "add", "-q", led, FEATURE);
+    await writeFile(
+      join(led, ".featra", "cards", "FEAT-2-review.md"),
+      serializeCard({ ...feature, extra: { ...feature.extra, "drafted-by": String(lead) } }),
+      "utf8",
+    );
+    git(led, "commit", "-q", "-am", "FEAT-2: led by the Dev Lead's chat");
+    git(repo.dir, "worktree", "remove", led);
     await composer(page).fill("write_summary");
     await page.getByRole("button", { name: "Send", exact: true }).click();
     await expect(page.getByRole("log", { name: "Chat" })).toContainText("Tool said: Wrote the summary of FEAT-2.");

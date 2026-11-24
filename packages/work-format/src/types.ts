@@ -24,7 +24,10 @@ export type HistoryField =
   | "merged"
   | "held"
   | "not-merged"
-  | "summary";
+  | "summary"
+  | "changes-asked"
+  | "changes-handled"
+  | "changes-dismissed";
 export const HISTORY_FIELDS: readonly HistoryField[] = [
   "status",
   "parent",
@@ -40,6 +43,9 @@ export const HISTORY_FIELDS: readonly HistoryField[] = [
   "held",
   "not-merged",
   "summary",
+  "changes-asked",
+  "changes-handled",
+  "changes-dismissed",
 ];
 
 /** Append-only record of a change, written at the card's owner (ADR 0002). */

@@ -1,8 +1,10 @@
 /**
  * The review screen's bridge (STORY-69): one feature's review, live from the server's `review.watch`, which pushes it
- * again as its stories move, checks finish, proof arrives and the Dev Lead writes its summary.
+ * again as its stories move, checks finish, proof arrives and the Dev Lead writes its summary. And "Not yet" with its
+ * Dismiss (STORY-71): the changes the user asks for before approving.
  */
 import { normalizeFeatureReview, type FeatureReview } from "@featra/work-format/review";
+import { refused, sent, type ReviewResult, type SendBackResult } from "./card-pane.ts";
 import type { ServerClient } from "./server-client.ts";
 
 export type { FeatureReview };
@@ -17,6 +19,10 @@ export interface ReviewUpdate {
 export interface ReviewBridge {
   /** Calls back with feature `id`'s review now and on every change; returns the stop. */
   watchReview: (dir: string, id: string, listener: (update: ReviewUpdate) => void) => () => void;
+  /** "Not yet": sends the reason to the feature's Dev Lead chat, and logs it as changes asked (STORY-71). */
+  askChanges: (dir: string, id: string, reason: string) => Promise<SendBackResult>;
+  /** Dismisses the changes asked on the feature, logged in its history (STORY-71). */
+  dismissChanges: (dir: string, id: string) => Promise<ReviewResult>;
 }
 
 export function serverReviews(server: ServerClient): ReviewBridge {
@@ -35,6 +41,9 @@ export function serverReviews(server: ServerClient): ReviewBridge {
         },
       );
     },
+    askChanges: (dir, id, reason) => server.call("feature.askChanges", { dir, id, reason }).then(sent, refused),
+    dismissChanges: (dir, id) =>
+      server.call("feature.dismissChanges", { dir, id }).then((): ReviewResult => ({ ok: true }), refused),
   };
 }
 
@@ -45,5 +54,7 @@ export function noReviews(error: string): ReviewBridge {
       listener({ review: null, loading: false, error });
       return () => {};
     },
+    askChanges: async () => ({ ok: false, error }),
+    dismissChanges: async () => ({ ok: false, error }),
   };
 }

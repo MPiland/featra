@@ -12,11 +12,15 @@ export const SUMMARY_HEADING = "Summary";
 export const WRITE_SUMMARY_TOOL = "write_summary";
 export const SUMMARY_LIMIT = 4000;
 
+/** What a Dev Lead chat is told when it writes for a feature another Dev Lead leads (its summary, its replies). */
+export const notLeadOf = (id: string): string => `You don't lead ${id}.`;
+
 export const SUMMARY_MESSAGES = {
   badFeature: "Give the feature's id, such as FEAT-9, as `feature`.",
   empty: "Write the summary as `summary`: plain language, what changed for the user.",
   tooLong: `Keep the summary under ${SUMMARY_LIMIT} characters.`,
   notActive: (id: string) => `${id} isn't a feature in progress.`,
+  notLead: notLeadOf,
   written: (id: string) => `Wrote the summary of ${id}. The user sees it on its review screen.`,
 } as const;
 

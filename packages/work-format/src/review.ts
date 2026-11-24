@@ -8,6 +8,7 @@ import type { FeatureApproval } from "./feature-end-copy.ts";
 import { mergeCommitMessage } from "./merge.ts";
 import { githubPrUrl, safeBranch } from "./prs.ts";
 import type { DiffStat, FeatureReview, ReviewItem, ReviewSummary } from "./review-types.ts";
+import type { FeatureChanges } from "./changes-types.ts";
 import type { FeatureRow } from "./work-list-types.ts";
 
 /** A GitHub PR's Files changed tab; null for anything that isn't a GitHub PR's link. */
@@ -40,10 +41,12 @@ export interface ReviewInputs {
   base: string;
   /** Where the feature's approval stands (`featureApprovalOf`). */
   approval: FeatureApproval | null;
+  /** The changes asked on it (changesOf). */
+  changes: FeatureChanges | null;
 }
 
 export function buildFeatureReview(inputs: ReviewInputs): FeatureReview {
-  const { row, feature, view, diff, summary, repo, base, approval } = inputs;
+  const { row, feature, view, diff, summary, repo, base, approval, changes } = inputs;
   const items = row.stories.flatMap((s): ReviewItem[] => {
     const v = s.tone === "cancelled" ? null : view(s.id);
     if (!v) return [];
@@ -60,6 +63,7 @@ export function buildFeatureReview(inputs: ReviewInputs): FeatureReview {
     diff: diff(feature.id),
     files: prFilesUrl(feature.pr) ?? compareUrl(repo, base, row.branch ?? null),
     approval,
+    changes,
   };
 }
 

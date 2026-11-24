@@ -171,3 +171,41 @@
   align-items: baseline;
   gap: 8px;
 }
+
+/* "Not yet" (STORY-71): its form takes the row's full width under Approve. */
+.rv-end > form.send-back {
+  flex-basis: 100%;
+}
+
+/* "Changes asked": the reasons the user gave, until the Dev Lead replies or the user dismisses them. */
+.rv-changes .sh {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+}
+
+.rv-asked-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rv-asked .sh .btn {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.rv-asked-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--warn);
+  list-style: none;
+}

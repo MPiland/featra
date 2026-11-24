@@ -58,6 +58,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "feature.createPr",
   "feature.rerunChecks",
   "feature.merge",
+  "feature.askChanges",
+  "feature.dismissChanges",
   "bug.propose",
   "bug.file",
   "story.createPr",
@@ -123,4 +125,14 @@ export function parsePush(text: string): ServerPush | null {
   const raw = json(text);
   if (!isRecord(raw) || "id" in raw || !isOneOf(PUSH_EVENTS, raw.event) || !isId(raw.watch)) return null;
   return { event: raw.event, watch: raw.watch, data: raw.data };
+}
+
+/** The `{ dir }` params every project method takes, or null. */
+export function dirParams(params: unknown): { dir: string } | null {
+  return isRecord(params) && typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
+}
+
+/** The `{ watch }` params of `work.unwatch`, or null. */
+export function unwatchParams(params: unknown): { watch: number } | null {
+  return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
 }

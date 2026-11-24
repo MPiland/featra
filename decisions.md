@@ -3299,3 +3299,39 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   and Create PR's retry (review Should-fix 5 now proves the PR's record is retried, adopting the PR GitHub has).
 - **Tests changed by the spec, not weakened:** "doesn't settle a PR merged on GitHub before the user approved it" now
   expects the landed state instead of no facts, and "settles later" expects the new note.
+
+## 2026-11-23 — STORY-71 Ask for changes before approving (developer)
+
+- **"Not yet" sits beside Approve** on the review screen and reuses Send back's form with its own words ("What to
+  change", Send, Cancel). It can't be sent without a reason; a refusal keeps the reason in the field.
+- **No live Dev Lead chat: refuse, record nothing.** The Dev Lead is found as shaping finds it (`drafted-by`, else a
+  story session's parent; server `feature-lead.ts`, shared with the feature facts) and resumed with `chats.open`. With
+  none, "This feature has no Dev Lead chat."; with a chat Featra no longer has, or whose project is closed, "The Dev
+  Lead's chat is gone."; a busy chat refuses as a send does. Nothing is logged, queued or created, so the screen never
+  says "Changes asked" for a reason nobody received. Queueing it for a later chat was rejected: the user would think the
+  Dev Lead had it.
+- **Send, then record**, as Send back: the reason reaches the chat as "Changes asked on FEAT-n: reason", then
+  `changes-asked` is committed on the feature branch; a failed record answers `recorded: false`.
+- **Rounds.** Asking again while changes are asked adds to the same round (the screen lists every reason); asking after
+  the Dev Lead's reply starts a new one, and the reply stays on the screen until then. The state is replayed from the
+  history only, so a restart shows the same thing.
+- **The MCP tool `mark_changes_handled`** (agent method `feature.changesHandled`) follows `write_summary`: Dev Lead chats
+  only, story sessions refused, taught in its description that a chat reply alone doesn't clear "Changes asked". Its
+  reply is logged as `changes-handled` by `session:<chat>` and shown as "Changes made", "Written by the Dev Lead".
+- **Handled and Dismiss only while changes are asked**, checked inside the card lane: of a reply and a Dismiss made at
+  once exactly one is kept; the late one is refused ("No changes are asked on FEAT-n: the user dismissed them, or their
+  ask wasn't recorded.", which also covers a reason the chat got but the history write lost).
+- **Approve is untouched**: `featureApprovalOf` ignores these events, so Approve stays as it was while changes are asked.
+- **ADR 0042** names the three events (`changes-asked`, `changes-handled`, `changes-dismissed`).
+- **The fake Dev Lead's MCP turns share one helper** (`leadToolTurn` in fake-agent-turns.mjs), for `write_summary` and
+  `mark_changes_handled`.
+- **Review fixes (PR #86):**
+  - A merged feature drops "Changes asked" and its Dismiss (its approval step is `merged`); the history keeps the round.
+    The watch payload is unchanged: the screen decides.
+  - Only the feature's own Dev Lead (`leadOf`) may mark its changes handled or write its summary; another Dev Lead chat
+    is refused with "You don't lead FEAT-n." The check lives in the writers (server `feature-lead.ts` `mustLead`), in
+    the card lane, so the MCP and any later caller get it alike. The STORY-69 e2e's summary chat now leads FEAT-2 (its
+    `drafted-by`), as the drafting chat would.
+  - The reason is kept with plain newlines, as the reply is, and both limits read "2,000 characters".
+  - `dirParams` and `unwatchParams` moved to protocol-frames.ts (re-exported) to keep protocol.ts under 300 lines;
+    services.ts shares the GitHub options as one `gh` object.

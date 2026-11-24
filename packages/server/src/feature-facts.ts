@@ -10,7 +10,6 @@
 import {
   behindMessage,
   checksWhere,
-  draftedBy,
   safeBranch,
   type FeatureChecks,
   type FeatureMergeFacts,
@@ -19,6 +18,7 @@ import {
 import type { ChatManager } from "./chat-manager.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import { baseInTheWay } from "./feature-base.ts";
+import { leadOf } from "./feature-lead.ts";
 import type { FeatureChecksRunner } from "./feature-checks.ts";
 import type { FeatureLook } from "./feature-look.ts";
 import { mergedFacts } from "./feature-seen.ts";
@@ -59,19 +59,9 @@ export function createFeatureFacts(deps: FeatureFactsDeps) {
   /** The base commit each feature's Dev Lead was last told about. */
   const told = new Map<string, string>();
 
-  /** The Dev Lead leading the feature: the chat that drafted it, else one that started a story under it. */
-  function leadOf(dir: string, look: FeatureLook): string | null {
-    const drafted = draftedBy(look.card);
-    if (drafted) return drafted;
-    const stories = new Set(
-      look.scan.resolution.cards.filter(({ card }) => card.parent === look.card.id).map(({ card }) => card.id),
-    );
-    return chats.list(dir).find((c) => c.story && stories.has(c.story.id) && c.story.parent)?.story?.parent ?? null;
-  }
-
   /** Posts `notice` to the feature's Dev Lead; false when none was found or the post failed. */
   function tell(dir: string, look: FeatureLook, notice: Omit<Notice, "story">): boolean {
-    const lead = leadOf(dir, look);
+    const lead = leadOf(chats, dir, look);
     if (!lead) return false;
     try {
       chats.notify(lead, { story: look.card.id, ...notice });

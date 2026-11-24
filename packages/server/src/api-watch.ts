@@ -5,6 +5,7 @@
  */
 import {
   buildFeatureReview,
+  changesOf,
   featureApprovalOf,
   featureRowOf,
   summaryOf,
@@ -58,6 +59,7 @@ export function createWatchApi({ watches, allowed, checks, prs, features, diffs,
       view,
       diff: diffs?.of(dir, scan, id) ?? (() => null),
       summary: summaryOf(owned),
+      changes: changesOf(owned),
       repo: diffs?.repo(dir) ?? null,
       base: scan.collected.git.baseBranch,
       approval: featureApprovalOf(

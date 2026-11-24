@@ -103,8 +103,8 @@ export interface AcceptActions {
   sendBack: (id: string, reason: string, addCriterion: boolean) => Promise<SendBackResult>;
 }
 
-const sent = (r: unknown): SendBackResult => ({ ok: true, recorded: !(isRecord(r) && r.recorded === false) });
-const refused = (err: unknown): SendBackResult => ({ ok: false, error: errorMessage(err) });
+export const sent = (r: unknown): SendBackResult => ({ ok: true, recorded: !(isRecord(r) && r.recorded === false) });
+export const refused = (err: unknown): SendBackResult => ({ ok: false, error: errorMessage(err) });
 
 export const CARD_COPY = {
   close: "Close card",

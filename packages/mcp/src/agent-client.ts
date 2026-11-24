@@ -16,6 +16,13 @@ export interface AgentClient extends FeatraHost {
   close: () => void;
 }
 
+/** A feature call's answer: the feature and what the agent is told. */
+function featureAnswer(result: unknown): { feature: string; message: string } {
+  if (!isRecord(result) || typeof result.feature !== "string" || typeof result.message !== "string")
+    throw new Error("Featra gave an unexpected answer.");
+  return { feature: result.feature, message: result.message };
+}
+
 /** Waits for the socket to open, or fails when it can't. */
 function opened(socket: AgentSocket): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -116,12 +123,8 @@ export async function connectAgent(url: string, token: string, open = defaultSoc
       if (!isRecord(result) || result.asked !== true) throw new Error("Featra gave an unexpected answer.");
       return { asked: true };
     },
-    async summarize(input) {
-      const result = await call("feature.summary", input);
-      if (!isRecord(result) || typeof result.feature !== "string" || typeof result.message !== "string")
-        throw new Error("Featra gave an unexpected answer.");
-      return { feature: result.feature, message: result.message };
-    },
+    summarize: async (input) => featureAnswer(await call("feature.summary", input)),
+    changesHandled: async (input) => featureAnswer(await call("feature.changesHandled", input)),
     async requestAction(input, signal) {
       // The call has a name of its own, so that when the agent's host drops it, the request it made ends with it.
       const name = `action-${++actions}`;
