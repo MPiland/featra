@@ -2,7 +2,7 @@
 id: STORY-71
 type: story
 title: Ask for changes before approving
-status: In Progress
+status: In Review
 parent: FEAT-9
 order: 4
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-71-ask-changes
-pr: null
+pr: https://github.com/MPiland/featra/pull/86
 created: 2026-11-23T12:00:00Z
 history:
   - at: 2026-11-23T12:00:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-24T08:00:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: developer
 ---
 
 ## Description
