@@ -23,7 +23,7 @@ import { createFeatureStart } from "../src/feature-start.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createRoleRegistry } from "../src/role-registry.ts";
 import { createScanner } from "../src/work-scan.ts";
-import { card, cardRepo, type CardRepo } from "./card-repo.ts";
+import { card, cardRepo, withIdentity, type CardRepo } from "./card-repo.ts";
 import { fakeClaude, sdk } from "./fake-query.ts";
 import { until } from "./until.ts";
 
@@ -50,6 +50,7 @@ async function started(drafter: string | null) {
 beforeEach(async () => {
   scanner = createScanner(createRepoGit());
   repo = await cardRepo();
+  withIdentity(repo);
   claude = fakeClaude();
   manager = createChatManager({
     providers: [createClaudeProvider(claude.deps)],

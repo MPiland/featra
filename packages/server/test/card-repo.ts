@@ -80,3 +80,13 @@ export async function cardRepo(folder = "main") {
 }
 
 export type CardRepo = Awaited<ReturnType<typeof cardRepo>>;
+
+/**
+ * Gives the repository its own committer, unsigned, for the product's commits (which run with the user's own git
+ * environment, not this file's): a CI runner has no global identity.
+ */
+export function withIdentity(repo: CardRepo) {
+  repo.git(repo.main, "config", "user.name", "Test");
+  repo.git(repo.main, "config", "user.email", "test@example.invalid");
+  repo.git(repo.main, "config", "commit.gpgsign", "false");
+}

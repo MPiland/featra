@@ -13,7 +13,7 @@ import { createFeatureStart } from "../src/feature-start.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { createServices } from "../src/services.ts";
 import { createScanner } from "../src/work-scan.ts";
-import { card, cardRepo, type CardRepo } from "./card-repo.ts";
+import { card, cardRepo, withIdentity, type CardRepo } from "./card-repo.ts";
 import { fakeClaude } from "./fake-query.ts";
 import { until } from "./until.ts";
 
@@ -42,6 +42,7 @@ function startServices() {
 
 beforeEach(async () => {
   repo = await cardRepo();
+  withIdentity(repo);
   feature.dir = repo.main;
   scanner = createScanner(createRepoGit());
   services = startServices();
