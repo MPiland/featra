@@ -2,7 +2,7 @@
 id: STORY-72
 type: story
 title: See attached evidence next to criteria
-status: New
+status: In Progress
 parent: FEAT-9
 order: 5
 origin: planned
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-72-evidence
 pr: null
 created: 2026-11-23T12:00:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-24T13:18:59Z
+    field: status
+    from: New
+    to: In Progress
+    by: dev-lead
 ---
 
 ## Description
