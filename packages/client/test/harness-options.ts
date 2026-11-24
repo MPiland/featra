@@ -6,6 +6,7 @@ import type { CloseToTraySupport, ProjectRef, ProjectSetup, SetupItemId, WorkOve
 import type { CardBridge } from "../src/card-pane.ts";
 import type { BugProposal, FiledBug } from "../src/bugs.ts";
 import type { BugPlacements } from "@featra/work-format/bug-copy";
+import type { EvidenceFile } from "@featra/work-format/evidence-link";
 import type { ReviewAnswers } from "./card-server.ts";
 import type { ChatHost } from "./chat-server.ts";
 import type { RolesHost } from "./roles-server.ts";
@@ -74,6 +75,8 @@ export interface HostOptions extends ChatHost, RolesHost {
    * Default: sent and logged in the feature's history.
    */
   askChangesRefusal?: string;
+  /** The evidence files the server reads, by the path a criterion links (STORY-72). Default: none, so each is missing. */
+  evidence?: Record<string, EvidenceFile>;
   /** Each folder's Checks section as the server answers it; the user's saves change it. */
   checks?: Record<string, ChecksView>;
   /** What each open project needs from the user, as the server first counts it (STORY-66). Default: nothing. */

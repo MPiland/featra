@@ -1,4 +1,5 @@
 import type { Menu, Tray } from "electron";
+import type { EvidenceOpening } from "./evidence-open.ts";
 
 /**
  * E2E runs set FEATRA_E2E=1. What differs is only where Featra meets the OS: notifications and "show in File Explorer"
@@ -14,6 +15,8 @@ export interface TestHooks {
   openedExternal: string[];
   /** Text Featra put on the clipboard (STORY-68's Copy on a command). */
   copied: string[];
+  /** Evidence copies Featra gave the OS (STORY-72): opened, or shown in their folder. */
+  openedFiles: EvidenceOpening[];
   /** Folders the next folder dialogs return, in order; an empty queue is a cancelled dialog. */
   folderPicks: string[];
   /** Titles of the folder dialogs Featra opened. */
@@ -63,6 +66,7 @@ export const testHooks: TestHooks = {
   shownInFolder: [],
   openedExternal: [],
   copied: [],
+  openedFiles: [],
   folderPicks: [],
   folderDialogs: [],
   notifications: [],

@@ -86,7 +86,8 @@ export function buildCardView(
     evidence: { reported: ev.reported, verified: ev.verified, proven: ev.proven, accepted: ev.accepted },
     acs: card.acs.map((ac, i) => {
       const run = proof(i) === "passed" ? runs.get(i + 1) : undefined;
-      return { text: ac.text, done: ac.done, test: ac.test, proof: proof(i), ...(run ? { run } : {}) };
+      const evidence = ac.evidence ? { evidence: ac.evidence } : {};
+      return { text: ac.text, done: ac.done, test: ac.test, proof: proof(i), ...(run ? { run } : {}), ...evidence };
     }),
     tasks: card.tasks.map((t) => ({ text: t.text, done: t.done })),
     notes: card.notes,

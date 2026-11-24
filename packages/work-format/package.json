@@ -38,7 +38,8 @@
     "./app-calls": "./src/app-calls.ts",
     "./feature-end-copy": "./src/feature-end-copy.ts",
     "./review": "./src/review-types.ts",
-    "./changes": "./src/changes-types.ts"
+    "./changes": "./src/changes-types.ts",
+    "./evidence-link": "./src/evidence-link.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

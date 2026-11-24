@@ -9,6 +9,7 @@ import type { ApprovalChoice } from "./approvals.ts";
 import type { BugPlacements } from "./bug-copy.ts";
 import type { Answers } from "./questions.ts";
 import type { ChecksPatch, ChecksView } from "./checks-types.ts";
+import type { EvidenceFile } from "./evidence-link.ts";
 import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
@@ -62,6 +63,10 @@ export interface ServerMethods {
   "review.watch": { params: { dir: string; id: string }; result: FeatureReview | null };
   /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
+  /** An evidence file a criterion of the card links, read from the card's owner (STORY-72, ADR 0043). */
+  "evidence.read": { params: { dir: string; id: string; path: string }; result: EvidenceFile };
+  /** Copies that evidence file for the OS to open; answers with the copy's path (STORY-72, ADR 0043). */
+  "evidence.open": { params: { dir: string; id: string; path: string }; result: { file: string } };
   /**
    * Sends a draft feature back to the chat that drafted it with the user's reason, then records it in the feature's
    * history (STORY-50). Refused without a reason, for a feature that isn't a draft, or when its chat is gone.

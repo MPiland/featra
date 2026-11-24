@@ -15,7 +15,7 @@
  * - "report" (STORY-10): only with FEATRA_E2E_REPORT set, for a story session's first message ("You are working on
  *   STORY-N"). Writes a small evidence file into the story's folder in its worktree, then calls the Featra MCP's
  *   update_card tool: ticks the drafted task and criterion with that evidence, adds a task, moves the story to In
- *   Review and notes it. The tool call is real; only the agent is faked.
+ *   Review and notes it. The tool call is real; only the agent is faked. "evidence": fake-agent-evidence.mjs.
  * - "subagent" (STORY-55): the agent spawns a background subagent (an Agent call, `task_started`, and the subagent's own
  *   messages, tagged as the SDK tags them). The subagent says something, then asks to run a Bash `npm test` through
  *   canUseTool as itself (`agentID`), and when that is answered says more and waits for `stopTask`, which ends it with
@@ -44,6 +44,7 @@
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { callMcpTool } from "./fake-mcp-client.mjs";
+import { draftCriteria, evidenceTurn } from "./fake-agent-evidence.mjs";
 import {
   markChangesHandledTurn,
   questionTurn,
@@ -149,7 +150,7 @@ const draftInput = (ids) => ({
       ...(ids ? { id: ids[0] } : {}),
       title: "Draft a feature",
       story: "As a builder, I get a drafted feature, so that I can review it.",
-      criteria: ids ? ["The draft shows in Work", "The draft says Review"] : ["The draft shows in Work"],
+      criteria: ids ? ["The draft shows in Work", "The draft says Review"] : draftCriteria(),
       tasks: ["Write the draft"],
     },
     {
@@ -251,7 +252,9 @@ export function query({ prompt, options }) {
       // A story session's first message is the card, which holds any word: only its marker routes it, never a keyword.
       const brief = text.startsWith("You are working on");
       const said = brief ? "" : text;
-      if (brief && process.env.FEATRA_E2E_REPORT) {
+      if (brief && process.env.FEATRA_E2E_REPORT === "evidence") {
+        yield* evidenceTurn(helpers, options, text);
+      } else if (brief && process.env.FEATRA_E2E_REPORT) {
         yield* reportTurn(options, text);
       } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {
         yield* slow(["The worktree is clean."], "Starting the story.");

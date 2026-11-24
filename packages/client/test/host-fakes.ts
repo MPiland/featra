@@ -36,6 +36,7 @@ export const fakeAppHost = (calls: string[]): FeatraBridge["app"] => ({
   toggleDevTools: () => void calls.push("toggleDevTools"),
   showLogs: () => void calls.push("showLogs"),
   openExternal: (url) => void calls.push(`openExternal:${url}`),
+  openEvidence: (file) => void calls.push(`openFile:${file}`),
   copyText: (text) => void calls.push(`copyText:${text}`),
   clearCacheAndRestart: () => void calls.push("clearCacheAndRestart"),
   resetAppData: () => void calls.push("resetAppData"),

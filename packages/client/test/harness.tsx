@@ -27,6 +27,7 @@ import { fakeChecksServer } from "./checks-server.ts";
 import { fakeNeedsServer } from "./needs-server.ts";
 import { fakeRolesServer } from "./roles-server.ts";
 import { fakeReviewServer } from "./review-server.ts";
+import { fakeEvidenceServer } from "./evidence-server.ts";
 import { fakeAppHost, fakeSetupServer } from "./host-fakes.ts";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
@@ -169,6 +170,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
       ...fakeBugServer(calls, host),
       ...cards.bridge,
       ...fakeReviewServer(cards, { diffs: host.reviewDiffs, askRefusal: host.askChangesRefusal, calls, at: EDIT_AT }),
+      ...fakeEvidenceServer(host.evidence ?? {}, calls),
     },
     // Records which element had focus when the command reached the host: that is the field it acts on.
     chats: chats.bridge,

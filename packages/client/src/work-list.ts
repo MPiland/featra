@@ -20,6 +20,7 @@ import { noCards, serverCards, type CardBridge } from "./card-pane.ts";
 import type { ServerClient } from "./server-client.ts";
 import { noBugs, serverBugs, type BugBridge } from "./bugs.ts";
 import { noReviews, serverReviews, type ReviewBridge } from "./review-screen.ts";
+import { noEvidence, serverEvidence, type EvidenceBridge } from "./evidence.ts";
 
 export type { CopyActionResult, WorkList };
 
@@ -30,7 +31,7 @@ export interface WorkUpdate {
 }
 
 /** The list, the stale-copy actions, and the card pane's card (ADR 0017). */
-export interface WorkBridge extends CardBridge, BugBridge, ReviewBridge {
+export interface WorkBridge extends CardBridge, BugBridge, ReviewBridge, EvidenceBridge {
   /** Calls back with the project's list now and on every change; returns the stop. */
   watch: (dir: string, listener: (update: WorkUpdate) => void) => () => void;
   /** Writes a stale copy's edit to the owner's card, then puts the copy back as git has it. */
@@ -171,6 +172,7 @@ export function serverWork(server: ServerClient): WorkBridge {
     ...serverCards(server),
     ...serverBugs(server),
     ...serverReviews(server),
+    ...serverEvidence(server),
     watch(dir, listener) {
       let last = EMPTY_WORK_LIST;
       return server.watch(
@@ -197,6 +199,7 @@ export function noWork(error: string): WorkBridge {
     ...noCards(error),
     ...noBugs(error),
     ...noReviews(error),
+    ...noEvidence(error),
     watch(_dir, listener) {
       listener({ list: EMPTY_WORK_LIST, error });
       return () => {};

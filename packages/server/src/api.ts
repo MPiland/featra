@@ -19,6 +19,7 @@ import type { AgentBridge } from "./agent-bridge.ts";
 import { ApiError } from "./api-error.ts";
 import { createChatApi, type ChatApiDeps } from "./api-chat.ts";
 import { createBugApi } from "./api-bugs.ts";
+import { createEvidenceApi, type EvidenceApiDeps } from "./api-evidence.ts";
 import { createStoryEndApi } from "./api-story-end.ts";
 import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
 import { createProjectApi } from "./api-project.ts";
@@ -84,6 +85,8 @@ export interface ApiDeps {
   needs?: ChatApiDeps["needs"];
   /** What each story of a feature changed, for its review screen (STORY-69). */
   diffs?: WatchApiDeps["diffs"];
+  /** Evidence files read back to show next to their criteria (STORY-72). */
+  evidence?: EvidenceApiDeps["evidence"];
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -134,6 +137,7 @@ export function createApi({
   agents,
   needs,
   diffs,
+  evidence,
 }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
@@ -161,6 +165,7 @@ export function createApi({
   const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
   const bugApi = createBugApi({ bugs, allow });
   const featureApi = createFeatureApi({ features, changes, card });
+  const evidenceApi = createEvidenceApi({ evidence, allow });
   const watchApi = createWatchApi({ watches, allowed, checks, prs, features, diffs, card });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, needs, ...(busy ? { busy } : {}) });
 
@@ -209,6 +214,9 @@ export function createApi({
         if (!p) throw new ApiError("Expected { dir, id, edit }.");
         return cards.update(allow(p.dir), p.id, p.edit);
       }
+      case "evidence.read":
+      case "evidence.open":
+        return evidenceApi(method, params);
       case "draft.sendBack": {
         const p = sendBackParams(params);
         if (!p) throw new ApiError("Expected { dir, id, reason }.");

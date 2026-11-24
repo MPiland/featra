@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { MERGE_COPY } from "@featra/work-format/merge-copy";
 import { CARD_COPY, type CardBridge, type CardEdit } from "../../card-pane.ts";
 import { Dropdown } from "../controls/Dropdown.tsx";
@@ -14,10 +14,12 @@ import { StoriesSection } from "./StoriesSection.tsx";
 import { useAction } from "./useAction.ts";
 import { useCard } from "./useCard.ts";
 import { DockedAside } from "./DockedAside.tsx";
+import type { EvidenceBridge } from "../../evidence.ts";
+import { EvidenceContext } from "./AcEvidence.tsx";
 import { AcSection, Evidence, TaskSection, TextSection, type SaveEdit } from "./CardSections.tsx";
 
 export interface CardPaneProps {
-  work: CardBridge;
+  work: CardBridge & EvidenceBridge;
   dir: string;
   id: string;
   paneId: string;
@@ -67,6 +69,7 @@ export function CardPane({
   const review = useAction();
   const reviewAlert = useRef<HTMLParagraphElement>(null);
   const { view, setView } = card;
+  const evidence = useMemo(() => ({ dir, work }), [dir, work]);
   // A failure that comes when the buttons are gone (the card isn't a draft just now) takes focus itself, in the commit
   // that shows it.
   useLayoutEffect(() => {
@@ -239,7 +242,9 @@ export function CardPane({
           {card.error}
         </p>
       )}
-      <div className="card-body">{body}</div>
+      <EvidenceContext.Provider value={evidence}>
+        <div className="card-body">{body}</div>
+      </EvidenceContext.Provider>
     </DockedAside>
   );
 }
