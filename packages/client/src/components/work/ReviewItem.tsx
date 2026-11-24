@@ -1,5 +1,6 @@
 import { useContext, type MouseEvent } from "react";
 import { REVIEW_COPY, type DiffStat, type ReviewItem } from "@featra/work-format/review";
+import { AcEvidence } from "./AcEvidence.tsx";
 import { AcProof } from "./AcProof.tsx";
 import { Status } from "./FeatureRows.tsx";
 import { ExternalLinkContext } from "./PrChip.tsx";
@@ -57,6 +58,7 @@ export function ReviewItemCard({ item }: { item: ReviewItem }) {
             <li key={i} className={ac.done ? "ac" : "ac todo"}>
               <span className="rv-ac">{ac.text}</span>
               <AcProof ac={ac} />
+              <AcEvidence card={view.id} ac={ac} />
             </li>
           ))}
         </ol>

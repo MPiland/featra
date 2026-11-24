@@ -29,6 +29,8 @@ export interface CardViewAc {
   proof: AcProof;
   /** The run that proved it, kept with the proof (STORY-69): a CI run's URL, or `local`; absent when not known. */
   run?: string;
+  /** The evidence file linked to it (STORY-72), a path in the card's evidence folder; absent when none is. */
+  evidence?: string;
 }
 
 export interface CardViewTask {
@@ -225,6 +227,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
       test: textOrNull(a.test),
       proof: isOneOf(AC_PROOFS, a.proof) ? a.proof : "none",
       ...(isRun(a.run, textOrNull(raw.pr)) ? { run: a.run } : {}),
+      ...(typeof a.evidence === "string" && a.evidence ? { evidence: a.evidence } : {}),
     })),
     tasks: list(raw.tasks, (t) => ({ text: text(t.text), done: t.done === true })),
     notes: text(raw.notes),

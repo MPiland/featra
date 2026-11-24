@@ -42,6 +42,8 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "card.watch",
   "review.watch",
   "card.update",
+  "evidence.read",
+  "evidence.open",
   "draft.sendBack",
   "draft.approve",
   "feature.start",

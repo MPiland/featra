@@ -4,13 +4,11 @@
  * copy, checks that each evidence file it links is really there and small, and writes. Nothing is committed: the
  * agent commits the card and its evidence with its work.
  */
-import { lstat, readdir, realpath } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { resolve } from "node:path";
 import {
   applyReport,
   draftAuthor,
   errorMessage,
-  REPORT_LIMITS,
   reportAuthError,
   serializeCard,
   toIso,
@@ -20,6 +18,7 @@ import {
 import { ApiError } from "./api-error.ts";
 import { cardViewIn, fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
+import { evidenceOnDisk } from "./evidence-disk.ts";
 import type { Scan } from "./work-scan.ts";
 
 export const REPORT_MESSAGES = {
@@ -42,41 +41,6 @@ export interface CardReportDeps {
   lane?: CardLane;
   /** The chats a story's sessions nest under, which spawned them (so lead them). None when not given. */
   leads?: (dir: string, story: string) => readonly string[];
-}
-
-const inside = (base: string, file: string): boolean => {
-  const rel = relative(base, file);
-  return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel);
-};
-
-/** The real folder of the evidence path's first four parts (.featra/evidence/FEAT-N/STORY-M). */
-const folderOf = (path: string): string[] => path.split("/").slice(0, 4);
-
-/**
- * Why the evidence file at `path` (relative to `root`) can't be linked, or null. Every part must be a real directory
- * entry by exactly that name (case and trailing dots included), the file a plain one, and its real path inside both the
- * root and the evidence folder (no link may lead out). The size is advisory: the file can change after this looks.
- */
-async function evidenceFileError(root: string, path: string): Promise<string | null> {
-  try {
-    let dir = root;
-    for (const part of path.split("/")) {
-      if (!(await readdir(dir)).includes(part)) return REPORT_MESSAGES.missing(path);
-      dir = join(dir, part);
-    }
-    const file = fileIn(root, path);
-    const stat = await lstat(file);
-    if (!stat.isFile()) return stat.isSymbolicLink() ? REPORT_MESSAGES.outside(path) : REPORT_MESSAGES.notFile(path);
-    const [real, realRoot, realFolder] = await Promise.all([
-      realpath(file),
-      realpath(root),
-      realpath(join(root, ...folderOf(path))),
-    ]);
-    if (!inside(realRoot, real) || !inside(realFolder, real)) return REPORT_MESSAGES.outside(path);
-    return stat.size > REPORT_LIMITS.evidenceBytes ? REPORT_MESSAGES.tooBig(path) : null;
-  } catch {
-    return REPORT_MESSAGES.missing(path);
-  }
 }
 
 const same = (a: string, b: string): boolean =>
@@ -111,8 +75,8 @@ export function createCardReport({ scan: scanDir, now, lane = createCardLane(), 
     const result = applyReport(found.owned.card, input, { config }, draftAuthor(who.chat), toIso(now()), label);
     if (!result.ok) throw new ApiError(result.error);
     for (const link of result.links) {
-      const why = await evidenceFileError(found.root, link);
-      if (why !== null) throw new ApiError(why);
+      const disk = await evidenceOnDisk(found.root, link);
+      if (!disk.ok) throw new ApiError(REPORT_MESSAGES[disk.problem](link));
     }
     if (result.changes.length === 0) return { card: id, changes: [] };
     try {

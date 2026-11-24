@@ -19,16 +19,12 @@ export type ScanPick<T> = (scan: Scan | null, list: WorkList) => T;
 export interface WorkWatches {
   /** Starts or joins the watch on `dir`: answers with the list now, then calls `listener` with each change. */
   watch: (dir: string, listener: WorkListener) => Promise<{ list: WorkList; stop: () => void }>;
-  /**
-   * Like `watch`, for what `pick` takes from each scan: answers with it now, then calls `listener` each time its
-   * JSON changes.
-   */
+  /** Like `watch`, for what `pick` takes from each scan: answers with it now, then each time its JSON changes. */
   observe: <T>(dir: string, pick: ScanPick<T>, listener: (value: T) => void) => Promise<{ value: T; stop: () => void }>;
-  /**
-   * Scans `dir` now. A watched folder scans through its watch, so the scan reaches every listener and reuses git's
-   * answers unless a git target fired (BUG-6); any other folder gets a full scan.
-   */
+  /** Scans `dir` now: through its watch when watched, so every listener hears it (BUG-6); else a full scan. */
   scan: (dir: string) => Promise<Scan | null>;
+  /** The last good scan of a watched `dir`, after any in flight, scanning nothing (STORY-72); else a full scan. */
+  shown: (dir: string) => Promise<Scan | null>;
   /**
    * Something a pick reads besides the scan changed (STORY-69): every listener of `dir` hears its last scan again, with
    * no new scan, after any scan in flight. Nothing for a folder nobody watches.
@@ -281,6 +277,10 @@ export function createWorkWatches(
       // An action needs the cards as they are now: the last good scan kept for display won't do.
       const out = await run(e);
       return out.failed ? null : out.scan;
+    },
+    shown(dir) {
+      const e = entries.get(dir);
+      return e ? e.queue.then(() => e.last) : scanner.scan(dir);
     },
     repush(dir) {
       const e = entries.get(dir);

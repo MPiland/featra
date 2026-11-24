@@ -146,6 +146,8 @@ export interface FeatraBridge {
     showLogs: () => void;
     /** Opens an https link (a story's PR) in the OS browser; anything else is ignored. */
     openExternal: (url: string) => void;
+    /** Opens the server's copy of an evidence file with the OS (STORY-72); anything else is ignored. */
+    openEvidence: (file: string) => void;
     /** Puts text on the clipboard (STORY-68's Copy on a command); nothing runs it. */
     copyText: (text: string) => void;
     /** Clears Chromium's HTTP cache, then restarts the app. */
@@ -174,6 +176,7 @@ export const IPC = {
   appToggleDevTools: "app:toggle-devtools",
   appShowLogs: "app:show-logs",
   appOpenExternal: "app:open-external",
+  appOpenEvidence: "app:open-evidence",
   appCopyText: "app:copy-text",
   appClearCacheAndRestart: "app:clear-cache-and-restart",
   appResetAppData: "app:reset-app-data",
@@ -278,6 +281,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
         const link = httpsLink(url);
         if (link) window.open(link, "_blank", "noopener,noreferrer");
       },
+      openEvidence() {},
       copyText: (text) => {
         navigator.clipboard?.writeText(text).catch(() => {});
       },

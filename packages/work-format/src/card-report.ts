@@ -8,13 +8,14 @@
 import { needsReview, draftedBy } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { appendHistory, setStatus } from "./history.ts";
+import { EVIDENCE_BYTES, evidenceFolder, evidenceLinkError } from "./evidence-link.ts";
 import { parseId } from "./ids.ts";
 import type { Parsed } from "./knowledge-log.ts";
 import type { Card, ProjectConfig } from "./types.ts";
 import { isRecord } from "./utils/guards.ts";
 
 /** What a call may carry, so a report stays a report: the longest text, the most ticks and new tasks, and a file's size. */
-export const REPORT_LIMITS = { text: 300, note: 1000, ticks: 40, added: 20, evidenceBytes: 1_000_000 } as const;
+export const REPORT_LIMITS = { text: 300, note: 1000, ticks: 40, added: 20, evidenceBytes: EVIDENCE_BYTES } as const;
 
 /** The card key that links a story's evidence folder. */
 export const EVIDENCE_KEY = "evidence";
@@ -46,32 +47,9 @@ export interface Reporter {
   leads?: (story: string) => readonly string[];
 }
 
-/** The folder of a card's evidence, `.featra/evidence/FEAT-N/STORY-M/`, or null when it has no feature. */
-export function evidenceFolder(card: Pick<Card, "id" | "parent">): string | null {
-  const feature = card.parent ? parseId(card.parent) : null;
-  const own = parseId(card.id);
-  return feature && own ? `.featra/evidence/${feature.prefix}-${feature.n}/${own.prefix}-${own.n}/` : null;
-}
-
 /** Text with its whitespace collapsed, so wording compares the way a person reads it. */
 const squash = (s: string) => s.replace(/\s+/g, " ").trim();
 const same = (a: string, b: string) => squash(a).toLowerCase() === squash(b).toLowerCase();
-
-const PATH_CHARS = /^[A-Za-z0-9._\-/]+$/;
-
-/** Why `path` can't be an evidence link of `card`, or null when it is a file inside the card's evidence folder. */
-export function evidenceLinkError(card: Pick<Card, "id" | "parent">, path: string): string | null {
-  const folder = evidenceFolder(card);
-  if (folder === null) return `${card.id} has no feature, so it has no evidence folder.`;
-  const inside = `Evidence goes in ${folder}`;
-  if (!PATH_CHARS.test(path)) return `${inside} and its path uses only letters, digits, . _ - and /.`;
-  const rest = path.startsWith(folder) ? path.slice(folder.length) : null;
-  if (rest === null || rest === "") return `${inside}: link a file there.`;
-  if (rest.split("/").some((part) => part === "" || part === "." || part === ".." || part.startsWith("."))) {
-    return `${inside}: no empty, hidden or relative parts in the path.`;
-  }
-  return null;
-}
 
 /** The stage a report may move up to: the last one before the first that counts as done (Acceptance by default). */
 export function stageCeiling(config: ProjectConfig): string | null {

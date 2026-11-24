@@ -1,7 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { REVIEW_COPY, type FeatureReview, type ReviewItem } from "@featra/work-format/review";
 import { CARD_COPY, type CardView } from "../../card-pane.ts";
 import type { WorkBridge } from "../../work-list.ts";
+import { EvidenceContext } from "./AcEvidence.tsx";
 import { FeatureEnd } from "./FeatureEnd.tsx";
 import { ChangesAsked, NotYet } from "./FeatureChanges.tsx";
 import { DiffLine, ExternalLink, ReviewItemCard } from "./ReviewItem.tsx";
@@ -126,26 +127,29 @@ export function ReviewScreen({
   const { review, loading, error } = useReview(work, dir, id);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
+  const evidence = useMemo(() => ({ dir, work, revision: review }), [dir, work, review]);
   return (
-    <section className="review-screen" aria-label={REVIEW_COPY.reviewOf(id)} data-view="review">
-      <div className="rv-top">
-        <button type="button" className="review-draft" onClick={onBack}>
-          {REVIEW_COPY.back}
-        </button>
-      </div>
-      <h2 className="rv-h" ref={heading} tabIndex={-1}>
-        {review ? REVIEW_COPY.title(id, review.feature.title) : REVIEW_COPY.reviewOf(id)}
-      </h2>
-      {error && (
-        <p className="work-error" role="alert">
-          {error}
-        </p>
-      )}
-      {review ? (
-        <ReviewBody review={review} dir={dir} work={work} />
-      ) : (
-        <p className="meta">{loading ? REVIEW_COPY.loading : REVIEW_COPY.gone}</p>
-      )}
-    </section>
+    <EvidenceContext.Provider value={evidence}>
+      <section className="review-screen" aria-label={REVIEW_COPY.reviewOf(id)} data-view="review">
+        <div className="rv-top">
+          <button type="button" className="review-draft" onClick={onBack}>
+            {REVIEW_COPY.back}
+          </button>
+        </div>
+        <h2 className="rv-h" ref={heading} tabIndex={-1}>
+          {review ? REVIEW_COPY.title(id, review.feature.title) : REVIEW_COPY.reviewOf(id)}
+        </h2>
+        {error && (
+          <p className="work-error" role="alert">
+            {error}
+          </p>
+        )}
+        {review ? (
+          <ReviewBody review={review} dir={dir} work={work} />
+        ) : (
+          <p className="meta">{loading ? REVIEW_COPY.loading : REVIEW_COPY.gone}</p>
+        )}
+      </section>
+    </EvidenceContext.Provider>
   );
 }

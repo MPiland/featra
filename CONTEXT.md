@@ -57,6 +57,10 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Stage board** — Work's other layout: one column per stage, New through Done, each with its count, holding the
   stories and bugs of all features or of one. Read-only: a card opens its card pane, and its stage changes only through
   agents, merges and the card pane. List or Board is remembered per project, for the user only.
+- **Evidence file** — a file an agent attached to one criterion (a screenshot, a log), kept in the story's evidence
+  folder `.featra/evidence/FEAT-N/STORY-M/` and linked from the criterion's line. The card pane and the review screen
+  show it beside the criterion: a screenshot as a thumbnail, anything else as a link (ADR 0043). Not the same as a
+  story's **evidence state**.
 - **Evidence state** — what is actually known about a story:
   - **Reported** — an agent said so (ticked a task, moved a stage).
   - **Verified** — the PR's CI checks passed.

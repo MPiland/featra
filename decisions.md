@@ -3335,3 +3335,45 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   - The reason is kept with plain newlines, as the reply is, and both limits read "2,000 characters".
   - `dirParams` and `unwatchParams` moved to protocol-frames.ts (re-exported) to keep protocol.ts under 300 lines;
     services.ts shares the GitHub options as one `gh` object.
+
+## 2026-11-24 — STORY-72 See attached evidence next to criteria (developer)
+
+- **One shared component, `AcEvidence`**, shows a criterion's evidence in both the card pane (`AcSection`) and the
+  review screen (`ReviewItem`). It reads through an `EvidenceContext` the two screens provide and opens files through an
+  `OpenFileContext` (the `ExternalLinkContext` pattern), so neither screen knows how evidence is fetched.
+- **Two server methods, `evidence.read` and `evidence.open`** (`{ dir, id, path }`, open projects only), in their own
+  `api-evidence.ts` so api.ts and protocol.ts stay under 300 lines. ADR 0043 records how files are served and limited.
+- **Only a path the card links is read**, and it must pass `evidenceLinkError` (moved from the server's card report to
+  work-format `evidence-link.ts`, so the link rules, the image types and the copy live in one place).
+- **Read from the copy whose criteria are shown** (`shownFrom`): from disk with `update_card`'s rules when it is checked
+  out, else from git at that copy's revision (`ls-tree` for a plain blob, never a link, then `cat-file`). At most 1 MB
+  (`EVIDENCE_BYTES`).
+- **Screenshots are png, jpg, gif and webp**: a 120 by 64 thumbnail that opens full size in an in-app overlay (the
+  shared `Dialog`: Escape closes it, focus returns to the thumbnail, the card stays open). Anything else is a link.
+- **Opening never touches the original**: the server copies the file into `<data>/evidence-open/<random>/<name>`
+  (cleared once per run); the desktop main process (`openEvidence` IPC, `evidence-open.ts`) opens it only if its real
+  path is inside that folder, with the OS for documents and images (`EVIDENCE_OPENABLE`), and shows anything else, such
+  as a script or a page, in its folder rather than run it. The server's data folder is Electron's `userData`
+  (`FEATRA_DATA_DIR`), the folder main checks.
+- **A file that can't be shown gets a short note** ("Evidence missing", "Can't open evidence") beside the criterion; the
+  criterion's text and the rest of the card render as before.
+- **The e2e journey** uses the fake agent's `FEATRA_E2E_REPORT=evidence` turn (`fake-agent-evidence.mjs`): it writes a
+  real PNG and a text file and links them through the real `update_card`; the spec removes a third linked file to show
+  the missing note.
+- **STORY-25 seam**: captured screenshots linked as a criterion's `evidence` show through the same `AcEvidence`, with
+  nothing new to build on the screen.
+- **Review fixes (PR #87):**
+  - No part of an evidence path may be a link or junction: `evidenceOnDisk` checks each part with `lstat` as it walks.
+    Before, only the file itself was checked, and a junctioned story folder let `evidence.read` serve any file in the
+    checkout. The same check guards `update_card`'s links.
+  - Evidence is read from the watch's last good scan (`WorkWatches.shown`), not `watches.scan`, so a read never queues
+    a rescan of every card. ADR 0043 notes the cost.
+  - `AcEvidence` reads again with each new revision of what is shown (the card's view, the review): a file attached
+    since, or one a read couldn't get, shows once the card changes, and what was read stays shown meanwhile.
+  - The host's contexts moved to `HostProviders`, which brings App.tsx back under 300 lines. The open copy's fallback
+    error is `EVIDENCE_COPY.failed`.
+  - Desktop: `openEvidenceFile` makes the open-or-show call against an `EvidenceShell` (Electron's `shell`, or a
+    recording one in E2E runs), and a test proves a program is only shown in its folder.
+  - CONTEXT.md defines **Evidence file**, as distinct from **Evidence state**.
+  - E2E (Windows) failed once at `chat-list.spec.ts:34`, waiting for the provider group. The page snapshot shows the
+    group arrived just after the 5 s wait, and nothing in this change touches it. Filed as BUG-40, with one rerun.

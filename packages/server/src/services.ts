@@ -32,6 +32,7 @@ import { createActionRequest } from "./action-request.ts";
 import { createBugRequest } from "./bug-request.ts";
 import { createStoryStop } from "./story-stop.ts";
 import { createCopyActions } from "./copy-actions.ts";
+import { createEvidenceFiles } from "./evidence-files.ts";
 import { createGit } from "./git.ts";
 import { createProjectNeeds } from "./project-needs.ts";
 import { createLogWriter } from "./log-writer.ts";
@@ -257,6 +258,7 @@ export function createServices({
     agents,
     needs: async (listener) => needs.watch(listener),
     diffs,
+    evidence: createEvidenceFiles({ scan: watches.shown, gitCommand, dataDir, log }),
   });
   // Saved settings that change a project's auto-merge setting in effect rescan it and re-check auto-merge (STORY-61).
   const settingsChanges = createSettingsChanges({
