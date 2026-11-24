@@ -2,7 +2,7 @@
 id: STORY-70
 type: story
 title: Approve merges the feature to main
-status: In Review
+status: Done
 parent: FEAT-9
 order: 3
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:story-70
+  - at: 2026-11-24T05:03:00Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-24T05:03:00Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
