@@ -240,6 +240,16 @@ describe("a feature's review screen (STORY-69)", () => {
     expect(item(review(), "STORY-1")?.diff).toEqual({ files: 2, added: 5, removed: 0 });
   });
 
+  it("still counts what the feature merged once main has it, with main's later commits left out (STORY-70 AC5)", async () => {
+    // GitHub's merge of the feature's PR, pulled into main, then a card commit on main after it, as settling makes.
+    repo.git(repo.main, "merge", "-q", "--no-ff", "-m", "Merge pull request #1 from acme/feature/1-review", FEATURE);
+    await writeFile(join(repo.main, "later.txt"), "later\n");
+    repo.commit(repo.main, "FEAT-1: merged into main");
+    await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
+    await until(() => review()?.diff != null);
+    expect(review()?.diff).toEqual({ files: 1, added: 3, removed: 0 });
+  });
+
   it("carries Approve, off with the unfinished items first, and refuses it (STORY-70 AC2)", async () => {
     await ask("review.watch", { dir: repo.main, id: "FEAT-1" });
     await until(() => review()?.approval != null);

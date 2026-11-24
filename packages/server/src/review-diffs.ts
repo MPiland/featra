@@ -104,8 +104,33 @@ export function createReviewDiffs({ changed, log, gitCommand = "git", gitRun = r
       const ranges = rounds.map(([first, second]) => `${first}...${second}`);
       stats.set(card.id, ranges.length > 0 ? await numstat(plan.top, ...ranges) : null);
     }
-    stats.set("", await numstat(plan.top, `refs/heads/${plan.base}...${feature}`));
+    stats.set("", await numstat(plan.top, await featureRange(plan.top, `refs/heads/${plan.base}`, feature)));
     return stats;
+  }
+
+  /**
+   * The range of what the feature changes: its branch against the base; once the base has it (STORY-70), against the
+   * base as it was when the feature merged, the first parent of the base's merge of it, so the stat stays what it merged.
+   */
+  async function featureRange(top: string, base: string, feature: string): Promise<string> {
+    const range = `${base}...${feature}`;
+    const tip = await gitRun(gitCommand, top, ["rev-parse", "--verify", "--quiet", `${feature}^{commit}`]);
+    const at = tip.stdout.trim();
+    if (tip.code !== 0 || !at) return range;
+    const merges = await gitRun(gitCommand, top, [
+      "rev-list",
+      "--first-parent",
+      "--merges",
+      "--parents",
+      "--ancestry-path",
+      `${at}..${base}`,
+    ]);
+    if (merges.code !== 0) return range;
+    const merge = merges.stdout
+      .split("\n")
+      .map((line) => line.trim().split(/\s+/))
+      .find((commits) => commits.slice(2).includes(at));
+    return merge?.[1] ? `${merge[1]}...${at}` : range;
   }
 
   function start(dir: string, id: string, plan: Plan) {

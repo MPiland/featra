@@ -3288,6 +3288,10 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   empty section stays.
 - **A merged feature's PR reads Merged.** The server stops reading a merged feature's PR, so the review screen shows
   the PR as Merged from the card's own merge record (the approval's `merged` step), as it shows Open before.
+- **A merged feature's stat stays what it merged.** The feature's files and lines were its branch against the base
+  (`base...feature`), which is empty once the base has the feature. Once it does, the range starts at the first parent
+  of the base's merge of the feature's tip (server `review-diffs.ts`), so later commits on main stay out. A feature
+  that reached the base without a merge commit keeps the old range.
 - **Merge to main waits for the stories as Approve does.** The retry is off, and refused, while a story or bug under
   the feature isn't Done or Cancelled, with that reason first.
 - **The server's separate Accept is gone.** `features.accept`, its PR-opening path and the card pane's unused
