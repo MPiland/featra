@@ -59,6 +59,7 @@ its own.
   (test: packages/server/test/services-git.test.ts::applies a stale copy with one git command, the restore, and pushes the list without it)
   (test: packages/server/test/work-watch-handles.test.ts::starts git's watchers before the first scan reads git, so the rescan after it doesn't ask git again (BUG-44))
   (test: packages/server/test/work-watch-handles.test.ts::asks git again when a worktree's folder comes or goes, not when only its times change)
+  (test: packages/server/test/work-watch-handles.test.ts::asks git again after a scan starts a recursive watcher where recursive watchers share one stream (macOS))
   (test: packages/server/test/work-watch-late.test.ts::asks git again for a branch made just before a scan that reuses git starts its git watchers)
   (test: packages/server/test/ws-unwatch-early.test.ts::stops the watch when it answers, so nothing is pushed for it)
   (test: packages/server/test/ws-unwatch-early.test.ts::forgets an unwatch for a watch it never had, so a later watch with that id is kept)
@@ -113,3 +114,9 @@ that asks git follows; the watcher code moved to `work-watch-targets.ts`; `write
 config writer doesn't pull in the card actions (a crash's `.<hex>.featra-tmp` leftover is never read); an unwatch
 is remembered only for a request in flight and forgotten when it answers. Each new test was seen failing with its fix
 reverted.
+
+**macOS (E2E).** After the review, work-layout.spec.ts failed on macOS three times (runs 45698430494, 45706414860):
+the proven story never merged on its own. A temporary trace showed the story's commit landed as a scan started its
+new worktree's `.featra` watcher; Node's recursive watchers share one FSEvents stream there, the restart dropped the
+`refs/heads` event, and every rescan after it reused git's old commit, so auto-merge never saw a candidate. On macOS a
+scan that starts a recursive watcher now marks git as changed (ADR 0016). The trace was reverted.

@@ -137,6 +137,11 @@ six scans in a row, two of them with git, and missed the e2e tests' 5 s: 5.2–8
 - A git watcher that can't start early (out of handles, say) is tried again after the scan, as any watcher is, and
   marks git as changed when it starts then. One that first starts in a scan that reuses what git said is marked the
   same way, and a rescan that asks git follows it.
+- On macOS, Node's recursive watchers share one FSEvents stream, and starting another restarts it, dropping events it
+  had not delivered yet. A commit that lands as a scan starts a new worktree's `.featra` watcher lost its `refs/heads`
+  event that way, and the list kept the old commit, so a proven story never merged on its own. There, a scan that
+  starts a recursive watcher marks git as changed, and the rescan after it asks git. Windows and Linux keep the
+  disk-only rescan.
 
 So a first answer at start waits for the scan running and one more, which reuses git, when no git target fires during
 the first scan. A git event then, or a scan that fails or reads a card mid-write and is tried again when that settles

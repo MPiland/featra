@@ -5,7 +5,6 @@
 import type { FSWatcher, watch } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
 import { FEATRA_DIR } from "@featra/work-format";
-import { trace } from "./debug-trace.ts";
 import type { Scan } from "./work-scan.ts";
 
 export interface Target {
@@ -66,11 +65,21 @@ export function targetsOf(dir: string, scan: Scan | null): Target[] {
 
 const keyOf = (t: Target) => `${t.recursive ? "r" : "f"}|${t.path}`;
 
-/** Starts and ends a watch's file watchers; `trigger` asks for a rescan. */
-export function watchTargets<S extends WatchSet>(watchFolder: WatchFolder, trigger: (set: S) => void) {
+/**
+ * Whether every recursive watcher shares one stream that starting another restarts, dropping the events it had not
+ * delivered yet: Node's on macOS (FSEvents). A git event dropped so would leave the list on git's old answer (BUG-44).
+ */
+export const SHARED_RECURSIVE = process.platform === "darwin";
+
+/**
+ * Starts and ends a watch's file watchers; `trigger` asks for a rescan. `shared` when recursive watchers share one
+ * stream (`SHARED_RECURSIVE`).
+ */
+export function watchTargets<S extends WatchSet>(watchFolder: WatchFolder, trigger: (set: S) => void, shared: boolean) {
   /**
    * Starts a watcher on `t` unless one runs; whether it started. `stale` when what git said may predate it, so the
-   * next scan asks git again.
+   * next scan asks git again: a git target's watcher heard nothing before it, and a recursive one where recursive
+   * watchers share a stream may have dropped a git event on the others.
    */
   const start = (set: S, t: Target, stale: boolean): boolean => {
     const key = keyOf(t);
@@ -86,22 +95,16 @@ export function watchTargets<S extends WatchSet>(watchFolder: WatchFolder, trigg
       };
       const w = watchFolder(t.path, { recursive: t.recursive, persistent: false }, (type, name) => {
         // Windows names the folder itself, absolute, without end once it's deleted (BUG-6).
-        trace(`event ${type} ${String(name)} on ${t.path}`);
         if (name && isAbsolute(name)) return gone();
         if (!counts(t, type, name)) return;
         if (t.git) set.gitChanged = true;
         trigger(set);
       });
-      w.on("error", (err) => {
-        trace(`error ${String(err)} on ${t.path}`);
-        gone();
-      });
+      w.on("error", gone);
       set.watchers.set(key, w);
-      if (t.git && stale) set.gitChanged = true;
-      trace(`started ${key} stale=${stale}`);
+      if (stale && (t.git || (shared && t.recursive))) set.gitChanged = true;
       return true;
-    } catch (err) {
-      trace(`start failed ${key}: ${String(err)}`);
+    } catch {
       // Not there (yet), or out of handles: the next scan tries again.
       return false;
     }
@@ -113,7 +116,6 @@ export function watchTargets<S extends WatchSet>(watchFolder: WatchFolder, trigg
       const wanted = new Map(targets.map((t) => [keyOf(t), t]));
       for (const [key, w] of set.watchers) {
         if (wanted.has(key)) continue;
-        trace(`closed ${key}`);
         w.close();
         set.watchers.delete(key);
       }
