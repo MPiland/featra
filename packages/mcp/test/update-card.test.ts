@@ -184,6 +184,16 @@ describe("update_card through the Featra MCP", () => {
     }
   });
 
+  it("takes a page for each criterion, which Featra captures on the move to review (STORY-25)", async () => {
+    const { tools } = await (await agent(nine)).listTools();
+    const tool = tools.find((t) => t.name === "update_card");
+    const criteria = (tool?.inputSchema.properties ?? {}) as Record<string, { items?: { properties?: object } }>;
+    const items = criteria.criteria?.items;
+    expect(items?.properties).toHaveProperty("page", expect.objectContaining({ type: "string" }));
+    expect(tool?.description).toContain("/settings");
+    expect(tool?.description).toContain("page");
+  });
+
   it("updates the story session's own card in its worktree, and says what changed: Reported, not committed", async () => {
     await mkdir(join(worktree, ...FOLDER.split("/")), { recursive: true });
     await writeFile(join(worktree, ...FOLDER.split("/"), "report.png"), "png");

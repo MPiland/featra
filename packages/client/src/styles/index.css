@@ -15,8 +15,10 @@
 @import "./bugs.css";
 @import "./card-pane.css";
 @import "./card-proof.css";
+@import "./evidence.css";
 @import "./card-review.css";
 @import "./feature-progress.css";
+@import "./review.css";
 @import "./chat.css";
 @import "./chat-list.css";
 @import "./chat-story.css";

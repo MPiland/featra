@@ -3189,3 +3189,276 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
 - "Not yet" needs a reason, which goes to the Dev Lead's chat and the feature's history. The screen shows "Changes asked" until the Dev Lead marks it handled through the MCP or the user dismisses it. It creates no cards, and Approve stays available.
 - STORY-25 is split: showing attached evidence is STORY-72, the design review of screenshots is STORY-73, and STORY-25 keeps the proof setting and screenshot capture.
 - Stories, in order: STORY-69 Review a feature on one screen; STORY-70 Approve merges the feature to main; STORY-71 Ask for changes before approving; STORY-72 See attached evidence next to criteria; STORY-25 Choose the project's proof and capture screenshots; STORY-73 Design review of screenshots. STORY-70, 71 and 72 depend on 69; STORY-25 on 72; STORY-73 on 25.
+
+## 2026-11-23 — STORY-69 Review a feature on one screen (developer)
+
+- **The run that proved a criterion is a card event.** `ran:<n>@<run>` sits beside `proven:<n>` in the card's
+  history, where `<run>` is `local` or a GitHub Actions run URL in the card's PR repository
+  (`https://github.com/<owner>/<repo>/actions/runs/<id>`); any other URL, as an edited card might hold, is dropped, so a
+  link labelled "CI run" never opens a foreign site. It is written with the proof through the shared evidence writer,
+  so it survives a restart and travels with the card; the SQLite index is only a cache. Whenever a passing run differs
+  from the stored one (a CI run after a local one at the same head, or a CI re-run) a new `ran:` is recorded;
+  `unproven:<n>` drops it. The CI run is the first run whose own report passes every test the criterion links, else
+  the newest run whose report holds at least one of them; with neither, no run is linked. Its URL is derived from the
+  PR's repository, with the same pattern that validates PR links.
+- **The Dev Lead's summary is the feature card's `## Summary` section**, plus a `summary` history event by
+  `session:<chat>`. Only the Dev Lead's chat writes it (any other chat is refused, story session or not), through the MCP tool `write_summary` (agent method `feature.summary`),
+  since `update_card` refuses features. It is written where the feature's branch has its card (`writeFeature`), in the
+  card lane like every card write. The screen labels it "Written by the Dev Lead"; with none, there is no heading.
+- **One server watch builds the screen.** `review.watch` composes the feature's Work row, each story's and bug's card
+  view, git's numstat and the links, and pushes again on every scan, so stage moves, checks and proof show live.
+  Cancelled stories are left out. Diffs are read in the background and cached by the commits they compare, an open story's
+  by its branch tip even without a worktree, so pushed commits refresh its counts: a merged story's from every merge
+  round's parents (Featra's subject built from `mergeCommitMessage`, GitHub's PR or git's merge subject), each file
+  counted once, an open story's from its branch against the feature's, the feature's against the base. A finished read
+  re-runs the watch's listeners against its last scan instead of scanning again. Card files count, as on GitHub's Files changed.
+- **Files changed links:** a story's PR `/files`; the feature's PR `/files`, or before it has one a GitHub compare of
+  base...branch. Links open in the OS browser.
+- **The feature's own checks** exist once it is accepted (ADR 0037); before that the screen says "No checks run yet".
+- **Where Review shows.** On the active feature's Work row as an icon, like the progress button, so the name cell still
+  reads as the title and "Review" stays the Draft badge's word (STORY-8); in its card pane as a button that says
+  Review. Not in a chat's docked card pane, which has no screen to open. The screen replaces the Work list in place;
+  Back restores focus to the row's Review.
+- **The screen's header, from the screenshot review:** it counts the stories done once ("1 of 2 stories done") and
+  beside it only the stages not done (the Work row's `notDone`, "1 in progress"), not the bar's full breakdown.
+  "Written by the Dev Lead" is plain secondary text, not link-coloured. Back has no action-button left margin, so its
+  edge lines up with the title and content.
+- **Seams:** FeatureEnd's Accept and Merge are unchanged; STORY-70 puts Approve on this screen. STORY-71's "Changes
+  asked" and STORY-72's evidence go in the screen's body.
+- **No new ADR:** ADR 0033 is amended for the stored run and ADR 0004 names the `ran:` event.
+- **BUG-39, found by the gate:** `vi.waitFor` and `vi.waitUntil` keep vitest's own 1 s default, which the hang
+  guard doesn't set. The BUG-28 wait scan now flags one left at that default; the one in story-acceptance.test.ts
+  waits with `until`.
+
+## 2026-11-23 — STORY-70 Approve merges the feature to main (developer)
+
+- **Approve is one click: Accept and Merge to main together.** It merges a finished feature (every story and bug Done
+  or Cancelled, at least one Done) through FeatureEnd's own merge path (ADR 0037): the facts are judged, the merge goes
+  ahead only at the judged tips, a merge commit, never a rebase, with the same reasons in the same order. The user's
+  Accept is carried in the Done card (`accepted` by `user`, then `merged` and Done by `system`). Nothing is committed to
+  the feature branch first, so the merge is at the commit whose checks passed.
+- **A merge that fails after Approve keeps the Accept.** Any refusal or failure of the merge records the Accept on the
+  feature branch, as Accept did, and the error is shown in one sentence. The screen's button is then "Merge to main",
+  with the same reasons beside it: it is the retry. When main moved, the Dev Lead is told to merge main in, as before.
+- **The feature's PR opens once it is finished, not on Accept.** With GitHub usable and `openFeaturePrs` on, the
+  server opens (or adopts) the PR as soon as the feature is finished, so CI has run before the user approves. Create
+  PR and Re-run are offered for a finished feature too. Facts and checks are read for finished features, not only
+  accepted ones. A PR that fails to open leaves its note and isn't retried on every read.
+- **A PR merged on GitHub settles only with the user's yes.** A finished feature whose PR merged on GitHub before the
+  user approved or accepted it isn't settled; its facts are dropped. A PR merged by Approve whose Done card couldn't be
+  committed onto main then (for example GitHub couldn't be fetched) settles on a later read with the Accept: the
+  server remembers, in memory, that the user approved it.
+- **The approval is part of the review.** `review.watch` carries `approval` (step `approve`, `merge` or `merged`;
+  `ready`; `reason`; `base`), built by work-format's `featureApprovalOf`: the unfinished stories first, then the merge's
+  reason, or "Checking…" before the first read. Once merged, the screen says "Merged to main" with any leftover notes.
+- **The card pane has no Accept or Merge.** A feature's card pane keeps Review, its link to the screen; its PR and
+  Checks sections stay. The socket method `feature.accept` is replaced by `feature.approve`.
+- **Tests changed by the spec, not weakened:** the card pane's Accept and Merge tests moved to the review screen
+  (feature-end.test.tsx), the e2e `merge-feature.spec.ts` became `approve-feature.spec.ts`, and the server's "Create PR
+  isn't offered before Accept" became "isn't offered before the feature is finished" plus "is offered once finished,
+  before any Accept".
+- **"Accept opens the PR when it fails to write" now starts from a failed auto-open.** The review test (Should-fix 5)
+  kept its assertions; its PR's first open fails (`createFails`), so Accept is still the one that opens it.
+- **A read that opens the PR stops once FeatureEnd closes.** That test exposed a read opening the PR as the server
+  closed and then scanning, which reopened the project's index and held its files (the test's cleanup hung on
+  Windows). `openPr` and `refresh` now stop when closed; the test is its regression.
+- **ADR 0037 is amended** for Approve, the PR opening at finish and the settle rule.
+
+## 2026-11-23 — STORY-70 review fixes (developer)
+
+- **A PR merged on GitHub at the branch's commit before Approve no longer waits forever.** Its facts say `landed`
+  (`FeatureMergeFacts.pr`), which nothing else outranks: Approve stays on, and the screen says "Merged on GitHub.
+  Approve to finish." Approve then settles it with the user's Accept in the Done card; `gh pr merge` isn't called. This
+  supersedes "its facts are dropped" above; a PR merged at another commit still waits, saying so.
+- **Approvals are durable.** The user's Approve is recorded before its merge starts in
+  `<git common dir>/featra/approved.json` (server `feature-approvals.ts`), beside the card index, so every checkout
+  shares it and nothing is committed. A PR merged by Approve whose Done card couldn't be committed then settles on a
+  later read, after a restart too. An approval is dropped once its feature is no longer finished and unaccepted
+  (settled, or its Accept recorded on the branch); what was read is forgotten on unwatch.
+- **GitHub's word decides after a `gh` failure.** When `gh pr merge` fails, the PR is read again; merged at the judged
+  tip, it settles as Featra's instead of recording the Accept on the branch.
+- **A Done card main can't take now says Featra will finish it.** The merge's note is "Merged. Featra will mark it Done
+  on main." (`FEATURE_END_MESSAGES.settleLater`), also beside Merge to main for a landed, accepted feature. A read checks
+  a merged PR before whether main has the branch, so a user's pull of GitHub's merge doesn't skip the settle.
+  After such a pull main owns the feature's card (its branch is in main's history and not checked out), so the read and
+  the settle also look at a feature whose card on main isn't Done yet (server `lookAtLanded`).
+- **One source of truth for a feature's checks on the review screen (from the screenshot review).** A feature with a
+  PR shows its checks on the PR line only; the empty "No checks run yet" Checks section is hidden then, rather than
+  mirroring the PR's checks into a second place. Checks run here still show their own section. Without a PR the
+  empty section stays.
+- **A merged feature's PR reads Merged.** The server stops reading a merged feature's PR, so the review screen shows
+  the PR as Merged from the card's own merge record (the approval's `merged` step), as it shows Open before.
+- **A merged feature's stat stays what it merged.** The feature's files and lines were its branch against the base
+  (`base...feature`), which is empty once the base has the feature. Once it does, the range starts at the first parent
+  of the base's merge of the feature's tip (server `review-diffs.ts`), so later commits on main stay out. A feature
+  that reached the base without a merge commit keeps the old range.
+- **Merge to main waits for the stories as Approve does.** The retry is off, and refused, while a story or bug under
+  the feature isn't Done or Cancelled, with that reason first.
+- **The server's separate Accept is gone.** `features.accept`, its PR-opening path and the card pane's unused
+  `CardView.featureEnd` are removed; their tests were ported to Approve, Merge to main after the Accept on the branch,
+  and Create PR's retry (review Should-fix 5 now proves the PR's record is retried, adopting the PR GitHub has).
+- **Tests changed by the spec, not weakened:** "doesn't settle a PR merged on GitHub before the user approved it" now
+  expects the landed state instead of no facts, and "settles later" expects the new note.
+
+## 2026-11-23 — STORY-71 Ask for changes before approving (developer)
+
+- **"Not yet" sits beside Approve** on the review screen and reuses Send back's form with its own words ("What to
+  change", Send, Cancel). It can't be sent without a reason; a refusal keeps the reason in the field.
+- **No live Dev Lead chat: refuse, record nothing.** The Dev Lead is found as shaping finds it (`drafted-by`, else a
+  story session's parent; server `feature-lead.ts`, shared with the feature facts) and resumed with `chats.open`. With
+  none, "This feature has no Dev Lead chat."; with a chat Featra no longer has, or whose project is closed, "The Dev
+  Lead's chat is gone."; a busy chat refuses as a send does. Nothing is logged, queued or created, so the screen never
+  says "Changes asked" for a reason nobody received. Queueing it for a later chat was rejected: the user would think the
+  Dev Lead had it.
+- **Send, then record**, as Send back: the reason reaches the chat as "Changes asked on FEAT-n: reason", then
+  `changes-asked` is committed on the feature branch; a failed record answers `recorded: false`.
+- **Rounds.** Asking again while changes are asked adds to the same round (the screen lists every reason); asking after
+  the Dev Lead's reply starts a new one, and the reply stays on the screen until then. The state is replayed from the
+  history only, so a restart shows the same thing.
+- **The MCP tool `mark_changes_handled`** (agent method `feature.changesHandled`) follows `write_summary`: Dev Lead chats
+  only, story sessions refused, taught in its description that a chat reply alone doesn't clear "Changes asked". Its
+  reply is logged as `changes-handled` by `session:<chat>` and shown as "Changes made", "Written by the Dev Lead".
+- **Handled and Dismiss only while changes are asked**, checked inside the card lane: of a reply and a Dismiss made at
+  once exactly one is kept; the late one is refused ("No changes are asked on FEAT-n: the user dismissed them, or their
+  ask wasn't recorded.", which also covers a reason the chat got but the history write lost).
+- **Approve is untouched**: `featureApprovalOf` ignores these events, so Approve stays as it was while changes are asked.
+- **ADR 0042** names the three events (`changes-asked`, `changes-handled`, `changes-dismissed`).
+- **The fake Dev Lead's MCP turns share one helper** (`leadToolTurn` in fake-agent-turns.mjs), for `write_summary` and
+  `mark_changes_handled`.
+- **Review fixes (PR #86):**
+  - A merged feature drops "Changes asked" and its Dismiss (its approval step is `merged`); the history keeps the round.
+    The watch payload is unchanged: the screen decides.
+  - Only the feature's own Dev Lead (`leadOf`) may mark its changes handled or write its summary; another Dev Lead chat
+    is refused with "You don't lead FEAT-n." The check lives in the writers (server `feature-lead.ts` `mustLead`), in
+    the card lane, so the MCP and any later caller get it alike. The STORY-69 e2e's summary chat now leads FEAT-2 (its
+    `drafted-by`), as the drafting chat would.
+  - The reason is kept with plain newlines, as the reply is, and both limits read "2,000 characters".
+  - `dirParams` and `unwatchParams` moved to protocol-frames.ts (re-exported) to keep protocol.ts under 300 lines;
+    services.ts shares the GitHub options as one `gh` object.
+
+## 2026-11-24 — STORY-72 See attached evidence next to criteria (developer)
+
+- **One shared component, `AcEvidence`**, shows a criterion's evidence in both the card pane (`AcSection`) and the
+  review screen (`ReviewItem`). It reads through an `EvidenceContext` the two screens provide and opens files through an
+  `OpenFileContext` (the `ExternalLinkContext` pattern), so neither screen knows how evidence is fetched.
+- **Two server methods, `evidence.read` and `evidence.open`** (`{ dir, id, path }`, open projects only), in their own
+  `api-evidence.ts` so api.ts and protocol.ts stay under 300 lines. ADR 0043 records how files are served and limited.
+- **Only a path the card links is read**, and it must pass `evidenceLinkError` (moved from the server's card report to
+  work-format `evidence-link.ts`, so the link rules, the image types and the copy live in one place).
+- **Read from the copy whose criteria are shown** (`shownFrom`): from disk with `update_card`'s rules when it is checked
+  out, else from git at that copy's revision (`ls-tree` for a plain blob, never a link, then `cat-file`). At most 1 MB
+  (`EVIDENCE_BYTES`).
+- **Screenshots are png, jpg, gif and webp**: a 120 by 64 thumbnail that opens full size in an in-app overlay (the
+  shared `Dialog`: Escape closes it, focus returns to the thumbnail, the card stays open). Anything else is a link.
+- **Opening never touches the original**: the server copies the file into `<data>/evidence-open/<random>/<name>`
+  (cleared once per run); the desktop main process (`openEvidence` IPC, `evidence-open.ts`) opens it only if its real
+  path is inside that folder, with the OS for documents and images (`EVIDENCE_OPENABLE`), and shows anything else, such
+  as a script or a page, in its folder rather than run it. The server's data folder is Electron's `userData`
+  (`FEATRA_DATA_DIR`), the folder main checks.
+- **A file that can't be shown gets a short note** ("Evidence missing", "Can't open evidence") beside the criterion; the
+  criterion's text and the rest of the card render as before.
+- **The e2e journey** uses the fake agent's `FEATRA_E2E_REPORT=evidence` turn (`fake-agent-evidence.mjs`): it writes a
+  real PNG and a text file and links them through the real `update_card`; the spec removes a third linked file to show
+  the missing note.
+- **STORY-25 seam**: captured screenshots linked as a criterion's `evidence` show through the same `AcEvidence`, with
+  nothing new to build on the screen.
+- **Review fixes (PR #87):**
+  - No part of an evidence path may be a link or junction: `evidenceOnDisk` checks each part with `lstat` as it walks.
+    Before, only the file itself was checked, and a junctioned story folder let `evidence.read` serve any file in the
+    checkout. The same check guards `update_card`'s links.
+  - Evidence is read from the watch's last good scan (`WorkWatches.shown`), not `watches.scan`, so a read never queues
+    a rescan of every card. ADR 0043 notes the cost.
+  - `AcEvidence` reads again with each new revision of what is shown (the card's view, the review): a file attached
+    since, or one a read couldn't get, shows once the card changes, and what was read stays shown meanwhile.
+  - The host's contexts moved to `HostProviders`, which brings App.tsx back under 300 lines. The open copy's fallback
+    error is `EVIDENCE_COPY.failed`.
+  - Desktop: `openEvidenceFile` makes the open-or-show call against an `EvidenceShell` (Electron's `shell`, or a
+    recording one in E2E runs), and a test proves a program is only shown in its folder.
+  - CONTEXT.md defines **Evidence file**, as distinct from **Evidence state**.
+  - E2E (Windows) failed once at `chat-list.spec.ts:34`, waiting for the provider group. The page snapshot shows the
+    group arrived just after the 5 s wait, and nothing in this change touches it. Filed as BUG-40, with one rerun.
+
+## 2026-11-24 — STORY-25 Choose the project's proof and capture screenshots (developer)
+
+Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev-server lifecycle and capture path.
+
+- **Where the setting lives**: `.featra/config.yaml` (`proof`, `devServerCommand`, `devServerUrl`, `testScreenshots`),
+  shown in Settings > Project > Proof beside Checks and Pull requests, so it travels with the project like the check
+  command. The dev-server command runs only once confirmed in Settings (`dev-server-confirmed.json` in the data
+  folder), as a check command does: a command changed through git is a note, "Dev-server command not confirmed",
+  until the user confirms it.
+- **When the question is asked**: when a Dev Lead chat drafts the project's first feature (exactly one feature after
+  the draft) and `proof` is unset. The card says "when the first feature is shaped", so a project that had features
+  before Featra is not asked; its proof is chosen in Settings. It is the app's question on the chat's question card
+  (subject `proof`), so it costs no tokens and stays open past the turn; it isn't asked twice while it waits.
+- **Page listing**: `update_card`'s criteria take `page`, a route on the dev server (`/settings`), kept on the
+  criterion's line as `(page: /route)` between the test and the evidence. Capture happens when the agent's report
+  moves the story to In Review, the moment the work is claimed done; the tool's answer says what was captured and asks
+  the agent to commit it with the card.
+- **Test screenshots**: a file in `testScreenshots` named `<STORY-ID>-ac<n>[-anything].(png|jpg|jpeg|gif|webp)`,
+  any case, `n` counting criteria from 1, the first by sorted name winning. A criterion that lists a page under
+  screenshot proof takes the captured page instead; an agent's own evidence is never replaced. Test screenshots are
+  attached whatever the proof, since they cost nothing.
+- **Dev-server lifecycle**: one per story worktree, reused, two asks sharing one start; a free port when the URL's
+  is taken and the command takes `{port}` (also set as `PORT`); 60 s to answer, then "Dev server didn't start" with
+  its last 20 lines; stopped when the story merges or is abandoned, its project closes, or the app quits. A process
+  that already exited is never signalled.
+- **Quit order** (found in CI on Windows): main used to exit without waiting for the server, so Node's job object
+  ended the server mid-shutdown along with each dev server's shell, but not the node process the shell started. That
+  orphan held the app's inherited stdio and the app never finished closing. Now the server stops its dev servers
+  first when the host goes, and main waits for the server to exit (5 s at most, then ends it) before exiting.
+- **Capture path**: Electron main loads the page in a hidden 1280×800 window and answers the server over the host's
+  IPC channel, PNG or, over 1 MB, JPEG. Only `localhost`/`127.0.0.1` pages load, and a Preview window navigates only
+  within its dev server. The server's tests fake the capture and the process runner; the e2e journeys run the real
+  thing against `apps/desktop/e2e/fixture-dev-server.mjs`.
+- **Failures** are notes on the criterion in the card pane (the dev server's output folded in a disclosure), never a
+  refusal of the move. Notes live in memory; the next move to review tries again.
+- **Review fixes (Opus review of PR #88)**: a port counts as taken when anything listens on either loopback
+  (127.0.0.1 or ::1) or its URL already answers before Featra starts a server, and a server whose own process exited
+  before its URL answered didn't start, so another worktree's code is never captured as the story's. A page is
+  captured only when it is a route that keeps the dev server's origin (`pageUrl`), and main checks that origin again;
+  every web contents is guarded against navigations and redirects off its dev server's origin, and dev-server windows
+  run in their own partition (`featra-dev-pages`) that denies every permission. A new screenshot removes the
+  criterion's earlier ones of another type. Recorded in ADR 0044.
+
+## 2026-11-24 — STORY-73 Design review of screenshots (developer)
+
+- **Who reviews** (user decision, 2026-11-24): the Dev Lead chat that delegated the story, through `update_card`'s
+  `designReview`: `{findings}` or `{clear: true}` (with `stage: "Acceptance"` in the same call when it moves the story
+  on). The story's session reports `{fixed: true}` after findings, which captures the screenshots again and tells the
+  Dev Lead again. Featra starts no session for the review and injects no prompt: `update_card`'s description is all the
+  agents are taught. Recorded in ADR 0045.
+- **Has screenshots**: a criterion's evidence is a screenshot Featra attached, `ac<n>-page.*` (a captured page) or
+  `ac<n>-test.*` (a matched test screenshot) in the story's evidence folder. An agent's own image doesn't count.
+- **Setting**: `designReview` in the project config, unset meaning on when `proof` is `screenshots` or `both`. A switch
+  in Settings > Project > Proof, "Design review of screenshots", below the proof.
+- **Gate**: on agents' reports only. A report can't move the story to Acceptance until the review is cleared, and with
+  the check on it can't skip from before review straight to Acceptance. The user's own stage edit isn't gated.
+- **Round**: each move into review from before it starts a new review, so a story sent back is reviewed again. Each
+  finding, fix and clear is a `design-review` event in `history[]`.
+- **Notice**: "STORY-N waits for design review: Screenshots in <folder>: <files>", held while the story's turn runs
+  and batched with its turn notice; "Findings fixed." comes first after a fix.
+- **Findings** reach the story's session as "Message from the Dev Lead:" with how to report them fixed. A session that
+  is working, stopped, queued or merging refuses them and nothing is recorded.
+- **Dev Lead chat gone** (the session has no parent chat, or it isn't listed): the card's design review says so and
+  offers Clear review (recorded as the user's, and the story moves to Acceptance) and Send back, which is allowed while
+  the review waits.
+- **Card**: "Design review: waiting", "findings sent" (with the findings) or "cleared", in the card pane's actions.
+- **Internal**: `stageCeiling`, `reviewStage`, `checksApply` and `inReview` moved to `review-stages.ts` so the design
+  review rules can use them without an import cycle.
+
+## 2026-11-25 — STORY-73 review fixes (developer)
+
+- **Capture window**: while a story's screenshots are being captured after its move to review, a report that moves it
+  to Acceptance is refused ("STORY-N's screenshots are still being captured: move it on once they're attached.").
+- **Auto-merge** waits for the design review: a story whose review isn't cleared doesn't merge on its own. Merge by
+  hand isn't gated; it is the user's call, as for a held story.
+- **Dev Lead gone** on the card uses the same test as notice delivery: no parent chat, or it is gone, closed or can't
+  run.
+- **Who reviews**: only the chat the story's session nests under, which started it. The chat that drafted the feature
+  can update the card, but its findings and clears are refused.
+- **Rounds** (Dev Lead decision): any move into review starts a new round, including the user moving a story back from
+  Acceptance. A clear from an earlier round never carries over.
+- **Findings** are delivered only after every other check on the report has passed, just before the card is written.
+- **Send back** beside Accept (a story's Work row, its session's end) is the same compact action button as Accept, not the dialog's larger button, so the row stays on one line. It predates STORY-73 (STORY-23), and showed in its Acceptance screenshot.
+- Recorded in ADR 0045.

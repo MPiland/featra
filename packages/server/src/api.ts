@@ -2,13 +2,11 @@ import {
   assertNever,
   cardParams,
   cardUpdateParams,
-  copyParams,
   dirParams,
   sendBackParams,
   storySendBackParams,
   checksSetParams,
   starter,
-  unwatchParams,
   type PushEvent,
   type ServerMethod,
   type ServerMethods,
@@ -19,12 +17,16 @@ import type { AgentBridge } from "./agent-bridge.ts";
 import { ApiError } from "./api-error.ts";
 import { createChatApi, type ChatApiDeps } from "./api-chat.ts";
 import { createBugApi } from "./api-bugs.ts";
+import { createEvidenceApi, type EvidenceApiDeps } from "./api-evidence.ts";
+import { createProofApi, type ProofApiDeps } from "./api-proof.ts";
 import { createStoryEndApi } from "./api-story-end.ts";
 import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
 import { createProjectApi } from "./api-project.ts";
 import { createRoleApi } from "./api-roles.ts";
+import { createWatchApi, type WatchApiDeps } from "./api-watch.ts";
+import { createWorkApi } from "./api-work.ts";
 import type { BugFiling } from "./bug-filing.ts";
-import { cardViewIn, type CardActions } from "./card-actions.ts";
+import type { CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
 import type { CopyActions } from "./copy-actions.ts";
 import type { DraftActions } from "./draft-actions.ts";
@@ -66,6 +68,8 @@ export interface ApiDeps {
   holds?: Pick<StoryHold, "hold">;
   /** Accepts and merges features (STORY-14). Without it the `feature.*` ending methods are refused. */
   features?: FeatureApiDeps["features"];
+  /** Asks for changes on features before Approve (STORY-71). Without it `feature.askChanges` is refused. */
+  changes?: FeatureApiDeps["changes"];
   /** Files bugs from Work's New bug (STORY-13). Without it `bug.propose` and `bug.file` are refused. */
   bugs?: Pick<BugFiling, "propose" | "file">;
   /** Why a story's session takes no message from the user now: it is merging or being abandoned. */
@@ -79,6 +83,12 @@ export interface ApiDeps {
   /** Takes back what an agent logged; without it there is nothing to take back. */
   agents?: Pick<AgentBridge, "undo">;
   needs?: ChatApiDeps["needs"];
+  /** What each story of a feature changed, for its review screen (STORY-69). */
+  diffs?: WatchApiDeps["diffs"];
+  /** Evidence files read back to show next to their criteria (STORY-72). */
+  evidence?: EvidenceApiDeps["evidence"];
+  /** The project's proof (STORY-25): its settings, Preview, and the notes and Preview a card shows. */
+  proof?: ProofApiDeps["proof"] & { capture: WatchApiDeps["proof"]; design?: WatchApiDeps["design"] };
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -117,6 +127,7 @@ export function createApi({
   abandons,
   holds,
   features,
+  changes,
   bugs,
   busy,
   checks,
@@ -127,6 +138,9 @@ export function createApi({
   roleWatches,
   agents,
   needs,
+  diffs,
+  evidence,
+  proof,
 }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
@@ -143,17 +157,25 @@ export function createApi({
     if (!p) throw new ApiError("Expected { dir, id }.");
     return [allow(p.dir), p.id];
   };
-  const copy = (params: unknown) => {
-    const p = copyParams(params);
-    if (!p) throw new ApiError("Expected { dir, key }.");
-    allow(p.dir);
-    return p;
-  };
+  const workApi = createWorkApi({ watches, allowed, copies, prs, allow, project });
   const projectApi = createProjectApi({ git, allow, project });
   const roleApi = createRoleApi({ roles, roleWatches, allowed, allow, project });
   const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
   const bugApi = createBugApi({ bugs, allow });
-  const featureApi = createFeatureApi({ features, card });
+  const featureApi = createFeatureApi({ features, changes, card });
+  const evidenceApi = createEvidenceApi({ evidence, allow });
+  const proofApi = createProofApi({ proof, allow });
+  const watchApi = createWatchApi({
+    watches,
+    allowed,
+    checks,
+    prs,
+    features,
+    diffs,
+    card,
+    proof: proof?.capture,
+    design: proof?.design,
+  });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, needs, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
@@ -164,60 +186,23 @@ export function createApi({
       case "project.setupPlan":
       case "project.setup":
         return projectApi(method, params);
-      case "work.watch": {
-        const dir = project(params);
-        // The rows carry each story's PR state as last read (STORY-11), which a new read changes without a file event.
-        const { value, stop } = await watches.observe(
-          dir,
-          (_scan, list) => prs.decorate(dir, list),
-          (next) => {
-            // A project closed since: say nothing more about it.
-            if (allowed.has(dir)) connection.push("work.list", id, next);
-          },
-        );
-        connection.keep(id, stop);
-        return value;
-      }
-      case "work.unwatch": {
-        const p = unwatchParams(params);
-        if (!p) throw new ApiError("Expected { watch }.");
-        connection.unwatch(p.watch);
-        return null;
-      }
-      case "work.applyCopy": {
-        const p = copy(params);
-        return copies.apply(p.dir, p.key);
-      }
-      case "work.discardCopy": {
-        const p = copy(params);
-        return copies.discard(p.dir, p.key);
-      }
-      case "card.watch": {
-        const p = cardParams(params);
-        if (!p) throw new ApiError("Expected { dir, id }.");
-        const dir = allow(p.dir);
-        const { value, stop } = await watches.observe(
-          dir,
-          (scan) =>
-            cardViewIn(
-              scan,
-              p.id,
-              checks.checksFor(dir, p.id) ?? features?.checksFor(dir, p.id),
-              prs.prState(dir, p.id) ?? features?.prState(dir, p.id),
-              features?.mergeState(dir, p.id),
-            ),
-          (next) => {
-            if (allowed.has(dir)) connection.push("card.view", id, next);
-          },
-        );
-        connection.keep(id, stop);
-        return value;
-      }
+      case "work.watch":
+      case "work.unwatch":
+      case "work.applyCopy":
+      case "work.discardCopy":
+        return workApi(method, params, id, connection);
+      case "card.watch":
+      case "review.watch":
+        return watchApi(method, params, id, connection);
+
       case "card.update": {
         const p = cardUpdateParams(params);
         if (!p) throw new ApiError("Expected { dir, id, edit }.");
         return cards.update(allow(p.dir), p.id, p.edit);
       }
+      case "evidence.read":
+      case "evidence.open":
+        return evidenceApi(method, params);
       case "draft.sendBack": {
         const p = sendBackParams(params);
         if (!p) throw new ApiError("Expected { dir, id, reason }.");
@@ -243,10 +228,12 @@ export function createApi({
       case "bug.propose":
       case "bug.file":
         return bugApi(method, params);
-      case "feature.accept":
+      case "feature.approve":
       case "feature.createPr":
       case "feature.rerunChecks":
       case "feature.merge":
+      case "feature.askChanges":
+      case "feature.dismissChanges":
         return featureApi(method, params);
       case "story.rerunChecks":
         return checks.rerun(...card(params));
@@ -256,6 +243,11 @@ export function createApi({
         prs.focus();
         features?.focus();
         return null;
+      case "proof.load":
+      case "proof.set":
+      case "preview.start":
+      case "story.clearDesignReview":
+        return proofApi(method, params);
       case "checks.load":
         return checkSettings.load(project(params));
       case "checks.set": {

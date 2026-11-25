@@ -23,7 +23,12 @@ export type HistoryField =
   | "pr"
   | "merged"
   | "held"
-  | "not-merged";
+  | "not-merged"
+  | "summary"
+  | "changes-asked"
+  | "changes-handled"
+  | "changes-dismissed"
+  | "design-review";
 export const HISTORY_FIELDS: readonly HistoryField[] = [
   "status",
   "parent",
@@ -38,6 +43,11 @@ export const HISTORY_FIELDS: readonly HistoryField[] = [
   "merged",
   "held",
   "not-merged",
+  "summary",
+  "changes-asked",
+  "changes-handled",
+  "changes-dismissed",
+  "design-review",
 ];
 
 /** Append-only record of a change, written at the card's owner (ADR 0002). */
@@ -60,6 +70,8 @@ export interface AcceptanceCriterion extends ChecklistItem {
   test: string | null;
   /** The evidence file an agent linked for this AC, inside the story's evidence folder (STORY-10). Absent when none. */
   evidence?: string;
+  /** The page (a route on the dev server) the story's agent listed for Featra to capture (STORY-25). Absent when none. */
+  page?: string;
 }
 
 export interface BodySection {
@@ -125,7 +137,7 @@ export interface ProjectConfig {
   linkedTestCommand: string | null;
   /** Whether a story's PR is opened when it moves to review (STORY-11); off, the card offers Create PR. */
   openStoryPrs: boolean;
-  /** Whether an accepted feature's PR to main is opened (STORY-14); off, the feature offers Create PR. */
+  /** Whether a feature's PR to main opens once it is finished (STORY-14, STORY-70); off, it offers Create PR. */
   openFeaturePrs: boolean;
   /** How often open PRs are read again, in minutes (STORY-11). */
   prRefreshMinutes: number;
@@ -136,4 +148,17 @@ export interface ProjectConfig {
   testReportArtifact: string | null;
   /** The report files inside the artifact, a glob; null reads every `.xml` file in it. */
   testReportFiles: string | null;
+  /** How stories show they work (STORY-25): screenshots, Preview, both or none; null until the user chooses. */
+  proof: "screenshots" | "preview" | "both" | "none" | null;
+  /** The command that starts the project's dev server, with an optional `{port}`; null until the user confirms one. */
+  devServerCommand: string | null;
+  /** Where the dev server answers: http://localhost:<port> or http://127.0.0.1:<port>. */
+  devServerUrl: string | null;
+  /** The folder, relative to the project, where its own tests write screenshots (STORY-25); null when none. */
+  testScreenshots: string | null;
+  /**
+   * Whether the Dev Lead reviews a story's screenshots before it moves to Acceptance (STORY-73); null follows the proof:
+   * on when it captures screenshots.
+   */
+  designReview: boolean | null;
 }

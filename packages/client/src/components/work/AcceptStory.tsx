@@ -36,6 +36,7 @@ export function AcceptStory({
       )}
       <SendBack
         criterion
+        button="review-draft"
         into={into}
         name={CARD_COPY.sendBackOf(id)}
         unavailable={null}

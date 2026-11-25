@@ -26,6 +26,8 @@ const story = (app: App) => app.cardsIn(PROJECT.dir).find((c) => c.id === "STORY
 const belowRow = () => rowOf().nextElementSibling as HTMLElement;
 const accept = (scope: HTMLElement) => within(scope).queryByRole("button", { name: "Accept STORY-5" });
 const sendBack = (scope: HTMLElement) => within(scope).queryByRole("button", { name: "Send back STORY-5" });
+/** The classes of Send back and Accept in `scope`. */
+const classes = (scope: HTMLElement) => [sendBack(scope)?.className, accept(scope)?.className];
 
 /** Starts the story from its row, and its agent reports it ready for acceptance. */
 async function waiting(host: Host = {}, verified = false) {
@@ -69,6 +71,15 @@ describe("AC1: Accept and Send back for a story in Acceptance", () => {
     // At the end of the chat: after the transcript.
     const log = within(session).getByRole("log", { name: "Chat" });
     expect(log.compareDocumentPosition(accept(session) as HTMLElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("are the same kind of action button, so Send back sits in line with Accept in the row and the session", async () => {
+    const app = await waiting();
+    await waitFor(() => expect(accept(rowOf())).toBeTruthy());
+    const [rowSendBack, rowAccept] = classes(rowOf());
+    expect(rowSendBack).toBe(rowAccept);
+    const [sessionSendBack, sessionAccept] = classes(await openSession(app));
+    expect(sessionSendBack).toBe(sessionAccept);
   });
 
   it("are not offered on a story in another stage", async () => {

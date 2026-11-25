@@ -1,0 +1,211 @@
+/* A feature's review screen (STORY-69): the whole feature on one screen, in place of the Work list. */
+
+.review-screen {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+}
+
+.rv-top {
+  margin-bottom: 8px;
+}
+
+/* Back's left edge is the content column's: the action button's own margin doesn't push it in. */
+.rv-top .review-draft {
+  margin-left: 0;
+}
+
+.rv-h {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.rv-h:focus {
+  outline: none;
+}
+
+.rv-h:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.rv-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--tx2);
+}
+
+.rv-facts {
+  margin-bottom: 8px;
+}
+
+.rv-by {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--tx2);
+}
+
+.rv-summary-text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.rv-items {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rv-item {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.rv-item:last-child {
+  border-bottom: 0;
+}
+
+.rv-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.rv-name .card-id {
+  color: var(--tx3);
+  font-size: 12px;
+}
+
+.rv-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.rv-story {
+  margin: 0;
+  color: var(--tx2);
+}
+
+.rv-acs {
+  display: grid;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+
+.proof-run {
+  flex: 0 0 auto;
+}
+
+/* Approve (STORY-70): the screen's one decision, under its facts, with why it waits beside it. Its button is the card
+   actions' size; the reason and a failure wrap under it on a narrow window. */
+.rv-end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin-top: 12px;
+}
+
+.rv-end .btn {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.rv-end .meta,
+.rv-end .card-error {
+  font-size: 12px;
+}
+
+.rv-merged {
+  color: var(--ok);
+  font-weight: 600;
+}
+
+/* Its sections spaced as the card pane spaces them. */
+.review-screen .card-sec {
+  margin-top: 20px;
+}
+
+.review-screen .card-sec p {
+  margin: 0;
+}
+
+/* Links in the app's accent, underlined on hover, as the card pane's are. */
+.review-screen a {
+  color: var(--acc);
+  text-decoration: none;
+}
+
+.review-screen a:hover {
+  text-decoration: underline;
+}
+
+.review-screen a:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+/* Who wrote the summary sits beside its heading. */
+.rv-summary .sh {
+  justify-content: flex-start;
+  align-items: baseline;
+  gap: 8px;
+}
+
+/* "Not yet" (STORY-71): its form takes the row's full width under Approve. */
+.rv-end > form.send-back {
+  flex-basis: 100%;
+}
+
+/* "Changes asked": the reasons the user gave, until the Dev Lead replies or the user dismisses them. */
+.rv-changes .sh {
+  justify-content: flex-start;
+  align-items: center;
+  gap: 8px;
+}
+
+.rv-asked-badge {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--warn) 14%, transparent);
+  color: var(--warn);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rv-asked .sh .btn {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.rv-asked-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--warn);
+  list-style: none;
+}

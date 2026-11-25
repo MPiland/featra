@@ -12,7 +12,8 @@ Featra records and shows four distinct evidence states for a story: **Reported**
 passed), **Proven** (the AC's linked test passed), **Accepted** (the user signed off). "Done" requires at least
 Verified, plus Accepted where the project requires it.
 
-The history also records `checked:<commit>`, the commit the latest verdict was for (ADR 0034).
+The history also records `checked:<commit>`, the commit the latest verdict was for (ADR 0034), and `ran:<n>@<run>`,
+the run that proved criterion `<n>` (a CI run's URL, or `local`), written with its `proven:<n>` (ADR 0033).
 
 ## Consequences
 

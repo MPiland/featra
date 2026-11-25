@@ -3,13 +3,16 @@
  * (STORY-12's `request_merge`, STORY-68's `request_action`). Every request is held by the approval desk; this only
  * finds the chat that holds it. A `request_action` ends with its call, through `signal`, not with the turn (review B1).
  */
-import { APPROVAL_CANCELLED, type ActionOutcome } from "@featra/work-format";
+import { APPROVAL_CANCELLED, type ActionOutcome, type Answers } from "@featra/work-format";
 import type { ApprovalDesk } from "./approval-desk.ts";
-import type { AppApproval, ChatManager, ChoiceAnswer } from "./chat-manager-types.ts";
+import type { AppApproval, AppQuestion, ChatManager, ChoiceAnswer } from "./chat-manager-types.ts";
 import type { Chat } from "./chat-state.ts";
 import type { StoryMirror } from "./story-mirror.ts";
 
-export type ChatApprovals = Pick<ChatManager, "askApproval" | "askChoice" | "askAction" | "approve" | "answer">;
+export type ChatApprovals = Pick<
+  ChatManager,
+  "askApproval" | "askChoice" | "askAction" | "askQuestion" | "approve" | "answer"
+>;
 
 export function chatApprovals(
   desk: ApprovalDesk,
@@ -37,8 +40,15 @@ export function chatApprovals(
     return decision.reason ? { outcome: "cant", reason: decision.reason } : { outcome: "cant" };
   }
 
+  async function askQuestion(id: string, request: AppQuestion): Promise<Answers | null> {
+    await open(id);
+    const decision = await desk.ask({ ...request, chat: id }, new AbortController().signal);
+    return decision.allow ? decision.answers : null;
+  }
+
   return {
     askChoice,
+    askQuestion,
     askAction,
     askApproval: async (id, request) => typeof (await askChoice(id, request)) === "object",
     // A story session's approval shown in its parent chat is answered from there too.

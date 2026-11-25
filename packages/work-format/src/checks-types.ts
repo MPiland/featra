@@ -44,7 +44,7 @@ export interface ChecksView {
   github: GithubUse;
   /** Whether a story's PR opens when it moves to review (STORY-11). */
   openStoryPrs: boolean;
-  /** Whether an accepted feature's PR to main opens (STORY-14). */
+  /** Whether a feature's PR to main opens on its own once the feature is finished (STORY-14, STORY-70). */
   openFeaturePrs: boolean;
   /** How often open PRs are read again, in minutes. */
   prRefreshMinutes: number;

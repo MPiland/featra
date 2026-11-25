@@ -2,7 +2,7 @@
  * STORY-14 review regressions: Merge to main goes ahead only at the commits its facts were judged at, a PR merged on
  * GitHub outside Featra settles once and only at the branch's commit, main's checkout blocks a merge only with a local
  * change the merge would overwrite (found before anything is done), the Dev Lead's notice counts once posted, and the
- * paths a failure leaves (Accept's card write, a check run that fails or hangs, GitHub ahead). Real feature end, merge,
+ * paths a failure leaves (Create PR's card write, a check run that fails or hangs, GitHub ahead). Real feature end, merge,
  * checks, PRs, scanner, card lane and work-format rules on a real repository; GitHub is the fake `gh` over a bare
  * remote, and the clock, the check command and the chat manager are faked.
  */
@@ -18,7 +18,6 @@ import { FEATURE_BRANCH, featureWorld, LEAD, PR } from "./feature-end-world.ts";
 const w = featureWorld();
 const ID = "FEAT-1";
 const dir = () => w.repo.main;
-const accept = () => w.features.accept(dir(), ID);
 const merge = () => w.features.merge(dir(), ID);
 const state = () => w.features.mergeState(dir(), ID);
 const ci = { gh: { prs: [], next: 1 }, checks: "ci" as const };
@@ -39,26 +38,14 @@ async function onMain(file: string, text: string) {
   w.repo.commit(dir(), `main: ${file}`);
 }
 
-/** Accepted, checked and mergeable: on GitHub with CI passing when `github`, else with local checks. */
+/** Accepted (as a failed Approve leaves it), checked and mergeable: on GitHub with CI passing when `github`, else with local checks. */
 async function mergeable(github: boolean) {
   await w.start(github ? ci : { remote: false });
-  await accept();
+  await w.acceptOnBranch();
   await w.settle();
   if (github) await passing();
   await w.poll();
   expect(state()).toEqual({ mergeable: true, blocked: null });
-}
-
-/** The feature's PR merged on GitHub by someone else, at the branch's tip there. */
-async function mergedOnGithub() {
-  const base = w.remoteGit("rev-parse", "main");
-  const head = w.remoteGit("rev-parse", FEATURE_BRANCH);
-  const tree = w.remoteGit("merge-tree", "--write-tree", base, head).split("\n")[0]!;
-  const merged = w.remoteGit("commit-tree", tree, "-p", base, "-p", head, "-m", "Merge pull request #1");
-  w.remoteGit("update-ref", "refs/heads/main", merged, base);
-  await w.gh.change((s) => {
-    s.prs[0]!.state = "MERGED";
-  });
 }
 
 describe("the branch moving between the checks and the merge (review B1)", () => {
@@ -87,9 +74,9 @@ describe("the branch moving between the checks and the merge (review B1)", () =>
 describe("a PR merged on GitHub outside Featra (review B2)", () => {
   it("settles once, says main is ahead of GitHub, and later reads commit nothing more", async () => {
     await w.start(ci);
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
-    await mergedOnGithub();
+    await w.mergedOnGithub();
     await w.poll();
     expect(w.onMain().status).toBe("done");
     const settled = w.tip("main");
@@ -104,9 +91,9 @@ describe("a PR merged on GitHub outside Featra (review B2)", () => {
 
   it("isn't settled when it merged without this computer's latest commits, and says so on every read", async () => {
     await w.start(ci);
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
-    await mergedOnGithub();
+    await w.mergedOnGithub();
     await w.commitOn(FEATURE_BRANCH, "late.txt", "not on GitHub\n");
     const base = w.tip("main");
     await w.poll();
@@ -145,7 +132,7 @@ describe("main's checkout (review Should-fix 2)", () => {
 describe("the Dev Lead's notice (review Should-fix 4)", () => {
   it("counts as told only once it is posted, so a failed post is tried again", async () => {
     await w.start({ remote: false });
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     // Every post fails while main moves on, and then the chat takes them again.
     w.notifyFails = 1000;
@@ -160,7 +147,7 @@ describe("the Dev Lead's notice (review Should-fix 4)", () => {
 
   it("is dropped when no Dev Lead leads the feature, and Merge to main still says why it waits", async () => {
     await w.start({ remote: false, lead: false });
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     await onMain("other.txt", "other\n");
     await w.poll();
@@ -170,28 +157,30 @@ describe("the Dev Lead's notice (review Should-fix 4)", () => {
 });
 
 describe("what a failure leaves (review Should-fix 5)", () => {
-  it("lets Accept be tried again after its PR opened and its card write failed, adopting that PR", async () => {
-    // While GitHub opens the PR, the feature branch can't be read, so Accept's card write fails.
-    await w.start(ci);
+  it("lets the PR's card write be tried again after the PR opened and the write failed, adopting that PR", async () => {
+    // STORY-70 opens a finished feature's PR on its own; Create PR is the retry once that failed. So it fails once here,
+    // and then, while GitHub opens the PR, the feature branch can't be read: Create PR's card write fails.
+    await w.start({ ...ci, gh: { ...ci.gh, createFails: "GitHub is down" } });
+    expect(w.features.prState(dir(), ID)?.note).toMatch(/GitHub is down/);
     await w.gh.change((s) => {
+      s.createFails = undefined;
       s.whileCreating = { file: ref(), text: `${"0".repeat(40)}\n` };
     });
     const tip = w.tip(FEATURE_BRANCH);
-    await expect(accept()).rejects.toThrow(/./);
+    await expect(w.features.createPr(dir(), ID)).rejects.toThrow(/./);
     await writeFile(ref(), `${tip}\n`);
+    expect(w.onFeature().pr).toBeNull();
+    expect((await w.gh.load()).prs).toHaveLength(1);
+    // The branch reads again: the next read records the PR GitHub has, opening none.
+    await w.settle();
+    expect(w.onFeature().pr).toBe(PR);
     expect(evidenceState(w.onFeature()).accepted).toBe(false);
     expect((await w.gh.load()).prs).toHaveLength(1);
-    await expect(accept()).resolves.toBeNull();
-    const accepted = w.onFeature();
-    expect(evidenceState(accepted).accepted).toBe(true);
-    expect(accepted.pr).toBe(PR);
-    expect((await w.gh.load()).prs).toHaveLength(1);
   });
-
   it("removes the checks' worktree after a failed run", async () => {
     await w.start({ remote: false });
     await w.commitOn(FEATURE_BRANCH, "verdict.txt", "fail\n");
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     expect(w.features.checksFor(dir(), ID)?.last?.passed).toBe(false);
     expect(w.repo.git(dir(), "worktree", "list").trim().split("\n")).toHaveLength(1);
@@ -200,7 +189,7 @@ describe("what a failure leaves (review Should-fix 5)", () => {
   it("removes the checks' worktree after a run that hangs and is stopped", async () => {
     await w.start({ remote: false, checkTimeoutMs: 1500 });
     await w.commitOn(FEATURE_BRANCH, "verdict.txt", "hang\n");
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     expect(w.features.checksFor(dir(), ID)?.last?.passed).toBe(false);
     expect(state()).toEqual({ mergeable: false, blocked: m.failed });
@@ -209,7 +198,7 @@ describe("what a failure leaves (review Should-fix 5)", () => {
 
   it("blocks without pushing when GitHub's copy of the branch has commits this computer doesn't", async () => {
     await w.start(ci);
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     const local = w.tip(FEATURE_BRANCH);
     const tree = w.remoteGit("rev-parse", `${FEATURE_BRANCH}^{tree}`);
@@ -234,7 +223,7 @@ describe("what a failure leaves (review Should-fix 5)", () => {
 
   it("gives Create PR in local mode the reason it has none", async () => {
     await w.start({ remote: false });
-    await accept();
+    await w.acceptOnBranch();
     await expect(w.features.createPr(dir(), ID)).rejects.toThrow(GITHUB_COPY.noRemote);
   });
 });

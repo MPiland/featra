@@ -37,14 +37,19 @@ export interface EvidenceState {
 /** What a story waiting on the user's Accept needs, in a Done refusal and on a feature's bar (STORY-15). */
 export const NEEDS_ACCEPT = "needs your Accept";
 
+/** An evidence event's `proven:<n>[@<commit>]` or `unproven:<n>`, read; null for any other event. */
+export function proofStep(e: Card["history"][number]): { ac: number; proven: boolean; commit: string | null } | null {
+  const m = e.field === "evidence" ? /^(proven|unproven):(\d+)(?:@(\S+))?$/.exec(e.to ?? "") : null;
+  return m ? { ac: Number(m[2]), proven: m[1] === "proven", commit: m[3] ?? null } : null;
+}
+
 /** Each proven AC number with the commit its test passed on (null when not recorded), in history order. */
-export function provenCommits(card: Card): Map<number, string | null> {
+export function provenCommits(card: Pick<Card, "history">): Map<number, string | null> {
   const proven = new Map<number, string | null>();
   for (const e of card.history) {
-    if (e.field !== "evidence") continue;
-    const m = /^(proven|unproven):(\d+)(?:@(\S+))?$/.exec(e.to ?? "");
-    if (m?.[1] === "proven") proven.set(Number(m[2]), m[3] ?? null);
-    else if (m?.[1] === "unproven") proven.delete(Number(m[2]));
+    const step = proofStep(e);
+    if (step?.proven) proven.set(step.ac, step.commit);
+    else if (step) proven.delete(step.ac);
   }
   return proven;
 }

@@ -72,6 +72,8 @@ interface TestHooks {
   notices: string[];
   shownInFolder: string[];
   openedExternal: string[];
+  openedFiles: { how: "open" | "show"; file: string }[];
+  previews: { url: string; title: string }[];
   copied: string[];
   folderPicks: string[];
   folderDialogs: string[];
@@ -123,6 +125,12 @@ export const shownInFolder = (app: ElectronApplication) =>
 /** Links Featra asked the OS browser to open (a PR chip's link). */
 export const openedExternal = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.openedExternal);
+/** Evidence copies Featra gave the OS to open, or to show in their folder (STORY-72). */
+export const openedFiles = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as MainGlobal).featraTest.openedFiles);
+/** The Preview windows Featra opened (STORY-25): the dev server's URL and the window's title. */
+export const previews = (app: ElectronApplication) =>
+  app.evaluate(() => (globalThis as MainGlobal).featraTest.previews);
 /** Text Featra put on the clipboard (a request's Copy on a command). */
 export const copiedText = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.copied);

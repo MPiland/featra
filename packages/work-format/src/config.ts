@@ -15,6 +15,14 @@ import {
   PR_REFRESH_MAX,
   REPORT_RULES,
 } from "./checks-types.ts";
+import { isDevServerUrl, isProofMode, isScreenshotFolder, PROOF_RULES } from "./proof-types.ts";
+
+/** The proof settings (STORY-25): each key, what it may hold, and the rule said when it doesn't. */
+const PROOF_KEYS = [
+  ["proof", isProofMode],
+  ["devServerUrl", isDevServerUrl],
+  ["testScreenshots", isScreenshotFolder],
+] as const;
 import { isOneOf, isRecord, toText } from "./utils/guards.ts";
 
 export const DEFAULT_STAGES: Stage[] = [
@@ -46,6 +54,11 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   prRefreshMinutes: 2,
   testReportArtifact: null,
   testReportFiles: null,
+  proof: null,
+  devServerCommand: null,
+  devServerUrl: null,
+  testScreenshots: null,
+  designReview: null,
 };
 
 const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
@@ -60,8 +73,9 @@ const BOOLEAN_KEYS = [
   "uat",
   "openStoryPrs",
   "openFeaturePrs",
+  "designReview",
 ] as const;
-const COMMAND_KEYS = ["checkCommand", "linkedTestCommand"] as const;
+const COMMAND_KEYS = ["checkCommand", "linkedTestCommand", "devServerCommand"] as const;
 /** The longest check command a project can set, in characters. */
 export const COMMAND_MAX = 1000;
 
@@ -158,6 +172,11 @@ export function configOverrides(text: string): Partial<ProjectConfig> {
       throw new ConfigError(`testReportFiles ${REPORT_RULES.files}, got ${toText(raw.testReportFiles)}`);
     }
     out.testReportFiles = raw.testReportFiles;
+  }
+  for (const [key, valid] of PROOF_KEYS) {
+    if (!(key in raw)) continue;
+    if (!valid(raw[key])) throw new ConfigError(`${key} ${PROOF_RULES[key]}, got ${toText(raw[key])}`);
+    Object.assign(out, { [key]: raw[key] });
   }
   return out;
 }

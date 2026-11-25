@@ -3,8 +3,9 @@
  * the checks for data that crosses the socket only, so the client can import it without the card parser.
  */
 import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
-import { normalizeCardPr, type CardPr } from "./prs-types.ts";
-import { normalizeFeatureEnd, type CardFeatureEnd } from "./feature-end-copy.ts";
+import { isCiRunOf, normalizeCardPr, type CardPr } from "./prs-types.ts";
+import { normalizeDesignReview, type DesignReviewView } from "./design-review-types.ts";
+import { normalizeProofNote, type ProofNote } from "./proof-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
 /**
@@ -14,11 +15,26 @@ import { isOneOf, isRecord } from "./utils/guards.ts";
 export type AcProof = "passed" | "failed" | "missing" | "linked" | "none";
 const AC_PROOFS: readonly AcProof[] = ["passed", "failed", "missing", "linked", "none"];
 
+/** A run on this computer (STORY-69): there is no page to link to. */
+export const LOCAL_RUN = "local";
+
+/**
+ * A proving run Featra keeps and shows for a card whose PR is at `pr`: `local`, or a GitHub Actions run in that PR's
+ * repository. Any other link, as an edited card might hold, is refused, so the card never offers it to open.
+ */
+export const isRun = (run: unknown, pr: string | null): run is string => run === LOCAL_RUN || isCiRunOf(pr, run);
+
 export interface CardViewAc {
   text: string;
   done: boolean;
   test: string | null;
   proof: AcProof;
+  /** The run that proved it, kept with the proof (STORY-69): a CI run's URL, or `local`; absent when not known. */
+  run?: string;
+  /** The evidence file linked to it (STORY-72), a path in the card's evidence folder; absent when none is. */
+  evidence?: string;
+  /** Why Featra has no screenshot for it (STORY-25): the dev server or the page failed; absent otherwise. */
+  proofNote?: ProofNote;
 }
 
 export interface CardViewTask {
@@ -84,8 +100,6 @@ export interface CardView {
   mergeable?: true;
   /** True on a story that isn't merged or done, which Abandon can end (STORY-58); absent otherwise. */
   abandonable?: true;
-  /** A feature in progress: its Accept and Merge to main (STORY-14); absent otherwise. */
-  featureEnd?: CardFeatureEnd;
   /** True on a story merged into its feature (STORY-12); absent otherwise. */
   merged?: true;
   /** The feature branch a merged story went into (STORY-12), for its card's merged line; absent otherwise. */
@@ -94,6 +108,10 @@ export interface CardView {
   held?: boolean;
   /** Why a story didn't merge on its own, while that stands (STORY-60); absent otherwise. */
   notMerged?: string;
+  /** True on a story with a worktree in a project that offers Preview (STORY-25); absent otherwise. */
+  preview?: true;
+  /** Where the story's design review of its screenshots stands (STORY-73); absent when it has none. */
+  designReview?: DesignReviewView;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -187,15 +205,16 @@ const checksOf = (raw: unknown): { checks?: CardChecks } => {
   return checks ? { checks } : {};
 };
 
-const featureEndOf = (raw: unknown): { featureEnd?: CardFeatureEnd } => {
-  const featureEnd = normalizeFeatureEnd(raw);
-  return featureEnd ? { featureEnd } : {};
-};
-
 const prOf = (raw: unknown): { prState?: CardPr } => {
   const prState = normalizeCardPr(raw);
   return prState ? { prState } : {};
 };
+
+/** A view's design review as a spread: empty when it has none or it is malformed. */
+function designReviewOf(raw: unknown): { designReview?: DesignReviewView } {
+  const review = normalizeDesignReview(raw);
+  return review ? { designReview: review } : {};
+}
 
 /** A view from the socket, read defensively; null when there is no card. */
 export function normalizeCardView(raw: unknown): CardView | null {
@@ -221,6 +240,9 @@ export function normalizeCardView(raw: unknown): CardView | null {
       done: a.done === true,
       test: textOrNull(a.test),
       proof: isOneOf(AC_PROOFS, a.proof) ? a.proof : "none",
+      ...(isRun(a.run, textOrNull(raw.pr)) ? { run: a.run } : {}),
+      ...(typeof a.evidence === "string" && a.evidence ? { evidence: a.evidence } : {}),
+      ...normalizeProofNote(a.proofNote),
     })),
     tasks: list(raw.tasks, (t) => ({ text: text(t.text), done: t.done === true })),
     notes: text(raw.notes),
@@ -232,12 +254,13 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(typeof raw.draftStories === "number" ? { draftStories: raw.draftStories } : {}),
     ...checksOf(raw.checks),
     ...prOf(raw.prState),
-    ...featureEndOf(raw.featureEnd),
     ...(raw.awaiting === true ? { awaiting: true as const } : {}),
     ...(raw.startable === true ? { startable: true as const } : {}),
     ...(raw.mergeable === true ? { mergeable: true as const } : {}),
     ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
+    ...(raw.preview === true ? { preview: true as const } : {}),
+    ...designReviewOf(raw.designReview),
     ...(typeof raw.mergedInto === "string" && raw.mergedInto ? { mergedInto: raw.mergedInto } : {}),
     ...(typeof raw.held === "boolean" ? { held: raw.held } : {}),
     ...(typeof raw.notMerged === "string" && raw.notMerged ? { notMerged: raw.notMerged } : {}),

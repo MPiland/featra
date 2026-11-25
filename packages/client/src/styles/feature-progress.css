@@ -1,7 +1,8 @@
 /* The feature progress pane (STORY-24): a card pane's frame, with the feature's facts and one line per story. */
 
-/* Its opener on a feature row: an icon button beside the title. */
-.row-progress {
+/* Its opener on a feature row: an icon button beside the title; Review (STORY-69) is one too. */
+.row-progress,
+.row-icon {
   display: inline-grid;
   place-items: center;
   width: 22px;
@@ -17,12 +18,14 @@
 }
 
 .row-progress:hover,
+.row-icon:hover,
 .row-progress[aria-expanded="true"] {
   background: var(--row);
   color: var(--acc);
 }
 
-.row-progress:focus-visible {
+.row-progress:focus-visible,
+.row-icon:focus-visible {
   outline: 2px solid var(--acc);
   outline-offset: 1px;
 }

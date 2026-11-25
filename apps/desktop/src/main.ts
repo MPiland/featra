@@ -14,6 +14,7 @@ import { createOsBadge } from "./os-badge.ts";
 import { createTrayBadge } from "./tray-badge.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
+import { capturePage, guardContents } from "./dev-pages.ts";
 import { createServerProcess, startAfter } from "./server-process.ts";
 import { createSettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
@@ -53,11 +54,9 @@ function showNotice(message: string) {
   else if (Notification.isSupported()) new Notification({ title: "Featra", body: message }).show();
 }
 
-// The window only ever shows the bundled client: no navigation away, no pop-up windows.
-app.on("web-contents-created", (_e, contents) => {
-  contents.on("will-navigate", (e) => e.preventDefault());
-  contents.setWindowOpenHandler(() => ({ action: "deny" }));
-});
+// The window only ever shows the bundled client: no navigation away, no pop-up windows. A dev page moves only within
+// its story's dev server, by a link or a redirect (STORY-25).
+app.on("web-contents-created", (_e, contents) => guardContents(contents));
 
 if (!takeInstanceLock(app, userDataDir)) {
   app.quit();
@@ -89,6 +88,8 @@ if (!takeInstanceLock(app, userDataDir)) {
       execPath: process.execPath,
       log: (message) => log.info(message),
       dataDir: app.getPath("userData"),
+      // The server asks for a story's pages as it moves to review (STORY-25, ADR 0044).
+      capture: (url, origin) => app.whenReady().then(() => capturePage(url, origin)),
       waiting: (count) =>
         void app.whenReady().then(() => {
           badge.show(count);
@@ -96,6 +97,8 @@ if (!takeInstanceLock(app, userDataDir)) {
         }),
     }),
   );
+  // The quit's stop of the server: the app exits once the server has (it stops the dev servers it started first).
+  let serverStopped: Promise<void> = Promise.resolve();
   const client = clientIndex({ appPath: app.getAppPath(), packaged: app.isPackaged });
   let tray: Tray | undefined;
 
@@ -199,7 +202,7 @@ if (!takeInstanceLock(app, userDataDir)) {
     app.on("before-quit", () => {
       lifecycle.onBeforeQuit();
       // A server main stops logs nothing, so "Quitting" stays the log's last line.
-      void server.stop();
+      serverStopped = server.stop();
       if (!loggedQuit) log.info("Quitting");
       loggedQuit = true;
     });
@@ -254,6 +257,9 @@ if (!takeInstanceLock(app, userDataDir)) {
       settingsStore.flush(),
       projects.store.flush(),
       log.flush(),
+      // On Windows the app's exit ends the server process at once, and the dev servers it hadn't stopped yet would
+      // keep running (STORY-25). A server that doesn't exit in time is ended (server-process.ts).
+      serverStopped,
     ]).finally(() => app.exit(0));
   });
 }

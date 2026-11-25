@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { REPO } from "./run.ts";
-import { ALLOWED, findings, GH_KIND, testFiles } from "./wait-scan.ts";
+import { ALLOWED, findings, GH_KIND, testFiles, VITEST_WAIT_KIND } from "./wait-scan.ts";
 
 /** BUG-28: the scan in `wait-scan.ts` finds every fixed wait, however written, and none is left in the unit tests. */
 const kinds = (sample: string[]) => findings("sample.test.ts", sample.join("\n")).map((f) => f.split(": ")[1]);
@@ -55,6 +55,18 @@ describe("no unit test relies on a fixed wall-clock wait (BUG-28)", () => {
     ]);
   });
 
+  it("finds vitest's own waits left at their 1 s default, which the hang guard doesn't reach (BUG-39)", () => {
+    expect(
+      kinds([
+        'await vi.waitFor(() => expect(opened).toEqual(["chat-1"]));',
+        "await vi.waitUntil(() => ready, { interval: 10 });",
+        "await vi.waitFor(",
+        "  () => expect(x).toBe(1),",
+        ");",
+      ]),
+    ).toEqual([VITEST_WAIT_KIND, VITEST_WAIT_KIND, VITEST_WAIT_KIND]);
+  });
+
   it("passes a wait on a condition, a sleep that paces a loop, and a number that isn't a time", () => {
     expect(
       kinds([
@@ -89,6 +101,15 @@ describe("no unit test relies on a fixed wall-clock wait (BUG-28)", () => {
         'import { detectGithub } from "../src/github-detect.ts";',
       ]),
     ).toEqual([GH_KIND, GH_KIND, GH_KIND]);
+  });
+
+  it("finds a CI run report read without a time for its gh (STORY-69)", () => {
+    expect(
+      kinds([
+        "await readCiRunReports(dir, head, report, { gh: gh.command });",
+        "await readCiRunReports(dir, head, report, { gh: gh.command, timeoutMs: FAKE_GH_TIMEOUT_MS });",
+      ]),
+    ).toEqual([GH_KIND]);
   });
 
   it("finds none in the unit tests, outside the waits allowed for their reason", () => {

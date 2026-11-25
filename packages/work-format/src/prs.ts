@@ -4,7 +4,7 @@
  * `gh pr checks --required` buckets them, or every reported check when the repo requires none.
  */
 import type { CheckOutcome } from "./checks.ts";
-import { GITHUB_COPY, type GithubUse, type PrChecks, type PrState, type PrStatus } from "./prs-types.ts";
+import { GITHUB_COPY, prRepoPage, type GithubUse, type PrChecks, type PrState, type PrStatus } from "./prs-types.ts";
 import type { Card } from "./types.ts";
 import type { WorkList } from "./work-list-types.ts";
 import { isRecord } from "./utils/guards.ts";
@@ -155,7 +155,7 @@ export function githubUse({ remote, gh, signedIn }: GithubFacts): GithubUse {
 
 /** A strict GitHub PR URL, safe to hand to `gh` as one argument; null for anything else. */
 export function githubPrUrl(url: string | null): string | null {
-  return url && /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+$/.test(url) ? url : null;
+  return prRepoPage(url) ? url : null;
 }
 
 /** A branch name safe to hand to `git` and `gh` as one argument on every platform. */

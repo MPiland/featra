@@ -1,22 +1,30 @@
 /**
- * STORY-14 without GitHub: Accept a feature once its stories are finished, its checks at the commit its branch is at
- * (run here in a temporary worktree), the base moving on, and Merge to main as a merge commit made by git. Real feature
- * end, merge, checks, scanner, card lane and work-format rules on a real repository; the clock, the check command and
- * the chat manager are the only stand-ins.
+ * STORY-14 and STORY-70 without GitHub: Approve a feature once its stories are finished, its checks at the commit its
+ * branch is at (run here in a temporary worktree), the base moving on, and Merge to main, the retry once the Accept is
+ * on the branch, as a merge commit made by git. Real feature end, merge, checks, scanner, card lane and work-format
+ * rules on a real repository; the clock, the check command and the chat manager are the only stand-ins.
  */
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { evidenceState, FEATURE_END_MESSAGES } from "@featra/work-format";
+import {
+  evidenceState,
+  FEATURE_END_MESSAGES,
+  featureApprovalOf,
+  serializeCard,
+  toIso,
+  withFeatureAccepted,
+} from "@featra/work-format";
 import { cardViewIn, ownedIn } from "../src/card-actions.ts";
 import { MERGE_NOTES } from "../src/feature-merge.ts";
+import { cardPath } from "./card-repo.ts";
 import { FEATURE_BRANCH, featureWorld, LEAD } from "./feature-end-world.ts";
 
 const w = featureWorld();
 const ID = "FEAT-1";
 const dir = () => w.repo.main;
-const accept = () => w.features.accept(dir(), ID);
+const approve = () => w.features.approve(dir(), ID);
 const merge = () => w.features.merge(dir(), ID);
 const state = () => w.features.mergeState(dir(), ID);
 
@@ -24,9 +32,21 @@ const state = () => w.features.mergeState(dir(), ID);
 async function view() {
   const scan = await w.watches.scan(dir());
   const f = w.features;
-  return cardViewIn(scan, ID, f.checksFor(dir(), ID), f.prState(dir(), ID), f.mergeState(dir(), ID));
+  return cardViewIn(scan, ID, f.checksFor(dir(), ID), f.prState(dir(), ID));
 }
 
+/** Where FEAT-1's approval stands on its review screen, as the server builds it. */
+async function approval() {
+  const scan = await w.watches.scan(dir());
+  const feature = ownedIn(scan, ID)?.owned.card;
+  if (!scan || !feature) return null;
+  return featureApprovalOf(
+    feature,
+    scan.resolution.cards.map((c) => c.card),
+    scan.collected.config,
+    state(),
+  );
+}
 /** A commit on main, which is checked out. */
 async function onMain(file: string, text: string) {
   await writeFile(join(dir(), file), text);
@@ -41,51 +61,49 @@ function mergeMainIn() {
   w.repo.git(dir(), "worktree", "remove", "--force", tree);
 }
 
-describe("Accept on a feature (AC1)", () => {
+describe("Approve on a feature (AC1)", () => {
   it("is refused while a story under it isn't finished, and isn't offered", async () => {
     await w.start({ story2: "In Progress" });
-    expect((await view())?.featureEnd).toEqual({
-      acceptable: false,
-      accepted: false,
-      mergeable: false,
-      blocked: null,
+    expect(await approval()).toEqual({
+      step: "approve",
+      ready: false,
+      reason: FEATURE_END_MESSAGES.unfinished(ID, 1),
       base: "main",
     });
-    await expect(accept()).rejects.toThrow(FEATURE_END_MESSAGES.unfinished(ID, 1));
+    await expect(approve()).rejects.toThrow(FEATURE_END_MESSAGES.unfinished(ID, 1));
     expect(evidenceState(w.onFeature()).accepted).toBe(false);
   });
 
-  it("is offered once every story is Done or Cancelled, and records the user's Accept on the feature branch", async () => {
+  it("is offered once every story is Done or Cancelled, and records the user's Accept with the merge", async () => {
     await w.start({ remote: false, story2: "Cancelled" });
-    expect((await view())?.featureEnd?.acceptable).toBe(true);
-    await expect(accept()).resolves.toBeNull();
-    const card = w.onFeature();
+    expect((await approval())?.ready).toBe(true);
+    await expect(approve()).resolves.toEqual({ remains: [] });
+    const card = w.onMain();
     expect(evidenceState(card).accepted).toBe(true);
-    expect(card.history.at(-1)).toMatchObject({ field: "accepted", by: "user" });
-    // Main is untouched: the feature's card lives on its branch until it merges.
-    expect(evidenceState(w.onMain()).accepted).toBe(false);
+    expect(card.history.find((e) => e.field === "accepted")).toMatchObject({ field: "accepted", by: "user" });
+    // The feature branch is untouched: the Accept is carried in the Done card the merge commits to main.
+    expect(evidenceState(w.onFeature()).accepted).toBe(false);
     await w.settle();
-    expect((await view())?.featureEnd).toMatchObject({ acceptable: false, accepted: true });
+    expect(await approval()).toMatchObject({ step: "merged", ready: false });
   });
 
-  it("is refused twice", async () => {
+  it("is refused once accepted", async () => {
     await w.start();
-    await accept();
-    await expect(accept()).rejects.toThrow(FEATURE_END_MESSAGES.accepted(ID));
+    await w.acceptOnBranch();
+    await w.settle();
+    await expect(approve()).rejects.toThrow(FEATURE_END_MESSAGES.accepted(ID));
   });
 });
 
 describe("local mode (AC2)", () => {
   it("opens no PR and offers no Create PR", async () => {
     await w.start({ remote: false });
-    await accept();
     await w.settle();
     expect(w.onFeature().pr).toBeNull();
     expect(await w.gh.calls()).toEqual([]);
     expect((await view())?.prState).toBeUndefined();
   });
 });
-
 describe("Merge to main without GitHub (AC3, AC5)", () => {
   it("is refused before Accept", async () => {
     await w.start({ remote: false });
@@ -94,7 +112,7 @@ describe("Merge to main without GitHub (AC3, AC5)", () => {
 
   it("waits for the feature's checks, run at its branch's commit, then merges with a merge commit", async () => {
     await w.start({ remote: false });
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     expect(w.features.checksFor(dir(), ID)?.last?.passed).toBe(true);
     expect(state()).toEqual({ mergeable: true, blocked: null });
@@ -112,13 +130,13 @@ describe("Merge to main without GitHub (AC3, AC5)", () => {
     const scan = await w.watches.scan(dir());
     expect(ownedIn(scan, ID)?.owned.owner).toEqual({ kind: "main" });
     expect(ownedIn(scan, "STORY-1")?.owned.owner).toEqual({ kind: "main" });
-    expect((await view())?.featureEnd).toBeUndefined();
+    expect(await approval()).toEqual({ step: "merged", ready: false, reason: null, base: "main" });
   });
 
   it("stays off while the checks fail at the branch's commit, and the merge is refused", async () => {
     await w.start({ remote: false });
     await w.commitOn(FEATURE_BRANCH, "verdict.txt", "fail\n");
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     expect(state()).toEqual({ mergeable: false, blocked: FEATURE_END_MESSAGES.failed });
     await expect(merge()).rejects.toThrow(FEATURE_END_MESSAGES.failed);
@@ -127,7 +145,7 @@ describe("Merge to main without GitHub (AC3, AC5)", () => {
 
   it("leaves main alone when its checkout has a local change the merge would overwrite", async () => {
     await w.start({ remote: false });
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     const base = w.tip("main");
     // The merge brings feature.txt; main's checkout has its own, uncommitted (review Should-fix 2: the overlap).
@@ -142,9 +160,10 @@ describe("Merge to main without GitHub (AC3, AC5)", () => {
     await w.start({ remote: false });
     const tree = w.repo.worktree("unused", "unused", "main");
     w.repo.git(tree, "checkout", "-q", FEATURE_BRANCH);
-    await accept();
+    // A failed Approve writes the Accept to the checkout's file, which the user commits, as every card edit there is.
+    const accepted = withFeatureAccepted(w.onFeature(), "user", toIso(w.clock.now()));
+    await writeFile(join(tree, cardPath(ID)), serializeCard(accepted));
     await w.settle();
-    // An accept written to the checkout's file is committed by the user, as every card edit there is.
     w.repo.commit(tree, "accept");
     await w.settle();
     await expect(merge()).resolves.toEqual({ remains: [MERGE_NOTES.checkedOut(FEATURE_BRANCH, "main")] });
@@ -155,7 +174,7 @@ describe("Merge to main without GitHub (AC3, AC5)", () => {
 describe("when main moves on (AC4)", () => {
   it("turns Merge to main off and tells the Dev Lead to merge main in, once per main commit", async () => {
     await w.start({ remote: false });
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     await onMain("other.txt", "other\n");
     await w.poll();
@@ -172,7 +191,7 @@ describe("when main moves on (AC4)", () => {
 
   it("waits for passing checks on the merged tip, then merges", async () => {
     await w.start({ remote: false });
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     await onMain("other.txt", "other\n");
     await w.poll();
@@ -186,7 +205,7 @@ describe("when main moves on (AC4)", () => {
 
   it("names the files that conflict", async () => {
     await w.start({ remote: false });
-    await accept();
+    await w.acceptOnBranch();
     await w.settle();
     await onMain("feature.txt", "main's own\n");
     await w.poll();

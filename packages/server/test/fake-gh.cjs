@@ -152,6 +152,7 @@ if (first === "--version") {
   remoteGit("update-ref", `refs/heads/${pr.base}`, commit, base);
   pr.state = "MERGED";
   write(state);
+  if (state.mergeLost) fail(state.mergeLost);
 } else if (first === "pr" && second === "close") {
   // Closes the PR without merging it; its branch stays, as `gh pr close` without `--delete-branch` leaves it (STORY-58).
   const pr = state.prs.find((p) => p.url === args[2]);

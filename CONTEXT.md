@@ -34,6 +34,10 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   It names the chat that drafted it (`drafted-by`) and shows in Work with a **Review** badge until it is approved or
   rejected. A later call from that chat updates it in place (ADR 0021). It opens as a card pane docked in that chat,
   and the chat is named for it (ADR 0022).
+- **Changes asked** — what the user asked the Dev Lead to change with "Not yet" on a feature's review screen, before
+  approving it. Each reason is sent to the feature's Dev Lead chat and logged on the feature card (`changes-asked`); the
+  round ends when the Dev Lead marks it handled with `mark_changes_handled` (its reply shows) or the user dismisses it.
+  It never blocks Approve (ADR 0042).
 
 ## Progress
 
@@ -53,6 +57,14 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
 - **Stage board** — Work's other layout: one column per stage, New through Done, each with its count, holding the
   stories and bugs of all features or of one. Read-only: a card opens its card pane, and its stage changes only through
   agents, merges and the card pane. List or Board is remembered per project, for the user only.
+- **Evidence file** — a file an agent attached to one criterion (a screenshot, a log), kept in the story's evidence
+  folder `.featra/evidence/FEAT-N/STORY-M/` and linked from the criterion's line. The card pane and the review screen
+  show it beside the criterion: a screenshot as a thumbnail, anything else as a link (ADR 0043). Not the same as a
+  story's **evidence state**.
+- **Proof** — how a project's stories show they work beside their tests: screenshots, Preview, both or neither. A
+  project setting, asked once when its first feature is shaped and changed in Settings > Project (ADR 0044).
+- **Dev server** — the project's own server for its pages, started by Featra in a story's worktree with the command
+  the user confirmed. One per story, reused; it serves captured screenshots and **Preview**, the window that opens it.
 - **Evidence state** — what is actually known about a story:
   - **Reported** — an agent said so (ticked a task, moved a stage).
   - **Verified** — the PR's CI checks passed.

@@ -9,6 +9,7 @@ export type PushEvent = keyof ServerPushes;
 const PUSH_EVENTS: readonly PushEvent[] = [
   "work.list",
   "card.view",
+  "review.view",
   "chat.event",
   "chat.list",
   "roles.list",
@@ -39,7 +40,10 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "work.applyCopy",
   "work.discardCopy",
   "card.watch",
+  "review.watch",
   "card.update",
+  "evidence.read",
+  "evidence.open",
   "draft.sendBack",
   "draft.approve",
   "feature.start",
@@ -52,16 +56,22 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "story.abandonCheck",
   "story.abandon",
   "story.rerunChecks",
-  "feature.accept",
+  "feature.approve",
   "feature.createPr",
   "feature.rerunChecks",
   "feature.merge",
+  "feature.askChanges",
+  "feature.dismissChanges",
   "bug.propose",
   "bug.file",
   "story.createPr",
   "prs.refresh",
   "checks.load",
   "checks.set",
+  "proof.load",
+  "proof.set",
+  "preview.start",
+  "story.clearDesignReview",
   "story.sendBack",
   "draft.reject",
   "chat.roles",
@@ -121,4 +131,14 @@ export function parsePush(text: string): ServerPush | null {
   const raw = json(text);
   if (!isRecord(raw) || "id" in raw || !isOneOf(PUSH_EVENTS, raw.event) || !isId(raw.watch)) return null;
   return { event: raw.event, watch: raw.watch, data: raw.data };
+}
+
+/** The `{ dir }` params every project method takes, or null. */
+export function dirParams(params: unknown): { dir: string } | null {
+  return isRecord(params) && typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
+}
+
+/** The `{ watch }` params of `work.unwatch`, or null. */
+export function unwatchParams(params: unknown): { watch: number } | null {
+  return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
 }

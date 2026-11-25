@@ -19,8 +19,11 @@ const env = (() => {
 export const git = (cwd: string, ...args: string[]) =>
   execFileSync("git", args, { cwd, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
-/** A project in git with one finished feature, so the draft's IDs are the next ones. */
-export async function project(config = "version: 1\n") {
+/**
+ * A project in git with one finished feature, so the draft's IDs are the next ones; with `firstFeature` false, a project
+ * with no feature yet, whose draft is its first (STORY-25's proof question).
+ */
+export async function project(config = "version: 1\n", { firstFeature = true } = {}) {
   const dir = await realpath(await mkdtemp(join(tmpdir(), "featra-draft-e2e-")));
   await mkdir(join(dir, ".featra", "cards"), { recursive: true });
   git(dir, "init", "-q", "-b", "main");
@@ -30,15 +33,19 @@ export async function project(config = "version: 1\n") {
   git(dir, "config", "user.email", "test@example.invalid");
   git(dir, "config", "commit.gpgsign", "false");
   await writeFile(join(dir, ".featra", "config.yaml"), config);
+  if (firstFeature) await writeFirst(dir);
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "plan");
+  return { dir, dispose: () => rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }) };
+}
+
+async function writeFirst(dir: string) {
   const first = newCard(
     { id: "FEAT-1", type: "feature", title: "First", status: "done" },
     "user",
     "2026-11-01T00:00:00Z",
   );
   await writeFile(join(dir, ".featra", "cards", "FEAT-1-first.md"), serializeCard(first), "utf8");
-  git(dir, "add", "-A");
-  git(dir, "commit", "-q", "-m", "plan");
-  return { dir, dispose: () => rm(dir, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }) };
 }
 
 /** A card's file as the owner has it on disk. */

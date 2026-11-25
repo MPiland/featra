@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { AGENT_PATH, parseCard, type ChatEvent, type ChatSummary } from "@featra/work-format";
 import { createAllowedProjects } from "../src/allowed-projects.ts";
-import { createServices } from "../src/services.ts";
+import { createServices, type ServiceOptions } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 import { fakeClaude } from "./fake-query.ts";
@@ -68,6 +68,8 @@ export interface WorldOptions {
   interruptMs?: number;
   /** The window watches the project's work, as the app does: card writes then reuse the watch's git answers (ADR 0016). */
   watched?: boolean;
+  /** The platform behind the project's proof (STORY-25): the page capture and how dev servers start. */
+  proof?: Pick<ServiceOptions, "capturePage" | "devServers">;
 }
 
 export async function storyWorld({
@@ -77,6 +79,7 @@ export async function storyWorld({
   drafted = false,
   interruptMs,
   watched = false,
+  proof = {},
 }: WorldOptions = {}) {
   const allowed = createAllowedProjects();
   const services = createServices({
@@ -86,6 +89,7 @@ export async function storyWorld({
     claude: claude.deps,
     mcpEntry: fileURLToPath(import.meta.url),
     ...(interruptMs ? { interruptMs } : {}),
+    ...proof,
   });
   const repo: CardRepo = await cardRepo();
   repo.git(repo.main, "config", "user.name", "Test");

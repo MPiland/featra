@@ -17,11 +17,11 @@ import {
   evidenceState,
   FEATURE_END_MESSAGES,
   featureAcceptRefusal,
-  featureEndOf,
+  featureApprovalOf,
   featureMergeBlock,
   MAIN,
   mergeStateOf,
-  normalizeCardView,
+  normalizeFeatureApproval,
   normalizeChecksView,
   normalizeWorkList,
   parseCard,
@@ -32,6 +32,7 @@ import {
   withFeatureAccepted,
   type Card,
   type FeatureMergeFacts,
+  type FeatureMergeState,
 } from "../src/index.ts";
 import { at, config, feature, moves, story } from "./fixtures.ts";
 
@@ -196,76 +197,72 @@ describe("Merge to main waits (AC3, AC4)", () => {
   });
 });
 
-/** The card pane's view of `card`, with what the server found of its merge. */
-const view = (card: Card, cards: Card[], merge?: Parameters<typeof featureEndOf>[3]) =>
-  buildCardView(owned(card), true, { config, cards }, undefined, undefined, merge);
+/** Where `card`'s approval stands, with what the server found of its merge. */
+const approval = (card: Card, cards: Card[], merge?: FeatureMergeState) =>
+  featureApprovalOf(card, cards, config, merge);
 
-describe("the card pane's feature end (AC1, AC3)", () => {
-  it("offers Accept once acceptable, and no Merge to main before Accept", () => {
+// STORY-70 moved the feature's end from the card pane (CardView.featureEnd) to the review screen's approval: these are
+// the card pane's cases, ported to it.
+describe("the feature's end on its review screen (AC1, AC3)", () => {
+  it("offers Approve once every story is finished, and no Merge to main before the Accept", () => {
     const open = [feature(ID), story("STORY-1", ID)];
-    expect(view(open[0]!, open).featureEnd).toEqual({
-      acceptable: false,
-      accepted: false,
-      mergeable: false,
-      blocked: null,
+    expect(approval(open[0]!, open)).toEqual({
+      step: "approve",
+      ready: false,
+      reason: FEATURE_END_MESSAGES.unfinished(ID, 1),
       base: "main",
     });
     const ready = [feature(ID), done("STORY-1")];
-    // The server's merge state is ignored until Accept: Merge to main is never on before it.
-    const shown = view(ready[0]!, ready, { mergeable: true, blocked: null }).featureEnd;
-    expect(shown).toEqual({ acceptable: true, accepted: false, mergeable: false, blocked: null, base: "main" });
+    expect(approval(ready[0]!, ready, { mergeable: true, blocked: null })).toEqual({
+      step: "approve",
+      ready: true,
+      reason: null,
+      base: "main",
+    });
   });
 
   it("shows Merge to main once accepted, on only when the server finds it can merge", () => {
     const card = accepted();
     const cards = [card, done("STORY-1")];
     // Before the server's first read, it waits with a reason (review nit: "Checking…").
-    expect(view(card, cards).featureEnd).toEqual({
-      acceptable: false,
-      accepted: true,
-      mergeable: false,
-      blocked: FEATURE_END_MESSAGES.checking,
+    expect(approval(card, cards)).toEqual({
+      step: "merge",
+      ready: false,
+      reason: FEATURE_END_MESSAGES.checking,
       base: "main",
     });
     const waiting = { mergeable: false, blocked: FEATURE_END_MESSAGES.pending };
-    expect(view(card, cards, waiting).featureEnd).toEqual({
-      acceptable: false,
-      accepted: true,
-      ...waiting,
+    expect(approval(card, cards, waiting)).toEqual({
+      step: "merge",
+      ready: false,
+      reason: waiting.blocked,
       base: "main",
     });
-    expect(view(card, cards, { mergeable: true, blocked: null }).featureEnd?.mergeable).toBe(true);
+    expect(approval(card, cards, { mergeable: true, blocked: null })?.ready).toBe(true);
   });
 
   it("crosses the socket checked", () => {
     const card = accepted();
-    const raw = JSON.parse(JSON.stringify(view(card, [card, done("STORY-1")], { mergeable: true, blocked: null })));
-    expect(normalizeCardView(raw)?.featureEnd).toEqual({
-      acceptable: false,
-      accepted: true,
-      mergeable: true,
-      blocked: null,
-      base: "main",
-    });
+    const raw = JSON.parse(JSON.stringify(approval(card, [card, done("STORY-1")], { mergeable: true, blocked: null })));
+    expect(normalizeFeatureApproval(raw)).toEqual({ step: "merge", ready: true, reason: null, base: "main" });
   });
 
   it("names the project's base branch, as configured (review nit)", () => {
     const card = accepted();
     const cards = [card, done("STORY-1")];
-    const trunk = buildCardView(owned(card), true, { config: { ...config, baseBranch: "trunk" }, cards });
-    expect(trunk.featureEnd?.base).toBe("trunk");
+    const trunk = featureApprovalOf(card, cards, { ...config, baseBranch: "trunk" }, undefined);
+    expect(trunk?.base).toBe("trunk");
     expect(FEATURE_END_COPY.merge("trunk")).toBe("Merge to trunk");
     expect(FEATURE_END_COPY.mergeOf(ID, "trunk")).toBe(`Merge ${ID} to trunk`);
   });
 
   it("is absent on stories and on a feature that isn't in progress", () => {
     const s = done("STORY-1");
-    expect(view(s, [s]).featureEnd).toBeUndefined();
+    expect(approval(s, [s])).toBeNull();
     const planned = feature(ID, "planned");
-    expect(view(planned, [planned]).featureEnd).toBeUndefined();
+    expect(approval(planned, [planned])).toBeNull();
   });
 });
-
 describe("after the merge (AC5)", () => {
   it("the feature is Done by the system, with the merge and its PR in its history", () => {
     const card = doneFeature(accepted(), "feature/1-ship", "main", PR, "system", at(9));
@@ -273,7 +270,13 @@ describe("after the merge (AC5)", () => {
     expect(card.pr).toBe(PR);
     expect(card.history.find((e) => e.field === "merged")).toMatchObject({ from: "feature/1-ship", to: "main" });
     expect(card.history.at(-1)).toMatchObject({ field: "status", to: "done", by: "system" });
-    expect(featureEndOf(card, [card], config, undefined)).toBeUndefined();
+    // Neither button once merged: the screen says Merged.
+    expect(featureApprovalOf(card, [card], config, undefined)).toEqual({
+      step: "merged",
+      ready: false,
+      reason: null,
+      base: "main",
+    });
   });
 
   it("records the merge once, and has no PR in local mode", () => {

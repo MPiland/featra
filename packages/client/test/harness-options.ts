@@ -1,12 +1,22 @@
 /** What a test can ask of the fake host (harness.tsx): each option stands for something the platform or the server would answer. */
-import type { Card, CardChecks, CardPr, ChecksView, FeatureMergeState, NeedsList } from "@featra/work-format";
+import type {
+  Card,
+  CardChecks,
+  CardPr,
+  ChecksView,
+  DiffStat,
+  FeatureMergeState,
+  NeedsList,
+  ProofView,
+} from "@featra/work-format";
 import type { CopyActionResult } from "@featra/work-format/protocol";
 import type { WorkList } from "@featra/work-format/work-list";
 import type { CloseToTraySupport, ProjectRef, ProjectSetup, SetupItemId, WorkOverrides } from "../src/bridge.ts";
 import type { CardBridge } from "../src/card-pane.ts";
 import type { BugProposal, FiledBug } from "../src/bugs.ts";
 import type { BugPlacements } from "@featra/work-format/bug-copy";
-import type { ReviewAnswers } from "./card-server.ts";
+import type { EvidenceFile } from "@featra/work-format/evidence-link";
+import type { CardProof, ReviewAnswers } from "./card-server.ts";
 import type { ChatHost } from "./chat-server.ts";
 import type { RolesHost } from "./roles-server.ts";
 
@@ -63,12 +73,25 @@ export interface HostOptions extends ChatHost, RolesHost {
   cards?: Record<string, Card[]>;
   /** What the server's checks say about a story's card, by story id: absent where CI runs them (STORY-56). */
   cardChecks?: Record<string, CardChecks>;
+  /** What the server adds to a story's card from the project's proof, by story id (STORY-25). */
+  cardProof?: Record<string, CardProof>;
   /** What the server knows of a story's PR, by story id: its last read state, Create PR, opening (STORY-11). */
   cardPrs?: Record<string, CardPr>;
   /** Whether an accepted feature can merge to main now, and why not, by feature id (STORY-14). */
   cardMerges?: Record<string, FeatureMergeState>;
+  /** What git says each story, bug or feature changed, by id, on the review screen (STORY-69). Default: unknown. */
+  reviewDiffs?: Record<string, DiffStat>;
+  /**
+   * What "Not yet" answers when the server refuses it, as the server words it (STORY-71): no Dev Lead chat, a busy one.
+   * Default: sent and logged in the feature's history.
+   */
+  askChangesRefusal?: string;
+  /** The evidence files the server reads, by the path a criterion links (STORY-72). Default: none, so each is missing. */
+  evidence?: Record<string, EvidenceFile>;
   /** Each folder's Checks section as the server answers it; the user's saves change it. */
   checks?: Record<string, ChecksView>;
+  /** Each folder's Proof section as the server answers it (STORY-25); the user's saves change it. */
+  proofs?: Record<string, ProofView>;
   /** What each open project needs from the user, as the server first counts it (STORY-66). Default: nothing. */
   needs?: NeedsList;
 }

@@ -14,9 +14,8 @@ import type { CardPr } from "./prs-types.ts";
 import { draftedBy, needsReview } from "./card-draft-guard.ts";
 import { notStartableReason } from "./card-start.ts";
 import { evidenceState } from "./evidence.ts";
-import type { FeatureMergeState } from "./feature-end-copy.ts";
-import { featureEndOf } from "./feature-end.ts";
 import { locationLabel, sameLocation } from "./ownership.ts";
+import { provenRuns } from "./proof-run.ts";
 import type { OwnedCard } from "./owner-copies.ts";
 import { holdOf } from "./story-hold.ts";
 import { CANCELLED, type Card } from "./types.ts";
@@ -57,7 +56,7 @@ const storiesOf = (card: Card, cards: readonly Card[]) =>
 /**
  * The pane's view of `owned`; `checkedOut` says whether the owner's location has a working tree. `checks` is what the
  * server knows of the story's checks on this computer (STORY-56), which the card itself doesn't keep; `prState` what it
- * knows of the story's PR (STORY-11), or the feature's; `merge` whether an accepted feature can merge to main (STORY-14).
+ * knows of the story's PR (STORY-11), or the feature's.
  */
 export function buildCardView(
   owned: OwnedCard,
@@ -65,14 +64,13 @@ export function buildCardView(
   ctx: CardEditContext,
   checks?: CardChecks,
   prState?: CardPr,
-  merge?: FeatureMergeState,
 ): CardView {
   const { card } = owned;
   const ev = evidenceState(card);
   const proof = proofOf(card, ev.provenAcs, checks, prState);
+  const runs = provenRuns(card);
   const draftChat = card.type === "feature" && needsReview(card) ? draftedBy(card) : null;
   const readOnly = readOnlyReason(owned, checkedOut, ctx.config.baseBranch);
-  const featureEnd = featureEndOf(card, ctx.cards, ctx.config, merge);
   const held = holdOf(owned, ctx.config, readOnly === null);
   const notMerged = card.type === "story" ? notMergedOf(card) : null;
   const mergedInto = card.history.findLast((e) => e.field === "merged")?.to ?? null;
@@ -86,7 +84,11 @@ export function buildCardView(
     parentOptions: parentChoices(card, ctx),
     description: card.description,
     evidence: { reported: ev.reported, verified: ev.verified, proven: ev.proven, accepted: ev.accepted },
-    acs: card.acs.map((ac, i) => ({ text: ac.text, done: ac.done, test: ac.test, proof: proof(i) })),
+    acs: card.acs.map((ac, i) => {
+      const run = proof(i) === "passed" ? runs.get(i + 1) : undefined;
+      const evidence = ac.evidence ? { evidence: ac.evidence } : {};
+      return { text: ac.text, done: ac.done, test: ac.test, proof: proof(i), ...(run ? { run } : {}), ...evidence };
+    }),
     tasks: card.tasks.map((t) => ({ text: t.text, done: t.done })),
     notes: card.notes,
     pr: card.pr,
@@ -103,7 +105,6 @@ export function buildCardView(
     ...(mergedInto && card.type === "story" ? { mergedInto } : {}),
     ...(held === undefined ? {} : { held }),
     ...(notMerged ? { notMerged: notMerged.reason } : {}),
-    ...(featureEnd ? { featureEnd } : {}),
     ...(draftChat === null
       ? {}
       : { draftChat, draftStories: ctx.cards.filter((c) => c.type === "story" && c.parent === card.id).length }),

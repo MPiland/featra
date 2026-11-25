@@ -107,6 +107,12 @@ export const ProgressIcon = () => (
     <path d="M5 20v-6M12 20V8M19 20V4" />
   </Icon>
 );
+/** A clipboard with a tick: a feature's review (STORY-69). */
+export const ReviewIcon = () => (
+  <Icon>
+    <path d="M9 4h6v3H9zM7 5.5H5V20h14V5.5h-2M9 13.5l2 2 4-4" />
+  </Icon>
+);
 export const CloseIcon = () => (
   <Icon>
     <path d="M6 6l12 12M18 6L6 18" />

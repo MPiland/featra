@@ -1,6 +1,6 @@
 /**
  * The scripted turns of fake-agent-sdk.mjs that need more than a reply: a background subagent (STORY-55), an
- * AskUserQuestion, a report_bug (STORY-13) and a request_action (STORY-68). Each takes the SDK fake's message builders as `h`, so the numbering and
+ * AskUserQuestion, a report_bug (STORY-13), a request_action (STORY-68) and a write_summary (STORY-69). Each takes the SDK fake's message builders as `h`, so the numbering and
  * token use stay in one place.
  */
 import { callMcpTool } from "./fake-mcp-client.mjs";
@@ -145,3 +145,38 @@ export async function* requestActionTurn(h, options) {
   yield* say(`Tool said: ${result.text}`);
   yield success("Done.");
 }
+
+/** The summary the fake Dev Lead writes of FEAT-2 for its review screen (STORY-69). */
+export const WRITTEN_SUMMARY = {
+  feature: "FEAT-2",
+  summary: "Both stories are built. The summary is merged; the proof view is still in progress.",
+};
+
+/** Calls one Featra MCP tool as the Dev Lead would, and says what it answered; says so when Featra gave it no MCP. */
+async function* leadToolTurn(h, options, tool, input) {
+  const { assistant, toolResult, say, success, next } = h;
+  const spec = options.mcpServers?.featra;
+  if (!spec) {
+    yield* say("No Featra MCP.");
+    yield success("No Featra MCP.");
+    return;
+  }
+  const id = `toolu_mcp_${next()}`;
+  yield assistant(`msg_${next()}`, [{ type: "tool_use", id, name: `mcp__featra__${tool}`, input }]);
+  const result = await callMcpTool(spec, tool, input);
+  yield toolResult(id, result.text, result.isError);
+  yield* say(`Tool said: ${result.text}`);
+  yield success("Done.");
+}
+
+/** Writes the feature's summary through the Featra MCP's write_summary, as the Dev Lead would (STORY-69). */
+export const writeSummaryTurn = (h, options) => leadToolTurn(h, options, "write_summary", WRITTEN_SUMMARY);
+
+/** What the fake Dev Lead says it changed on FEAT-2 when it marks the changes asked handled (STORY-71). */
+export const CHANGES_HANDLED = {
+  feature: "FEAT-2",
+  reply: "Renamed the Save button to Keep.",
+};
+
+/** Marks the changes asked on FEAT-2 handled through the Featra MCP's mark_changes_handled (STORY-71). */
+export const markChangesHandledTurn = (h, options) => leadToolTurn(h, options, "mark_changes_handled", CHANGES_HANDLED);

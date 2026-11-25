@@ -14,6 +14,7 @@ import {
   isReportFile,
   parseJUnit,
   type JUnitCase,
+  type RunReport,
 } from "@featra/work-format";
 import { ghJson, runGh, type GhOptions } from "./gh-run.ts";
 import type { GithubPrDeps } from "./github-prs.ts";
@@ -70,9 +71,13 @@ async function reportFiles(folder: string, files: string | null): Promise<string
     .toSorted();
 }
 
+/** As `CiReports`, with each report file's run (STORY-69), so the run that proved a criterion can be linked. */
+type FileReports = { kind: "running" } | { kind: "read"; reports: RunReport[]; note: string | null };
+
 /**
- * The JUnit reports CI uploaded for `head`: `running` while any of its runs is queued or in progress, null when `gh` couldn't list or
- * download them (try again later). A run without the artifact adds nothing; none with it gives a note.
+ * The JUnit reports CI uploaded for `head`, one per report file: `running` while any of its runs is queued or in
+ * progress, null when `gh` couldn't list or download them (try again later). A run without the artifact adds nothing;
+ * none with it gives a note.
  */
 export async function readCiReports(
   dir: string,
@@ -80,6 +85,30 @@ export async function readCiReports(
   setting: ReportSetting,
   deps: CiReportDeps = {},
 ): Promise<CiReports | null> {
+  const found = await readFiles(dir, head, setting, deps);
+  return found?.kind === "read" ? { ...found, reports: found.reports.map((r) => [...r.cases]) } : found;
+}
+
+/** As `readCiReports`, with every report file of a run read as that run's one report. */
+export async function readCiRunReports(
+  dir: string,
+  head: string,
+  setting: ReportSetting,
+  deps: CiReportDeps = {},
+): Promise<FileReports | null> {
+  const found = await readFiles(dir, head, setting, deps);
+  if (found?.kind !== "read") return found;
+  const runs = new Map<number, JUnitCase[]>();
+  for (const { run, cases } of found.reports) runs.set(run, [...(runs.get(run) ?? []), ...cases]);
+  return { ...found, reports: [...runs].map(([run, cases]) => ({ run, cases })) };
+}
+
+async function readFiles(
+  dir: string,
+  head: string,
+  setting: ReportSetting,
+  deps: CiReportDeps,
+): Promise<FileReports | null> {
   if (!isReportArtifact(setting.artifact)) return null;
   const options: GhOptions = { gh: deps.ghCommand, timeoutMs: deps.ghTimeoutMs };
   const runs = await runsOf(dir, head, options);
@@ -99,7 +128,7 @@ export async function readCiReports(
     if (files.length === 0) return { kind: "read", reports: [], note: CI_PROOF_COPY.noReport };
     let budget = deps.maxReportBytes ?? MAX_REPORT_BYTES;
     let note: string | null = null;
-    const reports: JUnitCase[][] = [];
+    const reports: RunReport[] = [];
     for (const file of files) {
       const path = join(folder, file);
       const size = (await stat(path)).size;
@@ -108,7 +137,8 @@ export async function readCiReports(
         continue;
       }
       budget -= size;
-      reports.push(parseJUnit(await readFile(path, "utf8")));
+      // Each run downloads into its own folder, named by its id.
+      reports.push({ run: Number(file.split("/")[0]), cases: parseJUnit(await readFile(path, "utf8")) });
     }
     return { kind: "read", reports, note };
   } finally {

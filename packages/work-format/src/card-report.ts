@@ -8,35 +8,18 @@
 import { needsReview, draftedBy } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { appendHistory, setStatus } from "./history.ts";
-import { parseId } from "./ids.ts";
-import type { Parsed } from "./knowledge-log.ts";
+import { designReviewEvent, designReviewGate } from "./design-review.ts";
+import { evidenceFolder, evidenceLinkError } from "./evidence-link.ts";
+import { REPORT_LIMITS, same, squash, type ReportInput } from "./card-report-input.ts";
+import { stageCeiling } from "./review-stages.ts";
 import type { Card, ProjectConfig } from "./types.ts";
-import { isRecord } from "./utils/guards.ts";
 
-/** What a call may carry, so a report stays a report: the longest text, the most ticks and new tasks, and a file's size. */
-export const REPORT_LIMITS = { text: 300, note: 1000, ticks: 40, added: 20, evidenceBytes: 1_000_000 } as const;
+export { stageCeiling } from "./review-stages.ts";
+
+export { parseReportInput, REPORT_LIMITS, type CriterionReport, type ReportInput } from "./card-report-input.ts";
 
 /** The card key that links a story's evidence folder. */
 export const EVIDENCE_KEY = "evidence";
-
-/** A criterion to tick, with the evidence file that backs it when there is one. */
-export interface CriterionReport {
-  criterion: string;
-  evidence?: string;
-}
-
-export interface ReportInput {
-  /** The card to update; a story session's own card when left out. */
-  card?: string;
-  /** The stage to move to. */
-  stage?: string;
-  /** Tasks to tick, by their text. */
-  tasks?: string[];
-  /** New tasks to add. */
-  addTasks?: string[];
-  criteria?: CriterionReport[];
-  note?: string;
-}
 
 /** Who is calling: the chat, and the story it works on when it is a story session. */
 export interface Reporter {
@@ -44,39 +27,6 @@ export interface Reporter {
   story: string | null;
   /** The Dev Lead chats a story's sessions nest under (the chats that spawned them). */
   leads?: (story: string) => readonly string[];
-}
-
-/** The folder of a card's evidence, `.featra/evidence/FEAT-N/STORY-M/`, or null when it has no feature. */
-export function evidenceFolder(card: Pick<Card, "id" | "parent">): string | null {
-  const feature = card.parent ? parseId(card.parent) : null;
-  const own = parseId(card.id);
-  return feature && own ? `.featra/evidence/${feature.prefix}-${feature.n}/${own.prefix}-${own.n}/` : null;
-}
-
-/** Text with its whitespace collapsed, so wording compares the way a person reads it. */
-const squash = (s: string) => s.replace(/\s+/g, " ").trim();
-const same = (a: string, b: string) => squash(a).toLowerCase() === squash(b).toLowerCase();
-
-const PATH_CHARS = /^[A-Za-z0-9._\-/]+$/;
-
-/** Why `path` can't be an evidence link of `card`, or null when it is a file inside the card's evidence folder. */
-export function evidenceLinkError(card: Pick<Card, "id" | "parent">, path: string): string | null {
-  const folder = evidenceFolder(card);
-  if (folder === null) return `${card.id} has no feature, so it has no evidence folder.`;
-  const inside = `Evidence goes in ${folder}`;
-  if (!PATH_CHARS.test(path)) return `${inside} and its path uses only letters, digits, . _ - and /.`;
-  const rest = path.startsWith(folder) ? path.slice(folder.length) : null;
-  if (rest === null || rest === "") return `${inside}: link a file there.`;
-  if (rest.split("/").some((part) => part === "" || part === "." || part === ".." || part.startsWith("."))) {
-    return `${inside}: no empty, hidden or relative parts in the path.`;
-  }
-  return null;
-}
-
-/** The stage a report may move up to: the last one before the first that counts as done (Acceptance by default). */
-export function stageCeiling(config: ProjectConfig): string | null {
-  const firstDone = config.stages.findIndex((s) => stageCategory(s.name, config) === "done");
-  return config.stages[(firstDone < 0 ? config.stages.length : firstDone) - 1]?.name ?? null;
 }
 
 /** Why a report can't touch `card` at all, or null: it is Cancelled, Done or past the ceiling, which are the user's. */
@@ -127,71 +77,10 @@ export function reportAuthError(who: Reporter, id: string, cards: readonly Card[
   return needsReview(feature) ? `${feature.id} is still a draft: revise it with draft_cards.` : null;
 }
 
-const text = (v: unknown, max: number): string | null => {
-  const t = typeof v === "string" ? squash(v) : "";
-  return t && t.length <= max ? t : null;
-};
-
-function texts(raw: unknown, name: string, max: number): Parsed<string[] | undefined> {
-  if (raw === undefined) return { ok: true, value: undefined };
-  const items = Array.isArray(raw) ? raw.map((r) => text(r, REPORT_LIMITS.text)) : [];
-  if (!Array.isArray(raw) || items.length > max || items.some((t) => t === null)) {
-    return {
-      ok: false,
-      error: `"${name}" is a list of at most ${max} texts of at most ${REPORT_LIMITS.text} characters.`,
-    };
-  }
-  return { ok: true, value: items.filter((t) => t !== null) };
-}
-
-function criteria(raw: unknown): Parsed<CriterionReport[] | undefined> {
-  if (raw === undefined) return { ok: true, value: undefined };
-  const bad = {
-    ok: false,
-    error: `"criteria" is a list of at most ${REPORT_LIMITS.ticks} items like {criterion, evidence}.`,
-  } as const;
-  if (!Array.isArray(raw) || raw.length > REPORT_LIMITS.ticks) return bad;
-  const out: CriterionReport[] = [];
-  for (const r of raw) {
-    const criterion = isRecord(r) ? text(r.criterion, REPORT_LIMITS.text) : null;
-    const evidence = isRecord(r) && r.evidence !== undefined ? text(r.evidence, REPORT_LIMITS.text) : undefined;
-    if (criterion === null || evidence === null) return bad;
-    out.push({ criterion, ...(evidence ? { evidence } : {}) });
-  }
-  return { ok: true, value: out };
-}
-
-/** The call's input, or why it isn't one. */
-export function parseReportInput(input: unknown): Parsed<ReportInput> {
-  const raw = isRecord(input) ? input : {};
-  const tasks = texts(raw.tasks, "tasks", REPORT_LIMITS.ticks);
-  const addTasks = texts(raw.addTasks, "addTasks", REPORT_LIMITS.added);
-  const crit = criteria(raw.criteria);
-  if (!tasks.ok) return tasks;
-  if (!addTasks.ok) return addTasks;
-  if (!crit.ok) return crit;
-  const note = raw.note === undefined ? undefined : text(raw.note, REPORT_LIMITS.note);
-  if (note === null) return { ok: false, error: `"note" is text of at most ${REPORT_LIMITS.note} characters.` };
-  const id = typeof raw.card === "string" ? raw.card.trim().toUpperCase() : "";
-  const stage = typeof raw.stage === "string" ? raw.stage.trim() : "";
-  if (raw.card !== undefined && !parseId(id))
-    return { ok: false, error: "Give the card's id, such as STORY-9, as `card`." };
-  const value: ReportInput = {
-    ...(id ? { card: id } : {}),
-    ...(stage ? { stage } : {}),
-    ...(tasks.value?.length ? { tasks: tasks.value } : {}),
-    ...(addTasks.value?.length ? { addTasks: addTasks.value } : {}),
-    ...(crit.value?.length ? { criteria: crit.value } : {}),
-    ...(note ? { note } : {}),
-  };
-  const { stage: s, tasks: t, addTasks: a, criteria: c, note: n } = value;
-  return s || t || a || c || n
-    ? { ok: true, value }
-    : { ok: false, error: "Say what to update: stage, tasks, addTasks, criteria or note." };
-}
-
 export interface ReportContext {
   config: ProjectConfig;
+  /** The caller is a Dev Lead, not the story's own session: it reviews the story's screenshots (STORY-73). */
+  lead?: boolean;
 }
 
 /** What a report did: the card as it is now, a short line for each change, and the evidence files it links. */
@@ -244,6 +133,7 @@ interface Delta {
   addTasks?: string[];
   criteria?: string[];
   evidence?: string[];
+  pages?: string[];
   note?: string;
 }
 
@@ -264,10 +154,19 @@ export function applyReport(
   const delta: Delta = {};
   let next: Card = card;
 
+  // The design review first, so the Dev Lead clears it and moves the story on in one call.
+  if (input.designReview) {
+    const review = designReviewEvent(card, input.designReview, ctx.config, ctx.lead === true);
+    if (!review.ok) return refuse(review.error);
+    if (review.to !== null) next = appendHistory(next, { at, field: "design-review", from: null, to: review.to, by });
+    if (review.change !== null) changes.push(review.change);
+  }
   if (input.stage && !same(input.stage, card.status)) {
     const why = reportStageError(card, input.stage, ctx.config);
     if (why !== null) return refuse(why);
     const to = ctx.config.stages.find((s) => same(s.name, input.stage ?? ""))?.name ?? input.stage;
+    const waits = designReviewGate(next, to, ctx.config);
+    if (waits !== null) return refuse(waits);
     next = setStatus(next, to, by, at);
     changes.push(`moved to ${to}`);
   }
@@ -299,7 +198,14 @@ export function applyReport(
     if (!ticks.ok) return refuse(ticks.error);
     let acs = ticks.items;
     const linked: string[] = [];
-    for (const [n, { evidence }] of wanted.entries()) {
+    const pages: string[] = [];
+    for (const [n, { evidence, page }] of wanted.entries()) {
+      // The page Featra captures for it on the move to review (STORY-25).
+      const p = ticks.at[n] ?? -1;
+      if (page !== undefined && acs[p] && acs[p].page !== page) {
+        acs = acs.map((a, j) => (j === p ? { ...a, page } : a));
+        pages.push(page);
+      }
       if (!evidence) continue;
       const why = evidenceLinkError(card, evidence);
       if (why !== null) return refuse(why);
@@ -309,7 +215,7 @@ export function applyReport(
       acs = acs.map((a, j) => (j === i ? { ...a, evidence } : a));
       links.push(evidence);
     }
-    if (ticks.count || linked.length) {
+    if (ticks.count || linked.length || pages.length) {
       const folder = linked.length ? evidenceFolder(card) : null;
       next = { ...next, acs, extra: folder ? { ...next.extra, [EVIDENCE_KEY]: folder } : next.extra };
       if (ticks.count) {
@@ -319,6 +225,10 @@ export function applyReport(
       if (linked.length) {
         changes.push(`linked ${plural(linked.length, "evidence file")}`);
         delta.evidence = linked;
+      }
+      if (pages.length) {
+        changes.push(`listed ${plural(pages.length, "page")} to capture`);
+        delta.pages = pages;
       }
     }
   }

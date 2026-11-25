@@ -86,6 +86,8 @@ export interface FeatureRow {
   bar: Segment[];
   /** What the bar says on hover or focus (STORY-15): "1 done · 1 needs your Accept · 2 in progress"; empty with none. */
   breakdown: string;
+  /** The same without the done part, for a line that already counts what is done: "1 in progress"; empty with none. */
+  notDone: string;
   tasks: Count;
   /** Added after the scope baseline, with "+3 added: 2 stories · 1 bug" (empty when none), and open bugs. */
   scope: { added: number; addedBreakdown: string; openBugs: number };
@@ -204,6 +206,7 @@ const feature = (r: Record<string, unknown>): FeatureRow => {
     progress: progress(r.progress),
     bar: bar(r.bar),
     breakdown: text(r.breakdown),
+    notDone: text(r.notDone),
     tasks: count(r.tasks),
     scope: { added: num(scope.added), addedBreakdown: text(scope.addedBreakdown), openBugs: num(scope.openBugs) },
     ...(typeof r.branch === "string" && r.branch ? { branch: r.branch } : {}),

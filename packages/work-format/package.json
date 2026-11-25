@@ -14,6 +14,7 @@
     "./work-list": "./src/work-list-types.ts",
     "./card-view": "./src/card-view-types.ts",
     "./checks": "./src/checks-types.ts",
+    "./proof": "./src/proof-types.ts",
     "./prs": "./src/prs-types.ts",
     "./roles": "./src/roles.ts",
     "./modes": "./src/modes.ts",
@@ -36,7 +37,10 @@
     "./bug-copy": "./src/bug-copy.ts",
     "./action-request": "./src/action-request.ts",
     "./app-calls": "./src/app-calls.ts",
-    "./feature-end-copy": "./src/feature-end-copy.ts"
+    "./feature-end-copy": "./src/feature-end-copy.ts",
+    "./review": "./src/review-types.ts",
+    "./changes": "./src/changes-types.ts",
+    "./evidence-link": "./src/evidence-link.ts"
   },
   "scripts": {
     "typecheck": "tsc -p . --noEmit"

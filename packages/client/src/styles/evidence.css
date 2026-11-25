@@ -1,0 +1,78 @@
+/* A criterion's attached evidence (STORY-72): a screenshot's thumbnail, a file's link, or a note that it can't show. */
+
+.ac-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.evidence-thumb {
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--row);
+  cursor: zoom-in;
+}
+
+.evidence-thumb:hover {
+  border-color: var(--tx3);
+}
+
+.evidence-thumb:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 2px;
+}
+
+.evidence-thumb img {
+  display: block;
+  max-width: 120px;
+  max-height: 64px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.evidence-link {
+  color: var(--acc);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.evidence-note {
+  color: var(--warn);
+}
+
+/* Why a screenshot wasn't attached (STORY-25), with the dev server's last output folded away. */
+.proof-note summary {
+  cursor: pointer;
+}
+
+.proof-note pre {
+  margin: 4px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+/* The full-size screenshot: as wide as the window allows, and scrolled inside the dialog when taller. */
+.evidence-viewer .dialog {
+  width: min(960px, calc(100vw - 32px));
+}
+
+.evidence-full {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 180px);
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+/* A dev server that didn't start for Preview (STORY-25): its last output keeps its lines. */
+.proof-error {
+  white-space: pre-wrap;
+}

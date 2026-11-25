@@ -1,34 +1,65 @@
 /**
  * The Featra MCP calls only the Dev Lead's chat may make, never a story session's: messaging a story's session
- * (STORY-54), proposing a check command (STORY-56), asking the user to merge a story (STORY-12), and reporting a bug for
- * the user to place (STORY-13). None writes a card
- * or knowledge file on its own, so only the MCP's off switch applies (the read-only setting withholds the whole MCP at
- * `attach` anyway).
+ * (STORY-54), proposing a check command (STORY-56), asking the user to merge a story (STORY-12), reporting a bug for the
+ * user to place (STORY-13), writing a feature's summary for its review screen (STORY-69), and marking the changes the
+ * user asked on a feature handled (STORY-71). Only the summary and the changes write a card, the feature's own; only
+ * the MCP's off switch applies (the read-only setting withholds the whole MCP at `attach` anyway).
  */
-import { parseBugReport, parseMessageInput, parseRequestMergeInput } from "@featra/work-format";
+import {
+  DEV_LEAD_ROLE,
+  parseBugReport,
+  parseChangesHandledInput,
+  parseMessageInput,
+  parseRequestMergeInput,
+  parseSummaryInput,
+} from "@featra/work-format";
 import { AGENT_MESSAGES } from "./agent-messages.ts";
 import { ApiError } from "./api-error.ts";
 import type { BugRequest } from "./bug-request.ts";
 import { proposeChecks } from "./check-propose.ts";
 import type { CheckSettings } from "./check-settings.ts";
+import type { ChangesService } from "./feature-changes.ts";
+import type { FeatureSummaryWriter } from "./feature-summary.ts";
 import type { MergeRequest } from "./merge-request.ts";
 import type { StoryMessage } from "./story-message.ts";
 
 export interface LeadCallDeps {
   /** Why the MCP is off for the project, or null when it is on. */
   mcpRefusal: (dir: string) => Promise<string | null>;
+  /** Sends the Dev Lead's messages to story sessions (STORY-54). Without it `session.message` is refused. */
   messages?: StoryMessage;
+  /** Keeps the Dev Lead's check-command proposals for the user to confirm (STORY-56). Without it `checks.propose` is refused. */
   checkSettings?: Pick<CheckSettings, "propose">;
+  /** Asks the user to merge a story for the Dev Lead (STORY-12). Without it `story.requestMerge` is refused. */
   merges?: MergeRequest;
+  /** Asks the user to place a bug the Dev Lead reports (STORY-13). Without it `bug.report` is refused. */
   bugs?: BugRequest;
+  /** Writes the Dev Lead's summary of a feature (STORY-69). Without it `feature.summary` is refused. */
+  summaries?: FeatureSummaryWriter;
+  /** Records the Dev Lead's reply to changes asked (STORY-71). Without it `feature.changesHandled` is refused. */
+  changes?: Pick<ChangesService, "handled">;
 }
 
-export function createLeadCalls({ mcpRefusal, messages, checkSettings, merges, bugs }: LeadCallDeps) {
+/** The chat a Dev-Lead-only call comes from. */
+interface Caller {
+  dir: string;
+  story?: boolean;
+  role?: string;
+}
+
+export function createLeadCalls(deps: LeadCallDeps) {
+  const { mcpRefusal, messages, checkSettings, merges, bugs, summaries, changes } = deps;
   /** Refuses a story session with `sessionRefusal`, and any chat when the MCP is off. */
   async function lead(dir: string, story: boolean | undefined, sessionRefusal: string) {
     if (story) throw new ApiError(sessionRefusal);
     const off = await mcpRefusal(dir);
     if (off !== null) throw new ApiError(off);
+  }
+
+  /** Refuses as lead does, and any chat but a Dev Lead's with `notLead`. */
+  async function devLead({ dir, story, role }: Caller, sessionRefusal: string, notLead: string) {
+    await lead(dir, story, sessionRefusal);
+    if (role !== DEV_LEAD_ROLE) throw new ApiError(notLead);
   }
 
   return {
@@ -60,6 +91,25 @@ export function createLeadCalls({ mcpRefusal, messages, checkSettings, merges, b
       const input = parseBugReport(params);
       if (!input.ok) throw new ApiError(input.error);
       return bugs.report(dir, input.value, chat);
+    },
+
+    /** The summary reads as written by the Dev Lead, so only the feature's Dev Lead may write it (STORY-69). */
+    async summarize(chat: string, caller: Caller, params: unknown) {
+      const { dir } = caller;
+      await devLead(caller, AGENT_MESSAGES.sessionSummary, AGENT_MESSAGES.notLeadSummary);
+      if (!summaries) throw new ApiError(AGENT_MESSAGES.noSummary);
+      const input = parseSummaryInput(params);
+      if (!input.ok) throw new ApiError(input.error);
+      return summaries.write(dir, input.value, chat);
+    },
+
+    /** The reply reads as written by the Dev Lead, so only the feature's Dev Lead marks its changes handled (STORY-71). */
+    async changesHandled(chat: string, caller: Caller, params: unknown) {
+      await devLead(caller, AGENT_MESSAGES.sessionChanges, AGENT_MESSAGES.notLeadChanges);
+      if (!changes) throw new ApiError(AGENT_MESSAGES.noChanges);
+      const input = parseChangesHandledInput(params);
+      if (!input.ok) throw new ApiError(input.error);
+      return changes.handled(caller.dir, input.value, chat);
     },
   };
 }

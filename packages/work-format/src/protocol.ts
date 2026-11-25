@@ -8,17 +8,17 @@ import type { AbandonWarning } from "./abandon-copy.ts";
 import type { ApprovalChoice } from "./approvals.ts";
 import type { BugPlacements } from "./bug-copy.ts";
 import type { Answers } from "./questions.ts";
-import type { ChecksPatch, ChecksView } from "./checks-types.ts";
+import type { SettingsMethods } from "./protocol-settings.ts";
+import type { EvidenceFile } from "./evidence-link.ts";
 import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
 import type { ChatList } from "./chat-list.ts";
 import type { Inbox, InboxItem } from "./inbox.ts";
 import type { NeedsList } from "./project-needs.ts";
+import type { FeatureReview } from "./review-types.ts";
 import type { Role } from "./roles.ts";
 import type { RoleEdit, RoleEditResult, RoleList } from "./role-edit.ts";
 import type { SetupItemId, SetupPlan } from "./setup-plan.ts";
-import { isRecord } from "./utils/guards.ts";
-import { isId } from "./protocol-frames.ts";
 import type { InitResult, ProjectSetup } from "./protocol-setup.ts";
 import type { WorkList } from "./work-list-types.ts";
 
@@ -31,8 +31,8 @@ export const SERVER_PATH = "/v1";
 /** What applying or discarding a stale copy did. */
 export type CopyActionResult = { ok: true } | { ok: false; error: string };
 
-/** Every method, its params and its result. A new method is added here first. */
-export interface ServerMethods {
+/** Every method, its params and its result (settings ones in protocol-settings.ts). A new method is added here first. */
+export interface ServerMethods extends SettingsMethods {
   /** Whether the project folder is a git repository and holds `.featra/`. */
   "project.setupStatus": { params: { dir: string }; result: ProjectSetup };
   /** Runs `git init` in a folder that is not yet in a repository; answers with the new status. */
@@ -56,8 +56,17 @@ export interface ServerMethods {
   "work.discardCopy": { params: { dir: string; key: string }; result: CopyActionResult };
   /** One card from its owner (null if none), then a `card.view` push on each change until `work.unwatch` (ADR 0017). */
   "card.watch": { params: { dir: string; id: string }; result: CardView | null };
+  /**
+   * A feature's review screen (STORY-69), null when it has no feature card; then a `review.view` push on each change
+   * (stories moving, checks finishing, proof arriving, git read) until `work.unwatch`.
+   */
+  "review.watch": { params: { dir: string; id: string }; result: FeatureReview | null };
   /** Applies one edit to the card's owner copy, on disk; answers with the card as it is after (ADR 0017). */
   "card.update": { params: { dir: string; id: string; edit: CardEdit }; result: CardUpdateResult };
+  /** An evidence file a criterion of the card links, read from the card's owner (STORY-72, ADR 0043). */
+  "evidence.read": { params: { dir: string; id: string; path: string }; result: EvidenceFile };
+  /** Copies that evidence file for the OS to open; answers with the copy's path (STORY-72, ADR 0043). */
+  "evidence.open": { params: { dir: string; id: string; path: string }; result: { file: string } };
   /**
    * Sends a draft feature back to the chat that drafted it with the user's reason, then records it in the feature's
    * history (STORY-50). Refused without a reason, for a feature that isn't a draft, or when its chat is gone.
@@ -126,13 +135,14 @@ export interface ServerMethods {
    */
   "story.rerunChecks": { params: { dir: string; id: string }; result: null };
   /**
-   * Accepts a feature in progress once every story and bug under it is Done or Cancelled (STORY-14): with "Open feature
-   * PRs automatically" on and GitHub usable, its branch is pushed and its PR to the base opened first. The user's only.
+   * The review screen's Approve (STORY-70): accepts a feature in progress whose stories and bugs are all Done or
+   * Cancelled and merges it into the base, in one click, once nothing stops the merge. Refused with why otherwise; when
+   * the merge fails, the Accept stands and why is thrown, and `feature.merge` retries. The user's only.
    */
-  "feature.accept": { params: { dir: string; id: string }; result: null };
-  /** Pushes an accepted feature's branch and opens (or adopts) its PR to the base (STORY-14). Refused in local mode. */
+  "feature.approve": { params: { dir: string; id: string }; result: { remains: string[] } };
+  /** Pushes a finished feature's branch and opens (or adopts) its PR to the base (STORY-14). Refused in local mode. */
   "feature.createPr": { params: { dir: string; id: string }; result: null };
-  /** Runs an accepted feature's checks on this computer again, at the commit its branch is at (STORY-14). */
+  /** Runs a finished feature's checks on this computer again, at the commit its branch is at (STORY-14). */
   "feature.rerunChecks": { params: { dir: string; id: string }; result: null };
   /**
    * Merges an accepted feature into the base with a merge commit (STORY-14): through its PR when the project uses
@@ -140,6 +150,14 @@ export interface ServerMethods {
    * cards; `remains` says what was left to do.
    */
   "feature.merge": { params: { dir: string; id: string }; result: { remains: string[] } };
+  /**
+   * The review screen's "Not yet" (STORY-71): sends `reason` to the feature's Dev Lead chat, then records it as changes
+   * asked in its history. Refused, recording nothing, without a reason or a Dev Lead chat that takes it; `recorded` is
+   * false when the chat has it but the history write failed. The user's only.
+   */
+  "feature.askChanges": { params: { dir: string; id: string; reason: string }; result: { recorded: boolean } };
+  /** Dismisses the changes asked on a feature (STORY-71), recorded in its history; refused when none are asked. */
+  "feature.dismissChanges": { params: { dir: string; id: string }; result: null };
   /** Where a bug believed to come from `cause` (or null) would go (STORY-13): the proposal and every place it can go. */
   "bug.propose": { params: { dir: string; cause: string | null }; result: BugPlacements };
   /**
@@ -158,10 +176,6 @@ export interface ServerMethods {
   "story.createPr": { params: { dir: string; id: string }; result: null };
   /** The window regained focus: every open project reads its open PRs again soon (STORY-11). */
   "prs.refresh": { params: Record<string, never>; result: null };
-  /** Project settings' Checks section: where checks run, the commands, and the proposals waiting for the user (STORY-56). */
-  "checks.load": { params: { dir: string }; result: ChecksView };
-  /** Changes the Checks settings in the project's config (`null` clears one); answers with the section as it is after. */
-  "checks.set": { params: { dir: string; patch: ChecksPatch }; result: ChecksView };
   /**
    * Sends a story in Acceptance back to its session with the user's reason, as the user's message (STORY-23): logged in
    * history, the story In Progress again, and with `addCriterion` the reason a new acceptance criterion. Refused
@@ -247,6 +261,8 @@ export interface ServerPushes {
   "work.list": WorkList;
   /** The watched card changed: the whole new view, or null when the card is gone. */
   "card.view": CardView | null;
+  /** The watched feature's review screen changed: the whole new review, or null when the feature is gone. */
+  "review.view": FeatureReview | null;
   /** A watched chat has a new event. */
   "chat.event": ChatEvent;
   /** A role file or a provider's agent file or settings changed: the whole new list. */
@@ -261,20 +277,11 @@ export interface ServerPushes {
   "needs.list": NeedsList;
 }
 
-/** The `{ dir }` params every project method takes, or null. */
-export function dirParams(params: unknown): { dir: string } | null {
-  return isRecord(params) && typeof params.dir === "string" && params.dir ? { dir: params.dir } : null;
-}
-
-/** The `{ watch }` params of `work.unwatch`, or null. */
-export function unwatchParams(params: unknown): { watch: number } | null {
-  return isRecord(params) && isId(params.watch) ? { watch: params.watch } : null;
-}
-
-// The framing lives in protocol-frames.ts and the setup shapes in protocol-setup.ts; both are part of this module's
-// surface.
+// The framing and the shared params live in protocol-frames.ts and the setup shapes in protocol-setup.ts; both are
+// part of this module's surface.
 export { normalizeInitResult, normalizeProjectSetup, type InitResult, type ProjectSetup } from "./protocol-setup.ts";
 export {
+  dirParams,
   parsePush,
   parseRequest,
   parseResponse,
@@ -284,4 +291,5 @@ export {
   type ServerPush,
   type ServerRequest,
   type ServerResponse,
+  unwatchParams,
 } from "./protocol-frames.ts";

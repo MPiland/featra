@@ -72,6 +72,8 @@ export interface QuestionRequest {
   questions: Question[];
   /** The label of the subagent that asks, when the session's own subagent does (STORY-55). */
   subagent?: string;
+  /** What an app-asked question is about (STORY-25): it outlives the turn it shows in. */
+  subject?: string;
 }
 
 /** The user's answers, each question answered as it asks; or why the agent is told no (Stop, the chat ending). */

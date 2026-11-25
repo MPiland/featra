@@ -5,8 +5,7 @@
  * is written to the card's history by `system`, only when it changes, so a re-run adds nothing while nothing differs.
  */
 import { settleDone } from "./acceptance.ts";
-import { stageCeiling } from "./card-report.ts";
-import { COMMAND_MAX, stageCategory } from "./config.ts";
+import { COMMAND_MAX } from "./config.ts";
 import {
   checkedEvent,
   evidenceState,
@@ -17,9 +16,13 @@ import {
   VERIFIED,
 } from "./evidence.ts";
 import { recordEvidence } from "./history.ts";
+import { isRun } from "./card-view-types.ts";
+import { provenRuns, ranEvent } from "./proof-run.ts";
 import type { ChecksWhere, GithubDetection } from "./checks-types.ts";
 import { isRecord } from "./utils/guards.ts";
 import type { Card, ProjectConfig } from "./types.ts";
+
+export { checksApply, inReview, reviewStage } from "./review-stages.ts";
 
 export const CHECKS_COPY = {
   ci: "Public on GitHub with workflows, so CI runs the checks.",
@@ -45,35 +48,15 @@ export function checksWhere(config: ProjectConfig, found: GithubDetection): Chec
   return config.checksWhere ?? defaultChecksWhere(found).where;
 }
 
-/**
- * The stage a story is reviewed in: the one before Acceptance when that is active and not the first active stage
- * (In Review by default), else Acceptance itself. Found by position, so a project may rename its stages.
- */
-export function reviewStage(config: ProjectConfig): string | null {
-  const ceiling = stageCeiling(config);
-  if (ceiling === null) return null;
-  const at = config.stages.findIndex((s) => s.name === ceiling);
-  const before = config.stages[at - 1];
-  const firstActive = config.stages.findIndex((s) => s.category === "active");
-  return before && before.category === "active" && at - 1 !== firstActive ? before.name : ceiling;
-}
-
-/** Whether checks apply to `card` now: a story in its review stage or in Acceptance. Not while it is being built. */
-export function checksApply(card: Card, config: ProjectConfig): boolean {
-  if (card.type !== "story") return false;
-  const names = config.stages.map((s) => s.name);
-  const from = names.indexOf(reviewStage(config) ?? "");
-  const to = names.indexOf(stageCeiling(config) ?? "");
-  const at = names.indexOf(card.status);
-  return from >= 0 && at >= from && at <= to && stageCategory(card.status, config) === "active";
-}
-
 /** What a finished run found: whether the check command passed, and each linked criterion's result. */
 export interface CheckOutcome {
   /** Null when the check command wasn't run, so Verified stays as it was. */
   passed: boolean | null;
-  /** AC number (1-based) and whether every test linked to it passed. */
-  acs: readonly { ac: number; passed: boolean }[];
+  /**
+   * AC number (1-based) and whether every test linked to it passed; `run` is the run that proved it, a CI run's URL or
+   * `local` (STORY-69), recorded with the proof.
+   */
+  acs: readonly { ac: number; passed: boolean; run?: string }[];
   /** The commit the verdict is for (STORY-12): recorded as `checked:<commit>` when the check command ran on it, and
    * with each criterion it proves (`proven:<n>@<commit>`, STORY-59). */
   head?: string;
@@ -95,12 +78,17 @@ export function withCheckEvidence(card: Card, config: ProjectConfig, outcome: Ch
   if (outcome.passed === true && !before.verified) next = recordEvidence(next, VERIFIED, by, at);
   if (outcome.passed === false && before.verified) next = recordEvidence(next, UNVERIFIED, by, at);
   const commits = provenCommits(card);
-  for (const { ac, passed } of outcome.acs) {
+  const runs = provenRuns(card);
+  for (const { ac, passed, run } of outcome.acs) {
     if (ac < 1 || ac > card.acs.length) continue;
     const proven = before.provenAcs.includes(ac);
     // Proof for a new commit is recorded with it, so what was proven at an older commit isn't taken for this one.
     const fresh = !!outcome.head && commits.get(ac) !== outcome.head;
-    if (passed && (!proven || fresh)) next = recordEvidence(next, provenEvent(ac, outcome.head), by, at);
+    const reproved = passed && (!proven || fresh);
+    if (reproved) next = recordEvidence(next, provenEvent(ac, outcome.head), by, at);
+    // The run is kept whenever it isn't the one already kept: a CI run after a local one, or a re-run, at one commit.
+    const kept = reproved ? undefined : runs.get(ac);
+    if (passed && isRun(run, card.pr) && run !== kept) next = recordEvidence(next, ranEvent(ac, run), by, at);
     if (!passed && proven) next = recordEvidence(next, unprovenEvent(ac), by, at);
   }
   return next === card ? card : settleDone(next, config, by, at);

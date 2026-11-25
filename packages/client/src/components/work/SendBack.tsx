@@ -14,7 +14,30 @@ export interface SendBackProps {
   into?: HTMLElement | null;
   /** Why Send back can't be used now (its chat is gone), or null. The button is disabled and says so. */
   unavailable: string | null;
+  /** Its words where it is another action with the same form: "Not yet" on a review screen (STORY-71). */
+  copy?: Partial<SendBackCopy>;
+  /** The opener's class, to match the actions beside it (Accept's in a row). Default: the dialog button. */
+  button?: string;
 }
+
+/** The words the button and its form show. */
+export interface SendBackCopy {
+  open: string;
+  form: string;
+  reason: string;
+  hint: string;
+  send: string;
+  cancel: string;
+}
+
+const SEND_BACK_COPY: SendBackCopy = {
+  open: CARD_COPY.sendBack,
+  form: CARD_COPY.sendBackForm,
+  reason: CARD_COPY.sendBackReason,
+  hint: CARD_COPY.sendBackHint,
+  send: CARD_COPY.sendBackSend,
+  cancel: CARD_COPY.sendBackCancel,
+};
 
 /** The counter shows once the reason is this close to the limit. */
 const COUNT_FROM = SEND_BACK_MAX - 200;
@@ -25,7 +48,16 @@ const count = (n: number) => `${n.toLocaleString("en-US")} / ${SEND_BACK_MAX.toL
  * is empty or only spaces, or past the limit. A refusal is shown with the reason kept and focus back in the field, so it
  * can be sent again; if the chat has the message but history couldn't record it, the form closes and says so.
  */
-export function SendBack({ onSend, unavailable, criterion = false, name, into = null }: SendBackProps) {
+export function SendBack({
+  onSend,
+  unavailable,
+  criterion = false,
+  name,
+  into = null,
+  copy,
+  button = "btn",
+}: SendBackProps) {
+  const words = { ...SEND_BACK_COPY, ...copy };
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [addCriterion, setAddCriterion] = useState(false);
@@ -96,7 +128,7 @@ export function SendBack({ onSend, unavailable, criterion = false, name, into = 
         <button
           ref={opener}
           type="button"
-          className="btn"
+          className={button}
           disabled={unavailable !== null}
           aria-label={name}
           aria-describedby={unavailable ? hint : undefined}
@@ -105,7 +137,7 @@ export function SendBack({ onSend, unavailable, criterion = false, name, into = 
             setOpen(true);
           }}
         >
-          {CARD_COPY.sendBack}
+          {words.open}
         </button>
         {unavailable && (
           <span id={hint} className="meta">
@@ -120,9 +152,9 @@ export function SendBack({ onSend, unavailable, criterion = false, name, into = 
       </div>
     );
   const asking = (
-    <form ref={form} className="send-back" aria-label={name ?? CARD_COPY.sendBackForm} onSubmit={(e) => void submit(e)}>
+    <form ref={form} className="send-back" aria-label={name ?? words.form} onSubmit={(e) => void submit(e)}>
       <label className="sh" htmlFor={`${hint}-reason`}>
-        {CARD_COPY.sendBackReason}
+        {words.reason}
       </label>
       <textarea
         id={`${hint}-reason`}
@@ -132,7 +164,7 @@ export function SendBack({ onSend, unavailable, criterion = false, name, into = 
         maxLength={SEND_BACK_MAX}
         aria-describedby={`${hint}-count`}
         onChange={(e) => setReason(e.target.value)}
-        placeholder={CARD_COPY.sendBackHint}
+        placeholder={words.hint}
       />
       <span id={`${hint}-count`} className="meta" aria-live="polite">
         {reason.length >= COUNT_FROM ? count(reason.length) : ""}
@@ -150,10 +182,10 @@ export function SendBack({ onSend, unavailable, criterion = false, name, into = 
       )}
       <div className="send-back-actions">
         <button type="submit" className="btn primary" disabled={!reason.trim() || sending}>
-          {CARD_COPY.sendBackSend}
+          {words.send}
         </button>
         <button type="button" className="btn" onClick={close}>
-          {CARD_COPY.sendBackCancel}
+          {words.cancel}
         </button>
       </div>
     </form>

@@ -131,8 +131,24 @@ const TIMED_CALLS: readonly { kind: string; names: readonly string[] }[] = [
   },
 ];
 
+/**
+ * BUG-39: `vi.waitFor` and `vi.waitUntil` keep their own 1 s default, which the hang guard's config doesn't reach, so
+ * one left at it fails at random on a loaded PC. Tests use `until` (or Testing Library's `waitFor`, which the guard
+ * sets). One given a time is already a deadline on a wait helper.
+ */
+const VITEST_WAITS = /(?<![\w$])vi\s*\.\s*(?:waitFor|waitUntil)\s*\(/g;
+export const VITEST_WAIT_KIND = "vitest's own 1 s wait";
+
 /** Product calls that run `gh`. A test's must say how long the fake may take, or it gets the product's 15 s kill. */
-const GH_CALLS = ["detectGithub", "detectGithubUse", "repoIsPublic", "runGh", "ghJson", "readCiReports"];
+const GH_CALLS = [
+  "detectGithub",
+  "detectGithubUse",
+  "repoIsPublic",
+  "runGh",
+  "ghJson",
+  "readCiReports",
+  "readCiRunReports",
+];
 export const GH_KIND = "a gh with the product's 15 s limit";
 
 /** The index past a string, comment or bracketed span that starts at `i`; `i` itself when none starts there. */
@@ -232,6 +248,14 @@ export function findings(file: string, source: string): string[] {
       const last = args?.at(-1);
       if (!args || !last || !isTime(last.text)) continue;
       if (args.length >= 2 || m[1] === "next") raw.push({ line: lineOf(last.at), kind });
+    }
+  }
+
+  for (const m of text.matchAll(VITEST_WAITS)) {
+    const args = parts(text, m.index + m[0].length - 1);
+    const options = args?.[1]?.text ?? "";
+    if (args && (args.length < 2 || (options.startsWith("{") && !/\btimeout\s*:/.test(options)))) {
+      raw.push({ line: lineOf(m.index), kind: VITEST_WAIT_KIND });
     }
   }
 
