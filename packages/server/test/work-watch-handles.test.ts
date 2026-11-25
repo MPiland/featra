@@ -110,4 +110,27 @@ describe("watch handles", () => {
     }
     expect(logged).toEqual([]);
   });
+
+  it("asks git again when a worktree's folder comes or goes, not when only its times change", async () => {
+    const { git, calls } = countedGit();
+    const own = createScanner(git);
+    const watches = createWorkWatches(own, (m) => logged.push(m), fakeWatch);
+    const { stop } = await watches.watch(repo.main, () => {});
+    try {
+      const worktrees = made.find((w) => w.path === join(repo.main, ".git", "worktrees") && !w.closed);
+      await watches.shown(repo.main);
+      calls.length = 0;
+      // Windows reports git reading a worktree's folder as a change to it (BUG-44).
+      worktrees?.hear("change", "story-1");
+      await watches.scan(repo.main);
+      expect(calls).toEqual([]);
+      worktrees?.hear("rename", "story-1");
+      await until(() => calls.includes("worktrees"));
+    } finally {
+      stop();
+      watches.close();
+      await own.close();
+    }
+    expect(logged).toEqual([]);
+  });
 });

@@ -1,6 +1,7 @@
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { ConfigError, errorMessage, isRecord, setConfigValue, type ProjectConfig } from "@featra/work-format";
+import { writeAtomic, type AtomicIo } from "./card-actions.ts";
 
 export const CONFIG_PATH = [".featra", "config.yaml"] as const;
 export const configFile = (projectDir: string) => join(projectDir, ...CONFIG_PATH);
@@ -14,12 +15,14 @@ const queues = new Map<string, Promise<unknown>>();
 /**
  * Sets one key in the project's `.featra/config.yaml`, or removes it (`null`) so the default applies again. The file
  * is edited in place (comments and other keys kept) by work-format and replaced atomically. A file that can't be read
- * or would not be valid is left alone and the reason returned; `error` is null once written.
+ * or would not be valid is left alone and the reason returned; `error` is null once written. A replace that Windows
+ * refuses while another program has the file open is tried again (BUG-16, BUG-44).
  */
 export function writeConfigValue<K extends keyof ProjectConfig>(
   projectDir: string,
   key: K,
   value: ProjectConfig[K] | null,
+  io: AtomicIo = {},
 ): Promise<{ error: string | null }> {
   const file = configFile(projectDir);
   const run = async (): Promise<{ error: string | null }> => {
@@ -37,9 +40,7 @@ export function writeConfigValue<K extends keyof ProjectConfig>(
       throw err;
     }
     await mkdir(dirname(file), { recursive: true });
-    const tmp = `${file}.tmp`;
-    await writeFile(tmp, next, "utf8");
-    await rename(tmp, file);
+    await writeAtomic(file, next, io);
     return { error: null };
   };
   const next = (queues.get(file) ?? Promise.resolve()).then(run, run);

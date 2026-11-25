@@ -79,6 +79,8 @@ interface Entry {
   listeners: Set<ScanListener>;
   watchers: Map<string, FSWatcher>;
   queue: Promise<Outcome>;
+  /** The scan queued and not started yet: a new ask joins it rather than queue another (BUG-44). */
+  pending: Promise<Outcome> | null;
   timer: ReturnType<typeof setTimeout> | undefined;
   closed: boolean;
   /** The last scan, whose git state the next rescan reuses unless `gitChanged`. */
@@ -86,12 +88,16 @@ interface Entry {
   gitChanged: boolean;
 }
 
-/** Whether an event for `name` (relative to the target, or absolute for the target itself) counts. */
-function counts(t: Target, name: string | null): boolean {
+/**
+ * Whether a `type` event for `name` (relative to the target, or absolute for the target itself) counts. A child folder
+ * counts when added or removed (a rename), not when only its times change: Windows reports git reading a worktree's
+ * folder as a change to it (BUG-44).
+ */
+function counts(t: Target, type: string, name: string | null): boolean {
   // Node doesn't promise a name, and an event without one can't be ruled out (BUG-6).
   if (!t.names || !name) return true;
   if (t.names.includes(basename(name))) return true;
-  return Boolean(t.children) && !/[\\/]/.test(name);
+  return Boolean(t.children) && type === "rename" && !/[\\/]/.test(name);
 }
 
 function targetsOf(dir: string, scan: Scan | null): Target[] {
@@ -105,14 +111,19 @@ function targetsOf(dir: string, scan: Scan | null): Target[] {
       { path: join(root, FEATRA_DIR), recursive: true },
     );
   }
-  targets.push(
-    // `worktrees` itself comes with the first worktree and goes with the last.
-    { path: common, recursive: false, names: ["HEAD", "packed-refs", "worktrees"], git: true },
-    { path: join(common, "refs", "heads"), recursive: true, git: true },
-    { path: join(common, "worktrees"), recursive: true, names: ["HEAD", "gitdir"], children: true, git: true },
-  );
+  targets.push(...gitTargets(common));
   return targets;
 }
+
+/** Git's refs, HEAD and worktree list in the common dir `common`. */
+const gitTargets = (common: string): Target[] => [
+  // `worktrees` itself comes with the first worktree and goes with the last.
+  { path: common, recursive: false, names: ["HEAD", "packed-refs", "worktrees"], git: true },
+  { path: join(common, "refs", "heads"), recursive: true, git: true },
+  { path: join(common, "worktrees"), recursive: true, names: ["HEAD", "gitdir"], children: true, git: true },
+];
+
+const keyOf = (t: Target) => `${t.recursive ? "r" : "f"}|${t.path}`;
 
 /** `fs.watch`, or a stand-in for tests that drive a watcher's events and errors themselves. */
 export type WatchFolder = typeof watch;
@@ -124,43 +135,59 @@ export function createWorkWatches(
 ): WorkWatches {
   const entries = new Map<string, Entry>();
 
+  /**
+   * Starts a watcher on `t` unless one runs; whether it started. `stale` when what git said may predate it, so the
+   * next scan asks git again.
+   */
+  const start = (e: Entry, t: Target, stale: boolean): boolean => {
+    const key = keyOf(t);
+    if (e.watchers.has(key)) return false;
+    try {
+      const gone = () => {
+        w.close();
+        // A closed watcher's late event or error must not drop the newer watcher under its key (BUG-6).
+        if (e.watchers.get(key) !== w) return;
+        e.watchers.delete(key);
+        e.gitChanged = true;
+        trigger(e);
+      };
+      const w = watchFolder(t.path, { recursive: t.recursive, persistent: false }, (type, name) => {
+        // Windows names the folder itself, absolute, without end once it's deleted (BUG-6).
+        if (name && isAbsolute(name)) return gone();
+        if (!counts(t, type, name)) return;
+        if (t.git) e.gitChanged = true;
+        trigger(e);
+      });
+      w.on("error", gone);
+      e.watchers.set(key, w);
+      if (t.git && stale) e.gitChanged = true;
+      return true;
+    } catch {
+      // Not there (yet): the next scan tries again.
+      return false;
+    }
+  };
+
   /** Starts and ends watchers to match `targets`; whether it started any. */
   const rewatch = (e: Entry, targets: Target[]): boolean => {
-    let started = false;
-    const wanted = new Map(targets.map((t) => [`${t.recursive ? "r" : "f"}|${t.path}`, t]));
+    const wanted = new Map(targets.map((t) => [keyOf(t), t]));
     for (const [key, w] of e.watchers) {
       if (wanted.has(key)) continue;
       w.close();
       e.watchers.delete(key);
     }
-    for (const [key, t] of wanted) {
-      if (e.watchers.has(key)) continue;
-      try {
-        const gone = () => {
-          w.close();
-          // A closed watcher's late event or error must not drop the newer watcher under its key (BUG-6).
-          if (e.watchers.get(key) !== w) return;
-          e.watchers.delete(key);
-          e.gitChanged = true;
-          trigger(e);
-        };
-        const w = watchFolder(t.path, { recursive: t.recursive, persistent: false }, (_type, name) => {
-          // Windows names the folder itself, absolute, without end once it's deleted (BUG-6).
-          if (name && isAbsolute(name)) return gone();
-          if (!counts(t, name)) return;
-          if (t.git) e.gitChanged = true;
-          trigger(e);
-        });
-        w.on("error", gone);
-        e.watchers.set(key, w);
-        started = true;
-        // What git said before this watcher started may be out of date already: the next scan asks again.
-        if (t.git) e.gitChanged = true;
-      } catch {
-        // Not there (yet): the next scan tries again.
-      }
-    }
+    let started = false;
+    // What git said before a git watcher started may be out of date already: the next scan asks again.
+    for (const t of wanted.values()) if (start(e, t, true)) started = true;
     return started;
+  };
+
+  /**
+   * Git's watchers, started as soon as a scan knows the repository and before it reads git, so that read can't
+   * predate them: the first scan's answer needs no git rescan after it (BUG-44).
+   */
+  const watchGit = (e: Entry, common: string) => {
+    if (!e.closed) for (const t of gitTargets(common)) start(e, t, false);
   };
 
   /** One scan. One that fails keeps the last good scan and list, with the problem added (BUG-25). */
@@ -169,7 +196,7 @@ export function createWorkWatches(
     const reuse = e.gitChanged ? undefined : e.last?.collected.git;
     e.gitChanged = false;
     try {
-      const scan = await scanner.scan(e.dir, reuse);
+      const scan = await scanner.scan(e.dir, reuse, (paths) => watchGit(e, paths.common));
       e.last = scan;
       return { scan, list: scan?.list ?? EMPTY_WORK_LIST, failed: false };
     } catch (err) {
@@ -201,12 +228,20 @@ export function createWorkWatches(
     return out;
   };
 
-  const run = (e: Entry) => {
-    e.queue = e.queue.then(
-      () => scanOnce(e),
-      () => scanOnce(e),
-    );
-    return e.queue;
+  /**
+   * A scan that starts after this call: the one queued and not started yet, else a new one. Asks that come while a
+   * scan runs share the next one, so they don't queue a scan each, each running git (BUG-44).
+   */
+  const run = (e: Entry): Promise<Outcome> => {
+    if (e.pending) return e.pending;
+    const go = () => {
+      e.pending = null;
+      return scanOnce(e);
+    };
+    const next: Promise<Outcome> = e.queue.then(go, go);
+    e.pending = next;
+    e.queue = next;
+    return next;
   };
 
   function trigger(e: Entry) {
@@ -231,6 +266,7 @@ export function createWorkWatches(
         listeners: new Set(),
         watchers: new Map(),
         queue: Promise.resolve({ scan: null, list: EMPTY_WORK_LIST, failed: false }),
+        pending: null,
         timer: undefined,
         closed: false,
         last: null,

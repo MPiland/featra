@@ -1,5 +1,3 @@
-import { watch } from "node:fs";
-import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { WorkList } from "@featra/work-format";
 import { createRepoGit } from "../src/repo-git.ts";
@@ -59,7 +57,7 @@ describe("a watch's first scan", () => {
     expect(logged).toEqual([]);
   });
 
-  it("asks git again for a branch made just before its git watchers started (BUG-24 review)", async () => {
+  it("asks git again for a branch made after the first scan read the branches (BUG-24 review, BUG-44)", async () => {
     // A feature branch with its own card, made and then removed before the watch, so only its ref comes back.
     repo.git(repo.main, "checkout", "-q", "-b", "feature/2");
     await repo.write(repo.main, card("FEAT-2", "feature", null, "draft"));
@@ -67,16 +65,22 @@ describe("a watch's first scan", () => {
     const tip = repo.git(repo.main, "rev-parse", "HEAD");
     repo.git(repo.main, "checkout", "-q", "main");
     repo.git(repo.main, "branch", "-q", "-D", "feature/2");
-    // The real file watcher, with the branch made the moment before the branch watcher starts: no watcher hears it.
+    // Real git and file watchers, with the branch made the moment after the first scan read the branches. Git's
+    // watchers used to start after the scan, so none heard it; they now start before git is read (BUG-44).
     let made = false;
-    const watchFolder = ((...args: Parameters<typeof watch>) => {
-      if (!made && String(args[0]) === join(repo.main, ".git", "refs", "heads")) {
-        made = true;
-        repo.git(repo.main, "branch", "feature/2", tip);
-      }
-      return watch(...args);
-    }) as typeof watch;
-    const watches = createWorkWatches(real, (m) => logged.push(m), watchFolder);
+    const git = createRepoGit();
+    const scanner = createScanner({
+      ...git,
+      branches: async (...args: Parameters<typeof git.branches>) => {
+        const branches = await git.branches(...args);
+        if (!made) {
+          made = true;
+          repo.git(repo.main, "branch", "feature/2", tip);
+        }
+        return branches;
+      },
+    });
+    const watches = createWorkWatches(scanner, (m) => logged.push(m));
     const heard: WorkList[] = [];
     const { list, stop } = await watches.watch(repo.main, (l) => heard.push(l));
     try {
@@ -86,6 +90,7 @@ describe("a watch's first scan", () => {
     } finally {
       stop();
       watches.close();
+      await scanner.close();
     }
     expect(logged).toEqual([]);
   });

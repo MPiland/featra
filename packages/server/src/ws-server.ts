@@ -69,9 +69,12 @@ function frameText(data: RawData): string {
 /** The connection a socket's requests act through: its pushes, and the watches that end when it closes. */
 function connect(socket: WebSocket): { connection: Connection; closeAll: () => void } {
   const kept = new Map<number, () => void>();
+  /** Watches the client ended before their answer: each is stopped as it is kept (BUG-44). */
+  const ended = new Set<number>();
   const unwatch = (id: number) => {
     const stop = kept.get(id);
     kept.delete(id);
+    if (!stop) ended.add(id);
     stop?.();
     return Boolean(stop);
   };
@@ -81,9 +84,11 @@ function connect(socket: WebSocket): { connection: Connection; closeAll: () => v
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ event, watch, data }));
       },
       keep(id, stop) {
-        unwatch(id);
-        if (socket.readyState === socket.OPEN) kept.set(id, stop);
-        else stop();
+        const stale = kept.get(id);
+        kept.delete(id);
+        stale?.();
+        if (ended.delete(id) || socket.readyState !== socket.OPEN) stop();
+        else kept.set(id, stop);
       },
       unwatch,
     },

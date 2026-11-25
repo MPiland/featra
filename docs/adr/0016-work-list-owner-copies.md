@@ -117,6 +117,26 @@ Three more rules keep the watch sound:
   and the list stayed stale until some other event. The extra rescan is disk-only (no git event fired) and ends when a
   scan starts no watcher.
 
+**Asks share scans (amended 2026-11-25, BUG-44).** At start the server's own services each watch every open project
+(Needs, PRs, checks, feature ends, auto-merge), then the page asks for its watch, and actions ask for scans of their
+own. Each ask used to queue a whole scan behind the others. On a Windows runner the page's first answers waited out
+six scans in a row, two of them with git, and missed the e2e tests' 5 s: 5.2–8.5 s for the first `work.watch`, and
+5.3 s for a draft's Approve. Now:
+
+- An ask, a new listener's first answer or an action's scan, joins the scan queued and not started yet, if there is
+  one, instead of queuing another. That scan still starts after the ask, so the answer has the cards as they are when
+  it asks. Joining the scan already running was tried and rejected: that scan may have read the cards before the ask,
+  so a view opened right after a write showed the state before it.
+- Git's watchers start as soon as a scan knows the repository's paths, before it reads the worktrees, branches and
+  cards. That read can't predate them, so the first scan isn't followed by a git rescan; the BUG-12 rescan after it is
+  disk-only. Otherwise that git rescan ran behind the first answer, and an Apply right after it waited for it.
+- A child of `worktrees` counts when it is added or removed (a `rename`), not on a `change`. Windows reports git
+  reading a worktree's folder (`git worktree list`) as a change to that folder, so the scan's own read fired its git
+  target. A change to what a worktree holds still comes as its `HEAD` or `gitdir`.
+
+So a first answer at start waits for at most the scan running and one more, which reuses git. Rescans still run one
+at a time.
+
 **Protocol additions (ADR 0015).**
 
 | Method             | Params         | Result                                         |
@@ -128,7 +148,8 @@ Three more rules keep the watch sound:
 
 A **push** is `{ event, watch, data }`, with no `id`, so it can't be mistaken for an answer. The only event is
 `work.list`, whose `data` is the new `WorkList`. Pushes stop on `work.unwatch` or when the socket closes, and are held
-back while the folder is not in the open-project list. A stale copy's `key` is `<location>|<path>`, built by `copyKey`.
+back while the folder is not in the open-project list. A `work.unwatch` that comes before the watch's answer ends the
+watch as it answers (amended 2026-11-25, BUG-44); it used to find nothing, and the watch was kept. A stale copy's `key` is `<location>|<path>`, built by `copyKey`.
 
 **Client.** `ServerClient.watch` registers the watch id before sending, so a push that beats the answer is routed. When
 the socket drops, the listener keeps the last list with the reason, and the watch starts again on a new connection
