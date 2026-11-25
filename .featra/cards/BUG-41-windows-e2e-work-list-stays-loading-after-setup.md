@@ -2,7 +2,7 @@
 id: BUG-41
 type: bug
 title: Windows e2e Work list stays on Loading after project setup
-status: New
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: session:story-73
+  - at: 2026-11-25T13:40:00Z
+    field: status
+    from: New
+    to: Done
+    by: session:bug-44
 ---
 
 ## Description
@@ -64,3 +69,5 @@ default 5 s wait. It hadn't failed in the last 40 failed runs.
 - Found by STORY-73. Kept files: the `e2e-windows-traces` artifact of run 45563738256 (attempt 1), which has the
   socket frames in `electron-66.zip`.
 - Possibly the same root cause as BUG-36 and BUG-40. Look at them together.
+
+Fixed by BUG-44. The first `work.watch` waited out about six queued scans, two with git; asks now share the next scan. The push for the ended watch was the early `work.unwatch` that found nothing; it now ends the watch. The 52 s close came only after the failure: the test's cleanup retried deleting folders the app still held. E2E (Windows) passed 10 runs in a row on PR #92: run 45671030090, attempts 1-10.

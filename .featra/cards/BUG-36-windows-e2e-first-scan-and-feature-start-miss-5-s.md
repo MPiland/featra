@@ -2,7 +2,7 @@
 id: BUG-36
 type: bug
 title: Windows e2e first scan and feature Start miss their 5 s wait
-status: New
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: session:story-65
+  - at: 2026-11-25T13:40:00Z
+    field: status
+    from: New
+    to: Done
+    by: session:bug-44
 ---
 
 ## Description
@@ -51,3 +56,5 @@ default 5 s on the app's first git work after launch or Start.
 ## Notes
 
 - Found by STORY-65. Kept files: the `e2e-windows-traces` artifact of run 44562162156 (attempt 1).
+
+Fixed by BUG-44 for `work-layout.spec.ts` (Start waited behind the queued scans). The `work-list.spec.ts` half had a different cause: the server answered in 411 ms, but the page's socket opened about 4.75 s late, the same as BUG-40, which tracks it. E2E (Windows) passed 10 runs in a row on PR #92: run 45671030090, attempts 1-10.

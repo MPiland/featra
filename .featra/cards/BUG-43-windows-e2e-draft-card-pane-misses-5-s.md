@@ -2,7 +2,7 @@
 id: BUG-43
 type: bug
 title: Windows e2e draft card pane misses 5 s
-status: New
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: dev-lead
+  - at: 2026-11-25T13:40:00Z
+    field: status
+    from: New
+    to: Done
+    by: session:bug-44
 ---
 
 ## Description
@@ -45,3 +50,5 @@ attempt. The other six jobs passed, and the rerun of E2E (Windows) passed:
 - [ ] Fix the cause without weakening the test
 
 ## Notes
+
+Fixed by BUG-44: Approve and the card pane waited behind about six queued scans (5.3 s); asks now share the next scan. E2E (Windows) passed 10 runs in a row on PR #92: run 45671030090, attempts 1-10.

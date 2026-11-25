@@ -60,3 +60,5 @@ default 5 s wait.
 
 - Found by STORY-72. Kept files: the `e2e-windows-traces` artifact of run 45420608964 (attempt 1).
 - Possibly the same root cause as BUG-36. Look at the two together.
+
+Left open by BUG-44: a different cause. The server answered in 69 ms; the page's WebSocket handshake started about 4.75 s after the App rendered "Loading…" (0.4-0.9 s in other traces), between the App's mount and the socket opening (the endpoint IPC, main, or Chromium). Not reproduced in BUG-44's 10 green E2E (Windows) runs (run 45671030090, attempts 1-10), but nothing there changed that path.

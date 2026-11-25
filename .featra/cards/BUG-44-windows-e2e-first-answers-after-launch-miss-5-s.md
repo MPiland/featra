@@ -2,7 +2,7 @@
 id: BUG-44
 type: bug
 title: Windows e2e first answers after launch miss 5 s
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: opus
 reasoning: null
 sessions: []
 branch: claude/bug-44-windows-slow-start
-pr: null
+pr: 92
 created: 2026-11-25T18:00:00Z
 history:
   - at: 2026-11-25T18:00:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-25T13:40:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:bug-44
 ---
 
 ## Description
@@ -55,11 +60,11 @@ its own.
   (test: packages/server/test/work-watch-handles.test.ts::asks git again when a worktree's folder comes or goes, not when only its times change)
   (test: packages/server/test/ws-unwatch-early.test.ts::stops the watch when it answers, so nothing is pushed for it)
   (test: packages/server/test/config-writer-busy.test.ts::tries again after EPERM, and the value lands with no temporary file left)
-- [ ] The app's first answers after launch, setup and Start come within the tests' default wait on E2E (Windows),
+- [x] The app's first answers after launch, setup and Start come within the tests' default wait on E2E (Windows),
   fixed at the cause. No assertion is weakened, deleted or reordered; a longer wait is only acceptable if the cause
   is shown to be the runner itself, and is then recorded in an ADR.
-- [ ] E2E (Windows) passes 10 runs in a row on this branch with no failed test.
-- [ ] BUG-36, BUG-40, BUG-41, BUG-42 and BUG-43 are each closed by this fix with a note, or left open with a note on
+- [x] E2E (Windows) passes 10 runs in a row on this branch with no failed test.
+- [x] BUG-36, BUG-40, BUG-41, BUG-42 and BUG-43 are each closed by this fix with a note, or left open with a note on
   why they have a different cause.
 
 ## Tasks
@@ -67,7 +72,7 @@ its own.
 - [x] Download the `e2e-windows-traces` artifacts of the runs named in BUG-36 to BUG-43 and run 45635773882 (attempt 1)
 - [x] Time the server's first scan, git and process starts on Windows against Linux and macOS
 - [x] Fix the cause, with a regression test
-- [ ] Prove 10 green E2E (Windows) runs
+- [x] Prove 10 green E2E (Windows) runs
 
 ## Notes
 
@@ -95,3 +100,5 @@ the App's mount and the socket opening (the endpoint IPC, main, or Chromium); no
 
 **BUG-41's 52 s close** comes only after a failure: the test's `finally` disposes the profile and project folders
 (`rm` with 20 retries, linear backoff, about 21 s each) while the app still holds files. Harmless.
+
+**Proof.** E2E (Windows) passed 10 runs in a row on PR #92, all of run 45671030090 (attempt 1 the push, 2-10 reruns of the E2E (Windows) job): jobs 139406022288, 139412101252, 139417477219, 139422798119, 139428637693, 139434451143, 139439552203, 139444673369, 139450440252, 139454976954. Attempt 1 had every job green. BUG-36, BUG-41, BUG-42 and BUG-43 are Done; BUG-40 stays open for the late page socket.
