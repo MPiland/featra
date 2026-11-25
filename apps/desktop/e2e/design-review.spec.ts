@@ -71,7 +71,8 @@ async function startStory(page: Page, dir: string) {
 
 async function openWork(page: Page) {
   await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Work" }).click();
-  await page.getByRole("button", { name: "Shaping", exact: true }).click();
+  // The Work list's feature-group toggle: the Dev Lead's chat is also named "Shaping".
+  await page.getByRole("main", { name: "Work" }).getByRole("button", { name: "Shaping", exact: true }).click();
 }
 
 /** Opens the story's card pane from its Work row. */
