@@ -2,7 +2,7 @@
 id: STORY-25
 type: story
 title: Choose the project's proof and capture screenshots
-status: In Progress
+status: In Review
 parent: FEAT-9
 order: 6
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-25-proof
-pr: null
+pr: https://github.com/MPiland/featra/pull/88
 created: 2026-11-05T17:13:05Z
 history:
   - at: 2026-11-05T17:13:05Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-25T00:39:28Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: session:story-25
 ---
 
 ## Description
