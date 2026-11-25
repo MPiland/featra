@@ -5,8 +5,7 @@
  * is written to the card's history by `system`, only when it changes, so a re-run adds nothing while nothing differs.
  */
 import { settleDone } from "./acceptance.ts";
-import { stageCeiling } from "./card-report.ts";
-import { COMMAND_MAX, stageCategory } from "./config.ts";
+import { COMMAND_MAX } from "./config.ts";
 import {
   checkedEvent,
   evidenceState,
@@ -22,6 +21,8 @@ import { provenRuns, ranEvent } from "./proof-run.ts";
 import type { ChecksWhere, GithubDetection } from "./checks-types.ts";
 import { isRecord } from "./utils/guards.ts";
 import type { Card, ProjectConfig } from "./types.ts";
+
+export { checksApply, inReview, reviewStage } from "./review-stages.ts";
 
 export const CHECKS_COPY = {
   ci: "Public on GitHub with workflows, so CI runs the checks.",
@@ -45,29 +46,6 @@ export function defaultChecksWhere(found: GithubDetection): { where: ChecksWhere
 /** Where the project's checks run: its own choice, else the default for what Featra found. */
 export function checksWhere(config: ProjectConfig, found: GithubDetection): ChecksWhere {
   return config.checksWhere ?? defaultChecksWhere(found).where;
-}
-
-/**
- * The stage a story is reviewed in: the one before Acceptance when that is active and not the first active stage
- * (In Review by default), else Acceptance itself. Found by position, so a project may rename its stages.
- */
-export function reviewStage(config: ProjectConfig): string | null {
-  const ceiling = stageCeiling(config);
-  if (ceiling === null) return null;
-  const at = config.stages.findIndex((s) => s.name === ceiling);
-  const before = config.stages[at - 1];
-  const firstActive = config.stages.findIndex((s) => s.category === "active");
-  return before && before.category === "active" && at - 1 !== firstActive ? before.name : ceiling;
-}
-
-/** Whether checks apply to `card` now: a story in its review stage or in Acceptance. Not while it is being built. */
-export function checksApply(card: Card, config: ProjectConfig): boolean {
-  if (card.type !== "story") return false;
-  const names = config.stages.map((s) => s.name);
-  const from = names.indexOf(reviewStage(config) ?? "");
-  const to = names.indexOf(stageCeiling(config) ?? "");
-  const at = names.indexOf(card.status);
-  return from >= 0 && at >= from && at <= to && stageCategory(card.status, config) === "active";
 }
 
 /** What a finished run found: whether the check command passed, and each linked criterion's result. */

@@ -1,13 +1,21 @@
-/** The local API's proof methods (STORY-25): Project settings' Proof section, and a story's Preview. */
+/**
+ * The local API's proof methods (STORY-25): Project settings' Proof section, a story's Preview, and the user's clear of
+ * its design review (STORY-73).
+ */
 import { dirParams, isRecord, normalizeProofPatch } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
+import type { DesignReviews } from "./design-reviews.ts";
 import type { ProofCapture } from "./proof-capture.ts";
 import type { ProofSettings } from "./proof-settings.ts";
 
-export type ProofMethod = "proof.load" | "proof.set" | "preview.start";
+export type ProofMethod = "proof.load" | "proof.set" | "preview.start" | "story.clearDesignReview";
 
 export interface ProofApiDeps {
-  proof?: { settings: Pick<ProofSettings, "load" | "set">; capture: Pick<ProofCapture, "preview"> };
+  proof?: {
+    settings: Pick<ProofSettings, "load" | "set">;
+    capture: Pick<ProofCapture, "preview">;
+    design?: Pick<DesignReviews, "clear">;
+  };
   /** The folder if it is an open project; throws otherwise. */
   allow: (dir: string) => string;
 }
@@ -25,6 +33,8 @@ export function createProofApi({ proof, allow }: ProofApiDeps) {
       return proof.settings.set(allow(dir), patch);
     }
     if (typeof p.id !== "string" || !p.id) throw new ApiError("Expected { dir, id }.");
-    return proof.capture.preview(allow(dir), p.id);
+    if (method === "preview.start") return proof.capture.preview(allow(dir), p.id);
+    if (!proof.design) throw new ApiError("The design review isn't available.");
+    return proof.design.clear(allow(dir), p.id);
   };
 }

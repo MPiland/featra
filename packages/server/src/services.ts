@@ -2,6 +2,7 @@ import { createAgentBridge } from "./agent-bridge.ts";
 import { createApi } from "./api.ts";
 import { createCardActions } from "./card-actions.ts";
 import { createCardReport } from "./card-report.ts";
+import { createDesignReviews } from "./design-reviews.ts";
 import { createCardLane } from "./card-lane.ts";
 import { createCheckSettings } from "./check-settings.ts";
 import { createStoryChecks } from "./story-checks.ts";
@@ -183,6 +184,8 @@ export function createServices({
   // "Not yet" on a feature's review screen and the Dev Lead's reply to it (STORY-71).
   const changes = createFeatureChanges({ scan: watches.scan, now, lane, chats, gitCommand });
   const bugs = createBugFiling({ scan: watches.scan, now, lane, gitCommand });
+  // The Dev Lead's design review of a story's screenshots (STORY-73).
+  const design = createDesignReviews({ scan: watches.scan, now, lane, chats, busy });
   const reports = createCardReport({
     scan: watches.scan,
     now,
@@ -190,6 +193,7 @@ export function createServices({
     leads: (dir, story) =>
       chats.list(dir).flatMap((c) => (c.story?.id === story && c.story.parent ? [c.story.parent] : [])),
     proof: proof.capture,
+    review: design,
   });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,
@@ -252,7 +256,7 @@ export function createServices({
     needs: async (listener) => needs.watch(listener),
     diffs,
     evidence: createEvidenceFiles({ scan: watches.shown, gitCommand, dataDir, log }),
-    proof: { settings: proof.settings, capture: proof.capture },
+    proof: { settings: proof.settings, capture: proof.capture, design },
   });
   // Saved settings that change a project's auto-merge setting in effect rescan it and re-check auto-merge (STORY-61).
   const settingsChanges = createSettingsChanges({

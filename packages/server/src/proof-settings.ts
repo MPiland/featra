@@ -1,11 +1,13 @@
 /**
  * Project settings' Proof section (STORY-25): the project's proof (screenshots, Preview, both or neither), the dev
- * server's command and URL, and the folder the project's tests write screenshots to. The values live in the project's
- * `.featra/config.yaml`, as the Checks section's do (check-settings.ts), and the dev-server command runs only once the
+ * server's command and URL, the folder the project's tests write screenshots to, and whether the Dev Lead reviews the
+ * screenshots before Acceptance (STORY-73). The values live in the project's `.featra/config.yaml`, as the Checks
+ * section's do (check-settings.ts), and the dev-server command runs only once the
  * user has confirmed it here: one changed through git shows as not confirmed and doesn't run.
  */
 import {
   CHECKS_COPY,
+  designReviewOn,
   PROOF_COPY,
   type ProjectConfig,
   type ProofMode,
@@ -22,7 +24,7 @@ export interface ProofSettingsDeps {
   dataDir?: string;
 }
 
-const KEYS = ["proof", "devServerCommand", "devServerUrl", "testScreenshots"] as const;
+const KEYS = ["proof", "devServerCommand", "devServerUrl", "testScreenshots", "designReview"] as const;
 
 export function createProofSettings({ scan, dataDir }: ProofSettingsDeps) {
   const confirmed = commandStore(dataDir, "dev-server-confirmed.json");
@@ -36,6 +38,7 @@ export function createProofSettings({ scan, dataDir }: ProofSettingsDeps) {
       devServerCommand: command,
       devServerUrl: config?.devServerUrl ?? null,
       testScreenshots: config?.testScreenshots ?? null,
+      designReview: config ? designReviewOn(config) : false,
       unconfirmed: command !== null && command !== known,
       error: config ? error : (error ?? CHECKS_COPY.notFeatra),
     };

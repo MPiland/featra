@@ -1,4 +1,4 @@
-/** The local server's project-settings methods (part of `ServerMethods`, protocol.ts): Checks, Proof and Preview. */
+/** The local server's project-settings methods (part of `ServerMethods`, protocol.ts): Checks, Proof, Preview and the design review. */
 import type { ChecksPatch, ChecksView } from "./checks-types.ts";
 import type { ProofPatch, ProofView } from "./proof-types.ts";
 
@@ -16,4 +16,6 @@ export interface SettingsMethods {
    * URL for the host to open in a window. Refused with why when it has none or it didn't start.
    */
   "preview.start": { params: { dir: string; id: string }; result: { url: string } };
+  /** The user clears a story's design review of its screenshots (STORY-73), and it moves on to Acceptance. */
+  "story.clearDesignReview": { params: { dir: string; id: string }; result: null };
 }

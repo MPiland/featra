@@ -3420,3 +3420,45 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
   every web contents is guarded against navigations and redirects off its dev server's origin, and dev-server windows
   run in their own partition (`featra-dev-pages`) that denies every permission. A new screenshot removes the
   criterion's earlier ones of another type. Recorded in ADR 0044.
+
+## 2026-11-24 — STORY-73 Design review of screenshots (developer)
+
+- **Who reviews** (user decision, 2026-11-24): the Dev Lead chat that delegated the story, through `update_card`'s
+  `designReview`: `{findings}` or `{clear: true}` (with `stage: "Acceptance"` in the same call when it moves the story
+  on). The story's session reports `{fixed: true}` after findings, which captures the screenshots again and tells the
+  Dev Lead again. Featra starts no session for the review and injects no prompt: `update_card`'s description is all the
+  agents are taught. Recorded in ADR 0045.
+- **Has screenshots**: a criterion's evidence is a screenshot Featra attached, `ac<n>-page.*` (a captured page) or
+  `ac<n>-test.*` (a matched test screenshot) in the story's evidence folder. An agent's own image doesn't count.
+- **Setting**: `designReview` in the project config, unset meaning on when `proof` is `screenshots` or `both`. A switch
+  in Settings > Project > Proof, "Design review of screenshots", below the proof.
+- **Gate**: on agents' reports only. A report can't move the story to Acceptance until the review is cleared, and with
+  the check on it can't skip from before review straight to Acceptance. The user's own stage edit isn't gated.
+- **Round**: each move into review from before it starts a new review, so a story sent back is reviewed again. Each
+  finding, fix and clear is a `design-review` event in `history[]`.
+- **Notice**: "STORY-N waits for design review: Screenshots in <folder>: <files>", held while the story's turn runs
+  and batched with its turn notice; "Findings fixed." comes first after a fix.
+- **Findings** reach the story's session as "Message from the Dev Lead:" with how to report them fixed. A session that
+  is working, stopped, queued or merging refuses them and nothing is recorded.
+- **Dev Lead chat gone** (the session has no parent chat, or it isn't listed): the card's design review says so and
+  offers Clear review (recorded as the user's, and the story moves to Acceptance) and Send back, which is allowed while
+  the review waits.
+- **Card**: "Design review: waiting", "findings sent" (with the findings) or "cleared", in the card pane's actions.
+- **Internal**: `stageCeiling`, `reviewStage`, `checksApply` and `inReview` moved to `review-stages.ts` so the design
+  review rules can use them without an import cycle.
+
+## 2026-11-25 — STORY-73 review fixes (developer)
+
+- **Capture window**: while a story's screenshots are being captured after its move to review, a report that moves it
+  to Acceptance is refused ("STORY-N's screenshots are still being captured: move it on once they're attached.").
+- **Auto-merge** waits for the design review: a story whose review isn't cleared doesn't merge on its own. Merge by
+  hand isn't gated; it is the user's call, as for a held story.
+- **Dev Lead gone** on the card uses the same test as notice delivery: no parent chat, or it is gone, closed or can't
+  run.
+- **Who reviews**: only the chat the story's session nests under, which started it. The chat that drafted the feature
+  can update the card, but its findings and clears are refused.
+- **Rounds** (Dev Lead decision): any move into review starts a new round, including the user moving a story back from
+  Acceptance. A clear from an earlier round never carries over.
+- **Findings** are delivered only after every other check on the report has passed, just before the card is written.
+- **Send back** beside Accept (a story's Work row, its session's end) is the same compact action button as Accept, not the dialog's larger button, so the row stays on one line. It predates STORY-73 (STORY-23), and showed in its Acceptance screenshot.
+- Recorded in ADR 0045.

@@ -84,6 +84,8 @@ export interface ProofView {
   devServerUrl: string | null;
   /** Where the project's own tests write screenshots, relative to the project; null when they don't. */
   testScreenshots: string | null;
+  /** Whether the Dev Lead reviews a story's screenshots before Acceptance (STORY-73): the project's choice, else the default. */
+  designReview: boolean;
   /** The command in the project's config isn't the one the user confirmed here (changed through git): it doesn't run. */
   unconfirmed: boolean;
   /** Set when the project's config can't be read or a change was refused. */
@@ -96,6 +98,8 @@ export interface ProofPatch {
   devServerCommand?: string | null;
   devServerUrl?: string | null;
   testScreenshots?: string | null;
+  /** Turns the design review of screenshots on or off (STORY-73); null goes back to the default. */
+  designReview?: boolean | null;
   /** Confirms the dev-server command now in the project's config as it is. */
   confirm?: boolean;
 }
@@ -114,6 +118,11 @@ export function normalizeProofPatch(raw: unknown): ProofPatch | null {
     if (value === undefined) continue;
     if (value !== null && typeof value !== "string") return null;
     out[key] = value;
+  }
+  const review = raw.designReview;
+  if (review !== undefined) {
+    if (review !== null && typeof review !== "boolean") return null;
+    out.designReview = review;
   }
   if (raw.confirm === true) out.confirm = true;
   return out;
@@ -195,6 +204,7 @@ export function normalizeProofView(raw: unknown): ProofView {
       devServerCommand: null,
       devServerUrl: null,
       testScreenshots: null,
+      designReview: false,
       unconfirmed: false,
       error: PROOF_COPY.unreadable,
     };
@@ -204,6 +214,7 @@ export function normalizeProofView(raw: unknown): ProofView {
     devServerCommand: text(raw.devServerCommand),
     devServerUrl: text(raw.devServerUrl),
     testScreenshots: text(raw.testScreenshots),
+    designReview: raw.designReview === true,
     unconfirmed: raw.unconfirmed === true,
     error: text(raw.error),
   };

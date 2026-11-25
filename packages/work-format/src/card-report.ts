@@ -8,9 +8,13 @@
 import { needsReview, draftedBy } from "./card-draft-guard.ts";
 import { stageCategory } from "./config.ts";
 import { appendHistory, setStatus } from "./history.ts";
+import { designReviewEvent, designReviewGate } from "./design-review.ts";
 import { evidenceFolder, evidenceLinkError } from "./evidence-link.ts";
 import { REPORT_LIMITS, same, squash, type ReportInput } from "./card-report-input.ts";
+import { stageCeiling } from "./review-stages.ts";
 import type { Card, ProjectConfig } from "./types.ts";
+
+export { stageCeiling } from "./review-stages.ts";
 
 export { parseReportInput, REPORT_LIMITS, type CriterionReport, type ReportInput } from "./card-report-input.ts";
 
@@ -23,12 +27,6 @@ export interface Reporter {
   story: string | null;
   /** The Dev Lead chats a story's sessions nest under (the chats that spawned them). */
   leads?: (story: string) => readonly string[];
-}
-
-/** The stage a report may move up to: the last one before the first that counts as done (Acceptance by default). */
-export function stageCeiling(config: ProjectConfig): string | null {
-  const firstDone = config.stages.findIndex((s) => stageCategory(s.name, config) === "done");
-  return config.stages[(firstDone < 0 ? config.stages.length : firstDone) - 1]?.name ?? null;
 }
 
 /** Why a report can't touch `card` at all, or null: it is Cancelled, Done or past the ceiling, which are the user's. */
@@ -81,6 +79,8 @@ export function reportAuthError(who: Reporter, id: string, cards: readonly Card[
 
 export interface ReportContext {
   config: ProjectConfig;
+  /** The caller is a Dev Lead, not the story's own session: it reviews the story's screenshots (STORY-73). */
+  lead?: boolean;
 }
 
 /** What a report did: the card as it is now, a short line for each change, and the evidence files it links. */
@@ -154,10 +154,19 @@ export function applyReport(
   const delta: Delta = {};
   let next: Card = card;
 
+  // The design review first, so the Dev Lead clears it and moves the story on in one call.
+  if (input.designReview) {
+    const review = designReviewEvent(card, input.designReview, ctx.config, ctx.lead === true);
+    if (!review.ok) return refuse(review.error);
+    if (review.to !== null) next = appendHistory(next, { at, field: "design-review", from: null, to: review.to, by });
+    if (review.change !== null) changes.push(review.change);
+  }
   if (input.stage && !same(input.stage, card.status)) {
     const why = reportStageError(card, input.stage, ctx.config);
     if (why !== null) return refuse(why);
     const to = ctx.config.stages.find((s) => same(s.name, input.stage ?? ""))?.name ?? input.stage;
+    const waits = designReviewGate(next, to, ctx.config);
+    if (waits !== null) return refuse(waits);
     next = setStatus(next, to, by, at);
     changes.push(`moved to ${to}`);
   }

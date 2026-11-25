@@ -85,4 +85,6 @@ export * from "./review-types.ts";
 export * from "./review.ts";
 export * from "./proof-types.ts";
 export * from "./proof-files.ts";
+export * from "./design-review.ts";
+export * from "./design-review-types.ts";
 export * from "./ac-line.ts";

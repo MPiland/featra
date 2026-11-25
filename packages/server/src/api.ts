@@ -88,7 +88,7 @@ export interface ApiDeps {
   /** Evidence files read back to show next to their criteria (STORY-72). */
   evidence?: EvidenceApiDeps["evidence"];
   /** The project's proof (STORY-25): its settings, Preview, and the notes and Preview a card shows. */
-  proof?: ProofApiDeps["proof"] & { capture: WatchApiDeps["proof"] };
+  proof?: ProofApiDeps["proof"] & { capture: WatchApiDeps["proof"]; design?: WatchApiDeps["design"] };
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -165,7 +165,17 @@ export function createApi({
   const featureApi = createFeatureApi({ features, changes, card });
   const evidenceApi = createEvidenceApi({ evidence, allow });
   const proofApi = createProofApi({ proof, allow });
-  const watchApi = createWatchApi({ watches, allowed, checks, prs, features, diffs, card, proof: proof?.capture });
+  const watchApi = createWatchApi({
+    watches,
+    allowed,
+    checks,
+    prs,
+    features,
+    diffs,
+    card,
+    proof: proof?.capture,
+    design: proof?.design,
+  });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, needs, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
@@ -236,6 +246,7 @@ export function createApi({
       case "proof.load":
       case "proof.set":
       case "preview.start":
+      case "story.clearDesignReview":
         return proofApi(method, params);
       case "checks.load":
         return checkSettings.load(project(params));

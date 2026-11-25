@@ -27,7 +27,8 @@ export type HistoryField =
   | "summary"
   | "changes-asked"
   | "changes-handled"
-  | "changes-dismissed";
+  | "changes-dismissed"
+  | "design-review";
 export const HISTORY_FIELDS: readonly HistoryField[] = [
   "status",
   "parent",
@@ -46,6 +47,7 @@ export const HISTORY_FIELDS: readonly HistoryField[] = [
   "changes-asked",
   "changes-handled",
   "changes-dismissed",
+  "design-review",
 ];
 
 /** Append-only record of a change, written at the card's owner (ADR 0002). */
@@ -154,4 +156,9 @@ export interface ProjectConfig {
   devServerUrl: string | null;
   /** The folder, relative to the project, where its own tests write screenshots (STORY-25); null when none. */
   testScreenshots: string | null;
+  /**
+   * Whether the Dev Lead reviews a story's screenshots before it moves to Acceptance (STORY-73); null follows the proof:
+   * on when it captures screenshots.
+   */
+  designReview: boolean | null;
 }

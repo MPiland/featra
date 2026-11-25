@@ -71,6 +71,7 @@ export const SERVER_METHODS: readonly ServerMethod[] = [
   "proof.load",
   "proof.set",
   "preview.start",
+  "story.clearDesignReview",
   "story.sendBack",
   "draft.reject",
   "chat.roles",

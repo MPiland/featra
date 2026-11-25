@@ -1,5 +1,6 @@
 import type { CardBridge, CardView } from "../../card-pane.ts";
 import { AcceptStory } from "./AcceptStory.tsx";
+import { DesignReview } from "./DesignReview.tsx";
 import { HoldStory } from "./HoldStory.tsx";
 import { PreviewStory } from "./PreviewStory.tsx";
 import { MergeStory } from "./MergeStory.tsx";
@@ -19,7 +20,7 @@ export interface CardStageActionsProps {
 
 /**
  * What the card pane offers for where a story or feature is in its flow: a story's agent, Accept and Send back,
- * Merge, Hold and Abandon; Preview, when the project's proof offers it (STORY-25); a feature's review screen (STORY-69), where it is approved and merged (STORY-70).
+ * Merge, Hold and Abandon; its design review (STORY-73); Preview, when the project's proof offers it (STORY-25); a feature's review screen (STORY-69), where it is approved and merged (STORY-70).
  */
 export function CardStageActions({ work, dir, id, view, readOnly, onClose }: CardStageActionsProps) {
   return (
@@ -32,6 +33,23 @@ export function CardStageActions({ work, dir, id, view, readOnly, onClose }: Car
       {view.preview && (
         <div className="draft-actions card-actions">
           <PreviewStory key={`preview-${id}`} id={id} preview={(story) => work.previewStory(dir, story)} />
+        </div>
+      )}
+      {view.designReview && (
+        <div className="draft-actions card-actions">
+          <DesignReview
+            key={`design-${id}`}
+            id={id}
+            review={view.designReview}
+            actions={
+              readOnly
+                ? undefined
+                : {
+                    clear: (story) => work.clearDesignReview(dir, story),
+                    sendBack: (story, reason, addCriterion) => work.sendBackStory(dir, story, reason, addCriterion),
+                  }
+            }
+          />
         </div>
       )}
       {view.awaiting && !readOnly && (

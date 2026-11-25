@@ -1,5 +1,12 @@
 // The local server's checks side, as a fake: each project's Checks section held in memory, changed by the user's saves.
-import { CHECKS_COPY, GITHUB_COPY, type ChecksPatch, type ChecksView, type ProofView } from "@featra/work-format";
+import {
+  capturesScreenshots,
+  CHECKS_COPY,
+  GITHUB_COPY,
+  type ChecksPatch,
+  type ChecksView,
+  type ProofView,
+} from "@featra/work-format";
 import type { ChecksBridge } from "../src/checks-bridge.ts";
 
 /** A project with no GitHub and nothing set: checks run on this computer, with no commands yet. */
@@ -26,6 +33,7 @@ export const NO_PROOF: ProofView = {
   devServerCommand: null,
   devServerUrl: null,
   testScreenshots: null,
+  designReview: false,
   unconfirmed: false,
   error: null,
 };
@@ -68,11 +76,14 @@ export function fakeChecksServer(
     loadProof: async (dir) => proofOf(dir),
     setProof: async (dir, patch) => {
       calls.push(`proof.set:${dir}:${JSON.stringify(patch)}`);
-      const { confirm, ...values } = patch;
+      const { confirm, designReview, ...values } = patch;
       const now = proofOf(dir);
+      const proof = values.proof === undefined ? now.proof : values.proof;
       const next = {
         ...now,
         ...values,
+        // Unset, the design review follows the proof (STORY-73), as the server reads the config.
+        designReview: designReview === undefined ? now.designReview : (designReview ?? capturesScreenshots(proof)),
         unconfirmed: now.unconfirmed && !confirm && values.devServerCommand === undefined,
       };
       proofViews.set(dir, next);

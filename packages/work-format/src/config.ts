@@ -58,6 +58,7 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   devServerCommand: null,
   devServerUrl: null,
   testScreenshots: null,
+  designReview: null,
 };
 
 const CATEGORIES: StageCategory[] = ["not-started", "active", "done"];
@@ -72,6 +73,7 @@ const BOOLEAN_KEYS = [
   "uat",
   "openStoryPrs",
   "openFeaturePrs",
+  "designReview",
 ] as const;
 const COMMAND_KEYS = ["checkCommand", "linkedTestCommand", "devServerCommand"] as const;
 /** The longest check command a project can set, in characters. */
