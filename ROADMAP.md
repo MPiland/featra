@@ -124,6 +124,10 @@ epics in `.featra/cards/`.
   (decisions.md, STORY-64). If Anthropic objects, replace the SDK with Featra's own driver that runs `claude` in its
   stream-json mode, behind the same provider adapter, so no Anthropic code ships.
 
+- **Add to a chosen answer.** On a question card, each option can take a short note, so the user can answer "this,
+  and also …" without picking Other and retyping the recommended option. The note goes to the agent with the choice.
+  Raised by the user on 2026-11-23.
+
 ## Before public release
 
 - A trademark and registrar check on the name "Featra".

@@ -2,7 +2,7 @@
 id: BUG-35
 type: bug
 title: Send back race test misses its 1 s wait under load
-status: New
+status: Cancelled
 parent: null
 order: 0
 origin: bug
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: session:story-65
+  - at: 2026-11-25T14:06:49Z
+    field: status
+    from: New
+    to: Cancelled
+    by: dev-lead
 ---
 
 ## Description
@@ -59,3 +64,5 @@ take longer than that, so the wait gives up before `open` is called. If so, this
 - Failed again in 2 of 2 full local `pnpm check` runs during STORY-66 (2026-11-19, Windows), with the same assertion at
   line 265, and passed when run alone. See BUG-37 for the merge request test that failed in the same runs.
 - 2026-11-20: STORY-67's local hook run failed "refuses a Send back whose session was still opening when Accept landed" (story-acceptance.test.ts) once under load; it passed in the other runs and in CI.
+- Duplicate of BUG-39 (same test, same cause: `vi.waitFor` kept vitest's 1 s default). BUG-39's fix, merged with
+  STORY-69, waits with `until` and extends the wait scan. Cancelled by the Dev Lead on 2026-11-25.
