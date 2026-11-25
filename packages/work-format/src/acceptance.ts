@@ -8,6 +8,7 @@
  */
 import { recorded } from "./card-edit.ts";
 import { stageCeiling } from "./card-report.ts";
+import { designReviewState } from "./design-review.ts";
 import { checkTransition, evidenceState } from "./evidence.ts";
 import { recordAcceptance, recordSentBack, SEND_BACK_REFUSALS, setStatus } from "./history.ts";
 import { resumedStory } from "./story-stop.ts";
@@ -37,6 +38,15 @@ export function acceptanceRefusal(card: Card | undefined, id: string, config: Pr
   if (evidenceState(card).accepted) return ACCEPT_MESSAGES.accepted(id);
   if (!awaitingAcceptance(card, config)) return ACCEPT_MESSAGES.notWaiting(id, card.status);
   return null;
+}
+
+/**
+ * Why Send back can't be used on card, or null when it can: as for Accept, and also while it waits in review for its
+ * design review (STORY-73), so the user can send it back when the Dev Lead that reviews it is gone.
+ */
+export function sendBackRefusal(card: Card | undefined, id: string, config: ProjectConfig): string | null {
+  const review = card ? designReviewState(card, config) : null;
+  return review !== null && review.status !== "cleared" ? null : acceptanceRefusal(card, id, config);
 }
 
 /** The first stage whose category is done: where an accepted, verified story goes. */

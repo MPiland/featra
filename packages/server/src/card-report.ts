@@ -21,6 +21,7 @@ import { cardViewIn, fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { evidenceOnDisk } from "./evidence-disk.ts";
 import { samePath } from "./same-path.ts";
+import type { DesignReviews } from "./design-reviews.ts";
 import type { ProofCapture } from "./proof-capture.ts";
 import type { Scan } from "./work-scan.ts";
 
@@ -46,9 +47,22 @@ export interface CardReportDeps {
   leads?: (dir: string, story: string) => readonly string[];
   /** Attaches a story's screenshots once a report moves it to review (STORY-25). None when not given. */
   proof?: Pick<ProofCapture, "attach">;
+  /** The design review of a story's screenshots (STORY-73): delivers the Dev Lead's findings, tells it a story waits. */
+  review?: Pick<DesignReviews, "ready" | "deliver" | "waiting">;
 }
 
-export function createCardReport({ scan: scanDir, now, lane = createCardLane(), leads, proof }: CardReportDeps) {
+/** The Dev Lead's design findings a report carries, or null. */
+const findingsOf = (input: ReportInput): string | null =>
+  input.designReview !== undefined && "findings" in input.designReview ? input.designReview.findings : null;
+
+export function createCardReport({
+  scan: scanDir,
+  now,
+  lane = createCardLane(),
+  leads,
+  proof,
+  review: design,
+}: CardReportDeps) {
   async function report(
     dir: string,
     who: Reporter,
@@ -74,8 +88,12 @@ export function createCardReport({ scan: scanDir, now, lane = createCardLane(), 
     }
     if (view?.readOnly || !found.root) throw new ApiError(REPORT_MESSAGES.noCopy(id));
     const { config } = scan.collected;
-    const result = applyReport(found.owned.card, input, { config }, draftAuthor(who.chat), toIso(now()), label);
+    const lead = who.story === null;
+    const result = applyReport(found.owned.card, input, { config, lead }, draftAuthor(who.chat), toIso(now()), label);
     if (!result.ok) throw new ApiError(result.error);
+    // The findings go to the story's session before they are recorded: a session that can't take them refuses the report.
+    const findings = findingsOf(input);
+    if (findings !== null && design) await design.deliver(dir, id, who.chat, findings);
     for (const link of result.links) {
       const disk = await evidenceOnDisk(found.root, link);
       if (!disk.ok) throw new ApiError(REPORT_MESSAGES[disk.problem](link));
@@ -98,9 +116,15 @@ export function createCardReport({ scan: scanDir, now, lane = createCardLane(), 
      * `cwd`); the card it changed and what changed.
      */
     async report(dir: string, who: Reporter, label: string, input: ReportInput, cwd?: string) {
+      const id = input.card ?? who.story;
+      // Opening the story's session can be slow, so it is done before the lane.
+      if (findingsOf(input) !== null && design && id !== null) await design.ready(dir, id, who.chat);
       const { card, changes, review } = await lane.exclusive(() => report(dir, who, label, input, cwd));
+      // A fix is shown in new screenshots: the pages are captured again, and the Dev Lead reviews them again.
+      const fixed = input.designReview !== undefined && "fixed" in input.designReview;
       // Outside the lane: starting a dev server and capturing pages takes a while, and other cards go on meanwhile.
-      const attached = review && proof ? await proof.attach(dir, card) : [];
+      const attached = (review || fixed) && proof ? await proof.attach(dir, card) : [];
+      if ((review || fixed) && design) await design.waiting(dir, card);
       return { card, changes: [...changes, ...attached] };
     },
   };

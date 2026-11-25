@@ -236,6 +236,7 @@ describe("the Proof section on the socket", () => {
       devServerCommand: "x",
       devServerUrl: null,
       testScreenshots: null,
+      designReview: false,
       unconfirmed: true,
       error: null,
     });

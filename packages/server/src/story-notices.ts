@@ -46,6 +46,12 @@ export interface StoryNotices {
   failedStart: (c: Chat, reason: string) => void;
   /** Puts `notice` in the Dev Lead's chat `id`, when it can still be told (STORY-12: how a merge it asked for went). */
   tell: (id: string, notice: Notice) => void;
+  /**
+   * Puts 
+otice of the story session id in its Dev Lead's chat (STORY-73: the story waits for its design review).
+   * While the session's turn is on, it waits for the turn's own notice and goes with it.
+   */
+  from: (id: string, notice: Notice) => void;
   /** A chat's agent ended: what it held, notices and questions, goes with it. */
   forget: (c: Chat) => void;
 }
@@ -55,6 +61,8 @@ export function createStoryNotices({ chats, open, send, askUser, log }: NoticeHo
   const chains = new Map<string, Promise<void>>();
   /** The questions a story session's turn asked its Dev Lead, until the turn ends. */
   const asking = new Map<string, Asked[]>();
+  /** The notices a story session's turn gave its Dev Lead, which go after the turn's own notice. */
+  const held = new Map<string, Notice[]>();
   /** Dev Leads whose last turn the user stopped: their notices wait for a turn that isn't a stop. */
   const stopped = new Set<string>();
 
@@ -138,7 +146,9 @@ export function createStoryNotices({ chats, open, send, askUser, log }: NoticeHo
         return;
       }
       const requests = asking.get(c.id);
+      const after = held.get(c.id) ?? [];
       asking.delete(c.id);
+      held.delete(c.id);
       const lead = leadOf(c);
       if (!lead) {
         if (requests && outcome === "done") askTheUser(c, requests);
@@ -157,6 +167,7 @@ export function createStoryNotices({ chats, open, send, askUser, log }: NoticeHo
       } else {
         post(lead, { story: story.id, outcome: outcomeOf(outcome), summary: turnSummary(c.events ?? [], outcome) });
       }
+      for (const notice of after) post(lead, notice);
     },
     removed(c) {
       const story = c.summary.story;
@@ -174,8 +185,18 @@ export function createStoryNotices({ chats, open, send, askUser, log }: NoticeHo
       const lead = chats.get(id);
       if (lead && !lead.closed && lead.summary.story === undefined && lead.refusal === null) post(lead, notice);
     },
+    from(id, notice) {
+      const c = chats.get(id);
+      if (!c?.summary.story) return;
+      if (c.running) held.set(id, [...(held.get(id) ?? []), notice]);
+      else {
+        const lead = leadOf(c);
+        if (lead) post(lead, notice);
+      }
+    },
     forget(c) {
       asking.delete(c.id);
+      held.delete(c.id);
       pending.delete(c.id);
       stopped.delete(c.id);
     },

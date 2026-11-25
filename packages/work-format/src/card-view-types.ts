@@ -4,6 +4,7 @@
  */
 import { normalizeCardChecks, type CardChecks } from "./checks-types.ts";
 import { isCiRunOf, normalizeCardPr, type CardPr } from "./prs-types.ts";
+import { normalizeDesignReview, type DesignReviewView } from "./design-review-types.ts";
 import { normalizeProofNote, type ProofNote } from "./proof-types.ts";
 import { isOneOf, isRecord } from "./utils/guards.ts";
 
@@ -109,6 +110,8 @@ export interface CardView {
   notMerged?: string;
   /** True on a story with a worktree in a project that offers Preview (STORY-25); absent otherwise. */
   preview?: true;
+  /** Where the story's design review of its screenshots stands (STORY-73); absent when it has none. */
+  designReview?: DesignReviewView;
   /** Why the card can't be edited here, or null when it can. */
   readOnly: string | null;
 }
@@ -208,6 +211,12 @@ const prOf = (raw: unknown): { prState?: CardPr } => {
 };
 
 /** A view from the socket, read defensively; null when there is no card. */
+/** A view's design review as a spread: empty when it has none or it is malformed. */
+function designReviewOf(raw: unknown): { designReview?: DesignReviewView } {
+  const review = normalizeDesignReview(raw);
+  return review ? { designReview: review } : {};
+}
+
 export function normalizeCardView(raw: unknown): CardView | null {
   if (!isRecord(raw) || typeof raw.id !== "string" || !raw.id) return null;
   const ev = isRecord(raw.evidence) ? raw.evidence : {};
@@ -251,6 +260,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
     ...(raw.preview === true ? { preview: true as const } : {}),
+    ...designReviewOf(raw.designReview),
     ...(typeof raw.mergedInto === "string" && raw.mergedInto ? { mergedInto: raw.mergedInto } : {}),
     ...(typeof raw.held === "boolean" ? { held: raw.held } : {}),
     ...(typeof raw.notMerged === "string" && raw.notMerged ? { notMerged: raw.notMerged } : {}),

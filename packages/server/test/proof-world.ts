@@ -87,6 +87,9 @@ const capturePage: CapturePage = async (url, origin) => {
   return platform.shots.get(new URL(url).pathname) ?? { ok: true, data: PNG, ext: "png" };
 };
 
+/** The faked platform behind a project's proof, for a world of its own (STORY-73). */
+export const proofPlatform = { capturePage, devServers };
+
 /** A proof world: the project, its Dev Lead's agent socket, and what its tests do with stories. */
 export async function proofWorld() {
   const w: StoryWorld = await storyWorld({ drafted: true, config: CONFIG, proof: { capturePage, devServers } });

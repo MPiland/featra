@@ -1,6 +1,8 @@
 /**
  * The `update_card` call's input (STORY-10), read and bounded before any rule in card-report.ts applies to it.
  */
+import { parseDesignReview } from "./design-review.ts";
+import type { DesignReviewInput } from "./design-review-types.ts";
 import { EVIDENCE_BYTES } from "./evidence-link.ts";
 import { parseId } from "./ids.ts";
 import type { Parsed } from "./knowledge-log.ts";
@@ -31,6 +33,8 @@ export interface ReportInput {
   addTasks?: string[];
   criteria?: CriterionReport[];
   note?: string;
+  /** The design review of its screenshots (STORY-73): the Dev Lead's findings or clear, or the session's fix. */
+  designReview?: DesignReviewInput;
 }
 
 /** Text with its whitespace collapsed, so wording compares the way a person reads it. */
@@ -83,6 +87,8 @@ export function parseReportInput(input: unknown): Parsed<ReportInput> {
   if (!tasks.ok) return tasks;
   if (!addTasks.ok) return addTasks;
   if (!crit.ok) return crit;
+  const design = parseDesignReview(raw.designReview);
+  if (!design.ok) return design;
   const note = raw.note === undefined ? undefined : text(raw.note, REPORT_LIMITS.note);
   if (note === null) return { ok: false, error: `"note" is text of at most ${REPORT_LIMITS.note} characters.` };
   const id = typeof raw.card === "string" ? raw.card.trim().toUpperCase() : "";
@@ -96,9 +102,10 @@ export function parseReportInput(input: unknown): Parsed<ReportInput> {
     ...(addTasks.value?.length ? { addTasks: addTasks.value } : {}),
     ...(crit.value?.length ? { criteria: crit.value } : {}),
     ...(note ? { note } : {}),
+    ...(design.value ? { designReview: design.value } : {}),
   };
-  const { stage: s, tasks: t, addTasks: a, criteria: c, note: n } = value;
-  return s || t || a || c || n
+  const { stage: s, tasks: t, addTasks: a, criteria: c, note: n, designReview: d } = value;
+  return s || t || a || c || n || d
     ? { ok: true, value }
     : { ok: false, error: "Say what to update: stage, tasks, addTasks, criteria or note." };
 }

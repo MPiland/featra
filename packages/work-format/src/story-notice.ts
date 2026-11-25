@@ -17,6 +17,7 @@ import type { Tone } from "./work-list-types.ts";
  * of a merge the Dev Lead asked for (STORY-12), it merged, the user declined it, or it didn't merge; or, of a bug the
  * Dev Lead reported (STORY-13), it was filed, the user cancelled it, or it couldn't be filed.
  * Of a feature the user accepted (STORY-14): the base branch moved on, so the Dev Lead merges it in.
+ * Of a story with screenshots in review (STORY-73): it waits for the Dev Lead's design review.
  */
 export type NoticeOutcome =
   | "ended"
@@ -29,7 +30,8 @@ export type NoticeOutcome =
   | "filed"
   | "declined"
   | "not filed"
-  | "behind main";
+  | "behind main"
+  | "waits for design review";
 
 export interface Notice {
   story: string;

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { DESIGN_REVIEW_COPY } from "@featra/work-format";
 import type { ProofMode } from "@featra/work-format/proof";
 import type { ChecksBridge } from "../../checks-bridge.ts";
 import { PROOF_PAGE_COPY as COPY, type ProofPatch, type ProofView } from "../../proof-bridge.ts";
 import { SegmentedControl } from "../controls/SegmentedControl.tsx";
 import { SettingRow } from "../controls/SettingRow.tsx";
+import { Switch } from "../controls/Switch.tsx";
 import { SettingsGroup } from "./SettingsGroup.tsx";
 
 type Field = "devServerCommand" | "devServerUrl" | "testScreenshots";
@@ -18,7 +20,9 @@ const draftOf = (view: ProofView): Record<Field, string> => ({
 /**
  * Project settings' Proof section (STORY-25): the project's proof (the answer to the question asked when its first
  * feature was shaped), the dev server Featra starts for screenshots and Preview, and where the project's tests write
- * screenshots. A dev-server command changed through git runs only once the user confirms it here.
+ * screenshots. A dev-server command changed through git runs only once the user confirms it here. Next to the proof,
+ * whether the Dev Lead reviews a story's screenshots before it moves to Acceptance (STORY-73): on by default when the
+ * proof captures them.
  */
 export function ProjectProof({ checks, dir }: { checks: ChecksBridge; dir: string }) {
   const [loaded, setLoaded] = useState<{ dir: string; view: ProofView } | null>(null);
@@ -110,6 +114,19 @@ export function ProjectProof({ checks, dir }: { checks: ChecksBridge; dir: strin
                 // The choice shows at once; the saved view replaces it (or puts it back, with why).
                 setLoaded({ dir, view: { ...view, proof: proof || null } });
                 void change({ proof: proof || null });
+              }}
+            />
+          )}
+        </SettingRow>
+        <SettingRow id="proof-design-review" label={DESIGN_REVIEW_COPY.setting} help={DESIGN_REVIEW_COPY.settingHint}>
+          {(aria) => (
+            <Switch
+              checked={view.designReview}
+              labelledBy={aria.labelledBy}
+              describedBy={aria.describedBy}
+              onChange={(designReview) => {
+                setLoaded({ dir, view: { ...view, designReview } });
+                void change({ designReview });
               }}
             />
           )}

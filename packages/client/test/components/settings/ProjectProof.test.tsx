@@ -5,7 +5,7 @@
  */
 import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ProofView } from "@featra/work-format";
+import { DESIGN_REVIEW_COPY, type ProofView } from "@featra/work-format";
 import { PROOF_PAGE_COPY as COPY } from "../../../src/proof-bridge.ts";
 import { PROJECT, renderApp } from "../../harness.tsx";
 import { NO_PROOF } from "../../checks-server.ts";
@@ -18,6 +18,7 @@ const SET: ProofView = {
   devServerCommand: "pnpm dev --port {port}",
   devServerUrl: "http://localhost:5173",
   testScreenshots: null,
+  designReview: true,
   unconfirmed: false,
   error: null,
 };
@@ -92,5 +93,27 @@ describe("the dev server and the tests' screenshots", () => {
   it("shows why the section couldn't be read or saved", async () => {
     const { section } = await open({ ...NO_PROOF, error: "Couldn't read the project's proof settings." });
     expect(within(section).getByRole("alert").textContent).toBe("Couldn't read the project's proof settings.");
+  });
+});
+
+const toggle = (section: HTMLElement) =>
+  within(section).getByRole<HTMLButtonElement>("switch", { name: DESIGN_REVIEW_COPY.setting });
+
+describe("STORY-73 AC4: the project can turn the design review off", () => {
+  it("is on next to the proof when it captures screenshots, and turns off and on again", async () => {
+    const { section, user, calls } = await open(SET);
+    expect(toggle(section).getAttribute("aria-checked")).toBe("true");
+    expect(within(section).getByText(DESIGN_REVIEW_COPY.settingHint)).toBeTruthy();
+    await user.click(toggle(section));
+    await waitFor(() => expect(calls).toContain(`proof.set:${PROJECT.dir}:{"designReview":false}`));
+    expect(toggle(section).getAttribute("aria-checked")).toBe("false");
+    await user.click(toggle(section));
+    await waitFor(() => expect(calls).toContain(`proof.set:${PROJECT.dir}:{"designReview":true}`));
+    expect(toggle(section).getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("is off for a project whose proof doesn't capture screenshots", async () => {
+    const { section } = await open(NO_PROOF);
+    expect(toggle(section).getAttribute("aria-checked")).toBe("false");
   });
 });

@@ -86,6 +86,8 @@ export interface ChatManager {
   askQuestion: (id: string, request: AppQuestion) => Promise<Answers | null>;
   /** Puts a notice in the Dev Lead's chat `id`, as story sessions' notices are (STORY-12: how a merge it asked for went). */
   notify: (id: string, notice: Notice) => void;
+  /** Puts a notice of the story session `id` in its Dev Lead's chat, after its turn's own when the turn is on (STORY-73). */
+  notifyFrom: (id: string, notice: Notice) => void;
   /** Takes a story session that is queued and has never started out of the queue, and forgets it. False if it isn't one. */
   dropQueued: (id: string) => boolean;
   /** Whether a session for the story is waiting for a free slot. */

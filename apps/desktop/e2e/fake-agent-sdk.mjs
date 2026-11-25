@@ -17,7 +17,9 @@
  *   STORY-N"). Writes a small evidence file into the story's folder in its worktree, then calls the Featra MCP's
  *   update_card tool: ticks the drafted task and criterion with that evidence, adds a task, moves the story to In
  *   Review and notes it. The tool call is real; only the agent is faked. "evidence": fake-agent-evidence.mjs; "proof":
- *   fake-agent-proof.mjs.
+ *   fake-agent-proof.mjs; "design" and "design-plain": fake-agent-design.mjs.
+ * - "design findings STORY-N" and "design clear STORY-N" (STORY-73): the Dev Lead's design review of STORY-N's
+ *   screenshots through update_card, in fake-agent-design.mjs.
  * - "subagent" (STORY-55): the agent spawns a background subagent (an Agent call, `task_started`, and the subagent's own
  *   messages, tagged as the SDK tags them). The subagent says something, then asks to run a Bash `npm test` through
  *   canUseTool as itself (`agentID`), and when that is answered says more and waits for `stopTask`, which ends it with
@@ -44,6 +46,7 @@
  * and its reply names the earlier prompts it kept: "You said: <text>, after: <earlier>".
  */
 import { appendFileSync } from "node:fs";
+import { designLeadTurn, designStoryTurn } from "./fake-agent-design.mjs";
 import { evidenceTurn } from "./fake-agent-evidence.mjs";
 import { decideTurn, draftTurn, reportTurn } from "./fake-agent-mcp-turns.mjs";
 import { proofTurn } from "./fake-agent-proof.mjs";
@@ -168,10 +171,14 @@ export function query({ prompt, options }) {
         yield* evidenceTurn(helpers, options, text);
       } else if (brief && process.env.FEATRA_E2E_REPORT === "proof") {
         yield* proofTurn(helpers, options, text);
+      } else if (brief && process.env.FEATRA_E2E_REPORT?.startsWith("design")) {
+        yield* designStoryTurn(helpers, options, text);
       } else if (brief && process.env.FEATRA_E2E_REPORT) {
         yield* reportTurn(helpers, options, text);
       } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {
         yield* slow(["The worktree is clean."], "Starting the story.");
+      } else if (said.includes("design findings") || said.includes("design clear")) {
+        yield* designLeadTurn(helpers, options, said);
       } else if (said.includes("request_action")) {
         yield* requestActionTurn(helpers, options);
       } else if (said.includes("mark_changes_handled")) {

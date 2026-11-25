@@ -8,6 +8,7 @@ import {
   mergeRefusal,
   resumedStory,
   resumeRefusal,
+  sendBackRefusal,
   sentBackStory,
   stageTone,
   stopRefusal,
@@ -86,7 +87,7 @@ export function storyFlowFakes({
       calls.push(`sendBackStory:${dir}:${id}:${reason}:${addCriterion}`);
       if (review.sendBackStory) return review.sendBackStory(dir, id, reason, addCriterion);
       const card = find(dir, id);
-      const why = acceptanceRefusal(card, id, DEFAULT_CONFIG);
+      const why = sendBackRefusal(card, id, DEFAULT_CONFIG);
       if (why !== null || !card) return { ok: false, error: why ?? "That card is gone." };
       changed(dir, sentBackStory(card, DEFAULT_CONFIG, reason, addCriterion, "user", at));
       return { ok: true, recorded: true };

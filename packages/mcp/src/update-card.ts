@@ -2,7 +2,7 @@
  * The `update_card` tool (STORY-10): an agent reports on its card as it works. Its description is product copy: it is
  * what teaches an agent the limits, since Featra injects no system prompt (ADR 0006).
  */
-import { REPORT_LIMITS, parseReportInput } from "@featra/work-format";
+import { FINDINGS_MAX, REPORT_LIMITS, parseReportInput } from "@featra/work-format";
 import { ToolRefusal, type Tool } from "./tool-types.ts";
 
 const list = (description: string) => ({ type: "array", items: { type: "string" }, description });
@@ -27,6 +27,10 @@ export const UPDATE_CARD: Tool = {
     `each under ${REPORT_LIMITS.evidenceBytes / 1_000_000} MB, and none when a test already proves it.`,
     "When the project takes screenshots, you can list a page instead: give the criterion a `page`, the route on the project's dev server that shows it, such as /settings.",
     "When the story moves to review, Featra starts the dev server in your worktree, captures each listed page and links it as that criterion's evidence, at no cost to you; the result says where, so commit those files too.",
+    "Design review: when a story with screenshots Featra attached reaches review, Featra tells the Dev Lead that started it that it waits for design review, naming the screenshots.",
+    "The Dev Lead opens them and checks them for layout and design problems (overlapping or clipped text, misalignment, uneven spacing, poor contrast, broken or empty states),",
+    "then answers with `designReview`: {findings: what to fix} sends them to the story's session and keeps the story in review; {clear: true} lets it move on, and can go with `stage` Acceptance in one call.",
+    "A story waiting for its design review can't move to Acceptance. Its session, once it has fixed the findings, reports {fixed: true}: Featra captures the screenshots again for another review.",
     "This does not commit: commit the card and its evidence with your work. The input is checked, and a call that is refused changes nothing.",
   ].join(" "),
   inputSchema: {
@@ -62,6 +66,19 @@ export const UPDATE_CARD: Tool = {
       note: {
         type: "string",
         description: `One short line for the card's notes (at most ${REPORT_LIMITS.note} characters).`,
+      },
+      designReview: {
+        type: "object",
+        description:
+          "The design review of a story's screenshots: exactly one of findings (the Dev Lead), clear (the Dev Lead) or fixed (the story's session).",
+        properties: {
+          findings: {
+            type: "string",
+            description: `What to fix, sent to the story's session (at most ${FINDINGS_MAX} characters).`,
+          },
+          clear: { type: "boolean", description: "true: the screenshots pass, and the story may move on." },
+          fixed: { type: "boolean", description: "true: the story's session fixed the findings." },
+        },
       },
     },
     required: [],

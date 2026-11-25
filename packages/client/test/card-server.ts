@@ -25,7 +25,7 @@ import {
   type WorkList,
 } from "@featra/work-format";
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
-import { previewFake, withProof, type CardProof } from "./card-server-proof.ts";
+import { clearDesignReviewFake, previewFake, withProof, type CardProof } from "./card-server-proof.ts";
 import { featureEndFakes, type FeatureActions } from "./card-server-features.ts";
 import { storyEndFakes, type StoryEndActions } from "./card-server-story-end.ts";
 import { storyFlowFakes, type StoryFlowActions } from "./card-server-story-flow.ts";
@@ -41,6 +41,7 @@ export type ReviewAnswers = Partial<
     | "rerunChecks"
     | "createPr"
     | "previewStory"
+    | "clearDesignReview"
     | StoryFlowActions
     | StoryEndActions
     | FeatureActions
@@ -234,6 +235,7 @@ export function fakeCardServer(
       return review.createPr ? review.createPr(dir, id) : { ok: true };
     },
     previewStory: previewFake(calls, review.previewStory),
+    clearDesignReview: clearDesignReviewFake(calls, review.clearDesignReview),
     ...storyFlowFakes({
       cardsIn: (dir) => cardSets.get(dir) ?? [],
       changed,
