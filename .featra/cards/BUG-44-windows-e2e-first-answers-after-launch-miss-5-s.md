@@ -57,9 +57,14 @@ its own.
   (test: packages/server/test/work-watch-share.test.ts::answers a new watcher with the cards as they are when it asks, though a scan that read them earlier runs)
   (test: packages/server/test/work-watch-share.test.ts::gives the actions that ask while a scan runs one scan between them, started after they asked)
   (test: packages/server/test/services-git.test.ts::applies a stale copy with one git command, the restore, and pushes the list without it)
+  (test: packages/server/test/work-watch-handles.test.ts::starts git's watchers before the first scan reads git, so the rescan after it doesn't ask git again (BUG-44))
   (test: packages/server/test/work-watch-handles.test.ts::asks git again when a worktree's folder comes or goes, not when only its times change)
+  (test: packages/server/test/work-watch-late.test.ts::asks git again for a branch made just before a scan that reuses git starts its git watchers)
   (test: packages/server/test/ws-unwatch-early.test.ts::stops the watch when it answers, so nothing is pushed for it)
+  (test: packages/server/test/ws-unwatch-early.test.ts::forgets an unwatch for a watch it never had, so a later watch with that id is kept)
+  (test: packages/server/test/ws-unwatch-early.test.ts::forgets an unwatch for a watch that failed, so a later watch with that id is kept)
   (test: packages/server/test/config-writer-busy.test.ts::tries again after EPERM, and the value lands with no temporary file left)
+  (test: packages/server/test/atomic-write-leftover.test.ts::is read as neither a card nor the config, and the next config write lands)
 - [x] The app's first answers after launch, setup and Start come within the tests' default wait on E2E (Windows),
   fixed at the cause. No assertion is weakened, deleted or reordered; a longer wait is only acceptable if the cause
   is shown to be the runner itself, and is then recorded in an ADR.
@@ -102,3 +107,9 @@ the App's mount and the socket opening (the endpoint IPC, main, or Chromium); no
 (`rm` with 20 retries, linear backoff, about 21 s each) while the app still holds files. Harmless.
 
 **Proof.** E2E (Windows) passed 10 runs in a row on PR #92, all of run 45671030090 (attempt 1 the push, 2-10 reruns of the E2E (Windows) job): jobs 139406022288, 139412101252, 139417477219, 139422798119, 139428637693, 139434451143, 139439552203, 139444673369, 139450440252, 139454976954. Attempt 1 had every job green. BUG-36, BUG-41, BUG-42 and BUG-43 are Done; BUG-40 stays open for the late page socket.
+
+**Review (Opus, PR #92).** A git watcher that first starts in a scan that reuses git is now marked stale and a rescan
+that asks git follows; the watcher code moved to `work-watch-targets.ts`; `writeAtomic` moved to `atomic-write.ts` so the
+config writer doesn't pull in the card actions (a crash's `.<hex>.featra-tmp` leftover is never read); an unwatch
+is remembered only for a request in flight and forgotten when it answers. Each new test was seen failing with its fix
+reverted.

@@ -3,9 +3,8 @@
  * edit never interleave, so each reads the cards, decides and writes before the next reads. A second app instance on
  * the same project is not covered (decisions.md); the exclusive create below is what keeps it from overwriting a card.
  */
-import { randomBytes } from "node:crypto";
 import { link, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { tempFor } from "./atomic-write.ts";
 
 export interface CardLane {
   /** Runs `job` once every job before it has finished, whether those succeeded or not. */
@@ -32,7 +31,7 @@ export const isCollision = (err: unknown): boolean =>
  * file first and is hard-linked into place, so no reader sees half a card and an existing file is never replaced.
  */
 export async function createExclusive(file: string, text: string): Promise<void> {
-  const temp = join(dirname(file), `.${randomBytes(6).toString("hex")}.featra-tmp`);
+  const temp = tempFor(file);
   try {
     await writeFile(temp, text, "utf8");
     await link(temp, file);

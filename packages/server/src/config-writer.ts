@@ -1,7 +1,7 @@
 import { mkdir, readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { ConfigError, errorMessage, isRecord, setConfigValue, type ProjectConfig } from "@featra/work-format";
-import { writeAtomic, type AtomicIo } from "./card-actions.ts";
+import { writeAtomic, type AtomicIo } from "./atomic-write.ts";
 
 export const CONFIG_PATH = [".featra", "config.yaml"] as const;
 export const configFile = (projectDir: string) => join(projectDir, ...CONFIG_PATH);

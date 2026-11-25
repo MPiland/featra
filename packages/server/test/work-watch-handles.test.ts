@@ -111,6 +111,24 @@ describe("watch handles", () => {
     expect(logged).toEqual([]);
   });
 
+  it("starts git's watchers before the first scan reads git, so the rescan after it doesn't ask git again (BUG-44)", async () => {
+    const { git, calls } = countedGit();
+    const own = createScanner(git);
+    const watches = createWorkWatches(own, (m) => logged.push(m), fakeWatch);
+    const { stop } = await watches.watch(repo.main, () => {});
+    try {
+      calls.length = 0;
+      // The first scan started the `.featra` watchers after it read the cards, so a rescan follows it (BUG-12).
+      await watches.scan(repo.main);
+      expect(calls).toEqual([]);
+    } finally {
+      stop();
+      watches.close();
+      await own.close();
+    }
+    expect(logged).toEqual([]);
+  });
+
   it("asks git again when a worktree's folder comes or goes, not when only its times change", async () => {
     const { git, calls } = countedGit();
     const own = createScanner(git);
