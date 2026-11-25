@@ -2,7 +2,7 @@
 id: STORY-73
 type: story
 title: Design review of screenshots
-status: In Review
+status: Done
 parent: FEAT-9
 order: 7
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: developer
+  - at: 2026-11-25T13:46:47Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-25T13:46:47Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
