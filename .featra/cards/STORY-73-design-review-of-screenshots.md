@@ -2,7 +2,7 @@
 id: STORY-73
 type: story
 title: Design review of screenshots
-status: In Progress
+status: In Review
 parent: FEAT-9
 order: 7
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-73-design-review
-pr: null
+pr: https://github.com/MPiland/featra/pull/89
 created: 2026-11-23T12:00:00Z
 history:
   - at: 2026-11-23T12:00:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-25T06:51:11Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: developer
 ---
 
 ## Description
