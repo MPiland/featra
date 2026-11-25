@@ -290,6 +290,7 @@ export function createServices({
     agents,
     needs,
     settingsChanged: settingsChanges.saved,
+    devServers: proof.servers,
     async close() {
       stopClosing();
       proof.servers.stopAll();

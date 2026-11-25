@@ -1,6 +1,5 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { watchQuit } from "./diag-procs.ts";
 import { expect, test, type ElectronApplication } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
@@ -78,8 +77,6 @@ test("Screenshots: a story moved to review gets its page captured from the dev s
     await expect(log).toContainText(`${id} ended: Tool said:`, { timeout: 30_000 });
     await expect(log).toContainText("You said: [Featra notice");
 
-    // TEMPORARY diagnostic (Windows close hang): lists which of the app's processes outlive its quit.
-    await watchQuit(app);
     // Quitting stops the dev server Featra started.
     await app.close();
     await expect

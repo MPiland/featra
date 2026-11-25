@@ -7,6 +7,7 @@
 import { errorMessage } from "@featra/work-format";
 import { createAllowedProjects } from "./allowed-projects.ts";
 import { createHostCapture } from "./host-capture.ts";
+import { whenHostGone } from "./host-gone.ts";
 import { parseHostMessage, type ServerMessage } from "./host-messages.ts";
 import { watchWaitingTotal } from "./project-needs.ts";
 import { nodeRoleFs } from "./role-fs.ts";
@@ -68,6 +69,10 @@ process.on("message", (raw) => {
 });
 
 process.on("disconnect", () => {
-  capture.close();
-  void (server?.close() ?? Promise.resolve()).then(() => services.close()).finally(() => process.exit(0));
+  void whenHostGone({
+    capture,
+    devServers: services.devServers,
+    close: () => (server?.close() ?? Promise.resolve()).then(() => services.close()),
+    exit: () => process.exit(0),
+  });
 });

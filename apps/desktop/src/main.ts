@@ -102,6 +102,8 @@ if (!takeInstanceLock(app, userDataDir)) {
         }),
     }),
   );
+  // The quit's stop of the server: the app exits once the server has (it stops the dev servers it started first).
+  let serverStopped: Promise<void> = Promise.resolve();
   const client = clientIndex({ appPath: app.getAppPath(), packaged: app.isPackaged });
   let tray: Tray | undefined;
 
@@ -205,7 +207,7 @@ if (!takeInstanceLock(app, userDataDir)) {
     app.on("before-quit", () => {
       lifecycle.onBeforeQuit();
       // A server main stops logs nothing, so "Quitting" stays the log's last line.
-      void server.stop();
+      serverStopped = server.stop();
       if (!loggedQuit) log.info("Quitting");
       loggedQuit = true;
     });
@@ -260,6 +262,9 @@ if (!takeInstanceLock(app, userDataDir)) {
       settingsStore.flush(),
       projects.store.flush(),
       log.flush(),
+      // On Windows the app's exit ends the server process at once, and the dev servers it hadn't stopped yet would
+      // keep running (STORY-25). A server that doesn't exit in time is ended (server-process.ts).
+      serverStopped,
     ]).finally(() => app.exit(0));
   });
 }

@@ -3,7 +3,7 @@ import type { AgentBridge } from "./agent-bridge.ts";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import type { Api } from "./api.ts";
 import type { ChatStore } from "./chat-store.ts";
-import type { DevServerDeps } from "./dev-servers.ts";
+import type { DevServerDeps, DevServers } from "./dev-servers.ts";
 import type { CapturePage } from "./host-capture.ts";
 import type { ClaudeDeps } from "./claude-provider.ts";
 import type { Timers } from "./inbox.ts";
@@ -63,5 +63,7 @@ export interface Services {
   needs: ProjectNeeds;
   /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
   settingsChanged: () => void;
+  /** The stories' dev servers Featra started (STORY-25): stopped first when the app quits (host-gone.ts). */
+  devServers: Pick<DevServers, "stopAll">;
   close: () => Promise<void>;
 }

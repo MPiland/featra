@@ -3403,6 +3403,10 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
   is taken and the command takes `{port}` (also set as `PORT`); 60 s to answer, then "Dev server didn't start" with
   its last 20 lines; stopped when the story merges or is abandoned, its project closes, or the app quits. A process
   that already exited is never signalled.
+- **Quit order** (found in CI on Windows): main used to exit without waiting for the server, so Node's job object
+  ended the server mid-shutdown along with each dev server's shell, but not the node process the shell started. That
+  orphan held the app's inherited stdio and the app never finished closing. Now the server stops its dev servers
+  first when the host goes, and main waits for the server to exit (5 s at most, then ends it) before exiting.
 - **Capture path**: Electron main loads the page in a hidden 1280×800 window and answers the server over the host's
   IPC channel, PNG or, over 1 MB, JPEG. Only `localhost`/`127.0.0.1` pages load, and a Preview window navigates only
   within its dev server. The server's tests fake the capture and the process runner; the e2e journeys run the real

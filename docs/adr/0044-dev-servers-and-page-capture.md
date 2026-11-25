@@ -32,6 +32,10 @@ Featra must never kill a process it didn't start.
 - **Stopping.** A dev server stops when its story ends (merged or abandoned), before its worktree goes, when its
   project closes, and when the app quits. Featra cancels only a process it started that is still running: one that has exited is never signalled
   (its pid could belong to another process by then), and one stopped while its port was being checked is never spawned.
+  On quit the server stops its dev servers first, before it closes its sockets and services, and main waits for the
+  server to exit (5 s at most, then ends it) before the app exits. On Windows the app's exit ends the server process
+  and each dev server's shell through Node's job object, but not the server the shell started, which inherits the
+  app's handles: a dev server left running kept the app from closing.
 - **Capture runs in Electron main, over the host's IPC channel.** The server sends `{ type: "capture", seq, url }`;
   main loads the URL in a hidden 1280×800 window, waits for it to load (30 s at most), calls `capturePage()` and answers
   `{ type: "captured", seq, data, ext }` (a PNG, or a JPEG when the PNG is over 1 MB) or `{ seq, error }`. Only a page

@@ -18,7 +18,8 @@ export interface ServerProcess {
   settingsChanged: () => void;
   /**
    * Stops the server. A stop main asked for is expected, so nothing about it is logged, neither now nor when the child
-   * exits: a quit's "Quitting" stays the log's last line. Resolves when the child has exited.
+   * exits: a quit's "Quitting" stays the log's last line. Resolves when the child has exited; one that doesn't exit in
+   * time is ended.
    */
   stop: () => Promise<void>;
 }
@@ -40,12 +41,16 @@ export interface ServerProcessDeps {
   waiting?: (count: number) => void;
   /** Captures a page of a story's dev server when the server asks (STORY-25): Electron's Chromium in the app. */
   capture?: (url: string) => Promise<HostCapture>;
+  /** How long a stopped server has to exit before it is ended. */
+  stopMs?: number;
 }
 
 /** A captured page, base64, or why it wasn't. */
 export type HostCapture = { data: string; ext: "png" | "jpg" } | { error: string };
 
 const START_TIMEOUT_MS = 15_000;
+/** Time enough for the server to stop the dev servers it started and close (STORY-25). */
+const STOP_TIMEOUT_MS = 5_000;
 
 const send = (child: ChildProcess, message: HostMessage) => child.connected && child.send(message);
 
@@ -93,6 +98,7 @@ export function createServerProcess({
   mcpEntry,
   waiting = () => {},
   capture = async () => ({ error: "Featra can't capture pages here." }),
+  stopMs = STOP_TIMEOUT_MS,
 }: ServerProcessDeps): ServerProcess {
   let running: Running | null = null;
   let dirs: string[] = [];
@@ -203,7 +209,9 @@ export function createServerProcess({
       // Closing the IPC channel tells the server to close its sockets and exit.
       if (stopping.child.connected) stopping.child.disconnect();
       else if (stopping.child.exitCode === null) stopping.child.kill();
-      return stopping.exited;
+      // One that doesn't exit in time is ended, so a quit waiting on it goes on.
+      const late = setTimeout(() => stopping.child.kill(), stopMs);
+      return stopping.exited.finally(() => clearTimeout(late));
     },
   };
 }
