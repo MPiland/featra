@@ -31,24 +31,31 @@ on every stage change (would also gate the user's own edits in the card pane), o
 - **When it applies**: a story, with the check on, a review stage separate from the last agent stage (In Review
   before Acceptance), the story at or past review, and screenshots. Anything else has no design review.
 - **State lives in the card's history.** Each finding, fix and clear is a `design-review` event (`findings: <text>`,
-  `fixed`, `cleared`). A round starts at the last move into review from before it, so a story sent back is reviewed
-  again. The last event of the round decides: none or `fixed` is waiting, `findings: …` is findings sent, `cleared` is
+  `fixed`, `cleared`). A round starts at the last move into review from any other stage, so a story sent back, or one
+  the user moves back from Acceptance, is reviewed again: a clear never carries over (Dev Lead decision, 2026-11-25).
+  The last event of the round decides: none or `fixed` is waiting, `findings: …` is findings sent, `cleared` is
   cleared.
 - **The gate is on agents' reports** (`applyReport`): a report that moves the story to Acceptance is refused while the
   review isn't cleared, and with the check on a report can't skip from before review straight to Acceptance. The
-  user's own stage edit in the card pane isn't gated.
-- **Who does what**: `designReview: {findings}` and `{clear: true}` are the Dev Lead's (a chat that isn't a story
-  session), and `{clear: true}` may move the story to Acceptance in the same call. `{fixed: true}` is the story
+  user's own stage edit in the card pane isn't gated. While the story's screenshots are still being captured (its move
+  to review is written, the capture runs outside the card lane), a report that moves it to Acceptance is refused too,
+  so no move gets in before the screenshots are attached and the review can wait for them.
+- **Auto-merge waits for the review**: a story whose design review isn't cleared doesn't merge on its own (ADR 0034),
+  as a held story doesn't. Merge by hand isn't gated: it is the user's call, as for a held story.
+- **Who does what**: `designReview: {findings}` and `{clear: true}` are the Dev Lead's: the chat the story's session
+  nests under, which started it. Another chat that may update the card, such as the one that drafted its feature,
+  can't. `{clear: true}` may move the story to Acceptance in the same call. `{fixed: true}` is the story
   session's, only after findings; it captures the screenshots again and the Dev Lead is told again. Findings are at
   most 2000 characters.
 - **Telling the Dev Lead**: when a story enters review with screenshots, or reports its findings fixed, its session
   posts a "waits for design review" notice naming the evidence folder and the files. It is held while the session's
   turn runs and goes with that turn's notice, in one message (ADR 0028).
 - **Delivering findings**: the story's session is opened outside the card lane, then the findings are sent as a
-  message from the Dev Lead and recorded in the lane, before the card is written (send, then record). A session that
-  is working, stopped, queued or merging refuses them, and nothing is recorded.
-- **When the Dev Lead chat is gone** (the story's session has no parent chat, or it isn't listed any more), the card
-  says so. The user clears the review there, which records `cleared` by the user and moves the story to Acceptance,
+  message from the Dev Lead and recorded in the lane, after every other check on the report has passed and just before
+  the card is written (send, then record), so findings the session got are always on the card. A session that is
+  working, stopped, queued or merging refuses them, and nothing is recorded.
+- **When the Dev Lead chat is gone** (no chat the story's notices reach: it has no parent chat, or that chat is gone,
+  closed or can't run, the same test notices go by), the card says so. The user clears the review there, which records `cleared` by the user and moves the story to Acceptance,
   or sends the story back, which is allowed while the review waits, as from Acceptance.
 
 ## Consequences

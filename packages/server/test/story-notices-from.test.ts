@@ -94,3 +94,17 @@ describe("a story session's own notice", () => {
     expect(w.sent).toHaveBeenCalledWith("lead", noticeMessage([{ story: "STORY-7", outcome: "ended", summary: "" }]));
   });
 });
+
+describe("the Dev Lead a story session's notices reach", () => {
+  it("is the chat that started it while it can run; none when it can't run, is closed or is gone", () => {
+    const { lead, notices } = world();
+    expect(notices.lead("7")).toBe("lead");
+    lead.refusal = "Its role is gone.";
+    expect(notices.lead("7")).toBeNull();
+    lead.refusal = null;
+    lead.closed = true;
+    expect(notices.lead("7")).toBeNull();
+    expect(world(null).notices.lead("7")).toBeNull();
+    expect(world("gone").notices.lead("7")).toBeNull();
+  });
+});

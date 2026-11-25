@@ -210,6 +210,15 @@ describe("a story sent back", () => {
   });
 });
 
+describe("any move into review starts a new round", () => {
+  it("waits again when the user moves a cleared story back from Acceptance to review", () => {
+    const cleared = ok(card("In Review"), { designReview: { clear: true }, stage: "Acceptance" }, true);
+    const back = moves(cleared, [20, "In Review"]);
+    expect(designReviewState(back, shots)).toEqual({ status: "waiting", shots: [`${FOLDER}ac1-page.png`] });
+    expect(refused(back, { stage: "Acceptance" }, false)).toBe(DESIGN_REVIEW_ERRORS.waits("STORY-10"));
+  });
+});
+
 describe("the update_card input", () => {
   it("takes exactly one of findings, clear or fixed", () => {
     expect(parseReportInput({ designReview: { findings: "  Too tight.  " } })).toEqual({

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   acceptedStory,
+  appendHistory,
   autoMergeOn,
   DEFAULT_CONFIG,
   evidenceState,
@@ -142,5 +143,31 @@ describe("STORY-59 AC4: auto-merge is a work setting, on by default, with an app
 
   it("off, nothing merges on its own", () => {
     expect(mergesOnItsOwn(owned(ready()), config, true, false, AT)).toBe(false);
+  });
+});
+
+describe("STORY-73: a story waiting for its design review doesn't merge on its own", () => {
+  const shots = { ...config, proof: "screenshots" as const };
+  const shot = ".featra/evidence/FEAT-1/STORY-1/ac1-page.png";
+  const withShot = (card: Card): Card => ({
+    ...card,
+    acs: card.acs.map((ac, i) => (i === 0 ? { ...ac, evidence: shot } : ac)),
+  });
+
+  it("waits in review until the Dev Lead clears its screenshots, and merges on its own once it does", () => {
+    const waiting = withShot(ready());
+    expect(mergesOnItsOwn(owned(waiting), shots, true, true, AT)).toBe(false);
+    const cleared = appendHistory(waiting, {
+      at: at(6),
+      field: "design-review",
+      from: null,
+      to: "cleared",
+      by: "session:lead-1",
+    });
+    expect(mergesOnItsOwn(owned(cleared), shots, true, true, AT)).toBe(true);
+  });
+
+  it("leaves Merge by hand to the user, as for a held story", () => {
+    expect(mergeRefusal(owned(withShot(ready())), "STORY-1", shots, true)).toBeNull();
   });
 });

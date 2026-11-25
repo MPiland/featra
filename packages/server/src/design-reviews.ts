@@ -8,16 +8,18 @@ import {
   appendHistory,
   DESIGN_REVIEW_COPY,
   designReviewState,
-  serializeCard,
+  evidenceFolder,
   setStatus,
   stageCeiling,
   toIso,
+  type Card,
   type CardView,
   type Notice,
+  type ProjectConfig,
 } from "@featra/work-format";
-import { ApiError } from "./api-error.ts";
-import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
+import { ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
+import { createCardMark } from "./card-mark.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import { createStoryMessage } from "./story-message.ts";
 import type { Scan } from "./work-scan.ts";
@@ -32,12 +34,20 @@ export interface DesignReviewDeps {
   now: () => Date;
   /** The lane every card write goes through; the server shares one. */
   lane?: CardLane;
-  chats: Pick<ChatManager, "storySession" | "list" | "open" | "send" | "notifyFrom">;
+  chats: Pick<ChatManager, "storySession" | "storyLead" | "list" | "open" | "send" | "notifyFrom">;
   /** Why the story takes no message now: it is merging or being abandoned. Null when it does. */
   busy?: (dir: string, id: string) => string | null;
   /** How a card reaches disk. Default: atomically. */
   write?: (file: string, text: string) => Promise<void>;
 }
+
+/** Why story `id`'s design review can't be cleared: none waits. */
+const waits =
+  (id: string) =>
+  (card: Card | undefined, config: ProjectConfig): string | null => {
+    const state = card ? designReviewState(card, config) : null;
+    return state === null || state.status === "cleared" ? DESIGN_REVIEW_MESSAGES.none(id) : null;
+  };
 
 export function createDesignReviews({
   scan: scanDir,
@@ -48,13 +58,15 @@ export function createDesignReviews({
   write = writeAtomic,
 }: DesignReviewDeps) {
   const messages = createStoryMessage({ scan: scanDir, chats, busy });
+  const marks = createCardMark({ scan: scanDir, write });
 
-  /** Whether the Dev Lead chat that started story `id`'s session is gone: no session, no parent, or not listed. */
+  /**
+   * Whether no Dev Lead chat can review story `id`: its session has none its notices reach (gone, closed or unable to
+   * run), the same test the "waits for design review" notice goes by.
+   */
   function leadGone(dir: string, id: string): boolean {
     const chat = chats.storySession(dir, id);
-    const list = chats.list(dir);
-    const parent = list.find((c) => c.id === chat)?.story?.parent;
-    return !parent || !list.some((c) => c.id === parent);
+    return chat === null || chats.storyLead(chat) === null;
   }
 
   return {
@@ -71,8 +83,8 @@ export function createDesignReviews({
       const card = ownedIn(scan, id)?.owned.card;
       const chat = chats.storySession(dir, id);
       const state = card && scan ? designReviewState(card, scan.collected.config) : null;
-      if (state?.status !== "waiting" || chat === null) return;
-      const folder = state.shots[0]?.slice(0, state.shots[0].lastIndexOf("/") + 1) ?? "";
+      if (!card || state?.status !== "waiting" || chat === null) return;
+      const folder = evidenceFolder(card) ?? "";
       const names = state.shots.map((s) => s.slice(folder.length));
       const notice: Notice = {
         story: id,
@@ -94,20 +106,18 @@ export function createDesignReviews({
     /** The user clears story `id`'s design review, and it moves on to Acceptance. */
     clear: (dir: string, id: string): Promise<null> =>
       lane.exclusive(async () => {
-        const scan = await scanDir(dir);
-        const found = ownedIn(scan, id);
-        const card = found?.owned.card;
-        const config = scan?.collected.config;
-        const state = card && config ? designReviewState(card, config) : null;
-        if (!card || !config || state === null || state.status === "cleared") {
-          throw new ApiError(DESIGN_REVIEW_MESSAGES.none(id));
-        }
-        if (!found?.root) throw new ApiError(DESIGN_REVIEW_MESSAGES.readOnly);
-        const at = toIso(now());
-        const cleared = appendHistory(card, { at, field: "design-review", from: null, to: "cleared", by: "user" });
-        const next = setStatus(cleared, stageCeiling(config) ?? card.status, "user", at);
-        await write(fileIn(found.root, found.owned.path), serializeCard(next));
-        await scanDir(dir);
+        const none = DESIGN_REVIEW_MESSAGES.none(id);
+        await marks.mark(
+          dir,
+          id,
+          waits(id),
+          { gone: none, readOnly: DESIGN_REVIEW_MESSAGES.readOnly },
+          (card, config) => {
+            const at = toIso(now());
+            const cleared = appendHistory(card, { at, field: "design-review", from: null, to: "cleared", by: "user" });
+            return setStatus(cleared, stageCeiling(config) ?? card.status, "user", at);
+          },
+        );
         return null;
       }),
   };

@@ -210,13 +210,13 @@ const prOf = (raw: unknown): { prState?: CardPr } => {
   return prState ? { prState } : {};
 };
 
-/** A view from the socket, read defensively; null when there is no card. */
 /** A view's design review as a spread: empty when it has none or it is malformed. */
 function designReviewOf(raw: unknown): { designReview?: DesignReviewView } {
   const review = normalizeDesignReview(raw);
   return review ? { designReview: review } : {};
 }
 
+/** A view from the socket, read defensively; null when there is no card. */
 export function normalizeCardView(raw: unknown): CardView | null {
   if (!isRecord(raw) || typeof raw.id !== "string" || !raw.id) return null;
   const ev = isRecord(raw.evidence) ? raw.evidence : {};

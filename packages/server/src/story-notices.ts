@@ -47,11 +47,12 @@ export interface StoryNotices {
   /** Puts `notice` in the Dev Lead's chat `id`, when it can still be told (STORY-12: how a merge it asked for went). */
   tell: (id: string, notice: Notice) => void;
   /**
-   * Puts 
-otice of the story session id in its Dev Lead's chat (STORY-73: the story waits for its design review).
+   * Puts `notice` of the story session `id` in its Dev Lead's chat (STORY-73: the story waits for its design review).
    * While the session's turn is on, it waits for the turn's own notice and goes with it.
    */
   from: (id: string, notice: Notice) => void;
+  /** The Dev Lead chat story session `id`'s notices go to, or null when there is none that can be told (STORY-73). */
+  lead: (id: string) => string | null;
   /** A chat's agent ended: what it held, notices and questions, goes with it. */
   forget: (c: Chat) => void;
 }
@@ -193,6 +194,10 @@ export function createStoryNotices({ chats, open, send, askUser, log }: NoticeHo
         const lead = leadOf(c);
         if (lead) post(lead, notice);
       }
+    },
+    lead(id) {
+      const c = chats.get(id);
+      return c?.summary.story ? (leadOf(c)?.id ?? null) : null;
     },
     forget(c) {
       asking.delete(c.id);

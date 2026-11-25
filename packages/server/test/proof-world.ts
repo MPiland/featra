@@ -47,6 +47,8 @@ export const platform = {
   captured: [] as { url: string; origin: string }[],
   /** The host's answer to each page, by its path on the dev server; a PNG when not given. */
   shots: new Map<string, Capture>(),
+  /** While set, each capture answers only once it settles: a capture held open (STORY-73). */
+  hold: null as Promise<void> | null,
 };
 
 let clock = 0;
@@ -84,6 +86,7 @@ const devServers: DevServerDeps = {
 
 const capturePage: CapturePage = async (url, origin) => {
   platform.captured.push({ url, origin });
+  if (platform.hold) await platform.hold;
   return platform.shots.get(new URL(url).pathname) ?? { ok: true, data: PNG, ext: "png" };
 };
 

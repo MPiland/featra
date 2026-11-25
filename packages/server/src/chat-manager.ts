@@ -282,6 +282,7 @@ export function createChatManager({
     ...approvals,
     notify: (id, notice) => notices.tell(id, notice),
     notifyFrom: (id, notice) => notices.from(id, notice),
+    storyLead: (id) => notices.lead(id),
     report(id, event) {
       const c = chats.get(id);
       if (c && c.events !== null && !c.closed) record(c, event);

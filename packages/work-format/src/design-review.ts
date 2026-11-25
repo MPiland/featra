@@ -7,7 +7,8 @@
  * test's screenshot it matched (`ac<n>-page.*`, `ac<n>-test.*`). An agent's own image file is evidence, not a
  * screenshot to review. The check is on by default when the project's proof captures screenshots, and the project can
  * turn it off (`designReview: false`). Each finding, fix and clear is a `design-review` event in the card's history; a
- * round starts each time the story enters review, so a story sent back is reviewed again.
+ * round starts each time the story moves into its review stage, so a story sent back, or moved back from Acceptance,
+ * is reviewed again.
  */
 import { evidenceFolder } from "./evidence-link.ts";
 import { isProofShot } from "./proof-files.ts";
@@ -29,6 +30,7 @@ export const DESIGN_REVIEW_ERRORS = {
   noFindings: (id: string) => `${id} has no open design findings to fix.`,
   waits: (id: string) =>
     `${id} waits for its design review: the Dev Lead clears it with update_card's designReview first.`,
+  capturing: (id: string) => `${id}'s screenshots are still being captured: move it on once they're attached.`,
   skip: (id: string, review: string) =>
     `Move ${id} to ${review} first: the Dev Lead reviews its screenshots there before it moves on.`,
 } as const;
@@ -51,13 +53,15 @@ const separateReview = (config: ProjectConfig): boolean => {
   return review !== null && review !== stageCeiling(config);
 };
 
-/** The `design-review` events since the story last entered review. */
+/**
+ * The `design-review` events since the story last moved into its review stage, from anywhere: from before it, sent
+ * back, or moved back from Acceptance by the user. A clear from an earlier round never carries over.
+ */
 function round(card: Card, config: ProjectConfig): HistoryEvent[] {
+  const review = reviewStage(config);
   let start = 0;
   for (const [i, e] of card.history.entries()) {
-    if (e.field === "status" && e.to !== null && inReview(e.to, config) && !(e.from && inReview(e.from, config))) {
-      start = i;
-    }
+    if (e.field === "status" && e.to === review && e.from !== review) start = i;
   }
   return card.history.slice(start).filter((e) => e.field === FIELD);
 }

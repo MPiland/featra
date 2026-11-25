@@ -12,50 +12,28 @@ import {
   leadMessage,
   noticeMessage,
   PROOF_COPY,
-  type CardView,
   type ProofView,
 } from "@featra/work-format";
+import { changesOf, designWorld, FINDINGS, PAGE, type DesignWorld } from "./design-review-world.ts";
 import { sdk } from "./fake-query.ts";
-import { CONFIG, folder, platform, proofPlatform, TWO } from "./proof-world.ts";
-import { storyWorld, type Client, type StoryWorld } from "./story-fixture.ts";
-import { finish, idleLead, noticesIn, settled, type Lead } from "./story-lead.ts";
+import { folder, platform, TWO } from "./proof-world.ts";
+import type { Client, StoryWorld } from "./story-fixture.ts";
+import { finish, noticesIn, settled, type Lead } from "./story-lead.ts";
 
+let d: DesignWorld;
 let w: StoryWorld;
 let lead: Lead;
-const PAGE = [{ criterion: "Settings show it", page: "/settings" }];
-const FINDINGS = "The Save button overlaps the footer.";
 
 beforeAll(async () => {
-  w = await storyWorld({ config: CONFIG.replace("maxStoryAgents: 9", "maxStoryAgents: 20"), proof: proofPlatform });
-  // The user confirms the dev-server command in Settings, and the project's proof captures screenshots.
-  await w.window.ask("proof.set", { dir: w.dir, patch: { confirm: true } });
-  lead = await idleLead(w);
+  d = await designWorld();
+  ({ w, lead } = d);
 });
 afterAll(() => w.close());
 
-async function update(agent: Client, params: Record<string, unknown>) {
-  const id = Math.floor(Math.random() * 1e9);
-  agent.socket.send({ id, method: "card.update", params });
-  return agent.socket.next((f) => f.id === id);
-}
-const changesOf = (frame: { result?: unknown }) => (frame.result as { changes: string[] }).changes;
-const view = async (id: string) => (await w.window.ask("card.watch", { dir: w.dir, id })).result as CardView;
-
-/** Story `id` spawned by the Dev Lead, with two criteria; its session's socket, run and worktree. */
-async function spawned(id: string, name: string) {
-  const child = await w.spawnAs(lead, id);
-  child.run.say(sdk.init());
-  const tree = join(w.repo.main, ".claude", "worktrees", name);
-  await w.repo.write(tree, { ...(await w.card(id, tree)), acs: TWO });
-  return { ...child, tree, session: await w.agentOf(child.chat) };
-}
-
-/** The Dev Lead takes in what it was told, and its turn ends. */
-async function leadHeard(n: number) {
-  await w.until(() => noticesIn(lead.events()).length === n);
-  finish(lead.run, "Noted.");
-  await w.until(() => lead.events().filter((e) => e.type === "turn-end").length === n + 1);
-}
+const update = (agent: Client, params: Record<string, unknown>) => d.update(agent, params);
+const view = (id: string) => d.view(id);
+const spawned = (id: string, name: string) => d.spawned(id, name);
+const leadHeard = (n: number) => d.leadHeard(n);
 
 describe("AC1 and AC2: a story with screenshots waits in review for the Dev Lead's design review", () => {
   let s: Awaited<ReturnType<typeof spawned>>;

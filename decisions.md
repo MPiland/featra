@@ -3446,3 +3446,18 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - **Card**: "Design review: waiting", "findings sent" (with the findings) or "cleared", in the card pane's actions.
 - **Internal**: `stageCeiling`, `reviewStage`, `checksApply` and `inReview` moved to `review-stages.ts` so the design
   review rules can use them without an import cycle.
+
+## 2026-11-25 — STORY-73 review fixes (developer)
+
+- **Capture window**: while a story's screenshots are being captured after its move to review, a report that moves it
+  to Acceptance is refused ("STORY-N's screenshots are still being captured: move it on once they're attached.").
+- **Auto-merge** waits for the design review: a story whose review isn't cleared doesn't merge on its own. Merge by
+  hand isn't gated; it is the user's call, as for a held story.
+- **Dev Lead gone** on the card uses the same test as notice delivery: no parent chat, or it is gone, closed or can't
+  run.
+- **Who reviews**: only the chat the story's session nests under, which started it. The chat that drafted the feature
+  can update the card, but its findings and clears are refused.
+- **Rounds** (Dev Lead decision): any move into review starts a new round, including the user moving a story back from
+  Acceptance. A clear from an earlier round never carries over.
+- **Findings** are delivered only after every other check on the report has passed, just before the card is written.
+- Recorded in ADR 0045.

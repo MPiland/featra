@@ -88,6 +88,8 @@ export interface ChatManager {
   notify: (id: string, notice: Notice) => void;
   /** Puts a notice of the story session `id` in its Dev Lead's chat, after its turn's own when the turn is on (STORY-73). */
   notifyFrom: (id: string, notice: Notice) => void;
+  /** The Dev Lead chat story session `id`'s notices go to, or null when none can be told: gone, closed or can't run. */
+  storyLead: (id: string) => string | null;
   /** Takes a story session that is queued and has never started out of the queue, and forgets it. False if it isn't one. */
   dropQueued: (id: string) => boolean;
   /** Whether a session for the story is waiting for a free slot. */

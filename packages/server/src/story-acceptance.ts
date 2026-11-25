@@ -14,13 +14,13 @@ import {
   SEND_BACK_MAX,
   sendBackMessage,
   sentBackStory,
-  serializeCard,
   toIso,
   type Card,
   type ProjectConfig,
 } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
-import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
+import { writeAtomic } from "./card-actions.ts";
+import { createCardMark } from "./card-mark.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import { sendThenRecord, type SendBackResult } from "./send-then-record.ts";
@@ -46,29 +46,20 @@ export function createStoryAcceptance({
   write = writeAtomic,
   busy = () => null,
 }: StoryAcceptanceDeps) {
+  const marks = createCardMark({ scan: scanDir, write });
+  const MESSAGES = { gone: ACCEPT_MESSAGES.gone, readOnly: ACCEPT_MESSAGES.readOnly };
+
   /** The story as its owner has it now, where to write it, and why Accept and Send back can't be used on it. */
-  async function fresh(dir: string, id: string, refusalOf = acceptanceRefusal) {
-    const scan = await scanDir(dir);
-    const found = ownedIn(scan, id);
-    const card: Card | undefined = found?.owned.card;
-    const config = scan?.collected.config;
-    const refusal = config ? refusalOf(card, id, config) : ACCEPT_MESSAGES.gone;
-    if (refusal !== null) throw new ApiError(refusal);
-    if (!found?.root || !card || !config) throw new ApiError(ACCEPT_MESSAGES.readOnly);
-    return { card, config, file: fileIn(found.root, found.owned.path) };
-  }
+  const fresh = (dir: string, id: string, refusalOf = acceptanceRefusal) =>
+    marks.fresh(dir, id, (card, config) => refusalOf(card, id, config), MESSAGES);
 
   /** Writes `change` of the story, read fresh, to its owner copy. The scan after pushes the new rows to the watchers. */
-  async function mark(
+  const mark = (
     dir: string,
     id: string,
     change: (card: Card, config: ProjectConfig) => Card,
     refusalOf = acceptanceRefusal,
-  ) {
-    const { card, config, file } = await fresh(dir, id, refusalOf);
-    await write(file, serializeCard(change(card, config)));
-    await scanDir(dir);
-  }
+  ) => marks.mark(dir, id, (card, config) => refusalOf(card, id, config), MESSAGES, change);
 
   return {
     /** Records the user's Accept on story `id`, and moves it to Done when it is also Verified (or needs Accept only). */
