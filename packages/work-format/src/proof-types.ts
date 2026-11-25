@@ -62,8 +62,19 @@ export function pageError(page: unknown): string | null {
     : `"page" is a route on the project's dev server, such as /settings: it starts with /, has no spaces or parentheses, and is at most ${PROOF_PATH_MAX} characters.`;
 }
 
-/** The page's address on the dev server at `base`. */
-export const pageUrl = (base: string, page: string): string => `${base.replace(/\/$/, "")}${page}`;
+/**
+ * The page's address on the dev server at `base`; null when `page` isn't a route there or would leave its origin. A
+ * card's file can hold any page, so this checks it again wherever a page becomes an address.
+ */
+export function pageUrl(base: string, page: string): string | null {
+  if (pageError(page) !== null) return null;
+  try {
+    const url = new URL(page, base);
+    return url.origin === new URL(base).origin ? url.href : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Project settings' Proof section. */
 export interface ProofView {

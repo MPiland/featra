@@ -41,6 +41,9 @@ const ac = (text: string, extra: Partial<AcceptanceCriterion> = {}): AcceptanceC
   ...extra,
 });
 
+/** A criterion's line listing `page`, as written into a card's file by hand. */
+const handWritten = (page: string) => `- [x] Listed a page (page: ${page})`;
+
 describe("a criterion's page on its card line", () => {
   it("is written after the test and before the evidence, and read back as it was", () => {
     const card = work([
@@ -98,6 +101,12 @@ describe("the dev server's URL", () => {
     expect(devServerPort("http://localhost:0")).toBeNull();
     expect(withPort("http://localhost:5173", 49152)).toBe("http://localhost:49152");
     expect(pageUrl("http://localhost:5173/", "/settings")).toBe("http://localhost:5173/settings");
+  });
+
+  it("holds a page only on the dev server's own origin", () => {
+    expect(pageUrl("http://localhost:5173", "/@127.0.0.1:8080/")).toBe("http://localhost:5173/@127.0.0.1:8080/");
+    for (const page of ["@127.0.0.1:8080/", "//127.0.0.1:8080/", "http://127.0.0.1:8080/", ":8080/", "settings"])
+      expect(pageUrl("http://localhost:5173", page)).toBeNull();
   });
 });
 
@@ -169,6 +178,19 @@ describe("what Featra attaches to each criterion", () => {
       { ac: 0, page: "/a" },
       { ac: 2, testShot: "STORY-10-ac3.png" },
       { ac: 3, page: "/d" },
+    ]);
+  });
+
+  it("never is a page written into the card that isn't a route on the dev server", () => {
+    const written = parseCard(
+      serializeCard(work([ac("x")])).replace(
+        "- [ ] x",
+        [handWritten("@127.0.0.1:8080/"), handWritten("//evil.example/")].join("\n"),
+      ),
+    );
+    expect(written.acs.map((a) => a.page)).toEqual(["@127.0.0.1:8080/", "//evil.example/"]);
+    expect(proofTargets(written.acs, FOLDER, new Map([[1, "STORY-10-ac2.png"]]), true)).toEqual([
+      { ac: 1, testShot: "STORY-10-ac2.png" },
     ]);
   });
 

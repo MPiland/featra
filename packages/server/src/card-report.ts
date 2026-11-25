@@ -5,7 +5,6 @@
  * agent commits the card and its evidence with its work. A report that moves a story to review has Featra attach its
  * screenshots (STORY-25) before the agent is answered, so they are there to commit with the card.
  */
-import { resolve } from "node:path";
 import {
   applyReport,
   checksApply,
@@ -21,6 +20,7 @@ import { ApiError } from "./api-error.ts";
 import { cardViewIn, fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { evidenceOnDisk } from "./evidence-disk.ts";
+import { samePath } from "./same-path.ts";
 import type { ProofCapture } from "./proof-capture.ts";
 import type { Scan } from "./work-scan.ts";
 
@@ -48,9 +48,6 @@ export interface CardReportDeps {
   proof?: Pick<ProofCapture, "attach">;
 }
 
-const same = (a: string, b: string): boolean =>
-  process.platform === "win32" ? resolve(a).toLowerCase() === resolve(b).toLowerCase() : resolve(a) === resolve(b);
-
 export function createCardReport({ scan: scanDir, now, lane = createCardLane(), leads, proof }: CardReportDeps) {
   async function report(
     dir: string,
@@ -72,7 +69,7 @@ export function createCardReport({ scan: scanDir, now, lane = createCardLane(), 
     if (denied !== null) throw new ApiError(denied);
     const view = cardViewIn(scan, id);
     // A story session writes through its own worktree: once that is gone (the card is owned elsewhere), it is refused.
-    if (who.story !== null && (!found.root || cwd === undefined || !same(found.root, cwd))) {
+    if (who.story !== null && (!found.root || cwd === undefined || !samePath(found.root, cwd))) {
       throw new ApiError(REPORT_MESSAGES.worktreeGone(id));
     }
     if (view?.readOnly || !found.root) throw new ApiError(REPORT_MESSAGES.noCopy(id));

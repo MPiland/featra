@@ -16,14 +16,17 @@ describe("the server's waiting message", () => {
 
 /** STORY-25: the server asks the host to capture a dev server's page, and the host answers with it or why not. */
 describe("the capture messages", () => {
-  it("ask with a numbered URL", () => {
-    expect(parseServerMessage({ type: "capture", seq: 4, url: "http://localhost:5173/settings" })).toEqual({
+  it("ask with a numbered URL and the dev server's origin, which the host checks the URL against", () => {
+    const origin = "http://localhost:5173";
+    expect(parseServerMessage({ type: "capture", seq: 4, url: "http://localhost:5173/settings", origin })).toEqual({
       type: "capture",
       seq: 4,
       url: "http://localhost:5173/settings",
+      origin,
     });
-    expect(parseServerMessage({ type: "capture", seq: 1.5, url: "http://localhost:5173" })).toBeNull();
-    expect(parseServerMessage({ type: "capture", seq: 1 })).toBeNull();
+    expect(parseServerMessage({ type: "capture", seq: 4, url: "http://localhost:5173/settings" })).toBeNull();
+    expect(parseServerMessage({ type: "capture", seq: 1.5, url: "http://localhost:5173", origin })).toBeNull();
+    expect(parseServerMessage({ type: "capture", seq: 1, origin })).toBeNull();
   });
 
   it("answer with a png or jpg, or why it wasn't captured", () => {

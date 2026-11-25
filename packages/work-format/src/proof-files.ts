@@ -6,9 +6,12 @@
  * `<STORY-ID>-ac<n>-<anything>.<ext>`, is criterion n's (counted from 1), for a png, jpg, jpeg, gif or webp; case
  * doesn't matter. When several match one criterion, the first by name wins.
  */
+import { pageError } from "./proof-types.ts";
 import type { AcceptanceCriterion } from "./types.ts";
 
-const SHOT_EXTENSIONS = "png|jpe?g|gif|webp";
+/** The image types a screenshot Featra attaches may be. */
+export const PROOF_SHOT_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp"] as const;
+const SHOT_EXTENSIONS = PROOF_SHOT_EXTENSIONS.join("|");
 const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Where Featra puts criterion `ac`'s (0-based) screenshot in `folder`: the captured page, or the test's copy. */
@@ -35,7 +38,8 @@ export type ProofTarget = { ac: number; page: string } | { ac: number; testShot:
 
 /**
  * The criteria Featra attaches a screenshot to, and from where: each criterion that lists a page, else has a matching
- * test screenshot. One whose evidence is the agent's own file keeps it.
+ * test screenshot. One whose evidence is the agent's own file keeps it. A page that isn't a route on the dev server
+ * (written into the card's file by hand, not through update_card) is never captured.
  */
 export function proofTargets(
   acs: readonly AcceptanceCriterion[],
@@ -45,7 +49,7 @@ export function proofTargets(
 ): ProofTarget[] {
   return acs.flatMap((ac, i): ProofTarget[] => {
     if (ac.evidence && !isProofShot(folder, ac.evidence)) return [];
-    if (capture && ac.page) return [{ ac: i, page: ac.page }];
+    if (capture && ac.page && pageError(ac.page) === null) return [{ ac: i, page: ac.page }];
     const shot = testShots.get(i);
     return shot ? [{ ac: i, testShot: shot }] : [];
   });

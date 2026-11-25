@@ -2,13 +2,11 @@ import {
   assertNever,
   cardParams,
   cardUpdateParams,
-  copyParams,
   dirParams,
   sendBackParams,
   storySendBackParams,
   checksSetParams,
   starter,
-  unwatchParams,
   type PushEvent,
   type ServerMethod,
   type ServerMethods,
@@ -26,6 +24,7 @@ import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
 import { createProjectApi } from "./api-project.ts";
 import { createRoleApi } from "./api-roles.ts";
 import { createWatchApi, type WatchApiDeps } from "./api-watch.ts";
+import { createWorkApi } from "./api-work.ts";
 import type { BugFiling } from "./bug-filing.ts";
 import type { CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
@@ -158,12 +157,7 @@ export function createApi({
     if (!p) throw new ApiError("Expected { dir, id }.");
     return [allow(p.dir), p.id];
   };
-  const copy = (params: unknown) => {
-    const p = copyParams(params);
-    if (!p) throw new ApiError("Expected { dir, key }.");
-    allow(p.dir);
-    return p;
-  };
+  const workApi = createWorkApi({ watches, allowed, copies, prs, allow, project });
   const projectApi = createProjectApi({ git, allow, project });
   const roleApi = createRoleApi({ roles, roleWatches, allowed, allow, project });
   const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
@@ -182,34 +176,11 @@ export function createApi({
       case "project.setupPlan":
       case "project.setup":
         return projectApi(method, params);
-      case "work.watch": {
-        const dir = project(params);
-        // The rows carry each story's PR state as last read (STORY-11), which a new read changes without a file event.
-        const { value, stop } = await watches.observe(
-          dir,
-          (_scan, list) => prs.decorate(dir, list),
-          (next) => {
-            // A project closed since: say nothing more about it.
-            if (allowed.has(dir)) connection.push("work.list", id, next);
-          },
-        );
-        connection.keep(id, stop);
-        return value;
-      }
-      case "work.unwatch": {
-        const p = unwatchParams(params);
-        if (!p) throw new ApiError("Expected { watch }.");
-        connection.unwatch(p.watch);
-        return null;
-      }
-      case "work.applyCopy": {
-        const p = copy(params);
-        return copies.apply(p.dir, p.key);
-      }
-      case "work.discardCopy": {
-        const p = copy(params);
-        return copies.discard(p.dir, p.key);
-      }
+      case "work.watch":
+      case "work.unwatch":
+      case "work.applyCopy":
+      case "work.discardCopy":
+        return workApi(method, params, id, connection);
       case "card.watch":
       case "review.watch":
         return watchApi(method, params, id, connection);

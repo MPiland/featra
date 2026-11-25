@@ -34,16 +34,21 @@ describe("the host going", () => {
   // server under it: it kept running, and the app never finished closing.
   it("stops the dev servers Featra started first, before the sockets and services close", async () => {
     const { proc, control } = devServerProcess();
+    let spawned = false;
+    // It answers once started: nothing answers on its port before.
     const devServers = createDevServers({
-      run: () => control,
-      answers: async () => true,
+      run: () => {
+        spawned = true;
+        return control;
+      },
+      answers: async () => spawned,
       portFree: async () => true,
     });
     const started = await devServers.start("/p", "STORY-1", "/p/tree", "serve {port}", "http://localhost:5173");
     expect(started).toEqual({ ok: true, url: "http://localhost:5173" });
     const sent: unknown[] = [];
     const capture = createHostCapture((message) => sent.push(message));
-    const asked = capture.capture("http://localhost:5173/");
+    const asked = capture.capture("http://localhost:5173/", "http://localhost:5173");
     let closed: () => void = noop;
     const closing = new Promise<void>((resolve) => {
       closed = resolve;

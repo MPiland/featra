@@ -8,8 +8,8 @@ import type { HostMessage, ServerMessage } from "./host-messages.ts";
 
 export type Capture = { ok: true; data: Buffer; ext: "png" | "jpg" } | { ok: false; error: string };
 
-/** Captures the page at `url`: the platform boundary, faked in tests. */
-export type CapturePage = (url: string) => Promise<Capture>;
+/** Captures the page at `url` of the dev server at `origin`, which the host checks it against: the platform boundary. */
+export type CapturePage = (url: string, origin: string) => Promise<Capture>;
 
 export const NO_HOST = "Featra can't capture pages here.";
 
@@ -17,13 +17,13 @@ export function createHostCapture(send: ((message: ServerMessage) => void) | nul
   const asked = new Map<number, (capture: Capture) => void>();
   let seq = 0;
   return {
-    capture: ((url) => {
+    capture: ((url, origin) => {
       if (!send) return Promise.resolve({ ok: false, error: NO_HOST });
       seq += 1;
       const mine = seq;
       return new Promise<Capture>((resolve) => {
         asked.set(mine, resolve);
-        send({ type: "capture", seq: mine, url });
+        send({ type: "capture", seq: mine, url, origin });
       });
     }) satisfies CapturePage,
     /** The host's answer to an ask. */

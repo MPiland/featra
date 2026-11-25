@@ -3413,3 +3413,10 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
   thing against `apps/desktop/e2e/fixture-dev-server.mjs`.
 - **Failures** are notes on the criterion in the card pane (the dev server's output folded in a disclosure), never a
   refusal of the move. Notes live in memory; the next move to review tries again.
+- **Review fixes (Opus review of PR #88)**: a port counts as taken when anything listens on either loopback
+  (127.0.0.1 or ::1) or its URL already answers before Featra starts a server, and a server whose own process exited
+  before its URL answered didn't start, so another worktree's code is never captured as the story's. A page is
+  captured only when it is a route that keeps the dev server's origin (`pageUrl`), and main checks that origin again;
+  every web contents is guarded against navigations and redirects off its dev server's origin, and dev-server windows
+  run in their own partition (`featra-dev-pages`) that denies every permission. A new screenshot removes the
+  criterion's earlier ones of another type. Recorded in ADR 0044.

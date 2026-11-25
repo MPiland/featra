@@ -6,8 +6,8 @@
  * agent and no tokens. What fails is a note on the criterion, kept in memory, and never stops the move to review.
  * Nothing is committed: the agent whose report moved the story commits the files with the card.
  */
-import { copyFile, mkdir, readdir, stat, writeFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { copyFile, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import {
   capturesScreenshots,
   EVIDENCE_BYTES,
@@ -19,6 +19,7 @@ import {
   offersPreview,
   pageUrl,
   PROOF_COPY,
+  PROOF_SHOT_EXTENSIONS,
   proofShotPath,
   proofTargets,
   serializeCard,
@@ -31,6 +32,7 @@ import { fileIn, ownedIn, writeAtomic } from "./card-actions.ts";
 import type { DevServers, DevServerStart } from "./dev-servers.ts";
 import type { CapturePage } from "./host-capture.ts";
 import type { ProofSettings } from "./proof-settings.ts";
+import { samePath } from "./same-path.ts";
 import type { Scan } from "./work-scan.ts";
 
 export interface ProofCaptureDeps {
@@ -42,9 +44,6 @@ export interface ProofCaptureDeps {
   log?: (message: string) => void;
 }
 
-const samePath = (a: string, b: string) =>
-  process.platform === "win32" ? resolve(a).toLowerCase() === resolve(b).toLowerCase() : resolve(a) === resolve(b);
-
 /** Copies a test's screenshot unless it is too big to be evidence; false when it is, or can't be read. */
 async function copyShot(from: string, to: string): Promise<boolean> {
   const size = await stat(from).then(
@@ -55,6 +54,14 @@ async function copyShot(from: string, to: string): Promise<boolean> {
   await mkdir(dirname(to), { recursive: true });
   await copyFile(from, to);
   return true;
+}
+
+/** Removes criterion `ac`'s earlier screenshots in `folder` other than `kept`: from a page or a test, of any type. */
+async function dropReplaced(root: string, folder: string, ac: number, kept: string) {
+  const earlier = (["page", "test"] as const).flatMap((from) =>
+    PROOF_SHOT_EXTENSIONS.map((ext) => proofShotPath(folder, ac, from, ext)),
+  );
+  await Promise.all(earlier.filter((path) => path !== kept).map((path) => rm(fileIn(root, path), { force: true })));
 }
 
 /** A story's notes, by project and id. */
@@ -116,8 +123,10 @@ export function createProofCapture({ scan, lane, servers, capture, settings, log
         mine[target.ac] = server.output ? { note: server.note, output: server.output } : { note: server.note };
         continue;
       }
-      const shot = await capture(pageUrl(server.url, target.page));
-      if (!shot.ok || shot.data.length > EVIDENCE_BYTES) {
+      // Only a page on the dev server's own origin, which the host checks again.
+      const url = pageUrl(server.url, target.page);
+      const shot = url ? await capture(url, new URL(server.url).origin) : null;
+      if (!shot?.ok || shot.data.length > EVIDENCE_BYTES) {
         mine[target.ac] = { note: PROOF_COPY.notes.pageFailed };
         continue;
       }
@@ -126,6 +135,7 @@ export function createProofCapture({ scan, lane, servers, capture, settings, log
       await writeFile(fileIn(root, path), shot.data);
       links.set(target.ac, path);
     }
+    for (const [ac, path] of links) await dropReplaced(root, folder, ac, path);
     notes.set(key(dir, id), mine);
     if (links.size) await lane.exclusive(() => link(dir, id, links));
     // Scans again, so the card and the review show the screenshots and the notes at once.

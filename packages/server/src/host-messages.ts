@@ -23,7 +23,8 @@ export type ServerMessage =
   | { type: "log"; message: string }
   | { type: "failed"; error: string }
   | { type: "waiting"; count: number }
-  | { type: "capture"; seq: number; url: string };
+  /** `origin` is the dev server's: the host loads `url` only on it. */
+  | { type: "capture"; seq: number; url: string; origin: string };
 
 /** True for a whole number JavaScript holds exactly, narrowing it to a number. */
 const wholeNumber = (value: unknown): value is number => Number.isSafeInteger(value);
@@ -55,8 +56,8 @@ export function parseServerMessage(raw: unknown): ServerMessage | null {
   if (raw.type === "waiting" && wholeNumber(raw.count) && raw.count >= 0) {
     return { type: "waiting", count: raw.count };
   }
-  if (raw.type === "capture" && wholeNumber(raw.seq) && typeof raw.url === "string") {
-    return { type: "capture", seq: raw.seq, url: raw.url };
+  if (raw.type === "capture" && wholeNumber(raw.seq) && typeof raw.url === "string" && typeof raw.origin === "string") {
+    return { type: "capture", seq: raw.seq, url: raw.url, origin: raw.origin };
   }
   return null;
 }

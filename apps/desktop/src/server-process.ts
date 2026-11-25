@@ -40,7 +40,7 @@ export interface ServerProcessDeps {
    */
   waiting?: (count: number) => void;
   /** Captures a page of a story's dev server when the server asks (STORY-25): Electron's Chromium in the app. */
-  capture?: (url: string) => Promise<HostCapture>;
+  capture?: (url: string, origin: string) => Promise<HostCapture>;
   /** How long a stopped server has to exit before it is ended. */
   stopMs?: number;
 }
@@ -152,7 +152,7 @@ export function createServerProcess({
             // A server main has stopped or replaced no longer speaks for the agents.
             return running?.child === child ? waiting(message.count) : undefined;
           case "capture":
-            void capture(message.url)
+            void capture(message.url, message.origin)
               .catch((err: unknown) => ({ error: err instanceof Error ? err.message : String(err) }))
               .then((shot) => send(child, { type: "captured", seq: message.seq, ...shot }));
             return;

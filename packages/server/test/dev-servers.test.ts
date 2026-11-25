@@ -2,12 +2,11 @@
  * STORY-25: a story's dev server (dev-servers.ts, ADR 0044). One per story, started in its worktree with the project's
  * command and reused; a port taken is moved when the command takes {port}; a server that doesn't answer in time is
  * stopped with a note showing its last output; and Featra stops only the servers it started. The process, the port
- * probe, HTTP and the clock are faked at their boundary; the last test runs a real one through the check runner.
+ * probe, HTTP and the clock are faked at their boundary; dev-servers-real.test.ts runs the real ones.
  */
 import { describe, expect, it } from "vitest";
-import { createServer } from "node:net";
 import { PROOF_COPY } from "@featra/work-format";
-import { runCommand, type RunControl, type RunResult } from "../src/check-run.ts";
+import type { RunControl, RunResult } from "../src/check-run.ts";
 import { createDevServers, type DevServerDeps } from "../src/dev-servers.ts";
 
 interface Spawned {
@@ -16,6 +15,7 @@ interface Spawned {
   env: Readonly<Record<string, string>>;
   cancelled: number;
   printed: string;
+  ended: boolean;
   exit: () => void;
   done: Promise<RunResult>;
 }
@@ -31,9 +31,12 @@ function platform(options: { up?: (url: string) => boolean; taken?: number[]; st
     run(command, cwd, env) {
       let exit: () => void = noop;
       const done = new Promise<RunResult>((resolve) => {
-        exit = () => resolve({ code: 0, output: "", timedOut: false });
+        exit = () => {
+          proc.ended = true;
+          resolve({ code: 0, output: "", timedOut: false });
+        };
       });
-      const proc: Spawned = { command, cwd, env, cancelled: 0, printed: "", exit, done };
+      const proc: Spawned = { command, cwd, env, cancelled: 0, printed: "", ended: false, exit, done };
       spawned.push(proc);
       const control: RunControl = {
         cancel: () => {
@@ -45,9 +48,10 @@ function platform(options: { up?: (url: string) => boolean; taken?: number[]; st
       };
       return control;
     },
+    // By default a URL answers while a process started on its port runs: nothing answers before one starts.
     answers: async (url) => {
       asked.push(url);
-      return (options.up ?? (() => true))(url);
+      return (options.up ?? ((u) => spawned.some((s) => !s.ended && s.env.PORT === new URL(u).port)))(url);
     },
     portFree: async (port) => !(options.taken ?? []).includes(port),
     freePort: async () => 49_152,
@@ -131,6 +135,40 @@ describe("a story's dev server", () => {
     const r = await createDevServers(p.deps).start(DIR, "STORY-1", TREE, "pnpm dev", "http://localhost");
     expect(r).toEqual({ ok: false, note: PROOF_COPY.notes.noUrl });
     expect(p.spawned).toHaveLength(0);
+  });
+
+  it("treats its port as taken when something answers on its URL before it starts", async () => {
+    const p = platform({ up: () => true });
+    const r = await createDevServers(p.deps).start(DIR, "STORY-1", TREE, "pnpm dev", "http://localhost:5173");
+    expect(r).toEqual({ ok: false, note: PROOF_COPY.notes.portTaken(5173) });
+    expect(p.spawned).toHaveLength(0);
+
+    const moved = await createDevServers(p.deps).start(
+      DIR,
+      "STORY-2",
+      TREE,
+      "vite --port {port}",
+      "http://localhost:5173",
+    );
+    expect(moved).toEqual({ ok: true, url: "http://localhost:49152" });
+    expect(p.spawned.map((s) => s.command)).toEqual(["vite --port 49152"]);
+  });
+
+  it("didn't start when its own process ended before its URL answered: what answers isn't it", async () => {
+    const p = platform();
+    const deps: DevServerDeps = {
+      ...p.deps,
+      answers: async () => {
+        const proc = p.spawned.at(-1);
+        if (!proc) return false;
+        proc.exit();
+        return true;
+      },
+    };
+    const servers = createDevServers(deps);
+    const r = await servers.start(DIR, "STORY-1", TREE, "pnpm dev", "http://localhost:5173");
+    expect(r).toMatchObject({ ok: false, note: PROOF_COPY.notes.notStarted });
+    expect(servers.running(DIR, "STORY-1")).toBe(false);
   });
 
   it("is asked on its URL until it answers", async () => {
@@ -253,7 +291,7 @@ describe("stopping dev servers", () => {
     const deps: DevServerDeps = {
       ...p.deps,
       answers: async () => {
-        servers.stop(DIR, "STORY-1");
+        if (p.spawned.length) servers.stop(DIR, "STORY-1");
         return false;
       },
     };
@@ -261,35 +299,5 @@ describe("stopping dev servers", () => {
     const r = await servers.start(DIR, "STORY-1", TREE, "pnpm dev", "http://localhost:5173");
     expect(r.ok).toBe(false);
     expect(p.spawned[0]?.cancelled).toBe(1);
-  });
-});
-
-describe("a real dev server through the check runner", () => {
-  it("starts, answers on the port Featra gave it, and is stopped", async () => {
-    // A port the OS has just handed out, so this test never meets another process's server.
-    const port = await new Promise<number>((resolve) => {
-      const probe = createServer().listen(0, "127.0.0.1", () => {
-        const address = probe.address();
-        probe.close(() => resolve(typeof address === "object" && address ? address.port : 0));
-      });
-    });
-    const runs: RunControl[] = [];
-    const servers = createDevServers({
-      run: (command, cwd, env) => {
-        const control = runCommand(command, cwd, null, env);
-        runs.push(control);
-        return control;
-      },
-    });
-    const script = "require('http').createServer((q,s)=>s.end('ok')).listen(Number(process.env.PORT),'127.0.0.1')";
-    const r = await servers.start(DIR, "STORY-1", process.cwd(), `node -e "${script}"`, `http://127.0.0.1:${port}`);
-    expect(r).toEqual({ ok: true, url: `http://127.0.0.1:${port}` });
-    const body = await fetch(`http://127.0.0.1:${port}/`).then((res) => res.text());
-    expect(body).toBe("ok");
-
-    servers.stop(DIR, "STORY-1");
-    const ended = await runs[0]?.done;
-    expect(ended?.code === 0).toBe(false);
-    expect(servers.running(DIR, "STORY-1")).toBe(false);
   });
 });

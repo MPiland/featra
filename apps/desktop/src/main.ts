@@ -14,7 +14,7 @@ import { createOsBadge } from "./os-badge.ts";
 import { createTrayBadge } from "./tray-badge.ts";
 import { setNativeMenu } from "./native-menu.ts";
 import { createProjectRegistry, findProject } from "./project-registry.ts";
-import { capturePage, mayNavigate } from "./dev-pages.ts";
+import { capturePage, guardContents } from "./dev-pages.ts";
 import { createServerProcess, startAfter } from "./server-process.ts";
 import { createSettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
@@ -54,14 +54,9 @@ function showNotice(message: string) {
   else if (Notification.isSupported()) new Notification({ title: "Featra", body: message }).show();
 }
 
-// The window only ever shows the bundled client: no navigation away, no pop-up windows. A Preview window moves only
-// within its story's dev server (STORY-25).
-app.on("web-contents-created", (_e, contents) => {
-  contents.on("will-navigate", (e, url) => {
-    if (!mayNavigate(contents, url)) e.preventDefault();
-  });
-  contents.setWindowOpenHandler(() => ({ action: "deny" }));
-});
+// The window only ever shows the bundled client: no navigation away, no pop-up windows. A dev page moves only within
+// its story's dev server, by a link or a redirect (STORY-25).
+app.on("web-contents-created", (_e, contents) => guardContents(contents));
 
 if (!takeInstanceLock(app, userDataDir)) {
   app.quit();
@@ -94,7 +89,7 @@ if (!takeInstanceLock(app, userDataDir)) {
       log: (message) => log.info(message),
       dataDir: app.getPath("userData"),
       // The server asks for a story's pages as it moves to review (STORY-25, ADR 0044).
-      capture: (url) => app.whenReady().then(() => capturePage(url)),
+      capture: (url, origin) => app.whenReady().then(() => capturePage(url, origin)),
       waiting: (count) =>
         void app.whenReady().then(() => {
           badge.show(count);

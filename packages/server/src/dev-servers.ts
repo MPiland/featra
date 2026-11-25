@@ -5,6 +5,10 @@
  *
  * The command may hold `{port}`: Featra puts the configured port there, or a free one when that is taken, and sets
  * `PORT` to it too. Without `{port}` it can't move the server, so a taken port is a note saying so.
+ *
+ * A port is taken when anything listens on it on either loopback (127.0.0.1 or ::1), or its URL already answers: a
+ * server another worktree started there would otherwise be captured as this story's. For the same reason a server
+ * whose own process ended before its URL answered didn't start, whatever answers there.
  */
 import { get } from "node:http";
 import { createServer } from "node:net";
@@ -45,16 +49,37 @@ interface Running {
   /** Its process ended: it is never killed after, so a reused process id is never touched. */
   exited: boolean;
 }
-const listenOn = (port: number) =>
+/** Where a dev server on this computer may listen: a server bound to `localhost` often listens on ::1 only. */
+const LOOPBACKS = ["127.0.0.1", "::1"] as const;
+/** How many ports the OS hands out before one free on both loopbacks is given up on. */
+const FREE_PORT_TRIES = 5;
+
+/** The port listened on at `host`, or null when it is taken; a host this computer doesn't have takes nothing. */
+const listenOn = (port: number, host: string) =>
   new Promise<number | null>((resolve) => {
     const probe = createServer();
-    probe.once("error", () => resolve(null));
-    probe.listen(port, "127.0.0.1", () => {
+    probe.once("error", (err: NodeJS.ErrnoException) =>
+      resolve(err.code === "EADDRNOTAVAIL" || err.code === "EAFNOSUPPORT" ? port : null),
+    );
+    probe.listen(port, host, () => {
       const address = probe.address();
       const got = typeof address === "object" && address ? address.port : null;
       probe.close(() => resolve(got));
     });
   });
+
+/** Whether nothing listens on `port` on either loopback. */
+const portFreeHere = async (port: number) =>
+  (await Promise.all(LOOPBACKS.map((host) => listenOn(port, host)))).every((got) => got !== null);
+
+/** A port the OS hands out on 127.0.0.1 that is free on ::1 too; 0 when none was. */
+async function freePortHere() {
+  for (let i = 0; i < FREE_PORT_TRIES; i++) {
+    const port = await listenOn(0, LOOPBACKS[0]);
+    if (port && (await listenOn(port, LOOPBACKS[1])) !== null) return port;
+  }
+  return 0;
+}
 
 const httpAnswers = (url: string) =>
   new Promise<boolean>((resolve) => {
@@ -75,8 +100,8 @@ const keyOf = (project: string, story: string) => `${project}\n${story}`;
 export function createDevServers({
   run = (command, cwd, env) => runCommand(command, cwd, null, env),
   answers = httpAnswers,
-  portFree = async (port) => (await listenOn(port)) !== null,
-  freePort = async () => (await listenOn(0)) ?? 0,
+  portFree = portFreeHere,
+  freePort = freePortHere,
   wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   now = Date.now,
   startMs = DEV_SERVER_START_MS,
@@ -87,7 +112,8 @@ export function createDevServers({
   async function plan(command: string, url: string) {
     const port = devServerPort(url);
     if (port === null) return { ok: false as const, note: PROOF_COPY.notes.noUrl };
-    const free = await portFree(port);
+    // A server that answers already isn't this story's: another story's, or the user's own.
+    const free = (await portFree(port)) && !(await answers(url));
     if (!command.includes("{port}")) {
       return free
         ? { ok: true as const, command, url, port }
@@ -106,7 +132,8 @@ export function createDevServers({
     const until = now() + startMs;
     for (;;) {
       if (entry.stopped || entry.exited) break;
-      if (await answers(url)) return { ok: true, url };
+      // An answer after its own process ended comes from another server: it didn't start.
+      if ((await answers(url)) && !entry.exited) return { ok: true, url };
       if (now() >= until) break;
       await wait(ASK_EVERY_MS);
     }
