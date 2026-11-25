@@ -9,6 +9,7 @@ import { watch } from "node:fs";
 import { setTimeout as pause } from "node:timers/promises";
 import { copyKey, EMPTY_WORK_LIST, errorMessage, type WorkList } from "@featra/work-format";
 import type { Scan, Scanner } from "./work-scan.ts";
+import { trace } from "./debug-trace.ts";
 import { targetsOf, watchTargets, type WatchFolder, type WatchSet } from "./work-watch-targets.ts";
 
 export type WorkListener = (list: WorkList) => void;
@@ -91,11 +92,14 @@ export function createWorkWatches(
     // Taken before the scan: a git event while it runs marks the next one.
     const reuse = e.gitChanged ? undefined : e.last?.collected.git;
     e.gitChanged = false;
+    const t0 = Date.now();
+    trace(`scan ${e.dir} reuse=${reuse !== undefined}`);
     try {
       const scan = await scanner.scan(e.dir, reuse, (paths) => {
         if (!e.closed) watchGit(e, paths.common, reuse !== undefined);
       });
       e.last = scan;
+      trace(`scanned ${e.dir} in ${Date.now() - t0} ms, gitChanged=${e.gitChanged}`);
       return { scan, list: scan?.list ?? EMPTY_WORK_LIST, failed: false };
     } catch (err) {
       e.gitChanged = true;

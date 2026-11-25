@@ -34,6 +34,7 @@ import { ApiError } from "./api-error.ts";
 import { ownedIn } from "./card-actions.ts";
 import type { ChatManager } from "./chat-manager.ts";
 import { locationKey } from "./collect.ts";
+import { trace } from "./debug-trace.ts";
 import { featureBranchOf } from "./merge-settle.ts";
 import { tellLead } from "./merge-request.ts";
 import type { TriedAt } from "./not-merged-record.ts";
@@ -164,7 +165,9 @@ export function createAutoMerge({ observe, allowed, enabled, merge, chats, recor
     const latest = () => !closed && allowed.has(dir) && tried.get(key) === mine;
     try {
       if (!latest()) return;
+      trace(`auto-merge attempt ${story.id} at ${mine.at}`);
       const on = await enabled(dir);
+      trace(`auto-merge attempt ${story.id} on=${on} latest=${latest()} busy=${sessionBusy(chats, dir, story.id)}`);
       if (!latest()) return;
       // Turned off, or its session started a turn, while it waited: it is tried again once that changes.
       if (!on || sessionBusy(chats, dir, story.id)) {
@@ -175,6 +178,7 @@ export function createAutoMerge({ observe, allowed, enabled, merge, chats, recor
       // As auto-merge's own try: a story held since it was picked is refused inside the merge (`HeldRefusal`), a
       // race that `failed` only logs.
       const merged = await merge(dir, story.id, { auto: true }).catch((err: unknown) => ({ err }));
+      trace(`auto-merge merged ${story.id}: ${"err" in merged ? errorMessage(merged.err) : "ok"}`);
       if ("err" in merged) return await failed(dir, story, lead, merged.err, mine);
       const summary = autoMergedSummary(story.into, merged.remains);
       if (lead) tellLead(chats, log, lead, { story: story.id, outcome: "merged", summary });
@@ -206,17 +210,27 @@ export function createAutoMerge({ observe, allowed, enabled, merge, chats, recor
     // A story no longer picked is forgotten, so it is tried again if it comes back at the same commits.
     const picked = new Set(ready.stories.map((s) => keyOf(dir, s.id)));
     for (const key of tried.keys()) if (key.startsWith(keyOf(dir, "")) && !picked.has(key)) tried.delete(key);
+    trace(
+      `auto-merge consider ${dir} look ${look}: ${JSON.stringify(ready.stories.map((s) => [s.id, s.head, s.checked, s.tip, s.refusal?.head ?? null]))}`,
+    );
     if (ready.stories.length === 0) return;
     const on = await enabled(dir);
+    trace(`auto-merge consider on=${on} stopped=${w.stopped} latest=${look === w.looks}`);
     // A later look, or the project's removal, has the last word.
     if (!on || w.stopped || look !== w.looks) return;
     for (const story of ready.stories) {
       const key = keyOf(dir, story.id);
       const at = `${story.head ?? ""}|${story.checked ?? ""}|${story.tip ?? ""}`;
       // Tried at these commits already, here or (before a restart) as its card records it.
-      if (tried.get(key)?.at === at || refusedHere(story)) continue;
+      if (tried.get(key)?.at === at || refusedHere(story)) {
+        trace(`auto-merge ${story.id} tried at ${at} already: ${refusedHere(story)}`);
+        continue;
+      }
       // Merge refuses a story whose session is working: it is looked at again when the session is idle.
-      if (sessionBusy(chats, dir, story.id)) continue;
+      if (sessionBusy(chats, dir, story.id)) {
+        trace(`auto-merge ${story.id} busy`);
+        continue;
+      }
       const waiting = pending.get(key);
       if (waiting?.at === at) {
         tried.set(key, waiting);

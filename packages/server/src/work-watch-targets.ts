@@ -5,6 +5,7 @@
 import type { FSWatcher, watch } from "node:fs";
 import { basename, isAbsolute, join } from "node:path";
 import { FEATRA_DIR } from "@featra/work-format";
+import { trace } from "./debug-trace.ts";
 import type { Scan } from "./work-scan.ts";
 
 export interface Target {
@@ -85,16 +86,22 @@ export function watchTargets<S extends WatchSet>(watchFolder: WatchFolder, trigg
       };
       const w = watchFolder(t.path, { recursive: t.recursive, persistent: false }, (type, name) => {
         // Windows names the folder itself, absolute, without end once it's deleted (BUG-6).
+        trace(`event ${type} ${String(name)} on ${t.path}`);
         if (name && isAbsolute(name)) return gone();
         if (!counts(t, type, name)) return;
         if (t.git) set.gitChanged = true;
         trigger(set);
       });
-      w.on("error", gone);
+      w.on("error", (err) => {
+        trace(`error ${String(err)} on ${t.path}`);
+        gone();
+      });
       set.watchers.set(key, w);
       if (t.git && stale) set.gitChanged = true;
+      trace(`started ${key} stale=${stale}`);
       return true;
-    } catch {
+    } catch (err) {
+      trace(`start failed ${key}: ${String(err)}`);
       // Not there (yet), or out of handles: the next scan tries again.
       return false;
     }
@@ -106,6 +113,7 @@ export function watchTargets<S extends WatchSet>(watchFolder: WatchFolder, trigg
       const wanted = new Map(targets.map((t) => [keyOf(t), t]));
       for (const [key, w] of set.watchers) {
         if (wanted.has(key)) continue;
+        trace(`closed ${key}`);
         w.close();
         set.watchers.delete(key);
       }
