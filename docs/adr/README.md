@@ -75,3 +75,4 @@ What becomes easier or harder, and what we must now do.
 | [0041](0041-project-needs-one-watch-across-open-projects.md)     | What each project needs: one server watch across the open projects    | proposed |
 | [0042](0042-changes-asked-before-approving.md)                   | Changes asked before approving a feature                              | proposed |
 | [0043](0043-serving-evidence-files.md)                           | Serving evidence files to the app                                     | proposed |
+| [0044](0044-dev-servers-and-page-capture.md)                     | Dev servers and page capture                                          | proposed |

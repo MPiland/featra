@@ -2,13 +2,11 @@ import {
   assertNever,
   cardParams,
   cardUpdateParams,
-  copyParams,
   dirParams,
   sendBackParams,
   storySendBackParams,
   checksSetParams,
   starter,
-  unwatchParams,
   type PushEvent,
   type ServerMethod,
   type ServerMethods,
@@ -20,11 +18,13 @@ import { ApiError } from "./api-error.ts";
 import { createChatApi, type ChatApiDeps } from "./api-chat.ts";
 import { createBugApi } from "./api-bugs.ts";
 import { createEvidenceApi, type EvidenceApiDeps } from "./api-evidence.ts";
+import { createProofApi, type ProofApiDeps } from "./api-proof.ts";
 import { createStoryEndApi } from "./api-story-end.ts";
 import { createFeatureApi, type FeatureApiDeps } from "./api-feature.ts";
 import { createProjectApi } from "./api-project.ts";
 import { createRoleApi } from "./api-roles.ts";
 import { createWatchApi, type WatchApiDeps } from "./api-watch.ts";
+import { createWorkApi } from "./api-work.ts";
 import type { BugFiling } from "./bug-filing.ts";
 import type { CardActions } from "./card-actions.ts";
 import { ChatError, type ChatManager } from "./chat-manager.ts";
@@ -87,6 +87,8 @@ export interface ApiDeps {
   diffs?: WatchApiDeps["diffs"];
   /** Evidence files read back to show next to their criteria (STORY-72). */
   evidence?: EvidenceApiDeps["evidence"];
+  /** The project's proof (STORY-25): its settings, Preview, and the notes and Preview a card shows. */
+  proof?: ProofApiDeps["proof"] & { capture: WatchApiDeps["proof"] };
 }
 
 /** The socket a request came in on: how a watch pushes to it and ends with it. */
@@ -138,6 +140,7 @@ export function createApi({
   needs,
   diffs,
   evidence,
+  proof,
 }: ApiDeps): Api {
   const allow = (dir: string) => {
     if (!allowed.has(dir)) throw new ApiError("Not an open project.");
@@ -154,19 +157,15 @@ export function createApi({
     if (!p) throw new ApiError("Expected { dir, id }.");
     return [allow(p.dir), p.id];
   };
-  const copy = (params: unknown) => {
-    const p = copyParams(params);
-    if (!p) throw new ApiError("Expected { dir, key }.");
-    allow(p.dir);
-    return p;
-  };
+  const workApi = createWorkApi({ watches, allowed, copies, prs, allow, project });
   const projectApi = createProjectApi({ git, allow, project });
   const roleApi = createRoleApi({ roles, roleWatches, allowed, allow, project });
   const storyEnd = createStoryEndApi({ merges, abandons, holds, allow });
   const bugApi = createBugApi({ bugs, allow });
   const featureApi = createFeatureApi({ features, changes, card });
   const evidenceApi = createEvidenceApi({ evidence, allow });
-  const watchApi = createWatchApi({ watches, allowed, checks, prs, features, diffs, card });
+  const proofApi = createProofApi({ proof, allow });
+  const watchApi = createWatchApi({ watches, allowed, checks, prs, features, diffs, card, proof: proof?.capture });
   const chatApi = createChatApi({ chats, roles, allowed, agents, allow, project, needs, ...(busy ? { busy } : {}) });
 
   const answer: Api = async (method, params, id, connection) => {
@@ -177,34 +176,11 @@ export function createApi({
       case "project.setupPlan":
       case "project.setup":
         return projectApi(method, params);
-      case "work.watch": {
-        const dir = project(params);
-        // The rows carry each story's PR state as last read (STORY-11), which a new read changes without a file event.
-        const { value, stop } = await watches.observe(
-          dir,
-          (_scan, list) => prs.decorate(dir, list),
-          (next) => {
-            // A project closed since: say nothing more about it.
-            if (allowed.has(dir)) connection.push("work.list", id, next);
-          },
-        );
-        connection.keep(id, stop);
-        return value;
-      }
-      case "work.unwatch": {
-        const p = unwatchParams(params);
-        if (!p) throw new ApiError("Expected { watch }.");
-        connection.unwatch(p.watch);
-        return null;
-      }
-      case "work.applyCopy": {
-        const p = copy(params);
-        return copies.apply(p.dir, p.key);
-      }
-      case "work.discardCopy": {
-        const p = copy(params);
-        return copies.discard(p.dir, p.key);
-      }
+      case "work.watch":
+      case "work.unwatch":
+      case "work.applyCopy":
+      case "work.discardCopy":
+        return workApi(method, params, id, connection);
       case "card.watch":
       case "review.watch":
         return watchApi(method, params, id, connection);
@@ -257,6 +233,10 @@ export function createApi({
         prs.focus();
         features?.focus();
         return null;
+      case "proof.load":
+      case "proof.set":
+      case "preview.start":
+        return proofApi(method, params);
       case "checks.load":
         return checkSettings.load(project(params));
       case "checks.set": {

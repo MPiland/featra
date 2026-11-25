@@ -3,6 +3,8 @@ import type { AgentBridge } from "./agent-bridge.ts";
 import type { AllowedProjects } from "./allowed-projects.ts";
 import type { Api } from "./api.ts";
 import type { ChatStore } from "./chat-store.ts";
+import type { DevServerDeps, DevServers } from "./dev-servers.ts";
+import type { CapturePage } from "./host-capture.ts";
 import type { ClaudeDeps } from "./claude-provider.ts";
 import type { Timers } from "./inbox.ts";
 import type { LogWriterDeps } from "./log-writer.ts";
@@ -46,6 +48,10 @@ export interface ServiceOptions {
   checkTimeoutMs?: number;
   /** The timers PR reads wait on (STORY-11); the real ones by default. */
   prTimers?: Timers;
+  /** Captures a page of a story's dev server: the desktop host's in the app (STORY-25); without it none is captured. */
+  capturePage?: CapturePage;
+  /** How stories' dev servers start and are waited on; the real process, network and clock by default. */
+  devServers?: DevServerDeps;
 }
 
 /** What `createServices` gives the server process. `close` ends watches and indexes. */
@@ -57,5 +63,7 @@ export interface Services {
   needs: ProjectNeeds;
   /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
   settingsChanged: () => void;
+  /** The stories' dev servers Featra started (STORY-25): stopped first when the app quits (host-gone.ts). */
+  devServers: Pick<DevServers, "stopAll">;
   close: () => Promise<void>;
 }

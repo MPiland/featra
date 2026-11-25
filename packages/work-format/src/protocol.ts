@@ -8,7 +8,7 @@ import type { AbandonWarning } from "./abandon-copy.ts";
 import type { ApprovalChoice } from "./approvals.ts";
 import type { BugPlacements } from "./bug-copy.ts";
 import type { Answers } from "./questions.ts";
-import type { ChecksPatch, ChecksView } from "./checks-types.ts";
+import type { SettingsMethods } from "./protocol-settings.ts";
 import type { EvidenceFile } from "./evidence-link.ts";
 import type { ChatControlState, SettingsChange } from "./chat-controls.ts";
 import type { ChatEvent, ChatSnapshot } from "./chat-events.ts";
@@ -31,8 +31,8 @@ export const SERVER_PATH = "/v1";
 /** What applying or discarding a stale copy did. */
 export type CopyActionResult = { ok: true } | { ok: false; error: string };
 
-/** Every method, its params and its result. A new method is added here first. */
-export interface ServerMethods {
+/** Every method, its params and its result (settings ones in protocol-settings.ts). A new method is added here first. */
+export interface ServerMethods extends SettingsMethods {
   /** Whether the project folder is a git repository and holds `.featra/`. */
   "project.setupStatus": { params: { dir: string }; result: ProjectSetup };
   /** Runs `git init` in a folder that is not yet in a repository; answers with the new status. */
@@ -176,10 +176,6 @@ export interface ServerMethods {
   "story.createPr": { params: { dir: string; id: string }; result: null };
   /** The window regained focus: every open project reads its open PRs again soon (STORY-11). */
   "prs.refresh": { params: Record<string, never>; result: null };
-  /** Project settings' Checks section: where checks run, the commands, and the proposals waiting for the user (STORY-56). */
-  "checks.load": { params: { dir: string }; result: ChecksView };
-  /** Changes the Checks settings in the project's config (`null` clears one); answers with the section as it is after. */
-  "checks.set": { params: { dir: string; patch: ChecksPatch }; result: ChecksView };
   /**
    * Sends a story in Acceptance back to its session with the user's reason, as the user's message (STORY-23): logged in
    * history, the story In Progress again, and with `addCriterion` the reason a new acceptance criterion. Refused

@@ -3377,3 +3377,46 @@ Note added 2026-11-18: "right-click then Open" no longer opens an unsigned app o
   - CONTEXT.md defines **Evidence file**, as distinct from **Evidence state**.
   - E2E (Windows) failed once at `chat-list.spec.ts:34`, waiting for the provider group. The page snapshot shows the
     group arrived just after the 5 s wait, and nothing in this change touches it. Filed as BUG-40, with one rerun.
+
+## 2026-11-24 — STORY-25 Choose the project's proof and capture screenshots (developer)
+
+Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev-server lifecycle and capture path.
+
+- **Where the setting lives**: `.featra/config.yaml` (`proof`, `devServerCommand`, `devServerUrl`, `testScreenshots`),
+  shown in Settings > Project > Proof beside Checks and Pull requests, so it travels with the project like the check
+  command. The dev-server command runs only once confirmed in Settings (`dev-server-confirmed.json` in the data
+  folder), as a check command does: a command changed through git is a note, "Dev-server command not confirmed",
+  until the user confirms it.
+- **When the question is asked**: when a Dev Lead chat drafts the project's first feature (exactly one feature after
+  the draft) and `proof` is unset. The card says "when the first feature is shaped", so a project that had features
+  before Featra is not asked; its proof is chosen in Settings. It is the app's question on the chat's question card
+  (subject `proof`), so it costs no tokens and stays open past the turn; it isn't asked twice while it waits.
+- **Page listing**: `update_card`'s criteria take `page`, a route on the dev server (`/settings`), kept on the
+  criterion's line as `(page: /route)` between the test and the evidence. Capture happens when the agent's report
+  moves the story to In Review, the moment the work is claimed done; the tool's answer says what was captured and asks
+  the agent to commit it with the card.
+- **Test screenshots**: a file in `testScreenshots` named `<STORY-ID>-ac<n>[-anything].(png|jpg|jpeg|gif|webp)`,
+  any case, `n` counting criteria from 1, the first by sorted name winning. A criterion that lists a page under
+  screenshot proof takes the captured page instead; an agent's own evidence is never replaced. Test screenshots are
+  attached whatever the proof, since they cost nothing.
+- **Dev-server lifecycle**: one per story worktree, reused, two asks sharing one start; a free port when the URL's
+  is taken and the command takes `{port}` (also set as `PORT`); 60 s to answer, then "Dev server didn't start" with
+  its last 20 lines; stopped when the story merges or is abandoned, its project closes, or the app quits. A process
+  that already exited is never signalled.
+- **Quit order** (found in CI on Windows): main used to exit without waiting for the server, so Node's job object
+  ended the server mid-shutdown along with each dev server's shell, but not the node process the shell started. That
+  orphan held the app's inherited stdio and the app never finished closing. Now the server stops its dev servers
+  first when the host goes, and main waits for the server to exit (5 s at most, then ends it) before exiting.
+- **Capture path**: Electron main loads the page in a hidden 1280×800 window and answers the server over the host's
+  IPC channel, PNG or, over 1 MB, JPEG. Only `localhost`/`127.0.0.1` pages load, and a Preview window navigates only
+  within its dev server. The server's tests fake the capture and the process runner; the e2e journeys run the real
+  thing against `apps/desktop/e2e/fixture-dev-server.mjs`.
+- **Failures** are notes on the criterion in the card pane (the dev server's output folded in a disclosure), never a
+  refusal of the move. Notes live in memory; the next move to review tries again.
+- **Review fixes (Opus review of PR #88)**: a port counts as taken when anything listens on either loopback
+  (127.0.0.1 or ::1) or its URL already answers before Featra starts a server, and a server whose own process exited
+  before its URL answered didn't start, so another worktree's code is never captured as the story's. A page is
+  captured only when it is a route that keeps the dev server's origin (`pageUrl`), and main checks that origin again;
+  every web contents is guarded against navigations and redirects off its dev server's origin, and dev-server windows
+  run in their own partition (`featra-dev-pages`) that denies every permission. A new screenshot removes the
+  criterion's earlier ones of another type. Recorded in ADR 0044.

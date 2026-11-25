@@ -27,6 +27,7 @@ import { normalizeZoom } from "@featra/client/zoom";
 import { httpsLink, isOneOf, toText } from "@featra/work-format";
 import { copyable } from "./copy-text.ts";
 import { openEvidenceFile, type EvidenceShell } from "./evidence-open.ts";
+import { openPreview } from "./dev-pages.ts";
 import { pickFolder } from "./folder-dialog.ts";
 import { closeToTraySupport, type Lifecycle } from "./lifecycle.ts";
 import type { Log } from "./log.ts";
@@ -167,6 +168,8 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
     // Only the server's copy of an evidence file, in the data folder, reaches the OS (STORY-72, ADR 0043).
     void openEvidenceFile(app.getPath("userData"), file, e2e ? recordedShell : shell, (m) => log.info(m));
   });
+  // Only a dev server on this computer opens in a Preview window (STORY-25).
+  ipcMain.on(IPC.appOpenPreview, (_e, url: unknown, title: unknown) => openPreview(url, title));
   ipcMain.on(IPC.appCopyText, (_e, text: unknown) => {
     // Only put on the clipboard: Featra never runs what it copies (STORY-68). No more than a command is copied.
     const copied = copyable(text);

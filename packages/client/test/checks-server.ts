@@ -1,5 +1,5 @@
 // The local server's checks side, as a fake: each project's Checks section held in memory, changed by the user's saves.
-import { CHECKS_COPY, GITHUB_COPY, type ChecksPatch, type ChecksView } from "@featra/work-format";
+import { CHECKS_COPY, GITHUB_COPY, type ChecksPatch, type ChecksView, type ProofView } from "@featra/work-format";
 import type { ChecksBridge } from "../src/checks-bridge.ts";
 
 /** A project with no GitHub and nothing set: checks run on this computer, with no commands yet. */
@@ -17,6 +17,16 @@ export const NO_CHECKS: ChecksView = {
   prRefreshMinutes: 2,
   testReportArtifact: null,
   testReportFiles: null,
+  error: null,
+};
+
+/** A project whose proof isn't chosen and has no dev server (STORY-25). */
+export const NO_PROOF: ProofView = {
+  proof: null,
+  devServerCommand: null,
+  devServerUrl: null,
+  testScreenshots: null,
+  unconfirmed: false,
   error: null,
 };
 
@@ -38,8 +48,14 @@ function applied(now: ChecksView, patch: ChecksPatch): ChecksView {
   };
 }
 
-export function fakeChecksServer(given: Record<string, ChecksView>, calls: string[]): ChecksBridge {
+export function fakeChecksServer(
+  given: Record<string, ChecksView>,
+  calls: string[],
+  proofs: Record<string, ProofView> = {},
+): ChecksBridge {
   const views = new Map(Object.entries(given));
+  const proofViews = new Map(Object.entries(proofs));
+  const proofOf = (dir: string) => proofViews.get(dir) ?? NO_PROOF;
   const viewOf = (dir: string) => views.get(dir) ?? NO_CHECKS;
   return {
     load: async (dir) => viewOf(dir),
@@ -47,6 +63,19 @@ export function fakeChecksServer(given: Record<string, ChecksView>, calls: strin
       calls.push(`checks.set:${dir}:${JSON.stringify(patch)}`);
       const next = applied(viewOf(dir), patch);
       views.set(dir, next);
+      return next;
+    },
+    loadProof: async (dir) => proofOf(dir),
+    setProof: async (dir, patch) => {
+      calls.push(`proof.set:${dir}:${JSON.stringify(patch)}`);
+      const { confirm, ...values } = patch;
+      const now = proofOf(dir);
+      const next = {
+        ...now,
+        ...values,
+        unconfirmed: now.unconfirmed && !confirm && values.devServerCommand === undefined,
+      };
+      proofViews.set(dir, next);
       return next;
     },
   };

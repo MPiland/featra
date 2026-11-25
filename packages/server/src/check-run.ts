@@ -21,6 +21,8 @@ export interface RunControl {
   /** Kills the run (the app is closing). */
   cancel: () => void;
   done: Promise<RunResult>;
+  /** The end of what it printed so far, as `done`'s: what a long-running command (a dev server) has said. */
+  output: () => string;
 }
 
 // ESC [ ... letter: colour and cursor codes, which a card cannot show.
@@ -40,12 +42,18 @@ function kill(pid: number | undefined) {
   }
 }
 
-export function runCommand(command: string, cwd: string, timeoutMs = RUN_TIMEOUT_MS): RunControl {
+/** Runs `command` in `cwd` with `env` added; with `timeoutMs` null it runs until it ends or is cancelled. */
+export function runCommand(
+  command: string,
+  cwd: string,
+  timeoutMs: number | null = RUN_TIMEOUT_MS,
+  env: Readonly<Record<string, string>> = {},
+): RunControl {
   let output = "";
   let timedOut = false;
   const child = spawn(command, {
     cwd,
-    env: { ...gitEnv(), CI: "true", FORCE_COLOR: "0" },
+    env: { ...gitEnv(), CI: "true", FORCE_COLOR: "0", ...env },
     shell: true,
     windowsHide: true,
     detached: process.platform !== "win32",
@@ -59,10 +67,13 @@ export function runCommand(command: string, cwd: string, timeoutMs = RUN_TIMEOUT
   };
   child.stdout.on("data", take);
   child.stderr.on("data", take);
-  const timer = setTimeout(() => {
-    timedOut = true;
-    kill(child.pid);
-  }, timeoutMs);
+  const timer =
+    timeoutMs === null
+      ? undefined
+      : setTimeout(() => {
+          timedOut = true;
+          kill(child.pid);
+        }, timeoutMs);
   const done = new Promise<RunResult>((resolve) => {
     let ended = false;
     const end = (code: number | null) => {
@@ -77,5 +88,5 @@ export function runCommand(command: string, cwd: string, timeoutMs = RUN_TIMEOUT
     });
     child.on("close", (code) => end(code));
   });
-  return { cancel: () => kill(child.pid), done };
+  return { cancel: () => kill(child.pid), done, output: () => tail(output.replace(ANSI, "")) };
 }

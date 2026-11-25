@@ -2,7 +2,6 @@
  * The contract between the UI and its host. Electron's preload implements it; a plain browser (Vite dev, later
  * remote control) gets the fallback below. The UI never talks to Electron any other way.
  */
-import { isRecord } from "@featra/work-format/guards";
 import { httpsLink } from "@featra/work-format/prs";
 import {
   DEFAULT_APP_SETTINGS,
@@ -24,9 +23,7 @@ import { noSetup, type ProjectSetupBridge } from "./project-setup.ts";
 import { EMPTY_PROJECTS, type ProjectsResult, type ProjectsSnapshot } from "./projects.ts";
 import { noWork, type WorkBridge } from "./work-list.ts";
 import { THEME_CHOICES, type ThemeChoice } from "./theme.ts";
-import { normalizePaneWidth } from "./pane-width.ts";
-import { normalizeBoardProjects } from "./work-layout.ts";
-import { DEFAULT_ZOOM, normalizeZoom } from "./zoom.ts";
+import { DEFAULT_UI_STATE, normalizeUiState, type UiState } from "./ui-state.ts";
 import { DEFAULT_WINDOW_STATE, type WindowState } from "./window-state.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
@@ -39,32 +36,9 @@ export * from "./projects.ts";
 export * from "./roles-bridge.ts";
 export * from "./server-client.ts";
 export * from "./settings.ts";
+export * from "./ui-state.ts";
 export * from "./work-list.ts";
 export * from "./window-state.ts";
-
-/** Window chrome state that survives a restart. The theme is an app setting (Settings > Appearance), not chrome. */
-export interface UiState {
-  sidebarCollapsed: boolean;
-  zoomFactor: number;
-  /** The card pane width the user chose by its handle; null for the default (STORY-4, `pane-width.ts`). */
-  cardPaneWidth: number | null;
-  /** The projects whose Work shows the stage board (STORY-17, `work-layout.ts`); left out while every one shows the list. */
-  boardProjects?: string[];
-}
-
-export const DEFAULT_UI_STATE: UiState = { sidebarCollapsed: false, zoomFactor: DEFAULT_ZOOM, cardPaneWidth: null };
-
-/** Reads stored state defensively: unknown or malformed fields fall back to defaults. */
-export function normalizeUiState(raw: unknown): UiState {
-  const r = isRecord(raw) ? raw : {};
-  const boardProjects = normalizeBoardProjects(r.boardProjects);
-  return {
-    sidebarCollapsed: typeof r.sidebarCollapsed === "boolean" ? r.sidebarCollapsed : DEFAULT_UI_STATE.sidebarCollapsed,
-    zoomFactor: normalizeZoom(r.zoomFactor),
-    cardPaneWidth: normalizePaneWidth(r.cardPaneWidth),
-    ...(boardProjects.length ? { boardProjects } : {}),
-  };
-}
 
 /** Text-editing commands; the host runs them on whatever field has focus. */
 export type EditCommand = "undo" | "redo" | "cut" | "copy" | "paste" | "delete" | "selectAll";
@@ -148,6 +122,8 @@ export interface FeatraBridge {
     openExternal: (url: string) => void;
     /** Opens the server's copy of an evidence file with the OS (STORY-72); anything else is ignored. */
     openEvidence: (file: string) => void;
+    /** Opens a story's dev server, on this computer, in a Featra window (STORY-25); anything else is ignored. */
+    openPreview: (url: string, title: string) => void;
     /** Puts text on the clipboard (STORY-68's Copy on a command); nothing runs it. */
     copyText: (text: string) => void;
     /** Clears Chromium's HTTP cache, then restarts the app. */
@@ -177,6 +153,7 @@ export const IPC = {
   appShowLogs: "app:show-logs",
   appOpenExternal: "app:open-external",
   appOpenEvidence: "app:open-evidence",
+  appOpenPreview: "app:open-preview",
   appCopyText: "app:copy-text",
   appClearCacheAndRestart: "app:clear-cache-and-restart",
   appResetAppData: "app:reset-app-data",
@@ -282,6 +259,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
         if (link) window.open(link, "_blank", "noopener,noreferrer");
       },
       openEvidence() {},
+      openPreview() {},
       copyText: (text) => {
         navigator.clipboard?.writeText(text).catch(() => {});
       },

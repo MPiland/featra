@@ -94,6 +94,7 @@ const bridge: FeatraBridge = {
     showLogs: () => ipcRenderer.send(IPC.appShowLogs),
     openExternal: (url: string) => ipcRenderer.send(IPC.appOpenExternal, url),
     openEvidence: (file: string) => ipcRenderer.send(IPC.appOpenEvidence, file),
+    openPreview: (url: string, title: string) => ipcRenderer.send(IPC.appOpenPreview, url, title),
     copyText: (text: string) => ipcRenderer.send(IPC.appCopyText, text),
     clearCacheAndRestart: () => ipcRenderer.send(IPC.appClearCacheAndRestart),
     resetAppData: () => ipcRenderer.send(IPC.appResetAppData),

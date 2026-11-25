@@ -7,6 +7,7 @@
  *   user's answer. "twice" in the text asks for a second, identical Bash call after it.
  * - "question": an AskUserQuestion call (a choice of one and a choice of several), asked through canUseTool; its result
  *   is the answers the user gave, as Claude hands them to the agent, and the reply says them back.
+ * - "decide", "draft" and "report" are in fake-agent-mcp-turns.mjs.
  * - "decide": starts the Featra MCP from options.mcpServers over stdio, as Claude does, and calls its log_decision tool
  *   (STORY-47). Without the MCP (it is off in the project) the reply says so. The tool call is real; only the agent is
  *   faked.
@@ -15,7 +16,8 @@
  * - "report" (STORY-10): only with FEATRA_E2E_REPORT set, for a story session's first message ("You are working on
  *   STORY-N"). Writes a small evidence file into the story's folder in its worktree, then calls the Featra MCP's
  *   update_card tool: ticks the drafted task and criterion with that evidence, adds a task, moves the story to In
- *   Review and notes it. The tool call is real; only the agent is faked. "evidence": fake-agent-evidence.mjs.
+ *   Review and notes it. The tool call is real; only the agent is faked. "evidence": fake-agent-evidence.mjs; "proof":
+ *   fake-agent-proof.mjs.
  * - "subagent" (STORY-55): the agent spawns a background subagent (an Agent call, `task_started`, and the subagent's own
  *   messages, tagged as the SDK tags them). The subagent says something, then asks to run a Bash `npm test` through
  *   canUseTool as itself (`agentID`), and when that is answered says more and waits for `stopTask`, which ends it with
@@ -41,10 +43,10 @@
  * the SDK's real reader can read it back after a restart. A resumed session (`options.resume`) goes on in that file,
  * and its reply names the earlier prompts it kept: "You said: <text>, after: <earlier>".
  */
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { callMcpTool } from "./fake-mcp-client.mjs";
-import { draftCriteria, evidenceTurn } from "./fake-agent-evidence.mjs";
+import { appendFileSync } from "node:fs";
+import { evidenceTurn } from "./fake-agent-evidence.mjs";
+import { decideTurn, draftTurn, reportTurn } from "./fake-agent-mcp-turns.mjs";
+import { proofTurn } from "./fake-agent-proof.mjs";
 import {
   markChangesHandledTurn,
   questionTurn,
@@ -121,96 +123,6 @@ async function* toolTurn(options, signal, twice) {
   yield success("Done.");
 }
 
-/** Logs a decision through the Featra MCP the way an agent would, when Featra gave it one. */
-async function* decideTurn(options) {
-  const spec = options.mcpServers?.featra;
-  if (!spec) {
-    yield* say("No Featra MCP.");
-    yield success("No Featra MCP.");
-    return;
-  }
-  const id = `toolu_mcp_${++seq}`;
-  const input = {
-    decision: "Keep entries in the working folder",
-    why: "They are committed with the branch.",
-    rejected: ["A central log: not versioned with the work"],
-  };
-  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "mcp__featra__log_decision", input }]);
-  const result = await callMcpTool(spec, "log_decision", input);
-  yield toolResult(id, result.text, result.isError);
-  yield* say(`Tool said: ${result.text}`);
-  yield success("Done.");
-}
-
-/** The draft the fake Dev Lead makes; the second call keeps the stories it was given IDs for, with a change. */
-const draftInput = (ids) => ({
-  feature: { title: "Shaping", description: "Talk a feature through with the Dev Lead, then review it." },
-  stories: [
-    {
-      ...(ids ? { id: ids[0] } : {}),
-      title: "Draft a feature",
-      story: "As a builder, I get a drafted feature, so that I can review it.",
-      criteria: ids ? ["The draft shows in Work", "The draft says Review"] : draftCriteria(),
-      tasks: ["Write the draft"],
-    },
-    {
-      ...(ids ? { id: ids[1] } : {}),
-      title: "Review the draft",
-      story: "As a builder, I review the draft, so that I can approve it.",
-      criteria: ["The review opens"],
-      tasks: [],
-    },
-  ],
-});
-let lastDraft = "";
-
-/** Drafts cards through the Featra MCP the way an agent would, when Featra gave it one. */
-async function* draftTurn(options, again) {
-  const spec = options.mcpServers?.featra;
-  if (!spec) {
-    yield* say("No Featra MCP.");
-    yield success("No Featra MCP.");
-    return;
-  }
-  const ids = again ? [...lastDraft.matchAll(/STORY-\d+/g)].map((m) => m[0]) : null;
-  const id = `toolu_mcp_${++seq}`;
-  const input = draftInput(ids);
-  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "mcp__featra__draft_cards", input }]);
-  const result = await callMcpTool(spec, "draft_cards", input);
-  lastDraft = result.text;
-  yield toolResult(id, result.text, result.isError);
-  yield* say(`Tool said: ${result.text}`);
-  yield success("Done.");
-}
-
-/** A story session's first turn, with FEATRA_E2E_REPORT set: reports on the story's card through the Featra MCP. */
-async function* reportTurn(options, text) {
-  const spec = options.mcpServers?.featra;
-  const story = /STORY-\d+/.exec(text)?.[0];
-  const feature = /FEAT-\d+/.exec(text)?.[0];
-  if (!spec || !story || !feature) {
-    yield* say("No Featra MCP.");
-    yield success("No Featra MCP.");
-    return;
-  }
-  const folder = `.featra/evidence/${feature}/${story}`;
-  mkdirSync(join(options.cwd, folder), { recursive: true });
-  writeFileSync(join(options.cwd, folder, "draft-shows.txt"), "The draft shows in Work.");
-  const id = `toolu_mcp_${++seq}`;
-  const input = {
-    stage: "In Review",
-    tasks: ["Write the draft"],
-    addTasks: ["Check the draft"],
-    criteria: [{ criterion: "The draft shows in Work", evidence: `${folder}/draft-shows.txt` }],
-    note: "Drafted and checked.",
-  };
-  yield assistant(`msg_${++seq}`, [{ type: "tool_use", id, name: "mcp__featra__update_card", input }]);
-  const result = await callMcpTool(spec, "update_card", input);
-  yield toolResult(id, result.text, result.isError);
-  yield* say(`Tool said: ${result.text}`);
-  yield success("Done.");
-}
-
 const nothing = () => {};
 const helpers = { MAIN, assistant, toolResult, say, success, next: () => ++seq, seq: () => seq };
 
@@ -254,8 +166,10 @@ export function query({ prompt, options }) {
       const said = brief ? "" : text;
       if (brief && process.env.FEATRA_E2E_REPORT === "evidence") {
         yield* evidenceTurn(helpers, options, text);
+      } else if (brief && process.env.FEATRA_E2E_REPORT === "proof") {
+        yield* proofTurn(helpers, options, text);
       } else if (brief && process.env.FEATRA_E2E_REPORT) {
-        yield* reportTurn(options, text);
+        yield* reportTurn(helpers, options, text);
       } else if (brief && process.env.FEATRA_E2E_STORY_TURN === "slow") {
         yield* slow(["The worktree is clean."], "Starting the story.");
       } else if (said.includes("request_action")) {
@@ -269,9 +183,9 @@ export function query({ prompt, options }) {
       } else if (said.includes("subagent")) {
         yield* subagentTurn(helpers, options, turn.signal, taskStopped);
       } else if (said.includes("decide")) {
-        yield* decideTurn(options);
+        yield* decideTurn(helpers, options);
       } else if (said.includes("draft")) {
-        yield* draftTurn(options, said.includes("again"));
+        yield* draftTurn(helpers, options, said.includes("again"));
       } else if (said.includes("tool")) {
         yield* toolTurn(options, turn.signal, said.includes("twice"));
       } else if (said.includes("question")) {

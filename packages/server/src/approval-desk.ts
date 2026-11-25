@@ -164,6 +164,7 @@ export function createApprovalDesk(tell: (chat: string, event: ChatEvent) => voi
         name,
         questions,
         ...(request.subagent ? { subagent: request.subagent } : {}),
+        ...(request.subject ? { subject: request.subject } : {}),
       };
       return hold<QuestionDecision>(chat, id, signal, opening, (settle) => ({
         kind: "question",

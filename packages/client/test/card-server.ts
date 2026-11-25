@@ -25,6 +25,7 @@ import {
   type WorkList,
 } from "@featra/work-format";
 import type { CardBridge, CardUpdate } from "../src/card-pane.ts";
+import { previewFake, withProof, type CardProof } from "./card-server-proof.ts";
 import { featureEndFakes, type FeatureActions } from "./card-server-features.ts";
 import { storyEndFakes, type StoryEndActions } from "./card-server-story-end.ts";
 import { storyFlowFakes, type StoryFlowActions } from "./card-server-story-flow.ts";
@@ -39,11 +40,14 @@ export type ReviewAnswers = Partial<
     | "startStory"
     | "rerunChecks"
     | "createPr"
+    | "previewStory"
     | StoryFlowActions
     | StoryEndActions
     | FeatureActions
   >
 >;
+
+export type { CardProof };
 
 /** The time the fake server stamps on a card edit. */
 export const EDIT_AT = "2026-11-05T12:00:00Z";
@@ -92,6 +96,8 @@ export function fakeCardServer(
   prOf: (dir: string, id: string) => CardPr | undefined = () => undefined,
   /** Whether the server finds an accepted feature can merge to main now, and why not (STORY-14). */
   mergeOf: (dir: string, id: string) => FeatureMergeState | undefined = () => undefined,
+  /** What the server adds to a story's card from its proof (STORY-25): why screenshots weren't taken, and Preview. */
+  proofOf: (dir: string, id: string) => CardProof | undefined = () => undefined,
 ) {
   const cardSets = new Map(Object.entries(given));
   const watchers = new Map<string, Set<(u: CardUpdate) => void>>();
@@ -100,9 +106,9 @@ export function fakeCardServer(
   const viewOf = (dir: string, id: string): CardView | null => {
     const cards = cardSets.get(dir) ?? [];
     const card = cards.find((c) => c.id === id);
-    return card
-      ? buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id), prOf(dir, id))
-      : null;
+    if (!card) return null;
+    const view = buildCardView(owned(card), true, { config: DEFAULT_CONFIG, cards }, checksOf(dir, id), prOf(dir, id));
+    return withProof(view, proofOf(dir, id));
   };
   const listOf = (dir: string): WorkList | null => {
     const cards = cardSets.get(dir);
@@ -110,11 +116,8 @@ export function fakeCardServer(
     const list = buildWorkList({ cards: cards.map(owned), stale: [], problems: [] }, DEFAULT_CONFIG);
     return withPrStatus(list, (id) => prOf(dir, id)?.status ?? undefined);
   };
-  /** The server sees the folder's cards change: it pushes the list and each watched card. */
-  const changed = (dir: string, card: Card) => {
-    const cards = cardSets.get(dir) ?? [];
-    // A card the folder doesn't have yet is one an agent just made (a draft).
-    cardSets.set(dir, cards.some((c) => c.id === card.id) ? replace(cards, card) : [...cards, card]);
+  /** The server pushes the folder's new list and each watched card (null when it is gone). */
+  const push = (dir: string) => {
     listChanged(dir, listOf(dir) as WorkList);
     for (const c of changes) c(dir);
     for (const [key, set] of watchers) {
@@ -122,18 +125,20 @@ export function fakeCardServer(
       if (d === dir) for (const l of set) l({ view: viewOf(dir, id), loading: false, error: null });
     }
   };
-  /** The server deletes cards: it pushes the new list, and each watched card that is gone is null. */
+  /** The server sees the folder's cards change. */
+  const changed = (dir: string, card: Card) => {
+    const cards = cardSets.get(dir) ?? [];
+    // A card the folder doesn't have yet is one an agent just made (a draft).
+    cardSets.set(dir, cards.some((c) => c.id === card.id) ? replace(cards, card) : [...cards, card]);
+    push(dir);
+  };
+  /** The server deletes cards. */
   const removed = (dir: string, ids: string[]) => {
     cardSets.set(
       dir,
       (cardSets.get(dir) ?? []).filter((c) => !ids.includes(c.id)),
     );
-    listChanged(dir, listOf(dir) as WorkList);
-    for (const c of changes) c(dir);
-    for (const [key, set] of watchers) {
-      const [d, id] = JSON.parse(key) as [string, string];
-      if (d === dir) for (const l of set) l({ view: viewOf(dir, id), loading: false, error: null });
-    }
+    push(dir);
   };
   const bridge: CardBridge = {
     watchCard: (dir, id, listener) => {
@@ -228,6 +233,7 @@ export function fakeCardServer(
       calls.push(`createPr:${dir}:${id}`);
       return review.createPr ? review.createPr(dir, id) : { ok: true };
     },
+    previewStory: previewFake(calls, review.previewStory),
     ...storyFlowFakes({
       cardsIn: (dir) => cardSets.get(dir) ?? [],
       changed,

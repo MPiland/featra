@@ -61,6 +61,10 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   folder `.featra/evidence/FEAT-N/STORY-M/` and linked from the criterion's line. The card pane and the review screen
   show it beside the criterion: a screenshot as a thumbnail, anything else as a link (ADR 0043). Not the same as a
   story's **evidence state**.
+- **Proof** — how a project's stories show they work beside their tests: screenshots, Preview, both or neither. A
+  project setting, asked once when its first feature is shaped and changed in Settings > Project (ADR 0044).
+- **Dev server** — the project's own server for its pages, started by Featra in a story's worktree with the command
+  the user confirmed. One per story, reused; it serves captured screenshots and **Preview**, the window that opens it.
 - **Evidence state** — what is actually known about a story:
   - **Reported** — an agent said so (ticked a task, moved a stage).
   - **Verified** — the PR's CI checks passed.

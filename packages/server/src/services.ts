@@ -23,9 +23,8 @@ import { createReviewDiffs } from "./review-diffs.ts";
 import { createStoryMessage } from "./story-message.ts";
 import { createStorySpawn } from "./story-spawn.ts";
 import { createStoryAcceptance } from "./story-acceptance.ts";
-import { createStoryMerge } from "./story-merge.ts";
-import { createStoryAbandon } from "./story-abandon.ts";
-import { createStoryEnding } from "./story-ending.ts";
+import { createProofServices } from "./proof-services.ts";
+import { createStoryEndServices } from "./story-end-services.ts";
 import { createMergeRequest } from "./merge-request.ts";
 import { createBugFiling } from "./bug-filing.ts";
 import { createActionRequest } from "./action-request.ts";
@@ -37,9 +36,7 @@ import { createGit } from "./git.ts";
 import { createProjectNeeds } from "./project-needs.ts";
 import { createLogWriter } from "./log-writer.ts";
 import { createStoryHold } from "./story-hold.ts";
-import { readAppAutoMerge, readAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
-import { createAutoMerge } from "./auto-merge.ts";
-import { recordNotMerged } from "./not-merged-record.ts";
+import { readAppAutoMerge, readKnowledge, readMcpEnabled, readMaxStoryAgents } from "./mcp-enabled.ts";
 import { createRepoGit } from "./repo-git.ts";
 import { createClaudeReader } from "./claude-reader.ts";
 import { createCodexReader } from "./codex-reader.ts";
@@ -73,6 +70,8 @@ export function createServices({
   ghTimeoutMs,
   checkTimeoutMs,
   prTimers = systemTimers(),
+  capturePage,
+  devServers,
 }: ServiceOptions): Services {
   // A scan's config carries the auto-merge setting in effect, the app default included, for Hold (STORY-61).
   const appAutoMerge = readAppAutoMerge(dataDir);
@@ -129,12 +128,34 @@ export function createServices({
     storyLimit: readMaxStoryAgents(dataDir),
     mcp: { attach: (chat) => agents.attach(chat), release: (chat) => agents.release(chat) },
   });
+  // The project's proof: its dev servers, the screenshots a move to review attaches, the proof question (STORY-25).
+  const proof = createProofServices({
+    scan: watches.scan,
+    lane,
+    chats,
+    log,
+    dataDir,
+    capture: capturePage,
+    devServers,
+  });
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
-  // A story that is merging or being abandoned takes no message, Send back or Resume: its session is about to end
-  // (STORY-12, STORY-58).
-  const ending = createStoryEnding();
-  const busy = ending.busy;
+  const ends = createStoryEndServices({
+    scan: watches.scan,
+    observe: watches.observe,
+    allowed,
+    now,
+    lane,
+    log,
+    dataDir,
+    settings: checkSettings,
+    chats,
+    checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
+    onGithubMerge: (dir) => prs.refresh(dir),
+    gh,
+    stopDevServer: (dir, id) => proof.servers.stop(dir, id),
+  });
+  const { busy, merges, autoMerges, abandons } = ends;
   const stops = createStoryStop({
     scan: watches.scan,
     now,
@@ -145,37 +166,6 @@ export function createServices({
   });
   const holds = createStoryHold({ scan: watches.scan, now, lane });
   const acceptance = createStoryAcceptance({ scan: watches.scan, now, lane, chats, busy });
-  const merges = createStoryMerge({
-    scan: watches.scan,
-    now,
-    lane,
-    log,
-    settings: checkSettings,
-    chats,
-    checkedHead: (dir, id, stored) => checks.settledHead(dir, id, stored),
-    ...gh,
-    ending,
-    onGithubMerge: (dir) => prs.refresh(dir),
-  });
-  // A Verified and Proven story merges on its own while the project's auto-merge is on (STORY-59).
-  const autoMerges = createAutoMerge({
-    observe: watches.observe,
-    allowed,
-    enabled: readAutoMerge(dataDir),
-    merge: merges.merge,
-    chats,
-    record: (dir, id, tried, reason) => recordNotMerged({ scan: watches.scan, lane, now }, dir, id, tried, reason),
-    log,
-  });
-  const abandons = createStoryAbandon({
-    scan: watches.scan,
-    now,
-    lane,
-    settings: checkSettings,
-    chats,
-    ...gh,
-    ending,
-  });
   const features = createFeatureEnd({
     scan: watches.scan,
     observe: watches.observe,
@@ -199,6 +189,7 @@ export function createServices({
     lane,
     leads: (dir, story) =>
       chats.list(dir).flatMap((c) => (c.story?.id === story && c.story.parent ? [c.story.parent] : [])),
+    proof: proof.capture,
   });
   const agents = createAgentBridge({
     entry: mcpEntry ?? null,
@@ -219,11 +210,13 @@ export function createServices({
     summaries: createFeatureSummary({ scan: watches.scan, lane, now, chats, gitCommand }),
     changes,
     actions: createActionRequest({ chats }),
+    proofQuestion: proof.question,
   });
   // A project the user closed takes its chats with it.
   const stopClosing = allowed.onChange(() => {
     chats.closeProjects(allowed.has);
     roleWatches.closeProjects(allowed.has);
+    proof.servers.keepProjects(allowed.dirs());
   });
   // What every open project needs from the user, for the project switcher (STORY-66) and the taskbar and Dock badge
   // (STORY-67); started by the first watch.
@@ -259,6 +252,7 @@ export function createServices({
     needs: async (listener) => needs.watch(listener),
     diffs,
     evidence: createEvidenceFiles({ scan: watches.shown, gitCommand, dataDir, log }),
+    proof: { settings: proof.settings, capture: proof.capture },
   });
   // Saved settings that change a project's auto-merge setting in effect rescan it and re-check auto-merge (STORY-61).
   const settingsChanges = createSettingsChanges({
@@ -273,8 +267,10 @@ export function createServices({
     agents,
     needs,
     settingsChanged: settingsChanges.saved,
+    devServers: proof.servers,
     async close() {
       stopClosing();
+      proof.servers.stopAll();
       checks.close();
       prs.close();
       features.close();

@@ -53,6 +53,8 @@ export interface CardBridge {
   createPr: (dir: string, id: string) => Promise<ReviewResult>;
   /** Merges a Verified story into its feature branch with a merge commit (STORY-12). */
   mergeStory: (dir: string, id: string) => Promise<MergeResult>;
+  /** Starts the story's dev server in its worktree for Preview (STORY-25); its URL, or why it didn't start. */
+  previewStory: (dir: string, id: string) => Promise<PreviewResult>;
   /** Holds a story back from auto-merge (`held`), or lets it go; recorded in its history (STORY-61). */
   holdStory: (dir: string, id: string, held: boolean) => Promise<ReviewResult>;
   /** What abandoning a story would lose, which the user confirms (STORY-58); or why it can't be abandoned. */
@@ -92,6 +94,8 @@ const ended = (call: Promise<unknown>): Promise<MergeResult> =>
 export type StartStoryResult = { ok: true; chat: string; queued: boolean } | { ok: false; error: string };
 
 /** Whether Approve or Reject went through, or why not. */
+export type PreviewResult = { ok: true; url: string } | { ok: false; error: string };
+
 export type ReviewResult = { ok: true } | { ok: false; error: string };
 
 /** Why a send-back didn't go, or that it did; `recorded` is false when the chat has it but history doesn't. */
@@ -231,6 +235,14 @@ export function serverCards(server: ServerClient): CardBridge {
     createPr: (dir, id) => review(server.call("story.createPr", { dir, id })),
     mergeStory: (dir, id) => ended(server.call("story.merge", { dir, id })),
     holdStory: (dir, id, held) => review(server.call("story.hold", { dir, id, held })),
+    previewStory: (dir, id) =>
+      server.call("preview.start", { dir, id }).then(
+        (r): PreviewResult =>
+          isRecord(r) && typeof r.url === "string"
+            ? { ok: true, url: r.url }
+            : { ok: false, error: "Featra gave an unexpected answer." },
+        (err: unknown): PreviewResult => ({ ok: false, error: errorMessage(err) }),
+      ),
     abandonCheck: (dir, id) =>
       server.call("story.abandonCheck", { dir, id }).then(
         (r): AbandonCheck => {
@@ -267,6 +279,7 @@ export function noCards(error: string): CardBridge {
     rerunChecks: async () => ({ ok: false, error }),
     mergeStory: async () => ({ ok: false, error }),
     holdStory: async () => ({ ok: false, error }),
+    previewStory: async () => ({ ok: false, error }),
     abandonCheck: async () => ({ ok: false, error }),
     abandonStory: async () => ({ ok: false, error }),
     stopStory: async () => ({ ok: false, error }),

@@ -1,4 +1,5 @@
 import type { CardViewAc } from "@featra/work-format/card-view";
+import type { ProofNote } from "@featra/work-format/proof";
 import { createContext, useContext, useEffect, useState, type MouseEvent } from "react";
 import { EVIDENCE_COPY, evidenceName, type EvidenceFile } from "@featra/work-format/evidence-link";
 import type { EvidenceBridge } from "../../evidence.ts";
@@ -90,13 +91,26 @@ function EvidenceBody({ card, path }: { card: string; path: string }) {
 /**
  * A criterion's evidence (STORY-72), shared by the card pane and the review screen: a screenshot as a thumbnail that
  * opens full size, any other file as a link that opens it with the OS, or a short note when it can't be shown. The
- * rest of the criterion never depends on it; a criterion without evidence shows nothing here.
+ * rest of the criterion never depends on it. Why Featra couldn't attach a screenshot (STORY-25) shows beside it, with
+ * the dev server's last output when it didn't start; a criterion with neither shows nothing here.
  */
 export function AcEvidence({ card, ac }: { card: string; ac: CardViewAc }) {
-  if (!ac.evidence) return null;
+  if (!ac.evidence && !ac.proofNote) return null;
   return (
     <div className="ac-evidence">
-      <EvidenceBody card={card} path={ac.evidence} />
+      {ac.evidence && <EvidenceBody card={card} path={ac.evidence} />}
+      {ac.proofNote && <ProofNoteLine note={ac.proofNote} />}
     </div>
+  );
+}
+
+/** Why a screenshot wasn't attached, and the dev server's output behind a disclosure. */
+function ProofNoteLine({ note }: { note: ProofNote }) {
+  if (!note.output) return <span className="evidence-note">{note.note}</span>;
+  return (
+    <details className="evidence-note proof-note">
+      <summary>{note.note}</summary>
+      <pre>{note.output}</pre>
+    </details>
   );
 }

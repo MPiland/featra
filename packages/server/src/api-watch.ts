@@ -16,6 +16,7 @@ import type { AllowedProjects } from "./allowed-projects.ts";
 import type { Connection } from "./api.ts";
 import { cardViewIn, ownedIn } from "./card-actions.ts";
 import type { FeatureEnd } from "./feature-end.ts";
+import type { ProofCapture } from "./proof-capture.ts";
 import type { ReviewDiffs } from "./review-diffs.ts";
 import type { StoryChecks } from "./story-checks.ts";
 import type { StoryPrs } from "./story-prs.ts";
@@ -30,21 +31,25 @@ export interface WatchApiDeps {
   features?: Pick<FeatureEnd, "checksFor" | "prState" | "mergeState">;
   /** What each story changed, from git (STORY-69). Without it the review shows no diff stats. */
   diffs?: Pick<ReviewDiffs, "of" | "repo">;
+  /** Adds a story's proof notes and Preview to its card (STORY-25). */
+  proof?: Pick<ProofCapture, "decorate">;
   /** A card's folder, an open project, and its id; throws otherwise. */
   card: (params: unknown) => [dir: string, id: string];
 }
 
 export type WatchMethod = "card.watch" | "review.watch";
 
-export function createWatchApi({ watches, allowed, checks, prs, features, diffs, card }: WatchApiDeps) {
+export function createWatchApi({ watches, allowed, checks, prs, features, diffs, card, proof }: WatchApiDeps) {
   /** Card `id` of `dir` as the card pane shows it, with its checks, PR and merge state as last read. */
-  const viewIn = (dir: string, scan: Scan | null) => (id: string) =>
-    cardViewIn(
+  const viewIn = (dir: string, scan: Scan | null) => (id: string) => {
+    const view = cardViewIn(
       scan,
       id,
       checks.checksFor(dir, id) ?? features?.checksFor(dir, id),
       prs.prState(dir, id) ?? features?.prState(dir, id),
     );
+    return proof ? proof.decorate(dir, scan, view) : view;
+  };
 
   /** Feature `id`'s review screen, with where its approval stands; null when `id` isn't a feature with a Work row. */
   function reviewIn(dir: string, scan: Scan | null, list: WorkList, id: string): FeatureReview | null {
