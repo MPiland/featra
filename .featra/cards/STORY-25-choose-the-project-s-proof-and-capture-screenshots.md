@@ -2,7 +2,7 @@
 id: STORY-25
 type: story
 title: Choose the project's proof and capture screenshots
-status: In Review
+status: Done
 parent: FEAT-9
 order: 6
 origin: planned
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:story-25
+  - at: 2026-11-25T03:51:29Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-25T03:51:29Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
