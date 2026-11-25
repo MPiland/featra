@@ -3460,4 +3460,5 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - **Rounds** (Dev Lead decision): any move into review starts a new round, including the user moving a story back from
   Acceptance. A clear from an earlier round never carries over.
 - **Findings** are delivered only after every other check on the report has passed, just before the card is written.
+- **Send back** beside Accept (a story's Work row, its session's end) is the same compact action button as Accept, not the dialog's larger button, so the row stays on one line. It predates STORY-73 (STORY-23), and showed in its Acceptance screenshot.
 - Recorded in ADR 0045.

@@ -16,6 +16,8 @@ export interface SendBackProps {
   unavailable: string | null;
   /** Its words where it is another action with the same form: "Not yet" on a review screen (STORY-71). */
   copy?: Partial<SendBackCopy>;
+  /** The opener's class, to match the actions beside it (Accept's in a row). Default: the dialog button. */
+  button?: string;
 }
 
 /** The words the button and its form show. */
@@ -46,7 +48,15 @@ const count = (n: number) => `${n.toLocaleString("en-US")} / ${SEND_BACK_MAX.toL
  * is empty or only spaces, or past the limit. A refusal is shown with the reason kept and focus back in the field, so it
  * can be sent again; if the chat has the message but history couldn't record it, the form closes and says so.
  */
-export function SendBack({ onSend, unavailable, criterion = false, name, into = null, copy }: SendBackProps) {
+export function SendBack({
+  onSend,
+  unavailable,
+  criterion = false,
+  name,
+  into = null,
+  copy,
+  button = "btn",
+}: SendBackProps) {
   const words = { ...SEND_BACK_COPY, ...copy };
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
@@ -118,7 +128,7 @@ export function SendBack({ onSend, unavailable, criterion = false, name, into = 
         <button
           ref={opener}
           type="button"
-          className="btn"
+          className={button}
           disabled={unavailable !== null}
           aria-label={name}
           aria-describedby={unavailable ? hint : undefined}

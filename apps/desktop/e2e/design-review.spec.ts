@@ -135,6 +135,8 @@ test("Design review: the Dev Lead's findings reach the story's session and keep 
     await expect(sent).toContainText("Design review: findings sent");
     await expect(sent).toContainText(FINDINGS);
     await expect(again.getByRole("button", { name: "Status: In Review" })).toBeVisible();
+    // The card was opened again: its screenshot shows once it is read back.
+    await expect(again.getByRole("button", { name: "Open ac1-page.png" })).toBeVisible();
     await uxShot(page, "feat9-design-review-findings", sent);
 
     // The Dev Lead clears the review and moves the story on to Acceptance, in one call.
@@ -145,6 +147,8 @@ test("Design review: the Dev Lead's findings reach the story's session and keep 
     await expect(done.getByRole("button", { name: "Status: Acceptance" })).toBeVisible({ timeout: 30_000 });
     const cleared = done.getByRole("group", { name: "Design review" });
     await expect(cleared).toContainText("Design review: cleared");
+    // The screenshot stays on the card at Acceptance.
+    await expect(done.getByRole("button", { name: "Open ac1-page.png" })).toBeVisible();
     await uxShot(page, "feat9-design-review-cleared", cleared);
   });
 });

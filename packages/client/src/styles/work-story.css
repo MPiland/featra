@@ -98,6 +98,7 @@
 .draft-actions > .story-action,
 .draft-actions > .story-agent,
 .story-action > .review-draft,
+.story-action > .send-back > .review-draft,
 .story-agent > .review-draft {
   margin-left: 0;
 }

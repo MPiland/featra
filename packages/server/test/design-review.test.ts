@@ -114,6 +114,12 @@ describe("AC1 and AC2: a story with screenshots waits in review for the Dev Lead
     ]);
     expect((await view("STORY-5")).designReview).toEqual({ status: "cleared", shots: [shot] });
   });
+
+  it("still shows the screenshots on the card once it is cleared and at Acceptance", async () => {
+    const shown = await view("STORY-5");
+    expect(shown.status).toBe("Acceptance");
+    expect(shown.acs.map((ac) => ac.evidence)).toContain(shot);
+  });
 });
 
 describe("findings the story's session can't take now", () => {
