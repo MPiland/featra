@@ -2,7 +2,7 @@
 id: BUG-42
 type: bug
 title: Windows e2e Settings pull requests switch misses 5 s
-status: New
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: dev-lead
+  - at: 2026-11-25T13:40:00Z
+    field: status
+    from: New
+    to: Done
+    by: session:bug-44
 ---
 
 ## Description
@@ -45,3 +50,5 @@ six jobs passed:
 - [ ] Fix the cause without weakening the test
 
 ## Notes
+
+Fixed by BUG-44: the setting's answer waited behind the scans every service queued at start; asks now share the next scan, and config writes retry a Windows EPERM. E2E (Windows) passed 10 runs in a row on PR #92: run 45671030090, attempts 1-10.

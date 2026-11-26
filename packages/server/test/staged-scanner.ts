@@ -11,9 +11,9 @@ export function stagedScanner(real: Scanner) {
   let calls = 0;
   const scanner: Scanner = {
     ...real,
-    async scan(dir, reuse) {
+    async scan(...args) {
       calls += 1;
-      const scan = await real.scan(dir, reuse);
+      const scan = await real.scan(...args);
       const staged = armed;
       if (staged && scan?.collected.copies.some((c) => c.workingTree && !c.card && c.path === cardPath(staged.id))) {
         armed = null;

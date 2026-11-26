@@ -67,28 +67,52 @@ function frameText(data: RawData): string {
 }
 
 /** The connection a socket's requests act through: its pushes, and the watches that end when it closes. */
-function connect(socket: WebSocket): { connection: Connection; closeAll: () => void } {
+interface Link {
+  connection: Connection;
+  ask: <T>(id: number, work: () => Promise<T>) => Promise<T>;
+  closeAll: () => void;
+}
+
+function connect(socket: WebSocket): Link {
   const kept = new Map<number, () => void>();
+  /** Requests not answered yet. */
+  const asking = new Set<number>();
+  /** Watches the client ended before their answer: each is stopped as it is kept (BUG-44). */
+  const ended = new Set<number>();
   const unwatch = (id: number) => {
     const stop = kept.get(id);
     kept.delete(id);
+    if (!stop && asking.has(id)) ended.add(id);
     stop?.();
     return Boolean(stop);
   };
   return {
+    /** Runs request `id`; an end that came before it kept a watch is forgotten once it answers, kept or not. */
+    async ask(id, work) {
+      asking.add(id);
+      try {
+        return await work();
+      } finally {
+        asking.delete(id);
+        ended.delete(id);
+      }
+    },
     connection: {
       push(event, watch, data) {
         if (socket.readyState === socket.OPEN) socket.send(JSON.stringify({ event, watch, data }));
       },
       keep(id, stop) {
-        unwatch(id);
-        if (socket.readyState === socket.OPEN) kept.set(id, stop);
-        else stop();
+        const stale = kept.get(id);
+        kept.delete(id);
+        stale?.();
+        if (ended.delete(id) || socket.readyState !== socket.OPEN) stop();
+        else kept.set(id, stop);
       },
       unwatch,
     },
     closeAll: () => {
       for (const id of kept.keys()) unwatch(id);
+      ended.clear();
     },
   };
 }
@@ -128,7 +152,7 @@ export function startServer({ token, api, agents, log, port = 0 }: ServerOptions
     verifyClient: ({ req }: { req: IncomingMessage }) => authorised(req, token, agents),
   });
 
-  const answer = async (socket: WebSocket, connection: Connection, text: string) => {
+  const answer = async (socket: WebSocket, { connection, ask }: Link, text: string) => {
     const request = parseRequest(text);
     if ("error" in request) {
       if (request.id !== null) socket.send(JSON.stringify({ id: request.id, ok: false, error: request.error }));
@@ -137,7 +161,7 @@ export function startServer({ token, api, agents, log, port = 0 }: ServerOptions
     await respond(
       socket,
       request.id,
-      () => api(request.method, request.params, request.id, connection),
+      () => ask(request.id, () => api(request.method, request.params, request.id, connection)),
       (err) => {
         if (!(err instanceof ApiError)) log(`${request.method} failed: ${errorMessage(err)}`);
       },
@@ -156,11 +180,11 @@ export function startServer({ token, api, agents, log, port = 0 }: ServerOptions
       socket.on("error", (err) => log(`Socket error: ${err.message}`));
       return;
     }
-    const { connection, closeAll } = connect(socket);
-    socket.on("close", closeAll);
+    const link = connect(socket);
+    socket.on("close", link.closeAll);
     socket.on("message", (data, isBinary) => {
       if (isBinary) return socket.close(1003, "Text frames only.");
-      void answer(socket, connection, frameText(data));
+      void answer(socket, link, frameText(data));
     });
     socket.on("error", (err) => log(`Socket error: ${err.message}`));
   });

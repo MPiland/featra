@@ -3,9 +3,7 @@
  * an edit is written to that copy only: never to a stale copy, and never to a location that isn't checked out. The
  * edit itself is work-format's `applyCardEdit`; the write is atomic (a temporary file, then a rename).
  */
-import { randomBytes } from "node:crypto";
-import { rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import {
   applyCardEdit,
   buildCardView,
@@ -20,10 +18,12 @@ import {
   type CardUpdateResult,
   type CardView,
 } from "@featra/work-format";
-import { retryBusy } from "./busy-retry.ts";
+import { writeAtomic } from "./atomic-write.ts";
 import { createCardLane, type CardLane } from "./card-lane.ts";
 import { locationKey } from "./collect.ts";
 import type { Scan } from "./work-scan.ts";
+
+export { writeAtomic, type AtomicIo } from "./atomic-write.ts";
 
 export interface CardActionDeps {
   /**
@@ -61,26 +61,6 @@ export function ownedIn(scan: Scan | null, id: string) {
 export function cardViewIn(scan: Scan | null, id: string, checks?: CardChecks, prState?: CardPr): CardView | null {
   const found = ownedIn(scan, id);
   return scan && found ? buildCardView(found.owned, found.root !== null, contextOf(scan), checks, prState) : null;
-}
-
-export interface AtomicIo {
-  rename?: typeof rename;
-  pause?: (ms: number) => Promise<unknown>;
-}
-
-/**
- * Writes `text` to `file` through a temporary file in the same folder, so no reader sees half a card. A rename that
- * Windows refuses because a scan or a scanner has the card open is tried again a few times (BUG-16).
- */
-export async function writeAtomic(file: string, text: string, { rename: move = rename, pause }: AtomicIo = {}) {
-  const temp = join(dirname(file), `.${randomBytes(6).toString("hex")}.featra-tmp`);
-  try {
-    await writeFile(temp, text, "utf8");
-    await retryBusy(() => move(temp, file), pause);
-  } catch (err) {
-    await rm(temp, { force: true });
-    throw err;
-  }
 }
 
 export const fileIn = (root: string, path: string) => join(root, ...path.split("/"));

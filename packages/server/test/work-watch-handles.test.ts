@@ -4,7 +4,7 @@ import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createWorkWatches, type WatchFolder } from "../src/work-watch.ts";
-import { createScanner } from "../src/work-scan.ts";
+import { createScanner, type Scanner } from "../src/work-scan.ts";
 import { createRepoGit } from "../src/repo-git.ts";
 import { card, cardRepo, type CardRepo } from "./card-repo.ts";
 import { countedGit } from "./counted-git.ts";
@@ -102,6 +102,82 @@ describe("watch handles", () => {
       calls.length = 0;
       // Node doesn't promise a name; without one the event can't be ruled out (BUG-6).
       worktrees?.hear("rename", null);
+      await until(() => calls.includes("worktrees"));
+    } finally {
+      stop();
+      watches.close();
+      await own.close();
+    }
+    expect(logged).toEqual([]);
+  });
+
+  it("starts git's watchers before the first scan reads git, so the rescan after it doesn't ask git again (BUG-44)", async () => {
+    const { git, calls } = countedGit();
+    const own = createScanner(git);
+    // Where recursive watchers don't share one stream (Windows, Linux).
+    const watches = createWorkWatches(own, (m) => logged.push(m), fakeWatch, false);
+    const { stop } = await watches.watch(repo.main, () => {});
+    try {
+      calls.length = 0;
+      // The first scan started the `.featra` watchers after it read the cards, so a rescan follows it (BUG-12).
+      await watches.scan(repo.main);
+      expect(calls).toEqual([]);
+    } finally {
+      stop();
+      watches.close();
+      await own.close();
+    }
+    expect(logged).toEqual([]);
+  });
+
+  it("asks git again after a scan starts a recursive watcher where recursive watchers share one stream (macOS)", async () => {
+    const other = await cardRepo();
+    await other.write(other.main, card("FEAT-1", "feature", null, "draft"));
+    other.commit(other.main, "plan");
+    const real = createScanner(createRepoGit());
+    let committed = false;
+    const own: Scanner = {
+      ...real,
+      async scan(...args) {
+        const scan = await real.scan(...args);
+        // A commit lands after the first scan read git and before its `.featra` watcher starts. Starting it restarts
+        // the stream every recursive watcher shares, which drops the commit's event: the fake delivers none.
+        if (!committed) {
+          committed = true;
+          other.commit(other.main, "work");
+        }
+        return scan;
+      },
+    };
+    const watches = createWorkWatches(own, (m) => logged.push(m), fakeWatch, true);
+    const { stop } = await watches.watch(other.main, () => {});
+    try {
+      const head = other.git(other.main, "rev-parse", "HEAD");
+      const heads = async () => [...((await watches.shown(other.main))?.collected.heads.values() ?? [])];
+      await until(async () => (await heads()).includes(head));
+    } finally {
+      stop();
+      watches.close();
+      await real.close();
+      await other.dispose();
+    }
+    expect(logged).toEqual([]);
+  });
+
+  it("asks git again when a worktree's folder comes or goes, not when only its times change", async () => {
+    const { git, calls } = countedGit();
+    const own = createScanner(git);
+    const watches = createWorkWatches(own, (m) => logged.push(m), fakeWatch);
+    const { stop } = await watches.watch(repo.main, () => {});
+    try {
+      const worktrees = made.find((w) => w.path === join(repo.main, ".git", "worktrees") && !w.closed);
+      await watches.shown(repo.main);
+      calls.length = 0;
+      // Windows reports git reading a worktree's folder as a change to it (BUG-44).
+      worktrees?.hear("change", "story-1");
+      await watches.scan(repo.main);
+      expect(calls).toEqual([]);
+      worktrees?.hear("rename", "story-1");
       await until(() => calls.includes("worktrees"));
     } finally {
       stop();

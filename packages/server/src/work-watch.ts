@@ -5,11 +5,11 @@
  * shared per folder and end when the last listener stops. A scan that fails, or reads a card a writer has just emptied,
  * is tried once more when that settles; one that fails again keeps the last good list, with the problem (BUG-24, BUG-25).
  */
-import { watch, type FSWatcher } from "node:fs";
-import { basename, isAbsolute, join } from "node:path";
+import { watch } from "node:fs";
 import { setTimeout as pause } from "node:timers/promises";
-import { copyKey, EMPTY_WORK_LIST, errorMessage, FEATRA_DIR, type WorkList } from "@featra/work-format";
+import { copyKey, EMPTY_WORK_LIST, errorMessage, type WorkList } from "@featra/work-format";
 import type { Scan, Scanner } from "./work-scan.ts";
+import { SHARED_RECURSIVE, targetsOf, watchTargets, type WatchFolder, type WatchSet } from "./work-watch-targets.ts";
 
 export type WorkListener = (list: WorkList) => void;
 
@@ -35,17 +35,6 @@ export interface WorkWatches {
 
 /** How long a burst of file events settles before the rescan. */
 export const SETTLE_MS = 50;
-
-interface Target {
-  path: string;
-  recursive: boolean;
-  /** Only events for these file names count. */
-  names?: readonly string[];
-  /** Events for the folder's own entries count too: a worktree's folder added or removed (BUG-6). */
-  children?: boolean;
-  /** An event here means git's state changed, so the rescan asks git again. */
-  git?: boolean;
-}
 
 /** Hears every scan; it decides itself whether anything it cares about changed. */
 type ScanListener = (scan: Scan | null, list: WorkList) => void;
@@ -74,94 +63,29 @@ const unsettled = (scan: Scan | null, before: Scan | null) => {
   return [...unreadable(scan)].some((c) => !was.has(c));
 };
 
-interface Entry {
+interface Entry extends WatchSet {
   dir: string;
   listeners: Set<ScanListener>;
-  watchers: Map<string, FSWatcher>;
   queue: Promise<Outcome>;
+  /** The scan queued and not started yet: a new ask joins it rather than queue another (BUG-44). */
+  pending: Promise<Outcome> | null;
   timer: ReturnType<typeof setTimeout> | undefined;
   closed: boolean;
   /** The last scan, whose git state the next rescan reuses unless `gitChanged`. */
   last: Scan | null;
-  gitChanged: boolean;
 }
 
-/** Whether an event for `name` (relative to the target, or absolute for the target itself) counts. */
-function counts(t: Target, name: string | null): boolean {
-  // Node doesn't promise a name, and an event without one can't be ruled out (BUG-6).
-  if (!t.names || !name) return true;
-  if (t.names.includes(basename(name))) return true;
-  return Boolean(t.children) && !/[\\/]/.test(name);
-}
-
-function targetsOf(dir: string, scan: Scan | null): Target[] {
-  // The opened folder itself, so a `.featra` made there (by init) starts the list.
-  const targets: Target[] = [{ path: dir, recursive: false, names: [FEATRA_DIR] }];
-  if (!scan) return targets;
-  const { top, common } = scan.collected.paths;
-  for (const root of new Set([top, ...scan.collected.roots.values()])) {
-    targets.push(
-      { path: root, recursive: false, names: [FEATRA_DIR] },
-      { path: join(root, FEATRA_DIR), recursive: true },
-    );
-  }
-  targets.push(
-    // `worktrees` itself comes with the first worktree and goes with the last.
-    { path: common, recursive: false, names: ["HEAD", "packed-refs", "worktrees"], git: true },
-    { path: join(common, "refs", "heads"), recursive: true, git: true },
-    { path: join(common, "worktrees"), recursive: true, names: ["HEAD", "gitdir"], children: true, git: true },
-  );
-  return targets;
-}
-
-/** `fs.watch`, or a stand-in for tests that drive a watcher's events and errors themselves. */
-export type WatchFolder = typeof watch;
+export type { WatchFolder };
 
 export function createWorkWatches(
   scanner: Scanner,
   log: (message: string) => void,
   watchFolder: WatchFolder = watch,
+  sharedRecursive = SHARED_RECURSIVE,
 ): WorkWatches {
   const entries = new Map<string, Entry>();
 
-  /** Starts and ends watchers to match `targets`; whether it started any. */
-  const rewatch = (e: Entry, targets: Target[]): boolean => {
-    let started = false;
-    const wanted = new Map(targets.map((t) => [`${t.recursive ? "r" : "f"}|${t.path}`, t]));
-    for (const [key, w] of e.watchers) {
-      if (wanted.has(key)) continue;
-      w.close();
-      e.watchers.delete(key);
-    }
-    for (const [key, t] of wanted) {
-      if (e.watchers.has(key)) continue;
-      try {
-        const gone = () => {
-          w.close();
-          // A closed watcher's late event or error must not drop the newer watcher under its key (BUG-6).
-          if (e.watchers.get(key) !== w) return;
-          e.watchers.delete(key);
-          e.gitChanged = true;
-          trigger(e);
-        };
-        const w = watchFolder(t.path, { recursive: t.recursive, persistent: false }, (_type, name) => {
-          // Windows names the folder itself, absolute, without end once it's deleted (BUG-6).
-          if (name && isAbsolute(name)) return gone();
-          if (!counts(t, name)) return;
-          if (t.git) e.gitChanged = true;
-          trigger(e);
-        });
-        w.on("error", gone);
-        e.watchers.set(key, w);
-        started = true;
-        // What git said before this watcher started may be out of date already: the next scan asks again.
-        if (t.git) e.gitChanged = true;
-      } catch {
-        // Not there (yet): the next scan tries again.
-      }
-    }
-    return started;
-  };
+  const { rewatch, watchGit } = watchTargets<Entry>(watchFolder, (e) => trigger(e), sharedRecursive);
 
   /** One scan. One that fails keeps the last good scan and list, with the problem added (BUG-25). */
   const attempt = async (e: Entry): Promise<Outcome> => {
@@ -169,7 +93,9 @@ export function createWorkWatches(
     const reuse = e.gitChanged ? undefined : e.last?.collected.git;
     e.gitChanged = false;
     try {
-      const scan = await scanner.scan(e.dir, reuse);
+      const scan = await scanner.scan(e.dir, reuse, (paths) => {
+        if (!e.closed) watchGit(e, paths.common, reuse !== undefined);
+      });
       e.last = scan;
       return { scan, list: scan?.list ?? EMPTY_WORK_LIST, failed: false };
     } catch (err) {
@@ -201,12 +127,20 @@ export function createWorkWatches(
     return out;
   };
 
-  const run = (e: Entry) => {
-    e.queue = e.queue.then(
-      () => scanOnce(e),
-      () => scanOnce(e),
-    );
-    return e.queue;
+  /**
+   * A scan that starts after this call: the one queued and not started yet, else a new one. Asks that come while a
+   * scan runs share the next one, so they don't queue a scan each, each running git (BUG-44).
+   */
+  const run = (e: Entry): Promise<Outcome> => {
+    if (e.pending) return e.pending;
+    const go = () => {
+      e.pending = null;
+      return scanOnce(e);
+    };
+    const next: Promise<Outcome> = e.queue.then(go, go);
+    e.pending = next;
+    e.queue = next;
+    return next;
   };
 
   function trigger(e: Entry) {
@@ -231,6 +165,7 @@ export function createWorkWatches(
         listeners: new Set(),
         watchers: new Map(),
         queue: Promise.resolve({ scan: null, list: EMPTY_WORK_LIST, failed: false }),
+        pending: null,
         timer: undefined,
         closed: false,
         last: null,

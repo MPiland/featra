@@ -16,7 +16,7 @@ import {
 } from "@featra/work-format";
 import { indexFile, openCardIndex, type CardIndex } from "./card-index.ts";
 import { collect, locationKey, type Collected, type GitState } from "./collect.ts";
-import type { RepoGit } from "./repo-git.ts";
+import type { RepoGit, RepoPaths } from "./repo-git.ts";
 
 export interface Scan {
   collected: Collected;
@@ -25,8 +25,11 @@ export interface Scan {
 }
 
 export interface Scanner {
-  /** Null when `dir` isn't a Featra project in git. With `reuse`, git isn't asked again (ADR 0016). */
-  scan: (dir: string, reuse?: GitState) => Promise<Scan | null>;
+  /**
+   * Null when `dir` isn't a Featra project in git. With `reuse`, git isn't asked again (ADR 0016). `onPaths` hears the
+   * repository's paths before the rest of git is read.
+   */
+  scan: (dir: string, reuse?: GitState, onPaths?: (paths: RepoPaths) => void) => Promise<Scan | null>;
   /** The Work list of `dir`: empty when it isn't a Featra project in git. */
   list: (dir: string) => Promise<WorkList>;
   /** Waits for scans in flight, then closes the indexes (a later scan opens them again). */
@@ -92,10 +95,10 @@ export function createScanner(git: RepoGit, { appAutoMerge }: ScannerOptions = {
   };
 
   const inFlight = new Set<Promise<Scan | null>>();
-  const scanNow = async (dir: string, reuse?: GitState): Promise<Scan | null> => {
+  const scanNow = async (dir: string, reuse?: GitState, onPaths?: (paths: RepoPaths) => void): Promise<Scan | null> => {
     const fallback = await appAutoMerge?.();
     const defaults = fallback === undefined ? DEFAULT_CONFIG : { ...DEFAULT_CONFIG, autoMerge: fallback };
-    const collected = await collect(dir, { git, index: indexOf, defaults }, reuse);
+    const collected = await collect(dir, { git, index: indexOf, defaults, onPaths }, reuse);
     if (!collected) return null;
     const resolution = await resolve(collected);
     const { config } = collected;
@@ -117,8 +120,8 @@ export function createScanner(git: RepoGit, { appAutoMerge }: ScannerOptions = {
     );
     return { collected, resolution, list };
   };
-  const scan = (dir: string, reuse?: GitState) => {
-    const running = scanNow(dir, reuse);
+  const scan: Scanner["scan"] = (dir, reuse, onPaths) => {
+    const running = scanNow(dir, reuse, onPaths);
     inFlight.add(running);
     void running.then(
       () => inFlight.delete(running),

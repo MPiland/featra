@@ -87,6 +87,8 @@ export interface CollectDeps {
   index: (paths: RepoPaths) => CardIndex;
   /** What a key the project's config leaves out is: Featra's own defaults unless the scanner says otherwise. */
   defaults?: ProjectConfig;
+  /** Told the repository's paths once known, before git is asked anything else (BUG-44). */
+  onPaths?: (paths: RepoPaths) => void;
 }
 
 /** One location to read: from disk with what its HEAD has, or the card files of a commit. */
@@ -148,6 +150,7 @@ async function readGit(paths: RepoPaths, baseBranch: string, { git, index }: Col
 export async function collect(dir: string, deps: CollectDeps, reuse?: GitState): Promise<Collected | null> {
   const paths = reuse?.paths ?? (await deps.git.paths(dir));
   if (!paths || !(await isDir(join(paths.top, FEATRA_DIR)))) return null;
+  deps.onPaths?.(paths);
   const problems: string[] = [];
   const configRead = await readConfig(paths.top, problems, deps.defaults ?? DEFAULT_CONFIG);
   // The config's `baseBranch` wins; without one, the repository's default (origin/HEAD, main, master), found once and

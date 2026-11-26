@@ -65,7 +65,8 @@ no queued scan (amended 2026-11-08, BUG-6).
 - the git common dir, for `HEAD`, `packed-refs` and `worktrees` (which comes with the first worktree and goes with the
   last);
 - `refs/heads`, recursively;
-- `worktrees`, recursively, for `HEAD`, `gitdir` and each worktree's own folder, so a worktree removed is heard.
+- `worktrees`, recursively, for `HEAD`, `gitdir` and each worktree's own folder added or removed, so a worktree
+  removed is heard.
 
 Events settle for 50 ms, then the server rescans. Rescans run one at a time. The targets are set again after each scan,
 so a new worktree or branch is picked up. Listeners hear only a list whose JSON changed. The last listener to stop ends
@@ -101,7 +102,7 @@ three serial git starts (the paths; the worktrees and branches side by side; one
 Since Apply now trusts that rule, it must hold when the watched folders themselves go. Removing a worktree fired no git
 target: git deletes `worktrees/<name>` as one folder, and the name filter dropped it. Windows also reports a deleted,
 recursively watched folder (that worktree's `.featra`) by its own absolute path, without end. Each of those events
-reset the 50 ms settle, so the rescan never ran. Now each worktree's folder counts as a git target. An event that names
+reset the 50 ms settle, so the rescan never ran. Now each worktree's folder, added or removed, counts as a git target. An event that names
 the watched folder itself is handled like a watcher error: that watch closes and git is asked again. Tests add and
 remove worktrees under a watch, the last one included, and apply and edit through it afterwards.
 
@@ -117,6 +118,35 @@ Three more rules keep the watch sound:
   and the list stayed stale until some other event. The extra rescan is disk-only (no git event fired) and ends when a
   scan starts no watcher.
 
+**Asks share scans (amended 2026-11-25, BUG-44).** At start the server's own services each watch every open project
+(Needs, PRs, checks, feature ends, auto-merge), then the page asks for its watch, and actions ask for scans of their
+own. Each ask used to queue a whole scan behind the others. On a Windows runner the page's first answers waited out
+six scans in a row, two of them with git, and missed the e2e tests' 5 s: 5.2–8.5 s for the first `work.watch`, and
+5.3 s for a draft's Approve. Now:
+
+- An ask, a new listener's first answer or an action's scan, joins the scan queued and not started yet, if there is
+  one, instead of queuing another. That scan still starts after the ask, so the answer has the cards as they are when
+  it asks. Joining the scan already running was tried and rejected: that scan may have read the cards before the ask,
+  so a view opened right after a write showed the state before it.
+- Git's watchers start as soon as a scan knows the repository's paths, before it reads the worktrees, branches and
+  cards. That read can't predate them, so the first scan isn't followed by a git rescan; the BUG-12 rescan after it is
+  disk-only. Otherwise that git rescan ran behind the first answer, and an Apply right after it waited for it.
+- A child of `worktrees` counts when it is added or removed (a `rename`), not on a `change`. Windows reports git
+  reading a worktree's folder (`git worktree list`) as a change to that folder, so the scan's own read fired its git
+  target. A change to what a worktree holds still comes as its `HEAD` or `gitdir`.
+- A git watcher that can't start early (out of handles, say) is tried again after the scan, as any watcher is, and
+  marks git as changed when it starts then. One that first starts in a scan that reuses what git said is marked the
+  same way, and a rescan that asks git follows it.
+- On macOS, Node's recursive watchers share one FSEvents stream, and starting another restarts it, dropping events it
+  had not delivered yet. A commit that lands as a scan starts a new worktree's `.featra` watcher lost its `refs/heads`
+  event that way, and the list kept the old commit, so a proven story never merged on its own. There, a scan that
+  starts a recursive watcher marks git as changed, and the rescan after it asks git. Windows and Linux keep the
+  disk-only rescan.
+
+So a first answer at start waits for the scan running and one more, which reuses git, when no git target fires during
+the first scan. A git event then, or a scan that fails or reads a card mid-write and is tried again when that settles
+(BUG-24, BUG-25), adds to that. Rescans still run one at a time.
+
 **Protocol additions (ADR 0015).**
 
 | Method             | Params         | Result                                         |
@@ -128,7 +158,9 @@ Three more rules keep the watch sound:
 
 A **push** is `{ event, watch, data }`, with no `id`, so it can't be mistaken for an answer. The only event is
 `work.list`, whose `data` is the new `WorkList`. Pushes stop on `work.unwatch` or when the socket closes, and are held
-back while the folder is not in the open-project list. A stale copy's `key` is `<location>|<path>`, built by `copyKey`.
+back while the folder is not in the open-project list. A `work.unwatch` that comes before the watch's answer ends the
+watch as it answers (amended 2026-11-25, BUG-44); it used to find nothing, and the watch was kept. One for a request
+not in flight is ignored, and one for a watch that fails is forgotten when it answers. A stale copy's `key` is `<location>|<path>`, built by `copyKey`.
 
 **Client.** `ServerClient.watch` registers the watch id before sending, so a push that beats the answer is routed. When
 the socket drops, the listener keeps the last list with the reason, and the watch starts again on a new connection
