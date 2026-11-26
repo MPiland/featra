@@ -145,7 +145,13 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
   ipcMain.handle(IPC.projectsCreate, (_e, location: unknown, name: unknown) =>
     projects.create(location, name).then(logged("New project")),
   );
-  ipcMain.handle(IPC.serverEndpoint, () => server.endpoint());
+  // Logged, so a page that connects late shows where the time went: here, in the server, or in between (BUG-40).
+  ipcMain.handle(IPC.serverEndpoint, async () => {
+    log.info("Page asked for the server's address");
+    const endpoint = await server.endpoint();
+    log.info(endpoint ? "Gave the page the server's address" : "No server address for the page");
+    return endpoint;
+  });
   ipcMain.on(IPC.notificationsAsked, (_e, item: unknown) => notifier.asked(item));
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());

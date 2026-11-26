@@ -21,7 +21,23 @@ import {
 } from "@featra/client/bridge";
 
 // The local server's WebSocket (ADR 0015). Main hands out its address and token; the page never sees either.
-const server = createServerClient(async () => normalizeEndpoint(await ipcRenderer.invoke(IPC.serverEndpoint)));
+// TEMPORARY TRACE (BUG-40): when the page asks, hears the address, makes the socket and sees it open.
+const trace = (m: string) => ipcRenderer.send("featra-trace", `${m} at ${new Date().toISOString()}`);
+const server = createServerClient(
+  async () => {
+    trace("asking for the address");
+    const where = normalizeEndpoint(await ipcRenderer.invoke(IPC.serverEndpoint));
+    trace("has the address");
+    return where;
+  },
+  (url) => {
+    const ws = new WebSocket(url);
+    trace("socket made");
+    ws.addEventListener("open", () => trace("socket open"), { once: true });
+    ws.addEventListener("error", () => trace("socket error"), { once: true });
+    return ws;
+  },
+);
 
 const bridge: FeatraBridge = {
   platform: process.platform,

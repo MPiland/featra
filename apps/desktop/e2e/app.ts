@@ -33,9 +33,12 @@ export async function tempProject(
   };
 }
 
-/** Launches the built app (run `pnpm --filter @featra/desktop build` first; `test:e2e` does). */
-export const launch = (userDataDir: string, extraEnv: Record<string, string> = {}) =>
-  launchExecutable(electronPath as unknown as string, [appDir], userDataDir, extraEnv);
+/**
+ * Launches the built app (run `pnpm --filter @featra/desktop build` first; `test:e2e` does). `switches` are Chromium's
+ * command-line switches, such as a proxy setting the platform would give it.
+ */
+export const launch = (userDataDir: string, extraEnv: Record<string, string> = {}, switches: string[] = []) =>
+  launchExecutable(electronPath as unknown as string, [appDir, ...switches], userDataDir, extraEnv);
 
 /**
  * Launches Featra from `executablePath`: Electron on the app folder, or an installed Featra (STORY-64), and waits for

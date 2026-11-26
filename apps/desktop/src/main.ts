@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import { IPC } from "@featra/client/bridge";
-import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
+import { app, BrowserWindow, ipcMain, nativeTheme, Notification, session, type Tray } from "electron";
 import { applyDockIcon } from "./app-icon.ts";
 import { APP_ID, nameApp } from "./app-name.ts";
 import { takeInstanceLock } from "./instance-lock.ts";
@@ -103,6 +103,12 @@ if (!takeInstanceLock(app, userDataDir)) {
   let tray: Tray | undefined;
 
   void app.whenReady().then(async () => {
+    // TEMPORARY TRACE (BUG-40): how long Chromium takes to decide the proxy for the server's address.
+    const proxyAsked = Date.now();
+    void session.defaultSession
+      .resolveProxy("ws://127.0.0.1:1/v1")
+      .then((p) => log.info(`TRACE proxy for 127.0.0.1: ${p} in ${Date.now() - proxyAsked} ms`));
+    ipcMain.on("featra-trace", (_e, m: unknown) => log.info(`TRACE page: ${String(m)}`));
     if (process.platform === "win32") app.setAppUserModelId(APP_ID); // notifications need it on Windows
     applyDockIcon(app.dock, process.platform);
     setNativeMenu();
