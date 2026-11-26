@@ -77,3 +77,4 @@ What becomes easier or harder, and what we must now do.
 | [0043](0043-serving-evidence-files.md)                           | Serving evidence files to the app                                     | proposed |
 | [0044](0044-dev-servers-and-page-capture.md)                     | Dev servers and page capture                                          | proposed |
 | [0045](0045-design-review-of-screenshots.md)                     | Design review of screenshots                                          | proposed |
+| [0046](0046-the-window-connects-directly.md)                     | The window connects directly, without the system's proxy settings     | proposed |
