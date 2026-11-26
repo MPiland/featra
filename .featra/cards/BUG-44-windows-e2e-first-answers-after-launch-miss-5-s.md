@@ -2,7 +2,7 @@
 id: BUG-44
 type: bug
 title: Windows e2e first answers after launch miss 5 s
-status: In Review
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: opus
 reasoning: null
 sessions: []
 branch: claude/bug-44-windows-slow-start
-pr: 92
+pr: "92"
 created: 2026-11-25T18:00:00Z
 history:
   - at: 2026-11-25T18:00:00Z
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-44
+  - at: 2026-11-26T01:06:03Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-26T01:06:03Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -51,27 +61,10 @@ its own.
 
 ## Acceptance criteria
 
-- [x] The cause is found from the kept traces and `main.log` files and recorded in Notes with timings (which calls,
-  how long, and why on Windows). If it is a product slowness, a regression test fails before the fix.
-  (test: packages/server/test/work-watch-share.test.ts::answers a new watcher with the scan after the one in flight, not after a scan of its own per earlier watcher)
-  (test: packages/server/test/work-watch-share.test.ts::answers a new watcher with the cards as they are when it asks, though a scan that read them earlier runs)
-  (test: packages/server/test/work-watch-share.test.ts::gives the actions that ask while a scan runs one scan between them, started after they asked)
-  (test: packages/server/test/services-git.test.ts::applies a stale copy with one git command, the restore, and pushes the list without it)
-  (test: packages/server/test/work-watch-handles.test.ts::starts git's watchers before the first scan reads git, so the rescan after it doesn't ask git again (BUG-44))
-  (test: packages/server/test/work-watch-handles.test.ts::asks git again when a worktree's folder comes or goes, not when only its times change)
-  (test: packages/server/test/work-watch-handles.test.ts::asks git again after a scan starts a recursive watcher where recursive watchers share one stream (macOS))
-  (test: packages/server/test/work-watch-late.test.ts::asks git again for a branch made just before a scan that reuses git starts its git watchers)
-  (test: packages/server/test/ws-unwatch-early.test.ts::stops the watch when it answers, so nothing is pushed for it)
-  (test: packages/server/test/ws-unwatch-early.test.ts::forgets an unwatch for a watch it never had, so a later watch with that id is kept)
-  (test: packages/server/test/ws-unwatch-early.test.ts::forgets an unwatch for a watch that failed, so a later watch with that id is kept)
-  (test: packages/server/test/config-writer-busy.test.ts::tries again after EPERM, and the value lands with no temporary file left)
-  (test: packages/server/test/atomic-write-leftover.test.ts::is read as neither a card nor the config, and the next config write lands)
-- [x] The app's first answers after launch, setup and Start come within the tests' default wait on E2E (Windows),
-  fixed at the cause. No assertion is weakened, deleted or reordered; a longer wait is only acceptable if the cause
-  is shown to be the runner itself, and is then recorded in an ADR.
+- [x] The cause is found from the kept traces and `main.log` files and recorded in Notes with timings (which calls, how long, and why on Windows). If it is a product slowness, a regression test fails before the fix. (test: packages/server/test/work-watch-share.test.ts::answers a new watcher with the scan after the one in flight, not after a scan of its own per earlier watcher) (test: packages/server/test/work-watch-share.test.ts::answers a new watcher with the cards as they are when it asks, though a scan that read them earlier runs) (test: packages/server/test/work-watch-share.test.ts::gives the actions that ask while a scan runs one scan between them, started after they asked) (test: packages/server/test/services-git.test.ts::applies a stale copy with one git command, the restore, and pushes the list without it) (test: packages/server/test/work-watch-handles.test.ts::starts git's watchers before the first scan reads git, so the rescan after it doesn't ask git again (BUG-44)) (test: packages/server/test/work-watch-handles.test.ts::asks git again when a worktree's folder comes or goes, not when only its times change) (test: packages/server/test/work-watch-handles.test.ts::asks git again after a scan starts a recursive watcher where recursive watchers share one stream (macOS)) (test: packages/server/test/work-watch-late.test.ts::asks git again for a branch made just before a scan that reuses git starts its git watchers) (test: packages/server/test/ws-unwatch-early.test.ts::stops the watch when it answers, so nothing is pushed for it) (test: packages/server/test/ws-unwatch-early.test.ts::forgets an unwatch for a watch it never had, so a later watch with that id is kept) (test: packages/server/test/ws-unwatch-early.test.ts::forgets an unwatch for a watch that failed, so a later watch with that id is kept) (test: packages/server/test/config-writer-busy.test.ts::tries again after EPERM, and the value lands with no temporary file left) (test: packages/server/test/atomic-write-leftover.test.ts::is read as neither a card nor the config, and the next config write lands)
+- [x] The app's first answers after launch, setup and Start come within the tests' default wait on E2E (Windows), fixed at the cause. No assertion is weakened, deleted or reordered; a longer wait is only acceptable if the cause is shown to be the runner itself, and is then recorded in an ADR.
 - [x] E2E (Windows) passes 10 runs in a row on this branch with no failed test.
-- [x] BUG-36, BUG-40, BUG-41, BUG-42 and BUG-43 are each closed by this fix with a note, or left open with a note on
-  why they have a different cause.
+- [x] BUG-36, BUG-40, BUG-41, BUG-42 and BUG-43 are each closed by this fix with a note, or left open with a note on why they have a different cause.
 
 ## Tasks
 
