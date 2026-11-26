@@ -2,16 +2,16 @@
 id: BUG-40
 type: bug
 title: Windows e2e chat list's provider group misses its 5 s wait
-status: New
+status: In Progress
 parent: null
 order: 0
 origin: bug
-role: null
-agent: null
-model: null
+role: developer
+agent: claude
+model: opus
 reasoning: null
 sessions: []
-branch: null
+branch: claude/bug-40-socket-delay
 pr: null
 created: 2026-11-24T16:30:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: session:story-72
+  - at: 2026-11-26T03:19:35Z
+    field: status
+    from: New
+    to: In Progress
+    by: session:bug-40
 ---
 
 ## Description
