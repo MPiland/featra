@@ -34,15 +34,38 @@ export function localOrigin(url: unknown): string | null {
 /** The dev pages' contents, Preview and capture windows, each with the origin it may be on. */
 const devPages = new WeakMap<WebContents, string>();
 
-/** Whether `contents` may go to `url`: a dev page, within its dev server's origin. Every other window stays put. */
+/** The Browser pane's pages (STORY-74, ADR 0047): they go to any web address, as a browser's tab does. */
+const browserPages = new WeakSet<WebContents>();
+
+/** Lets `contents` go anywhere on the web: a Browser pane's page. */
+export const allowBrowsing = (contents: WebContents): void => void browserPages.add(contents);
+
+/** An http or https URL without a user in it: what the Browser pane loads. */
+export function webUrl(url: unknown): string | null {
+  if (typeof url !== "string") return null;
+  try {
+    const u = new URL(url);
+    if (u.username || u.password) return null;
+    return u.protocol === "http:" || u.protocol === "https:" ? u.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether `contents` may go to `url`: a dev page, within its dev server's origin; a Browser pane's page, to any web
+ * address. Every other window stays put.
+ */
 export const mayNavigate = (contents: WebContents, url: string): boolean => {
+  if (browserPages.has(contents)) return webUrl(url) !== null;
   const origin = devPages.get(contents);
   return origin !== undefined && origin === localOrigin(url);
 };
 
 /**
  * Keeps a window where it is (every window, as it is created): the app's own window only ever shows the bundled
- * client, a dev page moves only within its origin, by a link or by a server's redirect alike, and none opens pop-ups.
+ * client, a dev page moves only within its origin, by a link or by a server's redirect alike, and none opens pop-ups. A
+ * Browser pane's page that opens one (a link to a new tab) goes there itself, as the pane has one tab.
  */
 export function guardContents(contents: WebContents): void {
   const stay = (e: { preventDefault: () => void }, url: string) => {
@@ -50,7 +73,11 @@ export function guardContents(contents: WebContents): void {
   };
   contents.on("will-navigate", stay);
   contents.on("will-redirect", stay);
-  contents.setWindowOpenHandler(() => ({ action: "deny" }));
+  contents.setWindowOpenHandler((details) => {
+    const url = browserPages.has(contents) ? webUrl(details?.url) : null;
+    if (url) void contents.loadURL(url).catch(() => {});
+    return { action: "deny" };
+  });
 }
 
 let sessionReady = false;

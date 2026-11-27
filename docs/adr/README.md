@@ -78,3 +78,4 @@ What becomes easier or harder, and what we must now do.
 | [0044](0044-dev-servers-and-page-capture.md)                     | Dev servers and page capture                                          | proposed |
 | [0045](0045-design-review-of-screenshots.md)                     | Design review of screenshots                                          | proposed |
 | [0046](0046-the-windows-session-in-memory-and-direct.md)         | The window's session: in memory and direct                            | proposed |
+| [0047](0047-the-browser-pane.md)                                 | The Browser pane: a view in the main window, its session and devices  | proposed |

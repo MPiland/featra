@@ -14,6 +14,7 @@ import {
   type WorkSettingKey,
   type WorkSettings,
 } from "./settings.ts";
+import { BROWSER_IPC, noBrowser, type BrowserBridge } from "./browser.ts";
 import { noChats, type ChatBridge } from "./chats.ts";
 import { noChecks, type ChecksBridge } from "./checks-bridge.ts";
 import { noInbox, noNotifications, type InboxBridge, type NotificationsBridge } from "./inbox.ts";
@@ -27,6 +28,8 @@ import { DEFAULT_UI_STATE, normalizeUiState, type UiState } from "./ui-state.ts"
 import { DEFAULT_WINDOW_STATE, type WindowState } from "./window-state.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
+export * from "./browser.ts";
+export * from "./browser-devices.ts";
 export * from "./chats.ts";
 export * from "./checks-bridge.ts";
 export * from "./inbox.ts";
@@ -111,6 +114,8 @@ export interface FeatraBridge {
   readonly needs: NeedsBridge;
   /** Desktop notifications for the requests that arrive (STORY-7); the host decides when to show one. */
   readonly notifications: NotificationsBridge;
+  /** The Browser pane: its dev server from the local server, its page from the host (STORY-74, ADR 0047). */
+  readonly browser: BrowserBridge;
   edit: (command: EditCommand) => void;
   readonly app: {
     info: () => Promise<AppInfo>;
@@ -170,6 +175,7 @@ export const IPC = {
   serverEndpoint: "server:endpoint",
   notificationsAsked: "notifications:asked",
   notificationsOpenChat: "notifications:open-chat",
+  ...BROWSER_IPC,
 } as const;
 
 declare global {
@@ -246,6 +252,7 @@ export function browserBridge(storage: Storage = window.localStorage): FeatraBri
     inbox: noInbox(),
     needs: noNeeds(),
     notifications: noNotifications(),
+    browser: noBrowser(NO_FOLDERS),
     edit: (command) => {
       document.execCommand(command);
     },

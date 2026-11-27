@@ -12,6 +12,8 @@ import {
   type WorkBridge,
 } from "../../work-list.ts";
 import type { WorkLayout } from "../../work-layout.ts";
+import { OpenBrowserContext } from "../browser/browser-context.tsx";
+import { useBrowserDock } from "../browser/useBrowserDock.tsx";
 import { SegmentedControl } from "../controls/SegmentedControl.tsx";
 import { SelectedCard } from "./card-selection.tsx";
 import { useMeasuredWidth, type ChosenWidth } from "./PaneHandle.tsx";
@@ -90,7 +92,9 @@ export function WorkList(props: {
     listRef.current?.querySelector<HTMLElement>(`[data-card="${reviewed.current}"] .row-review`)?.focus();
     reviewed.current = null;
   }, [reviewing]);
-  const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
+  // The Browser pane (STORY-74), at the right of the card pane when both are open.
+  const browser = useBrowserDock(project.dir, docked !== null);
+  const { splitRef, split, cardSplit, width, onMove, choose } = useDockedPane(paneWidth, browser.reserve);
   // The list's columns (STORY-62): fewer with the pane open, and only those that fit, so no cell wraps or clips.
   const listWidth = useMeasuredWidth(listRef);
   const columns = useMemo(() => workColumns(listWidth, docked !== null), [listWidth, docked]);
@@ -254,21 +258,24 @@ export function WorkList(props: {
         </section>
         {docked && (
           <StoryAgentsContext.Provider value={storyAgents}>
-            <SidePane
-              docked={docked}
-              onDock={setDocked}
-              onClose={close}
-              work={work}
-              dir={project.dir}
-              layout={{ split, width, onMove, choose }}
-              paneId={paneId}
-              list={list}
-              chats={chats}
-              onOpenChat={onOpenChat}
-              hasChat={hasChat}
-            />
+            <OpenBrowserContext.Provider value={browser.opener}>
+              <SidePane
+                docked={docked}
+                onDock={setDocked}
+                onClose={close}
+                work={work}
+                dir={project.dir}
+                layout={{ split: cardSplit, width, onMove, choose }}
+                paneId={paneId}
+                list={list}
+                chats={chats}
+                onOpenChat={onOpenChat}
+                hasChat={hasChat}
+              />
+            </OpenBrowserContext.Provider>
           </StoryAgentsContext.Provider>
         )}
+        {browser.pane(split)}
       </div>
     </OpenReview.Provider>
   );

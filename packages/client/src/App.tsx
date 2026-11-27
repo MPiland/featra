@@ -26,6 +26,8 @@ import { useWindowSync } from "./components/useWindowSync.ts";
 import { ViewPlaceholder } from "./components/ViewPlaceholder.tsx";
 import { WorkView } from "./components/WorkView.tsx";
 import { HostProviders } from "./components/HostProviders.tsx";
+import { useBrowserHostValue } from "./components/browser/browser-context.tsx";
+import { sameDevicesByProject } from "./browser-devices.ts";
 import { buildAppMenu, listShortcuts, type MenuActions } from "./menu.ts";
 import { canGoBack, canGoForward, currentView, entryChat, entryView, initialNav, leaveChats } from "./navigation.ts";
 import { useAppNav } from "./use-app-nav.ts";
@@ -47,7 +49,9 @@ const sameUiState = (a: UiState, b: UiState) =>
   a.sidebarCollapsed === b.sidebarCollapsed &&
   a.zoomFactor === b.zoomFactor &&
   a.cardPaneWidth === b.cardPaneWidth &&
-  sameBoardProjects(a, b);
+  a.browserPaneWidth === b.browserPaneWidth &&
+  sameBoardProjects(a, b) &&
+  sameDevicesByProject(a, b);
 
 export function App({ bridge, initialUiState, initialSettings, initialProjects }: AppProps) {
   const [nav, setNav] = useState(() => initialNav());
@@ -77,6 +81,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
     (dir: string, layout: WorkLayout) => setUi((s) => withWorkLayout(s, dir, layout)),
     [],
   );
+  const browserHost = useBrowserHostValue(bridge.browser, ui, setUi);
   const showKeyboardShortcuts = useCallback(() => {
     setSettingsPage("shortcuts");
     open("settings");
@@ -186,7 +191,7 @@ export function App({ bridge, initialUiState, initialSettings, initialProjects }
   }, [title]);
 
   return (
-    <HostProviders app={bridge.app}>
+    <HostProviders app={bridge.app} browser={browserHost}>
       <div className="shell" inert={dialog !== null || projectDialog !== null}>
         <TitleBar
           bridge={bridge}

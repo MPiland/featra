@@ -16,6 +16,14 @@ export interface SettingsMethods {
    * URL for the host to open in a window. Refused with why when it has none or it didn't start.
    */
   "preview.start": { params: { dir: string; id: string }; result: { url: string } };
+  /**
+   * The Browser pane (STORY-74): starts the dev server of a story (in its worktree) or of a feature in progress (in its
+   * branch's checkout, or a temporary one at its tip), or reuses the one running; answers with its URL. Refused with
+   * why when there is nothing to serve or it didn't start.
+   */
+  "browser.start": { params: { dir: string; id: string }; result: { url: string } };
+  /** The Browser pane closed: stops the dev server its start launched, if any, and removes a temporary checkout. */
+  "browser.stop": { params: { dir: string; id: string }; result: null };
   /** The user clears a story's design review of its screenshots (STORY-73), and it moves on to Acceptance. */
   "story.clearDesignReview": { params: { dir: string; id: string }; result: null };
 }

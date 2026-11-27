@@ -18,6 +18,8 @@ export interface DockedAsideProps {
   width: number;
   /** The pane's own element, for a host that moves focus back into it. */
   paneRef?: RefObject<HTMLElement | null>;
+  /** A class besides `card-pane`, for a pane with a layout of its own (the Browser pane). */
+  className?: string;
   children: ReactNode;
 }
 
@@ -27,7 +29,19 @@ export interface DockedAsideProps {
  * Its bar holds the id, the host's actions and Close.
  */
 export function DockedAside(props: DockedAsideProps) {
-  const { paneId, label, id, actions, closeLabel, onClose, focusOnOpen = true, width, paneRef, children } = props;
+  const {
+    paneId,
+    label,
+    id,
+    actions,
+    closeLabel,
+    onClose,
+    focusOnOpen = true,
+    width,
+    paneRef,
+    className,
+    children,
+  } = props;
   const own = useRef<HTMLElement>(null);
   const pane = paneRef ?? own;
   useEffect(() => {
@@ -44,7 +58,7 @@ export function DockedAside(props: DockedAsideProps) {
     <aside
       id={paneId}
       ref={pane}
-      className="card-pane"
+      className={className ? `card-pane ${className}` : "card-pane"}
       style={{ width }}
       aria-label={label}
       tabIndex={-1}

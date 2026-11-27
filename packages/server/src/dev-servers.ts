@@ -163,30 +163,45 @@ export function createDevServers({
     if (entry.control && !entry.exited) entry.control.cancel();
   }
 
+  /** Story `story`'s dev server: the one running, or one launched now (`launched`). */
+  function claim(project: string, story: string, worktree: string, command: string, url: string) {
+    const key = keyOf(project, story);
+    const known = servers.get(key);
+    if (known && !known.exited) return { launched: false, started: known.started };
+    const entry: Running = {
+      project,
+      control: null,
+      started: Promise.resolve({ ok: false, note: "" }),
+      stopped: false,
+      exited: false,
+    };
+    servers.set(key, entry);
+    entry.started = launch(entry, command, worktree, url).then((result) => {
+      // One that didn't start isn't kept, so the next ask starts it again.
+      if (!result.ok && servers.get(key) === entry) servers.delete(key);
+      return result;
+    });
+    return { launched: true, started: entry.started };
+  }
+
   return {
     /**
      * The dev server of story `story` of `project`, started with `command` in its `worktree` unless it runs already; its
      * URL once it answers, else why not.
      */
-    start(project: string, story: string, worktree: string, command: string, url: string): Promise<DevServerStart> {
-      const key = keyOf(project, story);
-      const known = servers.get(key);
-      if (known && !known.exited) return known.started;
-      const entry: Running = {
-        project,
-        control: null,
-        started: Promise.resolve({ ok: false, note: "" }),
-        stopped: false,
-        exited: false,
-      };
-      servers.set(key, entry);
-      entry.started = launch(entry, command, worktree, url).then((result) => {
-        // One that didn't start isn't kept, so the next ask starts it again.
-        if (!result.ok && servers.get(key) === entry) servers.delete(key);
-        return result;
-      });
-      return entry.started;
-    } /** Stops story `story`'s dev server, if Featra runs one: the story is ending and its worktree going. */,
+    start: (project: string, story: string, worktree: string, command: string, url: string): Promise<DevServerStart> =>
+      claim(project, story, worktree, command, url).started,
+    /** As `start`, and whether this ask launched it: the Browser pane stops only the servers it started (STORY-74). */
+    claim,
+    /** Stops story `story`'s dev server, if Featra runs one, and settles once its process has ended. */
+    async halt(project: string, story: string): Promise<void> {
+      const entry = servers.get(keyOf(project, story));
+      stop(keyOf(project, story));
+      if (!entry) return;
+      await entry.started;
+      if (entry.control) await entry.control.done;
+    },
+    /** Stops story `story`'s dev server, if Featra runs one: the story is ending and its worktree going. */
     stop: (project: string, story: string) => stop(keyOf(project, story)),
     /** Stops the dev servers of every project not in `open`: they closed. */
     keepProjects(open: readonly string[]) {

@@ -29,6 +29,7 @@ import { fakeRolesServer } from "./roles-server.ts";
 import { fakeReviewServer } from "./review-server.ts";
 import { fakeEvidenceServer } from "./evidence-server.ts";
 import { fakeAppHost, fakeSetupServer } from "./host-fakes.ts";
+import { fakeBrowserHost } from "./browser-fake.ts";
 
 export const PROJECT: ProjectRef = { dir: "/home/me/manager", name: "manager" };
 /** Where New Project… suggests a folder by default. */
@@ -92,6 +93,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
   const chats: ReturnType<typeof fakeChatServer> = fakeChatServer(calls, host);
   const roles = fakeRolesServer(calls, host);
   const needs = fakeNeedsServer(host.needs);
+  const browser = fakeBrowserHost(calls, host.browserStart);
   const listOf = (dir: string) => cards.listOf(dir) ?? workLists.get(dir) ?? EMPTY_WORK_LIST;
   const bridge: FeatraBridge = {
     platform,
@@ -188,6 +190,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     },
     edit: (command) => void calls.push(`edit:${command}:${(document.activeElement as HTMLElement | null)?.id ?? ""}`),
     app: fakeAppHost(calls),
+    browser: browser.bridge,
   };
   /** What the host does when the window changes (the OS, F11 or the button): report the new state. */
   const setWindowState = (s: Partial<WindowState>) =>
@@ -211,6 +214,7 @@ export function fakeBridge(platform = "win32", host: HostOptions = {}) {
     chats,
     roles,
     needs,
+    browser,
     cardsIn: cards.cardsIn,
     watchingCards: cards.watching,
     /** How many watches are open on `dir`. */

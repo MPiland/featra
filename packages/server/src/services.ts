@@ -138,6 +138,7 @@ export function createServices({
     dataDir,
     capture: capturePage,
     devServers,
+    gitCommand,
   });
   const starts = createFeatureStart({ scan: watches.scan, now, lane, gitCommand });
   const spawns = createStorySpawn({ scan: watches.scan, now, lane, chats, gitCommand });
@@ -256,7 +257,7 @@ export function createServices({
     needs: async (listener) => needs.watch(listener),
     diffs,
     evidence: createEvidenceFiles({ scan: watches.shown, gitCommand, dataDir, log }),
-    proof: { settings: proof.settings, capture: proof.capture, design },
+    proof: { settings: proof.settings, capture: proof.capture, design, browser: proof.browser },
   });
   // Saved settings that change a project's auto-merge setting in effect rescan it and re-check auto-merge (STORY-61).
   const settingsChanges = createSettingsChanges({
@@ -274,6 +275,8 @@ export function createServices({
     devServers: proof.servers,
     async close() {
       stopClosing();
+      // The Browser pane's servers stop first, and their temporary checkouts go once they have (STORY-74).
+      await proof.browser.close();
       proof.servers.stopAll();
       checks.close();
       prs.close();

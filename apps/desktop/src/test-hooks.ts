@@ -1,4 +1,5 @@
 import type { Menu, Tray } from "electron";
+import type { BrowserHandle } from "./browser-pane.ts";
 import type { EvidenceOpening } from "./evidence-open.ts";
 
 /**
@@ -19,6 +20,8 @@ export interface TestHooks {
   openedFiles: EvidenceOpening[];
   /** The Preview windows Featra opened (STORY-25): the dev server's URL and the window's title. */
   previews: { url: string; title: string }[];
+  /** The Browser panes open now (STORY-74), to read the page they show; set once the pane module loads. */
+  browserPanes?: () => BrowserHandle[];
   /** Folders the next folder dialogs return, in order; an empty queue is a cancelled dialog. */
   folderPicks: string[];
   /** Titles of the folder dialogs Featra opened. */

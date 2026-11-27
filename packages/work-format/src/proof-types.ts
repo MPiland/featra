@@ -169,6 +169,9 @@ export const PROOF_COPY = {
   noPreview: (id: string) =>
     `${id} has no dev server to preview: it needs its own worktree, and the project's proof needs Preview.`,
   previewTitle: (id: string) => `Preview ${id}`,
+  /** The Browser pane's refusal (STORY-74): nothing to serve `id` from. */
+  noBrowser: (id: string) =>
+    `${id} has nothing to serve: a story needs its own worktree, and a feature needs to be in progress.`,
   /** What the move to review tells the agent, after Featra captured or attached screenshots. */
   captured: (n: number, folder: string) =>
     `Featra put ${n} screenshot${n === 1 ? "" : "s"} in ${folder}; commit ${n === 1 ? "it" : "them"} with the card.`,

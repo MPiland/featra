@@ -1,20 +1,28 @@
 /**
- * The local API's proof methods (STORY-25): Project settings' Proof section, a story's Preview, and the user's clear of
- * its design review (STORY-73).
+ * The local API's proof methods (STORY-25): Project settings' Proof section, a story's Preview, the user's clear of
+ * its design review (STORY-73), and the Browser pane's dev servers (STORY-74).
  */
 import { dirParams, isRecord, normalizeProofPatch } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
+import type { BrowserPreview } from "./browser-preview.ts";
 import type { DesignReviews } from "./design-reviews.ts";
 import type { ProofCapture } from "./proof-capture.ts";
 import type { ProofSettings } from "./proof-settings.ts";
 
-export type ProofMethod = "proof.load" | "proof.set" | "preview.start" | "story.clearDesignReview";
+export type ProofMethod =
+  | "proof.load"
+  | "proof.set"
+  | "preview.start"
+  | "browser.start"
+  | "browser.stop"
+  | "story.clearDesignReview";
 
 export interface ProofApiDeps {
   proof?: {
     settings: Pick<ProofSettings, "load" | "set">;
     capture: Pick<ProofCapture, "preview">;
     design?: Pick<DesignReviews, "clear">;
+    browser?: Pick<BrowserPreview, "start" | "stop">;
   };
   /** The folder if it is an open project; throws otherwise. */
   allow: (dir: string) => string;
@@ -34,6 +42,10 @@ export function createProofApi({ proof, allow }: ProofApiDeps) {
     }
     if (typeof p.id !== "string" || !p.id) throw new ApiError("Expected { dir, id }.");
     if (method === "preview.start") return proof.capture.preview(allow(dir), p.id);
+    if (method === "browser.start" || method === "browser.stop") {
+      if (!proof.browser) throw new ApiError("The Browser pane isn't available.");
+      return method === "browser.start" ? proof.browser.start(allow(dir), p.id) : proof.browser.stop(allow(dir), p.id);
+    }
     if (!proof.design) throw new ApiError("The design review isn't available.");
     return proof.design.clear(allow(dir), p.id);
   };

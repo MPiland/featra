@@ -1,4 +1,5 @@
 import type { CardBridge, CardView } from "../../card-pane.ts";
+import { BrowserButton } from "../browser/BrowserButton.tsx";
 import { AcceptStory } from "./AcceptStory.tsx";
 import { DesignReview } from "./DesignReview.tsx";
 import { HoldStory } from "./HoldStory.tsx";
@@ -20,7 +21,9 @@ export interface CardStageActionsProps {
 
 /**
  * What the card pane offers for where a story or feature is in its flow: a story's agent, Accept and Send back,
- * Merge, Hold and Abandon; its design review (STORY-73); Preview, when the project's proof offers it (STORY-25); a feature's review screen (STORY-69), where it is approved and merged (STORY-70).
+ * Merge, Hold and Abandon; its design review (STORY-73); Preview, when the project's proof offers it (STORY-25), and
+ * Browser, when there is something to serve (STORY-74); a feature's review screen (STORY-69), where it is approved and
+ * merged (STORY-70).
  */
 export function CardStageActions({ work, dir, id, view, readOnly, onClose }: CardStageActionsProps) {
   return (
@@ -30,9 +33,12 @@ export function CardStageActions({ work, dir, id, view, readOnly, onClose }: Car
           <StoryAgent id={id} />
         </div>
       )}
-      {view.preview && (
+      {(view.preview || view.browser) && (
         <div className="draft-actions card-actions">
-          <PreviewStory key={`preview-${id}`} id={id} preview={(story) => work.previewStory(dir, story)} />
+          {view.preview && (
+            <PreviewStory key={`preview-${id}`} id={id} preview={(story) => work.previewStory(dir, story)} />
+          )}
+          {view.browser && <BrowserButton id={id} />}
         </div>
       )}
       {view.designReview && (

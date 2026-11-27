@@ -3475,3 +3475,14 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - Send puts one draft in the target chat's composer, with screenshots attached; nothing is sent until the user sends it. The target is the preview's session (the story's, or the Dev Lead's for a feature) and can be switched.
 - STORY-40 stays in FEAT-10 and is built last, on the same pane.
 - Stories, in order: STORY-74 Preview in the Browser pane; STORY-75 Annotate the page; STORY-76 Send annotations to the session; STORY-40 Agents drive the in-app browser.
+
+## 2026-11-27 — STORY-74 Preview in the Browser pane (developer)
+
+- **Where it shows**: a view of its own in the main window, drawn over the pane's viewport; not an iframe or webview tag. It hides while a dialog covers the window. One pane per window; opening it for another card replaces it.
+- **Where it docks**: right of the card or chat pane, which keeps its minimum width. It has its own width limits (360 to 1920 px, half the area by default), resized by its handle like the card pane.
+- **Session**: `featra-browser`, in memory, apart from the window's and Proof's. No permissions, no downloads, the system's proxy. Any http or https address; nothing else. A page's new window loads in the pane.
+- **Feature preview**: in the feature branch's checkout, or a temporary detached worktree at its tip, removed when the pane closes. A dev server already running is reused, and only a server the pane launched is stopped.
+- **Devices**: shown through the DevTools Protocol (viewport, pixel ratio, touch), scaled down to fit, never up. The user agent stays as is.
+- **Device choice remembered per project in the UI state**, not the project's settings as the brief suggested: those are committed, and how one person previews is theirs, as Work's layout is.
+- **Fixture page** has a viewport meta, as real dev pages do, so a phone preset reports the phone's width.
+- Recorded in ADR 0047.

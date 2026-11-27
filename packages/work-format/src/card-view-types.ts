@@ -110,6 +110,8 @@ export interface CardView {
   notMerged?: string;
   /** True on a story with a worktree in a project that offers Preview (STORY-25); absent otherwise. */
   preview?: true;
+  /** True on a story with its own worktree, or a feature in progress, the Browser pane can serve (STORY-74); absent otherwise. */
+  browser?: true;
   /** Where the story's design review of its screenshots stands (STORY-73); absent when it has none. */
   designReview?: DesignReviewView;
   /** Why the card can't be edited here, or null when it can. */
@@ -260,6 +262,7 @@ export function normalizeCardView(raw: unknown): CardView | null {
     ...(raw.abandonable === true ? { abandonable: true as const } : {}),
     ...(raw.merged === true ? { merged: true as const } : {}),
     ...(raw.preview === true ? { preview: true as const } : {}),
+    ...(raw.browser === true ? { browser: true as const } : {}),
     ...designReviewOf(raw.designReview),
     ...(typeof raw.mergedInto === "string" && raw.mergedInto ? { mergedInto: raw.mergedInto } : {}),
     ...(typeof raw.held === "boolean" ? { held: raw.held } : {}),
