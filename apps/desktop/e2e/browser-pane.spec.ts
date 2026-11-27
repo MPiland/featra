@@ -1,7 +1,7 @@
 import { expect, test, type ElectronApplication } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
-import { browserPanesOpen, browserShot, browserUrl, inBrowserPage } from "./browser-page.ts";
+import { browserPanesOpen, browserShot, browserTopRight, browserUrl, inBrowserPage } from "./browser-page.ts";
 import { draftInNewChat, pane } from "./draft-chat.ts";
 import { git, project } from "./draft-project.ts";
 import { freePort, setProof } from "./proof-setup.ts";
@@ -60,6 +60,7 @@ test("Browser pane: a story's dev server shows beside its card, as any device, a
     const viewport = browser.locator(".browser-viewport");
     const fitted = async () => Math.round((await viewport.boundingBox())?.width ?? 0);
     await expect.poll(async () => (await inBrowserPage(app, "innerWidth")) === (await fitted())).toBe(true);
+    await expect.poll(() => browserTopRight(app)).toBeLessThan(100);
     await browserShot(app, page, "feat10-browser-desktop-fit");
 
     // Any address, then back, then reload.
@@ -78,6 +79,8 @@ test("Browser pane: a story's dev server shows beside its card, as any device, a
     await device.selectOption({ label: "iPhone SE" });
     await expect.poll(() => inBrowserPage(app, "innerWidth")).toBe(375);
     await expect.poll(() => inBrowserPage(app, "navigator.maxTouchPoints")).toBe(5);
+    // Scaled to fit the pane, the phone's page fills its frame: its header reaches the right edge.
+    await expect.poll(() => browserTopRight(app)).toBeLessThan(100);
     await browserShot(app, page, "feat10-browser-phone");
 
     // Responsive, at a width of the user's own, with its handles.
@@ -85,6 +88,7 @@ test("Browser pane: a story's dev server shows beside its card, as any device, a
     await browser.getByRole("spinbutton", { name: "Width" }).fill("500");
     await expect.poll(() => inBrowserPage(app, "innerWidth")).toBe(500);
     await expect(browser.getByRole("separator", { name: "Resize width" })).toBeVisible();
+    await expect.poll(() => browserTopRight(app)).toBeLessThan(100);
     await browserShot(app, page, "feat10-browser-responsive");
 
     // Close: the view goes, and the dev server the pane started stops.

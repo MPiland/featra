@@ -19,6 +19,24 @@ export const inBrowserPage = <T>(app: ElectronApplication, js: string): Promise<
 export const browserUrl = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.browserPanes?.()[0]?.contents.getURL() ?? null);
 
+/**
+ * How light the page shows at its top right corner, as captured (0 black to 255 white): a page whose dark header
+ * spans its width shows dark there only when the page fills its view, as a device scaled to fit must.
+ */
+export const browserTopRight = (app: ElectronApplication) =>
+  app.evaluate(async () => {
+    const pane = (globalThis as MainGlobal).featraTest.browserPanes?.()[0];
+    if (!pane) return null;
+    const image = await pane.contents.capturePage();
+    const { width, height } = image.getSize();
+    const bitmap = image.toBitmap();
+    // The bitmap's own rows, which may be at the screen's scale rather than in DIPs.
+    const k = Math.sqrt(bitmap.length / 4 / Math.max(1, width * height));
+    const columns = Math.round(width * k);
+    const at = (Math.round(4 * k) * columns + columns - Math.round(4 * k)) * 4;
+    return Math.round(((bitmap[at] ?? 0) + (bitmap[at + 1] ?? 0) + (bitmap[at + 2] ?? 0)) / 3);
+  });
+
 /** How many Browser panes are open. */
 export const browserPanesOpen = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.browserPanes?.().length ?? 0);
