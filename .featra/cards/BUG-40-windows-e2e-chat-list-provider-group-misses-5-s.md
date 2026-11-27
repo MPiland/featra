@@ -2,7 +2,7 @@
 id: BUG-40
 type: bug
 title: Windows e2e chat list's provider group misses its 5 s wait
-status: In Progress
+status: In Review
 parent: null
 order: 0
 origin: bug
@@ -24,6 +24,11 @@ history:
     field: status
     from: New
     to: In Progress
+    by: session:bug-40
+  - at: 2026-11-27T14:11:58Z
+    field: status
+    from: In Progress
+    to: In Review
     by: session:bug-40
 ---
 
@@ -53,7 +58,7 @@ default 5 s wait.
 ## Acceptance criteria
 
 - [x] The cause is found and recorded in Notes: why the provider group can take over 5 s to show on a Windows runner.
-      If it is a product bug, a regression test fails before the fix. (test: apps/desktop/e2e/startup-proxy.spec.ts::The first answers come from the local server without waiting on the system's proxy settings) (test: apps/desktop/e2e/startup-session.spec.ts::The page's first request reads nothing from the profile's cookie store)
+      If it is a product bug, a regression test fails before the fix. (test: apps/desktop/e2e/startup-proxy.spec.ts::The first answers come from the local server without waiting on the system's proxy settings) (test: apps/desktop/e2e/startup-session.spec.ts::The window's session keeps nothing on disk)
 - [ ] The test passes 20 E2E (Windows) runs in a row, with its assertions unchanged.
 
 ## Tasks
@@ -95,6 +100,11 @@ shape; the page's socket opened at once in each:
 - 24 (140491756384): `setup.spec.ts:109`, BUG-41 again: after setup, `project.setupStatus` took 5.1 s and `work.watch`
   7.1 s; closing the app then took about 52 s.
 
-Earlier soaks had other causes too: `proof-setup.ts:48` (a stale proof.set answer, run 45888994492 attempt 10), and the
+Earlier soaks had other causes too: `proof-setup.ts:48` (a slow proof.set answer, run 45888994492 attempt 10), and the
 Start branch waits in `proof-capture`, `work-layout`, `story-pr`, `proven-story.ts:80`, `draft-chat.ts:30` and
 `update-card:44` (runs 45888994492 and 45935606968). 20 in a row stays open while those flake.
+
+Filed from those: BUG-45 (`setup.spec.ts:109`, BUG-41 again) and BUG-46 (server answers waiting behind slow git work:
+Start, Settings' project loads and saves).
+
+2026-11-27: the user chose to judge AC2 on the soak's evidence; the other-cause failures are filed as their own bugs.

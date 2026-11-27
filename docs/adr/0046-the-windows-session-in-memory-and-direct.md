@@ -30,8 +30,9 @@ bridge's localStorage is only for the client run in a plain browser). The option
 
 The window uses its own session, partition `featra` (no `persist:` prefix, so it keeps nothing on disk), and that
 session connects directly: `setProxy({ mode: "direct" })`, set as the app is ready and before the window is created.
-The window loads only bundled files and talks only to the local server, so it needs neither a proxy nor stored
-cookies. Electron's default session connects directly too: the app loads nothing in it, yet with only the window's
+The page loads only bundled files and talks only to the local server, so it needs no stored cookies, and none of its
+own requests needs a proxy. One request of Chromium's goes out from the window's session: on Linux, spell-check's
+dictionary download (see Consequences). Electron's default session connects directly too: the app loads nothing in it, yet with only the window's
 session direct, Chromium still fetched the proxy script for it at startup on the E2E (Windows) and E2E (macOS)
 runners. Other sessions, such as the dev-server captures, keep the system's settings.
 
@@ -44,6 +45,12 @@ runners. Other sessions, such as the dev-server captures, keep the system's sett
   page must keep its state through the main process, as it does.
 - Anything added later that loads from the internet in the window (it should not: the window shows only the bundled
   client) would bypass a company proxy. Such content belongs in its own session.
+- Spell-check stays on. On Linux, Chromium downloads its Hunspell dictionary through the window's session. Behind a
+  network that only reaches the internet through a proxy, that download fails and spell-check has no dictionary, and
+  since the session is in memory the dictionary may be fetched again at each launch. Windows and macOS use the
+  system's spell-checker and download nothing.
 - Help > Troubleshooting still clears Electron's default session, which holds what earlier versions stored on disk.
-- `main.log` records when the page asks for the server's address and when the server hears it connect, so a late
-  connection shows where the time went.
+  The window's session is in memory, so any restart clears it.
+- `main.log` records the page's ask for the server's address when its answer changes or is slow (over 100 ms, with
+  its time), and when the server hears the page connect, so a late connection shows where the time went. A page whose
+  server is down asks every second without filling the log.

@@ -20,7 +20,7 @@ import { createSettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 import { createTray, destroyTray, trayAvailable } from "./tray.ts";
 import { createAppStateStore, createUiStateStore } from "./ui-state-store.ts";
-import { createWindow, windowBackground, WINDOW_PARTITION } from "./window.ts";
+import { createWindow, prepareWindowSession, windowBackground } from "./window.ts";
 import { clientIndex } from "./client-path.ts";
 
 /**
@@ -111,9 +111,7 @@ if (!takeInstanceLock(app, userDataDir)) {
       trayAvailable(),
       settingsStore.load(),
       findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR).then(projects.start),
-      // The window only talks to this computer: it never waits on the system's proxy settings, and the default
-      // session, which loads nothing, never fetches a proxy script at startup (BUG-40, ADR 0046).
-      ...[session.fromPartition(WINDOW_PARTITION), session.defaultSession].map((s) => s.setProxy({ mode: "direct" })),
+      prepareWindowSession(),
     ]);
     const project = projects.current();
     void projects.snapshot().then((s) => server.setProjects(allowedDirs(s)));

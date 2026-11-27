@@ -1,5 +1,5 @@
 import { join } from "node:path";
-import { BrowserWindow, nativeTheme } from "electron";
+import { BrowserWindow, nativeTheme, session } from "electron";
 import { IPC, type WindowState } from "@featra/client/bridge";
 import { appIconPath } from "./app-icon.ts";
 import { e2e } from "./test-hooks.ts";
@@ -15,6 +15,17 @@ export const windowBackground = () => (nativeTheme.shouldUseDarkColors ? "#1c1c1
  * cookies from disk; the page keeps its state through the main process, not in web storage (BUG-40, ADR 0046).
  */
 export const WINDOW_PARTITION = "featra";
+
+/**
+ * Before the window opens: its session connects directly, so the page never waits on the system's proxy settings.
+ * The default session, which loads nothing, connects directly too, or Chromium fetches a proxy script for it at
+ * startup (BUG-40, ADR 0046).
+ */
+export async function prepareWindowSession(): Promise<void> {
+  await Promise.all(
+    [session.fromPartition(WINDOW_PARTITION), session.defaultSession].map((s) => s.setProxy({ mode: "direct" })),
+  );
+}
 
 /** The window, showing the built client at `client` (`clientIndex`: the workspace's, or the installed app's). */
 export function createWindow(client: string): BrowserWindow {

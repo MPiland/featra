@@ -28,7 +28,7 @@ export interface ServerOptions {
   api: Api;
   /** The narrow socket agents' MCP processes use; without it there is none. */
   agents?: AgentSockets;
-  /** Logs a line in the host's log: failures only, never params or tokens. */
+  /** Logs a failure in the host's log, never params or tokens. Page connections go to `pageConnected` instead. */
   log: (message: string) => void;
   /** Hears each page connection as it opens: the host logs it, to time a page that connects late (BUG-40). */
   pageConnected?: () => void;

@@ -1,11 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { AGENT_PATH } from "@featra/work-format";
 import { createAllowedProjects } from "../src/allowed-projects.ts";
 import { createServices } from "../src/services.ts";
 import { startServer, type RunningServer } from "../src/ws-server.ts";
 import { tempFolder } from "./temp-folder.ts";
-import { connect, request } from "./ws-client.ts";
+import { connect, request, type Socket } from "./ws-client.ts";
 
 /** The real server on a free loopback port, real git, a temporary repository; Node's WebSocket as the client. */
 const TOKEN = "test-token-0123456789";
@@ -95,6 +96,40 @@ describe("the WebSocket API", () => {
       expect(await socket.ask(request(3, "cards.delete", {}))).toEqual({ id: 3, ok: false, error: "Unknown method." });
     } finally {
       socket.close();
+    }
+  });
+
+  it("BUG-40: hears each page connection as it opens, and not an agent's", async () => {
+    let heard = 0;
+    const agentSecret = "agent-secret-0123456789";
+    const own = await startServer({
+      token: TOKEN,
+      api: services.api,
+      log: (m) => logged.push(m),
+      agents: {
+        resolve: (t) => (t === agentSecret ? "chat-1" : null),
+        call: async () => null,
+        dropped: () => {},
+      },
+      pageConnected: () => heard++,
+    });
+    const opened: Socket[] = [];
+    // A socket's connection is heard before any of its requests is answered, so an answer means it was heard.
+    const page = async () => {
+      const socket = await connect(withToken(TOKEN, own.url));
+      opened.push(socket);
+      await socket.ask(request(1, "project.setupStatus", { dir: repo.dir }));
+    };
+    try {
+      await page();
+      expect(heard).toBe(1);
+      opened.push(await connect(withToken(agentSecret, `ws://127.0.0.1:${own.port}${AGENT_PATH}`)));
+      // A page connecting after the agent is heard next: the agent in between was not.
+      await page();
+      expect(heard).toBe(2);
+    } finally {
+      for (const s of opened) s.close();
+      await own.close();
     }
   });
 

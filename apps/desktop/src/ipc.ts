@@ -26,6 +26,7 @@ import {
 import { normalizeZoom } from "@featra/client/zoom";
 import { httpsLink, isOneOf, toText } from "@featra/work-format";
 import { copyable } from "./copy-text.ts";
+import { loggedEndpoint } from "./endpoint-log.ts";
 import { openEvidenceFile, type EvidenceShell } from "./evidence-open.ts";
 import { openPreview } from "./dev-pages.ts";
 import { pickFolder } from "./folder-dialog.ts";
@@ -145,13 +146,10 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
   ipcMain.handle(IPC.projectsCreate, (_e, location: unknown, name: unknown) =>
     projects.create(location, name).then(logged("New project")),
   );
-  // Logged, so a page that connects late shows where the time went: here, in the server, or in between (BUG-40).
-  ipcMain.handle(IPC.serverEndpoint, async () => {
-    log.info("Page asked for the server's address");
-    const endpoint = await server.endpoint();
-    log.info(endpoint ? "Gave the page the server's address" : "No server address for the page");
-    return endpoint;
-  });
+  ipcMain.handle(
+    IPC.serverEndpoint,
+    loggedEndpoint(server.endpoint, (m) => log.info(m)),
+  );
   ipcMain.on(IPC.notificationsAsked, (_e, item: unknown) => notifier.asked(item));
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());

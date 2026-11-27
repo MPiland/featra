@@ -44,6 +44,9 @@ test("The first answers come from the local server without waiting on the system
     // The provider group is the server's answer to the chat list, as in chat-list.spec.ts.
     await expect(page.getByRole("region", { name: "Chats" }).getByRole("group", { name: "Claude Code" })).toBeVisible();
     expect(proxy.asked).toEqual([]);
+    // Nor in the second after: nothing in the app fetches the proxy script in the background.
+    await page.waitForTimeout(1000);
+    expect(proxy.asked).toEqual([]);
   } finally {
     await app.close();
     await proxy.dispose();

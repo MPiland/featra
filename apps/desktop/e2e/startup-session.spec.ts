@@ -8,7 +8,7 @@ import { launch, tempProject, tempUserData } from "./app.ts";
  * on a CI runner, and once over 5 s, so the first answers missed their wait. The page stores nothing in its session
  * (its state goes through the main process), so its session keeps nothing on disk and has nothing to load.
  */
-test("The page's first request reads nothing from the profile's cookie store", async () => {
+test("The window's session keeps nothing on disk", async () => {
   const userData = await tempUserData();
   const project = await tempProject("version: 1\n");
   const bin = await standInClaude();

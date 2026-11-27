@@ -48,6 +48,8 @@ Short, dated decisions made in conversation. Larger, durable decisions get an AD
     is focused), then clears web storage, the cache, `ui-state.json` and `app-state.json`, and restarts; projects and
     the log are kept. Both log the step and relaunch (`app.relaunch()` + quit). The logic is
     `apps/desktop/src/troubleshoot.ts`, free of Electron imports.
+  - The window's session is in memory, so any restart clears it (BUG-40, ADR 0046). Both actions clear Electron's
+    default session, which holds what older versions left on disk.
   - Edit items send the command to main, which calls `webContents.undo/redo/cut/copy/paste/selectAll`, the same calls
     Electron's menu roles make. The menu puts focus back on the field the user was in before running an item. The
     keyboard shortcuts for editing are left to Chromium.
