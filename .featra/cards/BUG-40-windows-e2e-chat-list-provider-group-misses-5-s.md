@@ -2,7 +2,7 @@
 id: BUG-40
 type: bug
 title: Windows e2e chat list's provider group misses its 5 s wait
-status: In Review
+status: Done
 parent: null
 order: 0
 origin: bug
@@ -12,7 +12,7 @@ model: opus
 reasoning: null
 sessions: []
 branch: claude/bug-40-socket-delay
-pr: 93
+pr: "93"
 created: 2026-11-24T16:30:00Z
 history:
   - at: 2026-11-24T16:30:00Z
@@ -30,6 +30,16 @@ history:
     from: In Progress
     to: In Review
     by: session:bug-40
+  - at: 2026-11-27T16:05:36Z
+    field: accepted
+    from: null
+    to: accepted
+    by: user
+  - at: 2026-11-27T16:05:36Z
+    field: status
+    from: In Review
+    to: Done
+    by: user
 ---
 
 ## Description
@@ -57,8 +67,7 @@ default 5 s wait.
 
 ## Acceptance criteria
 
-- [x] The cause is found and recorded in Notes: why the provider group can take over 5 s to show on a Windows runner.
-      If it is a product bug, a regression test fails before the fix. (test: apps/desktop/e2e/startup-proxy.spec.ts::The first answers come from the local server without waiting on the system's proxy settings) (test: apps/desktop/e2e/startup-session.spec.ts::The window's session keeps nothing on disk)
+- [x] The cause is found and recorded in Notes: why the provider group can take over 5 s to show on a Windows runner. If it is a product bug, a regression test fails before the fix. (test: apps/desktop/e2e/startup-proxy.spec.ts::The first answers come from the local server without waiting on the system's proxy settings) (test: apps/desktop/e2e/startup-session.spec.ts::The window's session keeps nothing on disk)
 - [ ] The test passes 20 E2E (Windows) runs in a row, with its assertions unchanged.
 
 ## Tasks
