@@ -22,28 +22,40 @@ The options for where the page lives were:
 **The view.** The page is a `WebContentsView` added to the main window's `contentView`, one per window
 (`browser-pane.ts`). The client renders the pane, its address bar and device toolbar, and an empty viewport, and sends
 the viewport's rect (CSS px) with the device to show; the main process sizes the view to it times the window's zoom
-factor. It hides the view while the viewport has no room, and while a dialog or modal covers the window (the view is
-drawn over the page, so it would show through). Each pane has a key; calls for a pane closed or replaced since are
-ignored, so a late layout never moves the next pane's view.
+factor. It hides the view while the viewport has no room, and while a dialog, a modal, a menu or an open listbox covers the
+window (the view is drawn over the page, so it would show through). Each pane has a key, made of the page load's own id
+and a count; calls for a pane closed or replaced since are ignored, so a late layout never moves the next pane's view,
+and a reloaded page never names the last one's pane. The pane closes with its window, and when the window's page starts
+a new document or its renderer goes, as nothing would drive it then. The viewport placeholder is a Tab stop that gives
+the view the keyboard, and Escape in the page closes the pane (`before-input-event`), as in the other panes.
 
 **Its session.** The view runs sandboxed, context-isolated and without Node, in partition `featra-browser`: in memory,
 apart from the window's (`featra`, ADR 0046) and Proof's (`featra-dev-pages`, ADR 0044). It grants no permission and
 takes no download. Unlike the window's, it keeps the system's proxy, as a browser does. Its pages may go to any http or
 https address (`webUrl` in `dev-pages.ts`); no other scheme, and no URL with a user in it, is loaded, whether typed, by
-a link or by a redirect. A page that opens a new window loads that address in the pane, which has one tab.
+a link or by a redirect. A page that opens a new tab or window (`foreground-tab`, `new-window`) from its own origin loads that address in the pane,
+which has one tab; a background tab, a frame of another site, and a `noreferrer` link, which gives no referrer to
+check, are denied.
 
 **The dev server.** Opening the pane starts the dev server with Proof's confirmed command (ADR 0044) through the same
 `DevServers`: for a story in its worktree; for a feature in its branch's checkout, or in a temporary detached worktree
 at the branch's tip (`featra-feature-preview-*`) when nobody has it checked out, as a feature's checks run (ADR 0037).
-A server already running (Preview's) is reused. Closing the pane stops only a server its own start launched and removes
-its checkout. Starts and stops for one pane run in turn, so a close sent during a start stops what that start launches.
+A worktree that has the branch checked out serves it as is. A temporary checkout has no dependencies, so it runs the
+install command first: Proof's `devServerInstall`, confirmed as the dev-server command is, or else the lockfile's
+(`pnpm install --frozen-lockfile`, `npm ci`, `yarn install --frozen-lockfile`); no lockfile, no install. The start
+answers `installing` at once and the pane's next start waits for it, so the pane says so meanwhile. A server already
+running (Preview's) is reused: `DevServers` counts holders (Preview, capture, each pane), and a server stops only when
+its last holder lets it go; the checkout is removed once its server has ended. Starts and stops for one pane run in
+turn, so a close sent during a start stops what that start launches. A pane's server is also let go when the page's
+socket closes.
 
 **Emulation.** A device is shown through the Chrome DevTools Protocol on the view's `webContents.debugger`:
 `Emulation.setDeviceMetricsOverride` with the device's width, height, pixel ratio, mobile flag and screen size, at a
 `scale` that fits it in the pane (never up) times the window's zoom; touch emulation for phones and tablets. Fit to
 pane clears the override. The view keeps its own size (`dontSetVisibleSize`), as DevTools' device mode does:
-otherwise Chromium sizes the page's surface to the device and the view shrinks it again, drawing it at its scale twice. Commands are queued in order, sent only when they change, and sent again after each new
-document. The user agent is left as is.
+otherwise Chromium sizes the page's surface to the device and the view shrinks it again, drawing it at its scale twice.
+Commands are queued in order, sent only when they change, and sent again after each new document. The user agent is
+left as is. The pixel ratio is kept within 0.5 to 5, and the toolbar shows the scale a device is drawn at to fit.
 
 **The device choice.** The choice (Fit, Responsive and its size, or a device) and the devices the user added are kept
 per project in the app's UI state (`browserDevices`, by project folder), with the pane's width (`browserPaneWidth`).
@@ -59,7 +71,11 @@ person previews is theirs, as Work's layout is (`work-layout.ts`).
 - The view is above the page, so nothing the client draws can overlap it. STORY-75's overlay is drawn in the page
   (injected into the view) or in a view of its own above it; `BrowserHandle.bounds` and `capture(rect)` are its seam.
 - STORY-40 drives the open pane through `BrowserHandle` (`openPanes()`, `paneOf`): navigate, back, forward, reload,
-  layout and capture, the same calls the client makes.
-- A feature preview's temporary worktree left by a quit is pruned at the next start (`git worktree prune`); its
-  folder in the temp directory is the OS's to clear.
-- One pane per window: opening it for another card replaces the first, and stops its dev server.
+  layout and capture, the same calls the client makes. Each handle names its project and story or feature, so a tool
+  call reaches the pane of the card it is about. The user may go anywhere, but an agent's navigation is not the user's:
+  STORY-40 needs its own allow-check on the host an agent sends the page to.
+- On quit every dev server is stopped first and at once (host-gone.ts), its process kept until it exits; the panes
+  then close, each waiting up to 3 s for its server to end before removing its checkout. A feature preview's
+  temporary worktree whose server hadn't ended is removed when its project next opens: the `featra-feature-preview-*`
+  worktrees in `git worktree list` are swept then.
+- One pane per window: opening it for another card replaces the first, and lets its dev server go.

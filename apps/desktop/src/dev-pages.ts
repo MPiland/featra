@@ -62,10 +62,39 @@ export const mayNavigate = (contents: WebContents, url: string): boolean => {
   return origin !== undefined && origin === localOrigin(url);
 };
 
+const originOf = (url: unknown): string | null => {
+  try {
+    const origin = typeof url === "string" ? new URL(url).origin : "null";
+    return origin === "null" ? null : origin;
+  } catch {
+    return null;
+  }
+};
+
+/** What a page asks for when it opens a window: where, how, and from which page. */
+export interface OpenAsk {
+  url?: string;
+  disposition?: string;
+  referrer?: { url?: string };
+}
+
+/**
+ * Where a Browser pane's page goes when it opens a window, or null to stay. Only a new tab or window (a link with
+ * target=_blank, window.open) asked for by the page's own origin is followed, in the pane itself: a background tab, a
+ * download, or a frame of another site asking is not.
+ */
+export function openedUrl(contents: WebContents, ask: OpenAsk | undefined): string | null {
+  if (!browserPages.has(contents) || !ask) return null;
+  if (ask.disposition !== "foreground-tab" && ask.disposition !== "new-window") return null;
+  const from = originOf(ask.referrer?.url);
+  if (!from || from !== originOf(contents.getURL())) return null;
+  return webUrl(ask.url);
+}
+
 /**
  * Keeps a window where it is (every window, as it is created): the app's own window only ever shows the bundled
  * client, a dev page moves only within its origin, by a link or by a server's redirect alike, and none opens pop-ups. A
- * Browser pane's page that opens one (a link to a new tab) goes there itself, as the pane has one tab.
+ * Browser pane's page that opens one of its own (a link to a new tab) goes there itself, as the pane has one tab.
  */
 export function guardContents(contents: WebContents): void {
   const stay = (e: { preventDefault: () => void }, url: string) => {
@@ -74,7 +103,7 @@ export function guardContents(contents: WebContents): void {
   contents.on("will-navigate", stay);
   contents.on("will-redirect", stay);
   contents.setWindowOpenHandler((details) => {
-    const url = browserPages.has(contents) ? webUrl(details?.url) : null;
+    const url = openedUrl(contents, details);
     if (url) void contents.loadURL(url).catch(() => {});
     return { action: "deny" };
   });

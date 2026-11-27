@@ -91,7 +91,15 @@ const bridge: FeatraBridge = {
   // The Browser pane (STORY-74): its dev server from the local server, its page from main.
   browser: {
     ...serverBrowser(server),
-    open: (key) => ipcRenderer.send(IPC.browserOpen, key),
+    open: (key, target) => ipcRenderer.send(IPC.browserOpen, key, target),
+    focus: (key) => ipcRenderer.send(IPC.browserFocus, key),
+    onEscape: (listener) => {
+      const handler = (_e: unknown, key: unknown) => {
+        if (typeof key === "string") listener(key);
+      };
+      ipcRenderer.on(IPC.browserEscape, handler);
+      return () => void ipcRenderer.removeListener(IPC.browserEscape, handler);
+    },
     layout: (key, layout) => ipcRenderer.send(IPC.browserLayout, key, layout),
     navigate: (key, url) => ipcRenderer.send(IPC.browserNavigate, key, url),
     back: (key) => ipcRenderer.send(IPC.browserBack, key),

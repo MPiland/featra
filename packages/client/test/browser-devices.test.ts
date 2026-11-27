@@ -18,7 +18,7 @@ import {
   withDevices,
   type BrowserDevices,
 } from "../src/browser-devices.ts";
-import { normalizeBrowserLayout, normalizeBrowserState } from "../src/browser.ts";
+import { DPR, normalizeBrowserLayout, normalizeBrowserState } from "../src/browser.ts";
 import { BROWSER_WIDTH, paneWidthFor, stepPaneWidth } from "../src/pane-width.ts";
 import { DEFAULT_UI_STATE, normalizeUiState } from "../src/ui-state.ts";
 
@@ -31,6 +31,16 @@ describe("addressToUrl", () => {
     ["127.0.0.1:8080/x", "http://127.0.0.1:8080/x"],
     ["[::1]:3000", "http://[::1]:3000/"],
     ["  HTTPS://Example.com/  ", "https://example.com/"],
+    // The local network and names that never have a public certificate go over http (STORY-74 review).
+    ["192.168.1.20:8080", "http://192.168.1.20:8080/"],
+    ["10.0.0.5", "http://10.0.0.5/"],
+    ["172.20.1.1:3000/a", "http://172.20.1.1:3000/a"],
+    ["169.254.10.1", "http://169.254.10.1/"],
+    ["printer.local", "http://printer.local/"],
+    ["app.test:5173", "http://app.test:5173/"],
+    ["api.localhost:3000", "http://api.localhost:3000/"],
+    ["172.32.1.1", "https://172.32.1.1/"],
+    ["localist.com", "https://localist.com/"],
   ])("loads %s as %s", (typed, url) => expect(addressToUrl(typed)).toBe(url));
 
   it.each(["", "file:///etc/passwd", "javascript:alert(1)", "data:text/html,x", "chrome://gpu", "intranet", "a b.com"])(
@@ -149,6 +159,12 @@ describe("what the page and host send", () => {
       normalizeBrowserLayout({ bounds: { x: 1, y: 2, width: -3, height: 4 }, device: { ...device, dpr: 0 } }),
     ).toEqual({ bounds: null, device: null });
     expect(normalizeBrowserLayout("nope")).toEqual({ bounds: null, device: null });
+  });
+
+  it("keeps a device's pixel ratio within what Chromium emulates", () => {
+    const device = { width: 375, height: 667, scale: 1, mobile: false };
+    const dpr = (n: number) => normalizeBrowserLayout({ bounds: null, device: { ...device, dpr: n } }).device?.dpr;
+    expect([dpr(0.1), dpr(2), dpr(1e9)]).toEqual([DPR.min, 2, DPR.max]);
   });
 
   it("reads a page's state defensively", () => {

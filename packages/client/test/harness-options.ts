@@ -12,7 +12,8 @@ import type {
 import type { CopyActionResult } from "@featra/work-format/protocol";
 import type { WorkList } from "@featra/work-format/work-list";
 import type { CloseToTraySupport, ProjectRef, ProjectSetup, SetupItemId, WorkOverrides } from "../src/bridge.ts";
-import type { CardBridge, PreviewResult } from "../src/card-pane.ts";
+import type { CardBridge } from "../src/card-pane.ts";
+import type { BrowserBridge } from "../src/browser.ts";
 import type { BugProposal, FiledBug } from "../src/bugs.ts";
 import type { BugPlacements } from "@featra/work-format/bug-copy";
 import type { EvidenceFile } from "@featra/work-format/evidence-link";
@@ -75,8 +76,11 @@ export interface HostOptions extends ChatHost, RolesHost {
   cardChecks?: Record<string, CardChecks>;
   /** What the server adds to a story's card from the project's proof, by story id (STORY-25). */
   cardProof?: Record<string, CardProof>;
-  /** What the server answers when a Browser pane starts its dev server (STORY-74); the default serves localhost:5173. */
-  browserStart?: (dir: string, id: string) => Promise<PreviewResult>;
+  /**
+   * What the server answers when a Browser pane starts its dev server (STORY-74): its URL, that dependencies install
+   * first, or why not; the default serves localhost:5173.
+   */
+  browserStart?: BrowserBridge["start"];
   /** What the server knows of a story's PR, by story id: its last read state, Create PR, opening (STORY-11). */
   cardPrs?: Record<string, CardPr>;
   /** Whether an accepted feature can merge to main now, and why not, by feature id (STORY-14). */

@@ -8,44 +8,21 @@ import { act, cleanup, fireEvent, screen, waitFor, within } from "@testing-libra
 import { afterEach, describe, expect, it } from "vitest";
 import { BROWSER_COPY } from "../../src/browser.ts";
 import { PROJECT, renderApp } from "../harness.tsx";
-import type { HostOptions } from "../harness-options.ts";
-import { cardOf } from "../work-fixtures.ts";
-import type { UiState } from "../../src/ui-state.ts";
+import {
+  STORY,
+  WEBSITE,
+  browserPane,
+  cardFromWork,
+  cards,
+  device,
+  key,
+  lastSaved,
+  openBrowser,
+  projectCards,
+  rowOf,
+} from "./browser-steps.tsx";
 
 afterEach(cleanup);
-
-const STORY = "STORY-5";
-const cards = (status = "In Progress") => ({
-  [PROJECT.dir]: [
-    cardOf({ id: "FEAT-2", type: "feature", status: "active", title: "Delegation" }),
-    cardOf({ id: STORY, type: "story", parent: "FEAT-2", status, title: "Spawn five", acs: [0, 1] }),
-  ],
-});
-type App = ReturnType<typeof renderApp>;
-
-const rowOf = () => screen.getByRole("row", { name: /Spawn five/ });
-const browserPane = () => screen.findByRole("complementary", { name: BROWSER_COPY.pane(STORY) });
-
-async function openCard(host: HostOptions & { state?: Partial<UiState> } = {}) {
-  const app = renderApp({ cards: cards(), cardProof: { [STORY]: { browser: true } }, ...host });
-  await screen.findByRole("region", { name: "Work list" });
-  await app.user.click(screen.getByRole("button", { name: "Delegation" }));
-  await app.user.click(within(rowOf()).getByRole("button", { name: "Spawn five" }));
-  const card = await screen.findByRole("complementary", { name: `${STORY} card` });
-  return { ...app, card };
-}
-
-/** Opens the card, then the Browser pane from it, with the story's dev server up. */
-async function openBrowser(host: HostOptions & { state?: Partial<UiState> } = {}) {
-  const app = await openCard(host);
-  await app.user.click(within(app.card).getByRole("button", { name: BROWSER_COPY.open }));
-  const pane = await browserPane();
-  return { ...app, pane };
-}
-
-const key = (app: App) => app.browser.current();
-const lastSaved = (app: App) => app.saves.at(-1);
-
 describe("AC1: the Browser pane docks beside the card or chat, and resizes and closes like the other panes", () => {
   it("opens from a story's card pane, beside it", async () => {
     const app = await openBrowser();
@@ -60,9 +37,9 @@ describe("AC1: the Browser pane docks beside the card or chat, and resizes and c
 
   it("opens from a story's chat", async () => {
     // A story not yet started: Start opens its chat.
-    const app = renderApp({ cards: cards("New") });
+    const app = renderApp({ cards: cards("New"), cardProof: { [STORY]: { browser: true } } });
     await screen.findByRole("region", { name: "Work list" });
-    await app.user.click(screen.getByRole("button", { name: "Delegation" }));
+    await app.user.click(await screen.findByRole("button", { name: "Delegation" }));
     await app.user.click(await screen.findByRole("button", { name: `Start ${STORY}` }));
     await app.user.click(await within(rowOf()).findByRole("button", { name: `Open the session of ${STORY}` }));
     await screen.findByRole("region", { name: "Developer" });
@@ -76,7 +53,7 @@ describe("AC1: the Browser pane docks beside the card or chat, and resizes and c
   it("isn't offered on a card with nothing to serve", async () => {
     const app = renderApp({ cards: cards() });
     await screen.findByRole("region", { name: "Work list" });
-    await app.user.click(screen.getByRole("button", { name: "Delegation" }));
+    await app.user.click(await screen.findByRole("button", { name: "Delegation" }));
     await app.user.click(within(rowOf()).getByRole("button", { name: "Spawn five" }));
     const card = await screen.findByRole("complementary", { name: `${STORY} card` });
     expect(within(card).queryByRole("button", { name: BROWSER_COPY.open })).toBeNull();
@@ -197,8 +174,6 @@ describe("AC3: the address bar, back, forward and reload", () => {
   });
 });
 
-const device = (pane: HTMLElement) => within(pane).getByRole("combobox", { name: BROWSER_COPY.device });
-
 describe("AC4: the device toolbar", () => {
   it("shows the page as a preset device: its size, pixel ratio and touch", async () => {
     const app = await openBrowser();
@@ -214,7 +189,7 @@ describe("AC4: the device toolbar", () => {
     await app.user.selectOptions(device(app.pane), BROWSER_COPY.responsive);
     const width = within(app.pane).getByRole("spinbutton", { name: BROWSER_COPY.width });
     await app.user.clear(width);
-    await app.user.type(width, "500");
+    await app.user.type(width, "500{Enter}");
     await waitFor(() => expect(app.browser.layout()?.device).toMatchObject({ width: 500, height: 800, mobile: false }));
     const handle = within(app.pane).getByRole("separator", { name: BROWSER_COPY.resizeHeight });
     handle.focus();
@@ -251,8 +226,35 @@ describe("AC4: the device toolbar", () => {
     const again = await openBrowser({ state: saved });
     expect((device(again.pane) as HTMLSelectElement).value).toBe("device:Pixel 8");
     await waitFor(() => expect(again.browser.layout()?.device).toMatchObject({ width: 412, height: 915 }));
-    // Another project starts at Fit.
-    expect(saved.browserDevices?.["/elsewhere"]).toBeUndefined();
+  });
+
+  it("starts another project at Fit, and keeps the first project's choice", async () => {
+    const first = await openBrowser();
+    await first.user.selectOptions(device(first.pane), "Pixel 8");
+    await waitFor(() => expect(lastSaved(first)?.browserDevices?.[PROJECT.dir]?.choice).toEqual({ device: "Pixel 8" }));
+    const saved = lastSaved(first)!;
+    cleanup();
+    const app = renderApp({
+      projects: [PROJECT, WEBSITE],
+      cards: { [PROJECT.dir]: projectCards(), [WEBSITE.dir]: projectCards() },
+      cardProof: { [STORY]: { browser: true } },
+      state: saved,
+    });
+    await app.user.click(await screen.findByRole("button", { name: /^Switch project: / }));
+    await app.user.click(screen.getByRole("menuitemradio", { name: "website" }));
+    await screen.findByRole("button", { name: /^Switch project: website/ });
+    await app.user.click(await screen.findByRole("button", { name: "Work" }));
+    const card = await cardFromWork(app);
+    await app.user.click(within(card).getByRole("button", { name: BROWSER_COPY.open }));
+    const pane = await browserPane();
+    expect((device(pane) as HTMLSelectElement).value).toBe("fit");
+    await waitFor(() => expect(app.browser.layout()?.device).toBeNull());
+    expect(app.calls).toContain(`browserStart:${WEBSITE.dir}:${STORY}`);
+    expect(
+      lastSaved(app)?.browserDevices?.[PROJECT.dir]?.choice ?? saved.browserDevices?.[PROJECT.dir]?.choice,
+    ).toEqual({
+      device: "Pixel 8",
+    });
   });
 });
 

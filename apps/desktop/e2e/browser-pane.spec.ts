@@ -50,6 +50,7 @@ test("Browser pane: a story's dev server shows beside its card, as any device, a
     await card.getByRole("button", { name: "Browser", exact: true }).click();
     const browser = page.getByRole("complementary", { name: `${id} browser` });
     await expect(browser).toBeVisible();
+    await expect(browser.getByText(`Browser · ${id}`, { exact: true })).toBeVisible();
     await expect.poll(() => browserUrl(app), { timeout: 60_000 }).toBe(`${url}/`);
     await expect.poll(() => inBrowserPage(app, "document.querySelector('h1')?.textContent")).toBe("Draft a feature");
     const address = browser.getByRole("textbox", { name: "Address" });
@@ -81,11 +82,15 @@ test("Browser pane: a story's dev server shows beside its card, as any device, a
     await expect.poll(() => inBrowserPage(app, "navigator.maxTouchPoints")).toBe(5);
     // Scaled to fit the pane, the phone's page fills its frame: its header reaches the right edge.
     await expect.poll(() => browserTopRight(app)).toBeLessThan(100);
+    // The scale it is drawn at shows beside its size, as Chrome shows it.
+    await expect(browser.locator(".browser-scale")).toHaveText(/^\d{1,2}%$/);
     await browserShot(app, page, "feat10-browser-phone");
 
     // Responsive, at a width of the user's own, with its handles.
     await device.selectOption({ label: "Responsive" });
-    await browser.getByRole("spinbutton", { name: "Width" }).fill("500");
+    const width = browser.getByRole("spinbutton", { name: "Width" });
+    await width.fill("500");
+    await width.press("Enter");
     await expect.poll(() => inBrowserPage(app, "innerWidth")).toBe(500);
     await expect(browser.getByRole("separator", { name: "Resize width" })).toBeVisible();
     await expect.poll(() => browserTopRight(app)).toBeLessThan(100);

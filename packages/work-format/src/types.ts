@@ -152,6 +152,11 @@ export interface ProjectConfig {
   proof: "screenshots" | "preview" | "both" | "none" | null;
   /** The command that starts the project's dev server, with an optional `{port}`; null until the user confirms one. */
   devServerCommand: string | null;
+  /**
+   * What installs the project's dependencies in a feature's temporary checkout before its dev server starts there
+   * (STORY-74); null derives it from the lockfile.
+   */
+  devServerInstall: string | null;
   /** Where the dev server answers: http://localhost:<port> or http://127.0.0.1:<port>. */
   devServerUrl: string | null;
   /** The folder, relative to the project, where its own tests write screenshots (STORY-25); null when none. */

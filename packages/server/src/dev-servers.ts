@@ -19,6 +19,7 @@ import { runCommand, type RunControl } from "./check-run.ts";
 export const DEV_SERVER_START_MS = 60_000;
 /** How long between asks while waiting for it. */
 const ASK_EVERY_MS = 250;
+const noop = () => {};
 /** The lines of its output a note shows when it didn't start. */
 const NOTE_LINES = 20;
 
@@ -48,6 +49,8 @@ interface Running {
   stopped: boolean;
   /** Its process ended: it is never killed after, so a reused process id is never touched. */
   exited: boolean;
+  /** Who uses it (Preview, the screenshots, each open Browser pane): released by the last, it stops (STORY-74). */
+  holders: Set<string>;
 }
 /** Where a dev server on this computer may listen: a server bound to `localhost` often listens on ::1 only. */
 const LOOPBACKS = ["127.0.0.1", "::1"] as const;
@@ -92,7 +95,7 @@ const httpAnswers = (url: string) =>
   });
 
 /** The last lines of what the server printed. */
-const lastLines = (output: string) => output.trimEnd().split("\n").slice(-NOTE_LINES).join("\n");
+export const lastLines = (output: string) => output.trimEnd().split("\n").slice(-NOTE_LINES).join("\n");
 
 /** A story's key: its project and id. */
 const keyOf = (project: string, story: string) => `${project}\n${story}`;
@@ -108,6 +111,8 @@ export function createDevServers({
 }: DevServerDeps = {}) {
   /** By story: the project and the story's id. A start is kept from the ask, so a second ask waits on the first. */
   const servers = new Map<string, Running>();
+  /** Servers stopped whose process may still run, by story: what runs in their folder until it ends. */
+  const exiting = new Map<string, { entry: Running; gone: Promise<void> }>();
   /** The command, URL and port it runs with, or why it can't run. */
   async function plan(command: string, url: string) {
     const port = devServerPort(url);
@@ -161,19 +166,38 @@ export function createDevServers({
     if (entry.stopped) return;
     entry.stopped = true;
     if (entry.control && !entry.exited) entry.control.cancel();
+    // Kept until its process ends: what runs in its folder (a feature's checkout) waits for it.
+    const gone = entry.started.then(() => entry.control?.done).then(noop);
+    exiting.set(key, { entry, gone });
+    void gone.finally(() => {
+      if (exiting.get(key)?.gone === gone) exiting.delete(key);
+    });
   }
 
-  /** Story `story`'s dev server: the one running, or one launched now (`launched`). */
-  function claim(project: string, story: string, worktree: string, command: string, url: string) {
+  /** Waits up to `within` ms for a stopped server's process to end; whether it has (or none was left running). */
+  async function ended(key: string, within: number): Promise<boolean> {
+    const left = exiting.get(key);
+    if (!left) return true;
+    if (Number.isFinite(within)) await Promise.race([left.gone, wait(within)]);
+    else await left.gone;
+    return left.entry.exited || left.entry.control === null;
+  }
+
+  /** Story `story`'s dev server, held by `holder`: the one running, or one launched now (`launched`). */
+  function claim(project: string, story: string, worktree: string, command: string, url: string, holder: string) {
     const key = keyOf(project, story);
     const known = servers.get(key);
-    if (known && !known.exited) return { launched: false, started: known.started };
+    if (known && !known.exited) {
+      known.holders.add(holder);
+      return { launched: false, started: known.started };
+    }
     const entry: Running = {
       project,
       control: null,
       started: Promise.resolve({ ok: false, note: "" }),
       stopped: false,
       exited: false,
+      holders: new Set([holder]),
     };
     servers.set(key, entry);
     entry.started = launch(entry, command, worktree, url).then((result) => {
@@ -189,17 +213,32 @@ export function createDevServers({
      * The dev server of story `story` of `project`, started with `command` in its `worktree` unless it runs already; its
      * URL once it answers, else why not.
      */
-    start: (project: string, story: string, worktree: string, command: string, url: string): Promise<DevServerStart> =>
-      claim(project, story, worktree, command, url).started,
-    /** As `start`, and whether this ask launched it: the Browser pane stops only the servers it started (STORY-74). */
+    start: (
+      project: string,
+      story: string,
+      worktree: string,
+      command: string,
+      url: string,
+      holder = "proof",
+    ): Promise<DevServerStart> => claim(project, story, worktree, command, url, holder).started,
+    /** As `start`, and whether this ask launched it. */
     claim,
+    /**
+     * `holder` is done with story `story`'s dev server: the last holder's release stops it (STORY-74). Whether no
+     * process of it runs now, waiting up to `within` ms for one stopped to end; false while others hold it.
+     */
+    release(project: string, story: string, holder: string, within = Infinity): Promise<boolean> {
+      const key = keyOf(project, story);
+      const entry = servers.get(key);
+      entry?.holders.delete(holder);
+      if (entry?.holders.size) return Promise.resolve(false);
+      stop(key);
+      return ended(key, within);
+    },
     /** Stops story `story`'s dev server, if Featra runs one, and settles once its process has ended. */
     async halt(project: string, story: string): Promise<void> {
-      const entry = servers.get(keyOf(project, story));
       stop(keyOf(project, story));
-      if (!entry) return;
-      await entry.started;
-      if (entry.control) await entry.control.done;
+      await ended(keyOf(project, story), Infinity);
     },
     /** Stops story `story`'s dev server, if Featra runs one: the story is ending and its worktree going. */
     stop: (project: string, story: string) => stop(keyOf(project, story)),

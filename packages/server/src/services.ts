@@ -222,6 +222,8 @@ export function createServices({
     chats.closeProjects(allowed.has);
     roleWatches.closeProjects(allowed.has);
     proof.servers.keepProjects(allowed.dirs());
+    // Feature preview checkouts a quit left behind go when their project opens (STORY-74).
+    proof.browser.sweep(allowed.dirs());
   });
   // What every open project needs from the user, for the project switcher (STORY-66) and the taskbar and Dock badge
   // (STORY-67); started by the first watch.
@@ -275,7 +277,7 @@ export function createServices({
     devServers: proof.servers,
     async close() {
       stopClosing();
-      // The Browser pane's servers stop first, and their temporary checkouts go once they have (STORY-74).
+      // The Browser pane's servers stop first, and their temporary checkouts go once their processes end (STORY-74).
       await proof.browser.close();
       proof.servers.stopAll();
       checks.close();

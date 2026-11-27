@@ -4,6 +4,7 @@
  */
 import { dirParams, isRecord, normalizeProofPatch } from "@featra/work-format";
 import { ApiError } from "./api-error.ts";
+import type { Connection } from "./api.ts";
 import type { BrowserPreview } from "./browser-preview.ts";
 import type { DesignReviews } from "./design-reviews.ts";
 import type { ProofCapture } from "./proof-capture.ts";
@@ -29,7 +30,7 @@ export interface ProofApiDeps {
 }
 
 export function createProofApi({ proof, allow }: ProofApiDeps) {
-  return async (method: ProofMethod, params: unknown) => {
+  return async (method: ProofMethod, params: unknown, request: number, connection: Connection) => {
     const dir = dirParams(params)?.dir;
     if (dir === undefined) throw new ApiError("Expected { dir }.");
     if (!proof) throw new ApiError("Proof isn't available.");
@@ -43,8 +44,17 @@ export function createProofApi({ proof, allow }: ProofApiDeps) {
     if (typeof p.id !== "string" || !p.id) throw new ApiError("Expected { dir, id }.");
     if (method === "preview.start") return proof.capture.preview(allow(dir), p.id);
     if (method === "browser.start" || method === "browser.stop") {
-      if (!proof.browser) throw new ApiError("The Browser pane isn't available.");
-      return method === "browser.start" ? proof.browser.start(allow(dir), p.id) : proof.browser.stop(allow(dir), p.id);
+      const { browser } = proof;
+      if (!browser) throw new ApiError("The Browser pane isn't available.");
+      // The page's key for its pane: one per pane it opens, never reused.
+      const pane = typeof p.pane === "string" && p.pane && p.pane.length <= 100 ? p.pane : null;
+      if (!pane) throw new ApiError("Expected { dir, id, pane }.");
+      if (method === "browser.stop") return browser.stop(pane);
+      // The pane is let go when the page's socket closes: reloaded, crashed or gone.
+      return browser.start(pane, allow(dir), p.id, (stop) => {
+        connection.keep(request, stop);
+        return () => connection.unwatch(request);
+      });
     }
     if (!proof.design) throw new ApiError("The design review isn't available.");
     return proof.design.clear(allow(dir), p.id);

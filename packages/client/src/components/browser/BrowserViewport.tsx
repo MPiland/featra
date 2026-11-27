@@ -37,35 +37,48 @@ function useWindowRect(ref: RefObject<HTMLElement | null>): Rect | null {
   return rect;
 }
 
-/** Whether a dialog or an inert shell covers the app: the page's view, drawn above it all, hides meanwhile. */
+/**
+ * What covers part of the app while it shows: a dialog, an inert shell, a menu, an open listbox. The page's view is
+ * drawn above all of the app, so it hides meanwhile.
+ */
+const COVERS = 'dialog[open], [aria-modal=true], .shell[inert], [role=menu], [role=listbox]:not([aria-hidden="true"])';
+
+/** Whether something covers the app (`COVERS`). */
 function useCovered(): boolean {
   const [covered, setCovered] = useState(false);
   useEffect(() => {
-    const check = () => setCovered(document.querySelector("dialog[open], [aria-modal=true], .shell[inert]") !== null);
+    const check = () => setCovered(document.querySelector(COVERS) !== null);
     check();
     const observer = new MutationObserver(check);
-    observer.observe(document.body, { subtree: true, childList: true, attributeFilter: ["open", "inert"] });
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      attributeFilter: ["open", "inert", "role", "aria-hidden"],
+    });
     return () => observer.disconnect();
   }, []);
   return covered;
 }
 
 export interface BrowserViewportProps {
-  host: Pick<BrowserBridge, "layout">;
+  host: Pick<BrowserBridge, "layout" | "focus">;
   pageKey: string;
-  /** Whether the page has something to show: its dev server is up. */
+  /** Whether the page has something to show: its dev server is up, or the user went to an address. */
   shown: boolean;
-  /** The dev server is starting. */
-  waiting: boolean;
+  /** What the pane waits for (the dev server starting, its dependencies installing); null when nothing. */
+  waiting: string | null;
   devices: BrowserDevices;
   onChange: (devices: BrowserDevices) => void;
+  /** Hears the scale a device is drawn at to fit; null when the page fits the pane. */
+  onScale?: (scale: number | null) => void;
 }
 
 /**
  * Where the page shows (ADR 0047): the host lays its view over this element's rectangle, or over the chosen device's
  * rectangle centred in it and scaled down to fit. Responsive has handles at the device's right and bottom edges.
  */
-export function BrowserViewport({ host, pageKey, shown, waiting, devices, onChange }: BrowserViewportProps) {
+export function BrowserViewport(props: BrowserViewportProps) {
+  const { host, pageKey, shown, waiting, devices, onChange, onScale } = props;
   const ref = useRef<HTMLDivElement>(null);
   const area = useWindowRect(ref);
   const covered = useCovered();
@@ -86,8 +99,22 @@ export function BrowserViewport({ host, pageKey, shown, waiting, devices, onChan
   useEffect(() => {
     host.layout(pageKey, JSON.parse(layout));
   }, [host, pageKey, layout]);
+  const scale = device && fit ? fit.scale : null;
+  useEffect(() => onScale?.(scale), [onScale, scale]);
   return (
-    <div ref={ref} className={device ? "browser-viewport on-device" : "browser-viewport"}>
+    // The page's place in the Tab order: focused, it hands the keyboard to the page's own view, which is drawn over it.
+    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+    <div
+      ref={ref}
+      className={device ? "browser-viewport on-device" : "browser-viewport"}
+      role="group"
+      aria-label={BROWSER_COPY.page}
+      // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex
+      tabIndex={0}
+      onFocus={(e) => {
+        if (e.target === e.currentTarget && bounds) host.focus(pageKey);
+      }}
+    >
       {fit && device && (
         <div
           className="browser-frame"
@@ -95,7 +122,7 @@ export function BrowserViewport({ host, pageKey, shown, waiting, devices, onChan
           aria-hidden="true"
         />
       )}
-      {waiting && <p className="meta browser-waiting">{BROWSER_COPY.starting}</p>}
+      {waiting && <p className="meta browser-waiting">{waiting}</p>}
       {fit && devices.choice === "responsive" && (
         <ResponsiveHandles
           frame={fit}

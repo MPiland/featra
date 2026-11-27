@@ -8,11 +8,17 @@ import { SettingRow } from "../controls/SettingRow.tsx";
 import { Switch } from "../controls/Switch.tsx";
 import { SettingsGroup } from "./SettingsGroup.tsx";
 
-type Field = "devServerCommand" | "devServerUrl" | "testScreenshots";
-const FIELDS = ["devServerCommand", "devServerUrl", "testScreenshots"] as const satisfies Field[];
-const EMPTY: Record<Field, string> = { devServerCommand: "", devServerUrl: "", testScreenshots: "" };
+type Field = "devServerCommand" | "devServerInstall" | "devServerUrl" | "testScreenshots";
+const FIELDS = ["devServerCommand", "devServerInstall", "devServerUrl", "testScreenshots"] as const satisfies Field[];
+const EMPTY: Record<Field, string> = {
+  devServerCommand: "",
+  devServerInstall: "",
+  devServerUrl: "",
+  testScreenshots: "",
+};
 const draftOf = (view: ProofView): Record<Field, string> => ({
   devServerCommand: view.devServerCommand ?? "",
+  devServerInstall: view.devServerInstall ?? "",
   devServerUrl: view.devServerUrl ?? "",
   testScreenshots: view.testScreenshots ?? "",
 });
@@ -20,9 +26,9 @@ const draftOf = (view: ProofView): Record<Field, string> => ({
 /**
  * Project settings' Proof section (STORY-25): the project's proof (the answer to the question asked when its first
  * feature was shaped), the dev server Featra starts for screenshots and Preview, and where the project's tests write
- * screenshots. A dev-server command changed through git runs only once the user confirms it here. Next to the proof,
- * whether the Dev Lead reviews a story's screenshots before it moves to Acceptance (STORY-73): on by default when the
- * proof captures them.
+ * screenshots. A dev-server or install command (the install a feature's Browser pane checkout runs, STORY-74) changed
+ * through git runs only once the user confirms it here. Next to the proof, whether the Dev Lead reviews a story's
+ * screenshots before it moves to Acceptance (STORY-73): on by default when the proof captures them.
  */
 export function ProjectProof({ checks, dir }: { checks: ChecksBridge; dir: string }) {
   const [loaded, setLoaded] = useState<{ dir: string; view: ProofView } | null>(null);
@@ -73,10 +79,11 @@ export function ProjectProof({ checks, dir }: { checks: ChecksBridge; dir: strin
             spellCheck={false}
             onChange={(e) => setDraft({ ...draft, [f]: e.target.value })}
           />
-          {f === "devServerCommand" && view.unconfirmed && (
+          {((f === "devServerCommand" && view.unconfirmed) ||
+            (f === "devServerInstall" && view.installUnconfirmed)) && (
             <div className="setting-help">
               <span>{COPY.changed}: </span>
-              <code>{view.devServerCommand}</code>{" "}
+              <code>{view[f]}</code>{" "}
               <button type="button" className="link" onClick={() => void change({ confirm: true })}>
                 {COPY.confirm}
               </button>
@@ -132,6 +139,7 @@ export function ProjectProof({ checks, dir }: { checks: ChecksBridge; dir: strin
           )}
         </SettingRow>
         {field("devServerCommand", COPY.command, COPY.commandHint)}
+        {field("devServerInstall", COPY.install, COPY.installHint)}
         {field("devServerUrl", COPY.url, COPY.urlHint)}
         {field("testScreenshots", COPY.shots, COPY.shotsHint)}
         <div className="setting-row">

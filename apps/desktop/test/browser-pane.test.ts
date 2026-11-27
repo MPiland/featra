@@ -2,119 +2,23 @@
  * STORY-74: the Browser pane's page in the main window (browser-pane.ts, browser-emulation.ts, ADR 0047). It is a view
  * of its own, sandboxed without Node in a session apart from the app's, laid out where the page says at the window's
  * zoom; it goes to any web address but no other scheme; its device is shown through the DevTools Protocol; and a
- * closed pane's late calls touch nothing. Fakes only Electron: its window, view, contents, debugger and session.
+ * closed pane's late calls touch nothing. Fakes only Electron (browser-fakes.ts): its window, view, contents, debugger
+ * and session.
  */
-import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
+import { fakeWindow, platform, type FakeContents } from "./browser-fakes.ts";
 
-class FakeContents extends EventEmitter {
-  url = "";
-  destroyed = false;
-  loads: string[] = [];
-  commands: [string, unknown][] = [];
-  attached = false;
-  setWindowOpenHandler = vi.fn<(handler: (d: { url: string }) => { action: string }) => void>();
-  navigationHistory = {
-    back: 0,
-    canGoBack: () => true,
-    canGoForward: () => false,
-    goBack: () => void this.navigationHistory.back++,
-    goForward: () => {},
-  };
-  debugger = {
-    isAttached: () => this.attached,
-    attach: () => void (this.attached = true),
-    sendCommand: async (method: string, params?: unknown) => void this.commands.push([method, params]),
-  };
-  getURL = () => this.url;
-  getTitle = () => "Fixture";
-  isLoading = () => false;
-  isDestroyed = () => this.destroyed;
-  close = () => void (this.destroyed = true);
-  reload = vi.fn<() => void>();
-  capturePage = vi.fn<(rect?: unknown) => Promise<string>>(async () => "image");
-  async loadURL(url: string) {
-    this.loads.push(url);
-  }
-}
-
-const platform = {
-  views: [] as { options: Record<string, unknown>; view: FakeView }[],
-  partitions: [] as string[],
-  request: null as null | ((c: unknown, p: string, decide: (ok: boolean) => void) => void),
-  check: null as null | (() => boolean),
-  downloads: [] as boolean[],
-};
-
-class FakeView {
-  webContents = new FakeContents();
-  bounds: unknown = null;
-  visible = true;
-  constructor(options: Record<string, unknown>) {
-    platform.views.push({ options, view: this });
-    guard(this.webContents);
-  }
-  setBounds(b: unknown) {
-    this.bounds = b;
-  }
-  setVisible(v: boolean) {
-    this.visible = v;
-  }
-  getVisible() {
-    return this.visible;
-  }
-  getBounds() {
-    return this.bounds;
-  }
-}
-
-vi.mock("electron", () => ({
-  WebContentsView: FakeView,
-  BrowserWindow: vi.fn<() => void>(),
-  session: {
-    fromPartition(name: string) {
-      platform.partitions.push(name);
-      const downloads = new EventEmitter();
-      downloads.on("will-download", () => {});
-      return {
-        setPermissionRequestHandler: (h: typeof platform.request) => void (platform.request = h),
-        setPermissionCheckHandler: (h: typeof platform.check) => void (platform.check = h),
-        on: (event: string, h: (e: { preventDefault: () => void }) => void) => {
-          if (event !== "will-download") return;
-          const e = { prevented: false, preventDefault: () => void (e.prevented = true) };
-          h(e);
-          platform.downloads.push(e.prevented);
-        },
-      };
-    },
-  },
-}));
+vi.mock("electron", async () => (await import("./browser-fakes.ts")).fakeElectron());
 
 const pages = await import("../src/dev-pages.ts");
-const guard = (contents: FakeContents) => pages.guardContents(contents as never);
+platform.onContents = (contents: FakeContents) => pages.guardContents(contents as never);
 const { BROWSER_PARTITION, closePane, openPane, openPanes, paneOf } = await import("../src/browser-pane.ts");
 const { emulationCommands } = await import("../src/browser-emulation.ts");
 
-/** The main window: its zoom, its child views, and what it sent the page. */
-function fakeWindow(zoom = 1) {
-  const sent: unknown[][] = [];
-  const children = new Set<FakeView>();
-  const events = new EventEmitter();
-  const win = {
-    isDestroyed: () => false,
-    webContents: { getZoomFactor: () => zoom, send: (...args: unknown[]) => void sent.push(args) },
-    contentView: {
-      addChildView: (v: FakeView) => void children.add(v),
-      removeChildView: (v: FakeView) => void children.delete(v),
-    },
-    once: (event: string, h: () => void) => void events.once(event, h),
-  };
-  return { win, sent, children, events };
-}
-
+const TARGET = { dir: "D:/p", id: "STORY-1" };
 const log = () => {};
 const open = (w = fakeWindow(), key = "browser-1") => {
-  const pane = openPane(w.win as never, key, log);
+  const pane = openPane(w.win as never, key, TARGET, log);
   const view = platform.views.at(-1)!.view;
   return { ...w, pane, view, contents: view.webContents };
 };
@@ -167,10 +71,29 @@ describe("the pane's page", () => {
 
   it("opens a page's new window in itself, and no window", () => {
     const { contents } = open();
+    contents.url = "https://example.com/list";
+    const own = { referrer: { url: "https://example.com/list" } };
     const handler = contents.setWindowOpenHandler.mock.calls[0]![0];
-    expect(handler({ url: "https://example.com/new" })).toEqual({ action: "deny" });
-    expect(handler({ url: "file:///x" })).toEqual({ action: "deny" });
+    expect(handler({ url: "https://example.com/new", disposition: "foreground-tab", ...own })).toEqual({
+      action: "deny",
+    });
+    expect(handler({ url: "file:///x", disposition: "foreground-tab", ...own })).toEqual({ action: "deny" });
     expect(contents.loads).toEqual(["https://example.com/new"]);
+  });
+
+  // Regression (STORY-74 review): any frame's window.open, of any kind, took the pane anywhere.
+  it("follows only a new tab or window its own page asked for", () => {
+    const { contents } = open();
+    contents.url = "https://example.com/list";
+    const handler = contents.setWindowOpenHandler.mock.calls[0]![0];
+    const ask = (disposition: string, referrer: string) =>
+      handler({ url: "https://example.com/next", disposition, referrer: { url: referrer } });
+    ask("new-window", "https://example.com/list");
+    ask("background-tab", "https://example.com/list");
+    ask("other", "https://example.com/list");
+    ask("foreground-tab", "https://ads.example.net/frame");
+    ask("foreground-tab", "");
+    expect(contents.loads).toEqual(["https://example.com/next"]);
   });
 
   it("tells the window its state as it loads, and why a load failed", () => {

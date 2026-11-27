@@ -6,13 +6,11 @@
  * One run per feature at a time; a run for a commit the branch has moved past, or for a check command since changed,
  * still finishes, and counts for nothing. Worktrees a run left behind (the app quit mid-run) are pruned first.
  */
-import { mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { CHECKS_COPY, toIso, type CardChecks, type FeatureChecks, type ProjectConfig } from "@featra/work-format";
 import { runCommand, type RunControl } from "./check-run.ts";
 import type { CheckSettings } from "./check-settings.ts";
 import type { MergeGit } from "./merge-git.ts";
+import { checkoutAt, removeCheckout } from "./temp-checkout.ts";
 
 export interface FeatureChecksDeps {
   git: MergeGit;
@@ -43,12 +41,10 @@ export function createFeatureChecks({ git, settings, now, log, timeoutMs, change
 
   /** Runs `command` at `tip` in a temporary detached worktree; its exit and output. */
   async function runAt(top: string, tip: string, command: string) {
-    await git.git(top, ["worktree", "prune"]);
-    const folder = await mkdtemp(join(tmpdir(), "featra-feature-checks-"));
+    const made = await checkoutAt(git, top, tip, "featra-feature-checks-");
+    if (!made.ok) return { code: null, output: made.error, timedOut: false };
     try {
-      const added = await git.git(top, ["worktree", "add", "--detach", "--quiet", folder, tip]);
-      if (added.code !== 0) return { code: null, output: added.stderr, timedOut: false };
-      const control = runCommand(command, folder, timeoutMs);
+      const control = runCommand(command, made.checkout.folder, timeoutMs);
       active.add(control);
       try {
         return await control.done;
@@ -56,8 +52,7 @@ export function createFeatureChecks({ git, settings, now, log, timeoutMs, change
         active.delete(control);
       }
     } finally {
-      await git.removeFolder(top, folder);
-      await rm(folder, { recursive: true, force: true }).catch(() => {});
+      await removeCheckout(git, made.checkout);
     }
   }
 

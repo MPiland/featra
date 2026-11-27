@@ -2,6 +2,7 @@ import {
   session,
   WebContentsView,
   type BrowserWindow,
+  type Input,
   type NativeImage,
   type Rectangle,
   type WebContents,
@@ -20,8 +21,14 @@ import { e2e, testHooks } from "./test-hooks.ts";
  */
 export const BROWSER_PARTITION = "featra-browser";
 
+/** What a pane shows: the project's folder and its story or feature. */
+export interface BrowserTarget {
+  dir: string;
+  id: string;
+}
+
 /** What drives an open pane's page: the page's own calls now, and later an agent's (STORY-40) or annotation (STORY-75). */
-export interface BrowserHandle {
+export interface BrowserHandle extends BrowserTarget {
   key: string;
   contents: WebContents;
   navigate: (url: string) => boolean;
@@ -33,6 +40,8 @@ export interface BrowserHandle {
   bounds: () => Rectangle | null;
   /** The page as shown, or `rect` of it (in the page's CSS px at its scale): for screenshots of an element or region. */
   capture: (rect?: Rectangle) => Promise<NativeImage>;
+  /** Gives the page the keyboard. */
+  focus: () => void;
 }
 
 interface Pane extends BrowserHandle {
@@ -66,8 +75,20 @@ function stateOf(contents: WebContents, failed: string | null): BrowserState {
   };
 }
 
-/** Makes `win`'s pane `key`, replacing the one it had. Hidden until laid out. */
-export function openPane(win: BrowserWindow, key: string, log: (message: string) => void): BrowserHandle {
+/** Escape with no modifier, pressed: in the pane's page it closes the pane, as Escape closes the other panes. */
+const isEscape = (input: Input) =>
+  input.type === "keyDown" && input.key === "Escape" && !input.shift && !input.control && !input.alt && !input.meta;
+
+/**
+ * Makes `win`'s pane `key`, showing `target`, replacing the one it had. Hidden until laid out. It closes when the
+ * window's page goes (a reload, a crash): the page that drove it, and would close it, is gone.
+ */
+export function openPane(
+  win: BrowserWindow,
+  key: string,
+  target: BrowserTarget,
+  log: (message: string) => void,
+): BrowserHandle {
   panes.get(win)?.close();
   browserSession();
   const view = new WebContentsView({
@@ -103,8 +124,18 @@ export function openPane(win: BrowserWindow, key: string, log: (message: string)
     failed = description || `error ${code}`;
     send();
   });
+  contents.on("before-input-event", (_e, input) => {
+    if (isEscape(input) && !win.isDestroyed()) win.webContents.send(IPC.browserEscape, key);
+  });
+  const pageGone = (details: { isMainFrame: boolean; isSameDocument: boolean }) => {
+    if (details.isMainFrame && !details.isSameDocument) pane.close();
+  };
+  const crashed = () => pane.close();
+  const windowClosed = () => pane.close();
   const pane: Pane = {
     key,
+    dir: target.dir,
+    id: target.id,
     contents,
     navigate(url) {
       const ok = webUrl(url);
@@ -135,14 +166,24 @@ export function openPane(win: BrowserWindow, key: string, log: (message: string)
     },
     bounds: () => (view.getVisible() ? view.getBounds() : null),
     capture: (rect) => contents.capturePage(rect),
+    focus: () => {
+      if (!contents.isDestroyed()) contents.focus();
+    },
     close() {
       if (panes.get(win) === pane) panes.delete(win);
-      if (!win.isDestroyed()) win.contentView.removeChildView(view);
+      win.off("closed", windowClosed);
+      if (!win.isDestroyed()) {
+        win.webContents.off("did-start-navigation", pageGone);
+        win.webContents.off("render-process-gone", crashed);
+        win.contentView.removeChildView(view);
+      }
       if (!contents.isDestroyed()) contents.close();
     },
   };
   panes.set(win, pane);
-  win.once("closed", () => pane.close());
+  win.once("closed", windowClosed);
+  win.webContents.on("did-start-navigation", pageGone);
+  win.webContents.on("render-process-gone", crashed);
   return pane;
 }
 

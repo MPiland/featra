@@ -9,6 +9,7 @@ import {
   configOverrides,
   devServerPort,
   evidenceFolder,
+  lockfileInstall,
   matchTestShots,
   normalizeProofPatch,
   normalizeProofView,
@@ -234,12 +235,45 @@ describe("the Proof section on the socket", () => {
     expect(normalizeProofView({ proof: "both", devServerCommand: "x", unconfirmed: true, error: null })).toEqual({
       proof: "both",
       devServerCommand: "x",
+      devServerInstall: null,
       devServerUrl: null,
       testScreenshots: null,
       designReview: false,
       unconfirmed: true,
+      installUnconfirmed: false,
       error: null,
     });
     expect(normalizeProofView(null).error).toBe("Couldn't read the project's proof settings.");
+  });
+
+  it("carries the install command and whether it is confirmed (STORY-74)", () => {
+    expect(normalizeProofPatch({ devServerInstall: "npm ci" })).toEqual({ devServerInstall: "npm ci" });
+    expect(normalizeProofPatch({ devServerInstall: null })).toEqual({ devServerInstall: null });
+    expect(normalizeProofPatch({ devServerInstall: ["npm", "ci"] })).toBeNull();
+    const view = normalizeProofView({ devServerInstall: "npm ci", installUnconfirmed: true });
+    expect([view.devServerInstall, view.installUnconfirmed]).toEqual(["npm ci", true]);
+  });
+});
+
+describe("the install a feature's preview checkout runs, from its lockfile (STORY-74)", () => {
+  it.each([
+    [["package.json", "pnpm-lock.yaml"], "pnpm install --frozen-lockfile"],
+    [["package-lock.json", "package.json"], "npm ci"],
+    [["yarn.lock", "package.json"], "yarn install --frozen-lockfile"],
+    // Two lockfiles: pnpm's is looked for first.
+    [["yarn.lock", "pnpm-lock.yaml"], "pnpm install --frozen-lockfile"],
+  ])("is the lockfile's own: %j", (files, install) => {
+    expect(lockfileInstall(files)).toBe(install);
+  });
+
+  it("is none without a lockfile", () => {
+    expect(lockfileInstall(["package.json", "README.md"])).toBeNull();
+    expect(lockfileInstall([])).toBeNull();
+  });
+
+  it("can be set in the project's config", () => {
+    expect(configOverrides("devServerInstall: npm ci --ignore-scripts\n")).toEqual({
+      devServerInstall: "npm ci --ignore-scripts",
+    });
   });
 });

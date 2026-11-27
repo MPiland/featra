@@ -16,10 +16,19 @@ const valueOf = (choice: DeviceChoice) => (typeof choice === "string" ? choice :
 const choiceOf = (value: string): DeviceChoice =>
   value === "fit" || value === "responsive" ? value : { device: value.slice("device:".length) };
 
-/** A width or height field: what is typed counts once it is a size a viewport can be. */
+/**
+ * A width or height field: what is typed applies on Enter or when the field is left, as a size a viewport can be
+ * (kept within its limits); not on each key, so typing 1280 never shows the page 1, 12 and 128 wide. Escape puts the
+ * size back.
+ */
 function SizeField(props: { label: string; value: number; onChange: (n: number) => void }) {
   const { label, value, onChange } = props;
   const [text, setText] = useState<string | null>(null);
+  const commit = () => {
+    const n = Number(text);
+    setText(null);
+    if (text && Number.isFinite(n) && n > 0 && clampViewport(n) !== value) onChange(clampViewport(n));
+  };
   return (
     <input
       type="number"
@@ -28,12 +37,16 @@ function SizeField(props: { label: string; value: number; onChange: (n: number) 
       min={VIEWPORT.min}
       max={VIEWPORT.max}
       value={text ?? String(value)}
-      onChange={(e) => {
-        setText(e.target.value);
-        const n = Number(e.target.value);
-        if (e.target.value && n >= VIEWPORT.min && n <= VIEWPORT.max) onChange(clampViewport(n));
+      onChange={(e) => setText(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        else if (e.key === "Escape" && text !== null) {
+          // The field's own Escape: the pane stays open.
+          e.preventDefault();
+          setText(null);
+        }
       }}
-      onBlur={() => setText(null)}
+      onBlur={commit}
     />
   );
 }
@@ -45,9 +58,12 @@ function SizeField(props: { label: string; value: number; onChange: (n: number) 
 export function DeviceToolbar({
   devices,
   onChange,
+  scale = null,
 }: {
   devices: BrowserDevices;
   onChange: (d: BrowserDevices) => void;
+  /** The scale the device is drawn at to fit the pane; shown when it is scaled down, as Chrome shows it. */
+  scale?: number | null;
 }) {
   const [adding, setAdding] = useState(false);
   const device = deviceOfChoice(devices);
@@ -101,6 +117,11 @@ export function DeviceToolbar({
             {device.width} × {device.height}
           </span>
         )
+      )}
+      {device && scale !== null && scale < 1 && (
+        <span className="meta browser-scale" title={BROWSER_COPY.scale(scale)}>
+          {BROWSER_COPY.percent(scale)}
+        </span>
       )}
       {customChosen && typeof choice === "object" && (
         <button type="button" className="review-draft" onClick={() => onChange(removeDevice(devices, choice.device))}>

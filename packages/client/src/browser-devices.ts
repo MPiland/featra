@@ -5,7 +5,7 @@
  * (work-layout.ts): how one person previews is theirs, not the team's, and the project's config is committed.
  */
 import { isRecord } from "@featra/work-format/guards";
-import type { DeviceMetrics, Rect } from "./browser.ts";
+import { DPR, type DeviceMetrics, type Rect } from "./browser.ts";
 
 export interface Device extends DeviceMetrics {
   name: string;
@@ -59,7 +59,7 @@ const sizeOf = (raw: unknown): Size | null => {
 function deviceOf(raw: unknown): Device | null {
   const size = sizeOf(raw);
   if (!size || !isRecord(raw) || typeof raw.name !== "string" || !raw.name.trim()) return null;
-  const dpr = typeof raw.dpr === "number" && raw.dpr > 0 && raw.dpr <= 5 ? raw.dpr : 1;
+  const dpr = typeof raw.dpr === "number" && raw.dpr >= DPR.min && raw.dpr <= DPR.max ? raw.dpr : 1;
   return { name: raw.name.trim().slice(0, 60), ...size, dpr, mobile: raw.mobile === true };
 }
 
@@ -153,12 +153,21 @@ export function fitViewport(area: Size, device: Size | null): Rect & { scale: nu
   return { x: Math.round((area.width - width) / 2), y: HANDLE_GUTTER, width, height, scale };
 }
 
-/** Hosts on this computer, which a bare address reaches over http. */
-const LOCAL_HOST = /^(localhost|127(\.\d{1,3}){3}|\[::1\])(:\d+)?$/i;
+/**
+ * Hosts a bare address reaches over http: this computer, the local network's private and link-local addresses, and
+ * names that never have a public certificate (.local, .test, .localhost).
+ */
+const LOCAL_HOST = new RegExp(
+  "^(localhost|[^/:]+\\.(local|test|localhost)|\\[::1\\]" +
+    "|(127|10)(\\.\\d{1,3}){3}|192\\.168(\\.\\d{1,3}){2}|169\\.254(\\.\\d{1,3}){2}" +
+    "|172\\.(1[6-9]|2\\d|3[01])(\\.\\d{1,3}){2})(:\\d+)?$",
+  "i",
+);
 
 /**
  * What the address bar loads for what was typed: an http or https URL as is; a bare address (example.com/a,
- * localhost:5173) with https, or http on this computer. Null for anything else: another scheme, or not an address.
+ * localhost:5173) with https, or http on this computer or the local network. Null for anything else: another scheme,
+ * or not an address.
  */
 export function addressToUrl(typed: string): string | null {
   const t = typed.trim();

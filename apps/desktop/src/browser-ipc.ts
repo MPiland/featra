@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain, type IpcMainEvent } from "electron";
 import { IPC, normalizeBrowserLayout } from "@featra/client/bridge";
-import { closePane, openPane, paneOf } from "./browser-pane.ts";
+import { isRecord } from "@featra/work-format/guards";
+import { closePane, openPane, paneOf, type BrowserTarget } from "./browser-pane.ts";
 
 /**
  * The page's calls for its Browser pane (STORY-74, ADR 0047). Each names the pane by its key, so only the window's open
@@ -9,10 +10,20 @@ import { closePane, openPane, paneOf } from "./browser-pane.ts";
 const win = (e: IpcMainEvent) => BrowserWindow.fromWebContents(e.sender);
 const pane = (e: IpcMainEvent, key: unknown) => paneOf(win(e), key);
 
+/** What the pane shows, read from the page: its project and story or feature; null when malformed. */
+export function targetOf(raw: unknown): BrowserTarget | null {
+  if (!isRecord(raw)) return null;
+  const { dir, id } = raw;
+  return typeof dir === "string" && dir && dir.length <= 1000 && typeof id === "string" && id && id.length <= 100
+    ? { dir, id }
+    : null;
+}
+
 export function registerBrowserIpc(log: (message: string) => void): void {
-  ipcMain.on(IPC.browserOpen, (e, key: unknown) => {
+  ipcMain.on(IPC.browserOpen, (e, key: unknown, target: unknown) => {
     const w = win(e);
-    if (w && typeof key === "string" && key) openPane(w, key.slice(0, 100), log);
+    const shows = targetOf(target);
+    if (w && typeof key === "string" && key && shows) openPane(w, key.slice(0, 100), shows, log);
   });
   ipcMain.on(IPC.browserLayout, (e, key: unknown, layout: unknown) =>
     pane(e, key)?.layout(normalizeBrowserLayout(layout)),
@@ -23,5 +34,6 @@ export function registerBrowserIpc(log: (message: string) => void): void {
   ipcMain.on(IPC.browserBack, (e, key: unknown) => pane(e, key)?.back());
   ipcMain.on(IPC.browserForward, (e, key: unknown) => pane(e, key)?.forward());
   ipcMain.on(IPC.browserReload, (e, key: unknown) => pane(e, key)?.reload());
+  ipcMain.on(IPC.browserFocus, (e, key: unknown) => pane(e, key)?.focus());
   ipcMain.on(IPC.browserClose, (e, key: unknown) => closePane(win(e), key));
 }

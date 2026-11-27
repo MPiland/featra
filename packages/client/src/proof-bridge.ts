@@ -47,6 +47,9 @@ export const PROOF_PAGE_COPY = {
   command: "Dev-server command",
   commandHint: "Runs in the story's worktree. Use {port} where the port goes. For example: pnpm dev --port {port}",
   url: "Dev-server URL",
+  install: "Install command",
+  installHint:
+    "Installs dependencies in a feature's fresh checkout before its dev server starts. Leave empty to use the lockfile's: npm ci, pnpm install or yarn install.",
   urlHint: "Where it answers, with its port. For example: http://localhost:5173",
   shots: "Test screenshots folder",
   shotsHint:

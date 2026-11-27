@@ -56,6 +56,7 @@ export const DEFAULT_CONFIG: ProjectConfig = {
   testReportFiles: null,
   proof: null,
   devServerCommand: null,
+  devServerInstall: null,
   devServerUrl: null,
   testScreenshots: null,
   designReview: null,
@@ -75,7 +76,7 @@ const BOOLEAN_KEYS = [
   "openFeaturePrs",
   "designReview",
 ] as const;
-const COMMAND_KEYS = ["checkCommand", "linkedTestCommand", "devServerCommand"] as const;
+const COMMAND_KEYS = ["checkCommand", "linkedTestCommand", "devServerCommand", "devServerInstall"] as const;
 /** The longest check command a project can set, in characters. */
 export const COMMAND_MAX = 1000;
 

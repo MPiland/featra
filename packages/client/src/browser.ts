@@ -19,6 +19,13 @@ export const BROWSER_COPY = {
   address: "Address",
   badAddress: "Enter a web address, like localhost:5173 or example.com.",
   starting: "Starting the dev server…",
+  installing: "Installing dependencies…",
+  /** The pane's header: what it shows. */
+  title: (id: string) => `Browser · ${id}`,
+  page: "Page",
+  /** How much a device shown scaled down to fit is drawn at, as Chrome shows it. */
+  percent: (scale: number) => `${Math.round(scale * 100)}%`,
+  scale: (scale: number) => `Shown at ${Math.round(scale * 100)}%`,
   device: "Device",
   fit: "Fit to pane",
   responsive: "Responsive",
@@ -83,13 +90,29 @@ export interface BrowserLayout {
   device: (DeviceMetrics & { scale: number }) | null;
 }
 
+/** A start's answer: the dev server's URL, that dependencies install first (start again to wait), or why not. */
+export type BrowserStart = PreviewResult | { ok: true; installing: true };
+
+/** What a pane shows: the project and its story or feature. */
+export interface BrowserTarget {
+  dir: string;
+  id: string;
+}
+
 export interface BrowserBridge {
-  /** Starts the dev server of story or feature `id`, or reuses the one running; its URL, or why not. */
-  start: (dir: string, id: string) => Promise<PreviewResult>;
-  /** The pane closed: the server stops the dev server its start launched. */
-  stop: (dir: string, id: string) => Promise<void>;
+  /**
+   * Starts the dev server of story or feature `id` for pane `key`, or holds the one running; its URL, or why not. A
+   * feature's fresh checkout installs its dependencies first: the answer says so, and the next start waits for it.
+   */
+  start: (dir: string, id: string, key: string) => Promise<BrowserStart>;
+  /** Pane `key` closed: the server lets go of its dev server, which stops once nothing else holds it. */
+  stop: (dir: string, id: string, key: string) => Promise<void>;
   /** Makes the pane's view, hidden until it is laid out and navigated; replaces any other pane's. */
-  open: (key: string) => void;
+  open: (key: string, target: BrowserTarget) => void;
+  /** Gives the page the keyboard. */
+  focus: (key: string) => void;
+  /** Calls back when Escape is pressed in a pane's page, as Escape closes the other panes; returns the unsubscribe. */
+  onEscape: (listener: (key: string) => void) => () => void;
   layout: (key: string, layout: BrowserLayout) => void;
   /** Loads an http or https URL; the host checks it again. */
   navigate: (key: string, url: string) => void;
@@ -112,7 +135,12 @@ export const BROWSER_IPC = {
   browserReload: "browser:reload",
   browserClose: "browser:close",
   browserState: "browser:state",
+  browserFocus: "browser:focus",
+  browserEscape: "browser:escape",
 } as const;
+
+/** The pixel ratios a device may have: what Chromium shows sensibly. */
+export const DPR = { min: 0.5, max: 5 } as const;
 
 const text = (v: unknown) => (typeof v === "string" ? v : "");
 const finite = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
@@ -150,23 +178,31 @@ export function normalizeBrowserLayout(raw: unknown): BrowserLayout {
   const [width, height, dpr, scale] = d ? [d.width, d.height, d.dpr, d.scale].map(positive) : [null, null, null, null];
   const device =
     d && width && height && dpr && scale
-      ? { width: Math.round(width), height: Math.round(height), dpr, scale, mobile: d.mobile === true }
+      ? {
+          width: Math.round(width),
+          height: Math.round(height),
+          dpr: Math.min(DPR.max, Math.max(DPR.min, dpr)),
+          scale,
+          mobile: d.mobile === true,
+        }
       : null;
   return { bounds: rectOf(r.bounds), device };
 }
 
 /** The server's half, over the local server's socket. */
 export const serverBrowser = (server: ServerClient): Pick<BrowserBridge, "start" | "stop"> => ({
-  start: (dir, id) =>
-    server.call("browser.start", { dir, id }).then(
-      (r): PreviewResult =>
+  start: (dir, id, pane) =>
+    server.call("browser.start", { dir, id, pane }).then(
+      (r): BrowserStart =>
         isRecord(r) && typeof r.url === "string"
           ? { ok: true, url: r.url }
-          : { ok: false, error: "Featra gave an unexpected answer." },
-      (err: unknown): PreviewResult => ({ ok: false, error: errorMessage(err) }),
+          : isRecord(r) && r.installing === true
+            ? { ok: true, installing: true }
+            : { ok: false, error: "Featra gave an unexpected answer." },
+      (err: unknown): BrowserStart => ({ ok: false, error: errorMessage(err) }),
     ),
-  stop: (dir, id) =>
-    server.call("browser.stop", { dir, id }).then(
+  stop: (dir, id, pane) =>
+    server.call("browser.stop", { dir, id, pane }).then(
       () => {},
       () => {},
     ),
@@ -178,6 +214,8 @@ export function noBrowser(error: string): BrowserBridge {
     start: async () => ({ ok: false, error }),
     stop: async () => {},
     open() {},
+    focus() {},
+    onEscape: () => () => {},
     layout() {},
     navigate() {},
     back() {},
