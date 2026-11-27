@@ -1,7 +1,6 @@
 import { join } from "node:path";
 import { IPC } from "@featra/client/bridge";
-import { appendFile, mkdir } from "node:fs/promises";
-import { app, BrowserWindow, ipcMain, netLog, nativeTheme, Notification, session, type Tray } from "electron";
+import { app, BrowserWindow, nativeTheme, Notification, session, type Tray } from "electron";
 import { applyDockIcon } from "./app-icon.ts";
 import { APP_ID, nameApp } from "./app-name.ts";
 import { takeInstanceLock } from "./instance-lock.ts";
@@ -21,7 +20,7 @@ import { createSettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 import { createTray, destroyTray, trayAvailable } from "./tray.ts";
 import { createAppStateStore, createUiStateStore } from "./ui-state-store.ts";
-import { createWindow, windowBackground } from "./window.ts";
+import { createWindow, windowBackground, WINDOW_PARTITION } from "./window.ts";
 import { clientIndex } from "./client-path.ts";
 
 /**
@@ -103,26 +102,7 @@ if (!takeInstanceLock(app, userDataDir)) {
   const client = clientIndex({ appPath: app.getAppPath(), packaged: app.isPackaged });
   let tray: Tray | undefined;
 
-  // TEMPORARY TRACE (BUG-40): Chromium's net log, the page's timings and any stall of either event loop.
-  const traceDir = join(app.getPath("userData"), "bug40");
-  const trace = (m: string) =>
-    void mkdir(traceDir, { recursive: true })
-      .then(() => appendFile(join(traceDir, "trace.log"), `${new Date().toISOString()} ${m}\n`))
-      .catch(() => undefined);
-  ipcMain.on("featra-trace", (_e, m: unknown) => trace(`page: ${String(m)}`));
-  let tick = Date.now();
-  setInterval(() => {
-    const now = Date.now();
-    if (now - tick > 400) trace(`main stalled ${now - tick} ms`);
-    tick = now;
-  }, 100).unref();
-
   void app.whenReady().then(async () => {
-    trace("ready");
-    void mkdir(traceDir, { recursive: true })
-      .then(() => netLog.startLogging(join(traceDir, "net.json"), { captureMode: "default" }))
-      .then(() => trace("net log started"))
-      .catch((err: unknown) => trace(`net log failed: ${String(err)}`));
     if (process.platform === "win32") app.setAppUserModelId(APP_ID); // notifications need it on Windows
     applyDockIcon(app.dock, process.platform);
     setNativeMenu();
@@ -132,7 +112,7 @@ if (!takeInstanceLock(app, userDataDir)) {
       settingsStore.load(),
       findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR).then(projects.start),
       // The window only talks to this computer: it never waits on the system's proxy settings (BUG-40, ADR 0046).
-      session.defaultSession.setProxy({ mode: "direct" }),
+      session.fromPartition(WINDOW_PARTITION).setProxy({ mode: "direct" }),
     ]);
     const project = projects.current();
     void projects.snapshot().then((s) => server.setProjects(allowedDirs(s)));

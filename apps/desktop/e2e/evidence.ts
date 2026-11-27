@@ -122,16 +122,6 @@ async function keepEvidence(
   // An app launched without a profile folder of its own (userData "") keeps its log where Electron put it.
   const logsIn = userData || (await app.evaluate(({ app: a }) => a.getPath("userData")).catch(() => ""));
   if (logsIn) await keepLogs(info, logsIn, n);
-  // TEMPORARY TRACE (BUG-40): the launch's net log and timings, copied beside its evidence but not named as evidence.
-  if (logsIn) {
-    for (const file of await readdir(join(logsIn, "bug40")).catch(() => [] as string[])) {
-      const bytes = await readFile(join(logsIn, "bug40", file)).catch(() => null);
-      if (!bytes) continue;
-      const to = info.outputPath(`electron-${n}-bug40`, file);
-      await mkdir(dirname(to), { recursive: true });
-      await writeFile(to, bytes);
-    }
-  }
 }
 
 /** Ends a process and, on Windows, the processes it started (Electron's GPU, renderer and utility processes). */

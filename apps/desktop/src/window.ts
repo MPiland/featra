@@ -10,6 +10,12 @@ const clientUrl = process.env.FEATRA_CLIENT_URL;
 /** Matches the client's --bg tokens so the window never flashes the wrong colour before the page paints. */
 export const windowBackground = () => (nativeTheme.shouldUseDarkColors ? "#1c1c1e" : "#fbfbfa");
 
+/**
+ * The window's session: in memory (no `persist:`), so the page's first request never waits on reading the profile's
+ * cookies from disk; the page keeps its state through the main process, not in web storage (BUG-40, ADR 0046).
+ */
+export const WINDOW_PARTITION = "featra";
+
 /** The window, showing the built client at `client` (`clientIndex`: the workspace's, or the installed app's). */
 export function createWindow(client: string): BrowserWindow {
   const isMac = process.platform === "darwin";
@@ -32,6 +38,7 @@ export function createWindow(client: string): BrowserWindow {
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      partition: WINDOW_PARTITION,
     },
   });
   win.once("ready-to-show", () => win.show());
