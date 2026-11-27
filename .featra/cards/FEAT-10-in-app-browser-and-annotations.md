@@ -2,7 +2,7 @@
 id: FEAT-10
 type: feature
 title: In-app browser and annotations
-status: approved
+status: active
 parent: EPIC-2
 order: 10
 origin: planned
@@ -18,6 +18,11 @@ history:
     from: draft
     to: approved
     by: user
+  - at: 2026-11-27T16:49:14Z
+    field: status
+    from: approved
+    to: active
+    by: dev-lead
 ---
 
 ## Description

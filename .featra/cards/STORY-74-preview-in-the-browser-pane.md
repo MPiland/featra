@@ -2,7 +2,7 @@
 id: STORY-74
 type: story
 title: Preview in the Browser pane
-status: New
+status: In Progress
 parent: FEAT-10
 order: 1
 origin: planned
@@ -11,7 +11,7 @@ agent: claude
 model: null
 reasoning: null
 sessions: []
-branch: null
+branch: claude/story-74-browser-pane
 pr: null
 created: 2026-11-27T12:00:00Z
 history:
@@ -20,6 +20,11 @@ history:
     from: null
     to: New
     by: user
+  - at: 2026-11-27T16:49:14Z
+    field: status
+    from: New
+    to: In Progress
+    by: dev-lead
 ---
 
 ## Description
