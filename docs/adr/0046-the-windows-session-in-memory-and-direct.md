@@ -31,7 +31,9 @@ bridge's localStorage is only for the client run in a plain browser). The option
 The window uses its own session, partition `featra` (no `persist:` prefix, so it keeps nothing on disk), and that
 session connects directly: `setProxy({ mode: "direct" })`, set as the app is ready and before the window is created.
 The window loads only bundled files and talks only to the local server, so it needs neither a proxy nor stored
-cookies. Other sessions, such as the dev-server captures, keep the system's settings.
+cookies. Electron's default session connects directly too: the app loads nothing in it, yet with only the window's
+session direct, Chromium still fetched the proxy script for it at startup on the E2E (Windows) and E2E (macOS)
+runners. Other sessions, such as the dev-server captures, keep the system's settings.
 
 ## Consequences
 

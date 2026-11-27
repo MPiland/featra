@@ -111,8 +111,9 @@ if (!takeInstanceLock(app, userDataDir)) {
       trayAvailable(),
       settingsStore.load(),
       findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR).then(projects.start),
-      // The window only talks to this computer: it never waits on the system's proxy settings (BUG-40, ADR 0046).
-      session.fromPartition(WINDOW_PARTITION).setProxy({ mode: "direct" }),
+      // The window only talks to this computer: it never waits on the system's proxy settings, and the default
+      // session, which loads nothing, never fetches a proxy script at startup (BUG-40, ADR 0046).
+      ...[session.fromPartition(WINDOW_PARTITION), session.defaultSession].map((s) => s.setProxy({ mode: "direct" })),
     ]);
     const project = projects.current();
     void projects.snapshot().then((s) => server.setProjects(allowedDirs(s)));
