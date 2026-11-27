@@ -3482,7 +3482,7 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - **Where it docks**: right of the card or chat pane, which keeps its minimum width. It has its own width limits (360 to 1920 px, half the area by default), resized by its handle like the card pane.
 - **Session**: `featra-browser`, in memory, apart from the window's and Proof's. No permissions, no downloads, the system's proxy. Any http or https address; nothing else. A page's new window loads in the pane.
 - **Feature preview**: in the feature branch's checkout, or a temporary detached worktree at its tip, removed when the pane closes. A dev server already running is reused, and only a server the pane launched is stopped.
-- **Devices**: shown through the DevTools Protocol (viewport, pixel ratio, touch), scaled down to fit, never up. The user agent stays as is.
+- **Devices**: shown through the DevTools Protocol (viewport, pixel ratio, touch), scaled down to fit, never up. The view keeps its own size (`dontSetVisibleSize`), or the page is drawn at its scale twice (found in the screens, caught by the journey). The user agent stays as is.
 - **Device choice remembered per project in the UI state**, not the project's settings as the brief suggested: those are committed, and how one person previews is theirs, as Work's layout is.
 - **Fixture page** has a viewport meta, as real dev pages do, so a phone preset reports the phone's width.
 - Recorded in ADR 0047.

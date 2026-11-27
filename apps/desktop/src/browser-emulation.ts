@@ -13,8 +13,9 @@ export type Emulated = BrowserLayout["device"];
 /**
  * The DevTools Protocol commands that show a page as `device` (STORY-74, ADR 0047), as Chrome's device toolbar does:
  * the page sees the device's viewport, screen and pixel ratio, and touch when it is a phone or tablet, and is drawn at
- * `scale` (to fit the pane) times the window's `zoom` (the view is sized in the window's pixels). None: the page fills
- * the view at its own size.
+ * `scale` (to fit the pane) times the window's `zoom` (the view is sized in the window's pixels). The view keeps its own
+ * size, as DevTools' device mode does: left to Chromium, the page's surface would take the device's full size and the
+ * view would shrink it again, drawing the page at its scale twice. None: the page fills the view at its own size.
  */
 export function emulationCommands(device: Emulated, zoom: number): [string, Record<string, unknown>][] {
   if (!device) {
@@ -36,6 +37,7 @@ export function emulationCommands(device: Emulated, zoom: number): [string, Reco
         scale: scale * zoom,
         screenWidth: width,
         screenHeight: height,
+        dontSetVisibleSize: true,
       },
     ],
     ["Emulation.setTouchEmulationEnabled", mobile ? { enabled: true, maxTouchPoints: 5 } : { enabled: false }],

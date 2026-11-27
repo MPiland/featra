@@ -41,7 +41,8 @@ its checkout. Starts and stops for one pane run in turn, so a close sent during 
 **Emulation.** A device is shown through the Chrome DevTools Protocol on the view's `webContents.debugger`:
 `Emulation.setDeviceMetricsOverride` with the device's width, height, pixel ratio, mobile flag and screen size, at a
 `scale` that fits it in the pane (never up) times the window's zoom; touch emulation for phones and tablets. Fit to
-pane clears the override. Commands are queued in order, sent only when they change, and sent again after each new
+pane clears the override. The view keeps its own size (`dontSetVisibleSize`), as DevTools' device mode does:
+otherwise Chromium sizes the page's surface to the device and the view shrinks it again, drawing it at its scale twice. Commands are queued in order, sent only when they change, and sent again after each new
 document. The user agent is left as is.
 
 **The device choice.** The choice (Fit, Responsive and its size, or a device) and the devices the user added are kept

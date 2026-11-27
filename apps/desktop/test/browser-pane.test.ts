@@ -248,6 +248,8 @@ describe("the device it shows", () => {
           scale: 0.75,
           screenWidth: 375,
           screenHeight: 667,
+          // The view keeps its size: else Chromium sizes the page's surface to the device and the view shrinks it again.
+          dontSetVisibleSize: true,
         },
       ],
       ["Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 5 }],
