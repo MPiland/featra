@@ -2,7 +2,7 @@
 id: STORY-74
 type: story
 title: Preview in the Browser pane
-status: In Progress
+status: In Review
 parent: FEAT-10
 order: 1
 origin: planned
@@ -12,7 +12,7 @@ model: null
 reasoning: null
 sessions: []
 branch: claude/story-74-browser-pane
-pr: null
+pr: https://github.com/MPiland/featra/pull/95
 created: 2026-11-27T12:00:00Z
 history:
   - at: 2026-11-27T12:00:00Z
@@ -25,6 +25,11 @@ history:
     from: New
     to: In Progress
     by: dev-lead
+  - at: 2026-11-27T20:30:00Z
+    field: status
+    from: In Progress
+    to: In Review
+    by: developer
 ---
 
 ## Description
