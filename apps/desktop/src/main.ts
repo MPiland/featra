@@ -20,7 +20,7 @@ import { createSettingsStore } from "./settings-store.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 import { createTray, destroyTray, trayAvailable } from "./tray.ts";
 import { createAppStateStore, createUiStateStore } from "./ui-state-store.ts";
-import { createWindow, windowBackground } from "./window.ts";
+import { createWindow, prepareWindowSession, windowBackground } from "./window.ts";
 import { clientIndex } from "./client-path.ts";
 
 /**
@@ -111,6 +111,7 @@ if (!takeInstanceLock(app, userDataDir)) {
       trayAvailable(),
       settingsStore.load(),
       findProject(process.cwd(), process.env.FEATRA_PROJECT_DIR).then(projects.start),
+      prepareWindowSession(),
     ]);
     const project = projects.current();
     void projects.snapshot().then((s) => server.setProjects(allowedDirs(s)));

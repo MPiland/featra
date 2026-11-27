@@ -28,8 +28,10 @@ export interface ServerOptions {
   api: Api;
   /** The narrow socket agents' MCP processes use; without it there is none. */
   agents?: AgentSockets;
-  /** Logs a line in the host's log: failures only, never params or tokens. */
+  /** Logs a failure in the host's log, never params or tokens. Page connections go to `pageConnected` instead. */
   log: (message: string) => void;
+  /** Hears each page connection as it opens: the host logs it, to time a page that connects late (BUG-40). */
+  pageConnected?: () => void;
   /** 0 (the default) lets the OS pick a free port. */
   port?: number;
 }
@@ -143,7 +145,14 @@ async function answerAgent(socket: WebSocket, chat: string, agent: AgentSockets,
  * Starts the WebSocket API (ADR 0015) on 127.0.0.1. Each request is answered on the socket it came in on; a watch
  * pushes `{ event, watch, data }` frames on it (ADR 0016) and ends when the socket closes.
  */
-export function startServer({ token, api, agents, log, port = 0 }: ServerOptions): Promise<RunningServer> {
+export function startServer({
+  token,
+  api,
+  agents,
+  log,
+  pageConnected,
+  port = 0,
+}: ServerOptions): Promise<RunningServer> {
   if (!token) return Promise.reject(new Error("The server needs a token."));
   const wss = new WebSocketServer({
     host: SERVER_HOST,
@@ -180,6 +189,7 @@ export function startServer({ token, api, agents, log, port = 0 }: ServerOptions
       socket.on("error", (err) => log(`Socket error: ${err.message}`));
       return;
     }
+    pageConnected?.();
     const link = connect(socket);
     socket.on("close", link.closeAll);
     socket.on("message", (data, isBinary) => {

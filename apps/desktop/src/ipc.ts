@@ -26,6 +26,7 @@ import {
 import { normalizeZoom } from "@featra/client/zoom";
 import { httpsLink, isOneOf, toText } from "@featra/work-format";
 import { copyable } from "./copy-text.ts";
+import { loggedEndpoint } from "./endpoint-log.ts";
 import { openEvidenceFile, type EvidenceShell } from "./evidence-open.ts";
 import { openPreview } from "./dev-pages.ts";
 import { pickFolder } from "./folder-dialog.ts";
@@ -145,7 +146,10 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
   ipcMain.handle(IPC.projectsCreate, (_e, location: unknown, name: unknown) =>
     projects.create(location, name).then(logged("New project")),
   );
-  ipcMain.handle(IPC.serverEndpoint, () => server.endpoint());
+  ipcMain.handle(
+    IPC.serverEndpoint,
+    loggedEndpoint(server.endpoint, (m) => log.info(m)),
+  );
   ipcMain.on(IPC.notificationsAsked, (_e, item: unknown) => notifier.asked(item));
   ipcMain.handle(IPC.appInfo, () => ({ name: "Featra", version: app.getVersion() }));
   ipcMain.on(IPC.appReload, (e) => e.sender.reload());

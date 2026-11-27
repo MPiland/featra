@@ -44,7 +44,7 @@ process.on("message", (raw) => {
   switch (message.type) {
     case "start":
       if (server) return;
-      startServer({ token: message.token, api, agents, log }).then(
+      startServer({ token: message.token, api, agents, log, pageConnected: () => log("Page connected") }).then(
         (running) => {
           server = running;
           agents.setPort(running.port);

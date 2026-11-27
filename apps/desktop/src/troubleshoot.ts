@@ -1,6 +1,7 @@
 /**
  * Help > Troubleshooting's restart actions. Free of Electron imports: main.ts hands in Electron's session and its
- * relaunch-and-quit, and tests hand in fakes of those.
+ * relaunch-and-quit, and tests hand in fakes of those. The window's session is in memory, so a restart clears it;
+ * these actions clear what older versions left in the default session (BUG-40, ADR 0046).
  */
 import type { Log } from "./log.ts";
 

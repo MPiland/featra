@@ -58,3 +58,6 @@ default 5 s on the app's first git work after launch or Start.
 - Found by STORY-65. Kept files: the `e2e-windows-traces` artifact of run 44562162156 (attempt 1).
 
 Fixed by BUG-44 for `work-layout.spec.ts` (Start waited behind the queued scans). The `work-list.spec.ts` half had a different cause: the server answered in 411 ms, but the page's socket opened about 4.75 s late, the same as BUG-40, which tracks it. E2E (Windows) passed 10 runs in a row on PR #92: run 45671030090, attempts 1-10.
+
+The work-list half is explained by BUG-40: the page's socket waited in Chromium on the system's proxy settings and the
+profile's cookie store (PR #93, ADR 0046).
