@@ -3464,3 +3464,14 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - **Findings** are delivered only after every other check on the report has passed, just before the card is written.
 - **Send back** beside Accept (a story's Work row, its session's end) is the same compact action button as Accept, not the dialog's larger button, so the row stays on one line. It predates STORY-73 (STORY-23), and showed in its Acceptance screenshot.
 - Recorded in ADR 0045.
+
+## 2026-11-27 — FEAT-10 In-app browser and annotations shaping (user and dev-lead)
+
+- The Browser pane is docked in the main window beside the chat or card pane. Proof keeps its own preview window.
+- It previews a story's worktree or the feature branch, starting the dev server with Proof's Preview command. You can type any URL; pages run without Node access in their own session.
+- The device toolbar works like Chrome's: Responsive mode with drag handles and size fields, device presets, and custom devices.
+- Unsent annotations are lost when the pane closes; closing with unsent annotations asks first.
+- The source-file hint is best effort, from the page's dev build (React and Vite first).
+- Send puts one draft in the target chat's composer, with screenshots attached; nothing is sent until the user sends it. The target is the preview's session (the story's, or the Dev Lead's for a feature) and can be switched.
+- STORY-40 stays in FEAT-10 and is built last, on the same pane.
+- Stories, in order: STORY-74 Preview in the Browser pane; STORY-75 Annotate the page; STORY-76 Send annotations to the session; STORY-40 Agents drive the in-app browser.
