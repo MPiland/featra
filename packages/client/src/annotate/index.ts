@@ -1,5 +1,6 @@
 /** Annotate (STORY-75, ADR 0048): the overlay the main process injects in the Browser pane's page, and its reports. */
 export * from "../annotations.ts";
+export * from "../annotations-wire.ts";
 export * from "./messages.ts";
 export {
   OVERLAY_BINDING,

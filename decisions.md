@@ -3514,3 +3514,16 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - **No tokens**: capturing, commenting, editing and deleting ask nothing of the server, proved in the client test.
 - **The journey** drives the pane's page by `sendInputEvent`, as Chromium marks it the user's own input.
 - Recorded in ADR 0048.
+
+## 2026-11-28 — STORY-75 review of PR #96 (developer)
+
+- **Later pages**: the overlay waits for a new document's root element before it mounts, so it shows after a reload or a link; proved by a unit test and the new journey (annotate-pages.spec.ts).
+- **The wire**: the window gets the list without screenshots and each screenshot once; a comment being typed is sent once the typing rests (300 ms). A pane keeps 50 annotations, and its log says when one more is dropped.
+- **Shift** adds only on the open annotation's own page (hash ignored), checked in the overlay and in the main process.
+- **Screenshots** are the renderer's (`Page.captureScreenshot`, clip in document CSS px, cut to the visual viewport), so a device, a page without a viewport meta and a pinch are right. The old capture test asserted the scaling that was wrong; it now asserts the clip.
+- **Annotate on/off** run in order and the last one asked holds; a pick still being captured counts as unsent for the close ask; `take()` replaces `clear()`, returning and emptying the list at once.
+- **Frames and calls**: only the main frame's world counts; each call into the page has its own object group; the debugger let go turns Annotate off and the next start sets up again.
+- **Source hint** is bounded in the page (primitives within size) before it is copied out.
+- **Stop when idle**: Annotate off with no marker left removes the new-document script; the page showing keeps its overlay until left.
+- **Visual review**: Close and discard is a danger button, Cancel focused; each element of an annotation has its own outline (marker 1 had covered the heading and the button as one union box); the badge sits just outside the first box's top-left corner; a region is drawn exactly where it was stored (the journey's drag now spans the paragraph's whole line box).
+- ADR 0048 updated, with what the page can still do: hide or cover the overlay, use the top layer, and tell Featra is there.

@@ -29,6 +29,7 @@ import { DEFAULT_WINDOW_STATE, type WindowState } from "./window-state.ts";
 
 export { THEME_CHOICES, type ThemeChoice };
 export * from "./annotations.ts";
+export * from "./annotations-wire.ts";
 export * from "./browser.ts";
 export * from "./browser-devices.ts";
 export * from "./chats.ts";

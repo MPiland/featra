@@ -101,6 +101,7 @@ describe("the annotations the window is sent", () => {
       annotating: true,
       list: [annotation],
       editing: "a1",
+      capturing: false,
     });
   });
 
@@ -116,6 +117,6 @@ describe("the annotations the window is sent", () => {
   });
 
   it("are none from nothing", () => {
-    expect(normalizeAnnotations(undefined)).toEqual({ annotating: false, list: [], editing: null });
+    expect(normalizeAnnotations(undefined)).toEqual({ annotating: false, list: [], editing: null, capturing: false });
   });
 });

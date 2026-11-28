@@ -78,7 +78,8 @@ function useBrowserPage(host: BrowserBridge, dir: string, id: string) {
 function useAnnotations(host: BrowserBridge, key: string, onUnsent: (n: number) => void) {
   const [annotations, setAnnotations] = useState<AnnotationsState>(NO_ANNOTATIONS);
   useEffect(() => host.onAnnotations((k, s) => k === key && setAnnotations(s)), [host, key]);
-  const unsent = annotations.list.length;
+  // A pick still being captured is an annotation in a moment: it counts as unsent.
+  const unsent = annotations.list.length + (annotations.capturing ? 1 : 0);
   useEffect(() => onUnsent(unsent), [onUnsent, unsent]);
   return annotations;
 }
@@ -154,12 +155,12 @@ export function BrowserPane(props: BrowserPaneProps) {
           cancel={ANNOTATE_COPY.keep}
           onCancel={closeAsk.cancel}
           actions={
-            <button type="button" className="btn" onClick={closeAsk.confirm}>
+            <button type="button" className="btn danger" onClick={closeAsk.confirm}>
               {ANNOTATE_COPY.closeAnyway}
             </button>
           }
         >
-          <p>{ANNOTATE_COPY.closeAsk(annotations.list.length)}</p>
+          <p>{ANNOTATE_COPY.closeAsk(Math.max(1, annotations.list.length))}</p>
         </ConfirmAsk>
       )}
       {annotating && <p className="meta browser-annotating">{ANNOTATE_COPY.annotateHint}</p>}

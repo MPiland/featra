@@ -25,6 +25,7 @@ describe("an element picked", () => {
     expect(t.last()).toEqual({
       annotating: true,
       editing: "a1",
+      capturing: false,
       list: [
         {
           id: "a1",
@@ -68,7 +69,7 @@ describe("an element picked", () => {
     await t.start();
     t.report(pick());
     await settle();
-    t.capture.mockResolvedValueOnce(fakeImage("data:image/png;base64,BOTH"));
+    t.capture.mockResolvedValueOnce("data:image/png;base64,BOTH");
     t.report(pick({ ref: 6, add: true, element: heading, rect: { x: 0, y: 0, width: 200, height: 80 } }));
     await settle();
     expect(t.last().list).toHaveLength(1);
@@ -94,7 +95,7 @@ describe("an element picked", () => {
     t.capture.mockRejectedValueOnce(new Error("gone"));
     t.report(pick({ ref: 6 }));
     await settle();
-    t.capture.mockResolvedValueOnce(fakeImage(""));
+    t.capture.mockResolvedValueOnce(null);
     t.report(pick({ ref: 7 }));
     await settle();
     expect(t.last().list.map((a) => a.screenshot)).toEqual([null, null, null]);

@@ -1,5 +1,6 @@
 import {
   ANNOTATION_LIMITS,
+  createAnnotationsSender,
   OVERLAY_BINDING,
   OVERLAY_GLOBAL,
   OVERLAY_WORLD,
@@ -7,14 +8,17 @@ import {
   parseSourceHint,
   readOverlayMessage,
   readSourceHintOnThis,
-  type AnnotationsState,
+  type AnnotationsMessage,
   type Marker,
   type OverlayReport,
 } from "@featra/client/annotate";
 import type { Rect } from "@featra/client/bridge";
 import { isRecord } from "@featra/work-format/guards";
 import { createAnnotations, type Annotations } from "./annotations.ts";
+import { inView } from "./page-capture.ts";
 import { createPageWorld, type Cdp } from "./page-world.ts";
+
+export { inView } from "./page-capture.ts";
 
 /** What the annotator needs of a pane's page. */
 export interface AnnotatedPage {
@@ -28,12 +32,12 @@ export interface AnnotatedPage {
 
 export interface AnnotatorDeps {
   page: AnnotatedPage;
-  /** A screenshot of `rect` of the page as shown, in the page's CSS px. */
-  capture: (rect: Rect) => Promise<{ isEmpty: () => boolean; toDataURL: () => string }>;
+  /** A PNG data URL of `rect` of the page as shown, in the page's CSS px; null when it gives none. */
+  capture: (rect: Rect) => Promise<string | null>;
   /** The device the page is shown as, by name; null when it fits the pane. */
   device: () => string | null;
-  /** Tells the window the pane's annotations. */
-  send: (state: AnnotationsState) => void;
+  /** Tells the window the pane's annotations, each screenshot once (annotations-wire.ts). */
+  send: (message: AnnotationsMessage) => void;
   /** Gives the window the keyboard, to type the comment. */
   focusWindow: () => void;
   log: (message: string) => void;
@@ -54,14 +58,8 @@ function consoleError(args: unknown[]): string | null {
 
 const withoutHash = (url: string) => url.split("#")[0] ?? url;
 
-/** `rect` within the viewport, whole pixels; null when none of it is in view. */
-export function inView(rect: Rect, viewport: { width: number; height: number }): Rect | null {
-  const x = Math.max(0, Math.floor(rect.x));
-  const y = Math.max(0, Math.floor(rect.y));
-  const right = Math.min(viewport.width, Math.ceil(rect.x + rect.width));
-  const bottom = Math.min(viewport.height, Math.ceil(rect.y + rect.height));
-  return right > x && bottom > y ? { x, y, width: right - x, height: bottom - y } : null;
-}
+/** How long a comment rests before the window is told it: the window has it already, as typed. */
+export const TYPED_MS = 300;
 
 /**
  * Annotate in one Browser pane's page (STORY-75, ADR 0048): the overlay in Featra's own world of the page, the
@@ -99,17 +97,32 @@ export function createAnnotator(deps: AnnotatorDeps) {
     synced = expression;
     return world.run(expression);
   };
-  const store: Annotations = createAnnotations((state) => {
-    deps.send(state);
+  // Whether the user wants Annotate on, as last asked: what holds once a start they asked for before has finished.
+  let wanted = false;
+  // Picks still being captured: each will be an annotation in a moment.
+  let pending = 0;
+  /** Nothing to show in the page: Annotate off, and no annotation or pick to mark. */
+  const idle = () => !wanted && !store.annotating && pending === 0 && store.list().length === 0;
+  const toWindow = createAnnotationsSender();
+  let typing: ReturnType<typeof setTimeout> | undefined;
+  const tell = () => {
+    clearTimeout(typing);
+    typing = undefined;
+    deps.send(toWindow(store.state()));
+  };
+  const store: Annotations = createAnnotations((_state, typed) => {
+    // A comment typed is the window's own already: it is told once the typing rests, and at once on any other change.
+    if (typed) typing ??= setTimeout(tell, TYPED_MS);
+    else tell();
     void sync();
+    if (idle()) void world.stop(idle);
   });
 
   const shot = async (rect: Rect, viewport: { width: number; height: number }) => {
     const area = inView(rect, viewport);
     if (!area) return null;
     try {
-      const image = await deps.capture(area);
-      return image.isEmpty() ? null : image.toDataURL();
+      return await deps.capture(area);
     } catch (err) {
       log(`Annotate couldn't capture the page: ${err instanceof Error ? err.message : String(err)}`);
       return null;
@@ -118,31 +131,44 @@ export function createAnnotator(deps: AnnotatorDeps) {
   const sourceOf = async (ref: number) =>
     parseSourceHint(await world.callOnNode(`${OVERLAY_GLOBAL}.node(${ref})`, readSourceHintOnThis()));
 
-  async function picked(report: Extract<OverlayReport, { type: "pick" | "region" }>) {
+  async function capture(report: Extract<OverlayReport, { type: "pick" | "region" }>) {
     const screenshot = await shot(report.rect, report.viewport);
     const open = store.editing ? store.list().find((a) => a.id === store.editing) : undefined;
-    if (report.type === "pick" && report.add && open?.kind === "elements") {
+    // Shift adds to the annotation open when it is of elements on this page; on another page it is one of its own.
+    const here = open !== undefined && withoutHash(open.url) === withoutHash(page.getURL());
+    if (report.type === "pick" && report.add && open?.kind === "elements" && here) {
       store.addElement(open.id, report.element, report.ref, screenshot);
-    } else {
-      const region =
-        report.type === "region"
-          ? { ...report.rect, x: report.rect.x + report.scroll.x, y: report.rect.y + report.scroll.y }
-          : null;
-      const element = report.element;
-      const ref = report.ref;
-      store.add(
-        {
-          kind: region ? "region" : "elements",
-          elements: element ? [element] : [],
-          region,
-          url: page.getURL().slice(0, ANNOTATION_LIMITS.url),
-          viewport: { ...report.viewport, device: deps.device() },
-          screenshot,
-          consoleErrors: errors,
-          source: ref ? await sourceOf(ref) : null,
-        },
-        ref ? [ref] : [],
-      );
+      return;
+    }
+    const region =
+      report.type === "region"
+        ? { ...report.rect, x: report.rect.x + report.scroll.x, y: report.rect.y + report.scroll.y }
+        : null;
+    const { element, ref } = report;
+    const added = store.add(
+      {
+        kind: region ? "region" : "elements",
+        elements: element ? [element] : [],
+        region,
+        url: page.getURL().slice(0, ANNOTATION_LIMITS.url),
+        viewport: { ...report.viewport, device: deps.device() },
+        screenshot,
+        consoleErrors: errors,
+        source: ref ? await sourceOf(ref) : null,
+      },
+      ref ? [ref] : [],
+    );
+    if (added === null) log(`Annotate keeps ${ANNOTATION_LIMITS.annotations} annotations at most.`);
+  }
+
+  async function picked(report: Extract<OverlayReport, { type: "pick" | "region" }>) {
+    pending++;
+    store.setCapturing(true);
+    try {
+      await capture(report);
+    } finally {
+      pending--;
+      if (pending === 0) store.setCapturing(false);
     }
     // Whatever the pick changed, the overlay shows again.
     await sync(true);
@@ -166,14 +192,24 @@ export function createAnnotator(deps: AnnotatorDeps) {
         deps.focusWindow();
       } else void picked(report);
     },
+    onDetach() {
+      wanted = false;
+      synced = "";
+      store.setAnnotating(false);
+    },
   });
 
   return {
     state: store.state,
-    /** Turns Annotate on or off; the overlay starts in the page the first time. */
+    /**
+     * Turns Annotate on or off; the overlay starts in the page when it is turned on. What was asked last holds: off
+     * asked while on is still starting leaves it off.
+     */
     async annotate(on: boolean) {
+      wanted = on;
       if (on) await world.start();
-      store.setAnnotating(on);
+      store.setAnnotating(wanted);
+      if (idle()) void world.stop(idle);
     },
     edit: (id: string | null) => store.edit(id),
     comment: (id: string, text: string) => store.comment(id, text),
@@ -181,12 +217,14 @@ export function createAnnotator(deps: AnnotatorDeps) {
     /** Escape in the page: leaves Annotate when it is on; false when it isn't, so Escape does what it otherwise does. */
     escape(): boolean {
       if (!store.annotating) return false;
+      wanted = false;
       store.setAnnotating(false);
       return true;
     },
-    /** For STORY-76's Send and STORY-40's tools: the list, and clearing it once sent. */
+    /** For STORY-40's tools: the list. */
     list: () => store.list(),
-    clear: () => store.clear(),
+    /** For STORY-76's Send: the list, cleared in the same step, so nothing added between is lost. */
+    take: () => store.take(),
   };
 }
 

@@ -82,8 +82,8 @@ test("Annotate: pick, comment, draw a region, edit from a marker, delete, and be
 
     // A drag draws a region over the paragraph: annotation 2, with its own comment.
     const p = await browserBox(app, "main > p");
-    const from = { x: Math.round(p.x + 2), y: Math.round(p.y + 2) };
-    const to = { x: Math.round(p.x + 150), y: Math.round(p.y + p.height - 2) };
+    const from = { x: Math.round(p.x - 4), y: Math.round(p.y - 4) };
+    const to = { x: Math.round(p.x + 150), y: Math.round(p.y + p.height + 4) };
     await browserInput(app, [
       { type: "mouseMove", ...from },
       { type: "mouseDown", button: "left", clickCount: 1, ...from },
@@ -106,8 +106,8 @@ test("Annotate: pick, comment, draw a region, edit from a marker, delete, and be
     await expect(toggle).toHaveAttribute("aria-pressed", "false");
     await expect(browser).toBeVisible();
 
-    // Marker 1, on the page, opens annotation 1 to edit.
-    await browserClick(app, Math.max(12, h1.x), Math.max(12, h1.y));
+    // Marker 1, on the page, opens annotation 1 to edit: its badge sits just outside the heading's top-left corner.
+    await browserClick(app, h1.x + 11, h1.y - 13);
     await expect(list.getByRole("button", { name: "Annotation 1: Make the heading bigger" })).toHaveAttribute(
       "aria-expanded",
       "true",

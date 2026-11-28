@@ -1,16 +1,9 @@
-import {
-  session,
-  WebContentsView,
-  type BrowserWindow,
-  type Input,
-  type NativeImage,
-  type Rectangle,
-  type WebContents,
-} from "electron";
+import { session, WebContentsView, type BrowserWindow, type Input, type Rectangle, type WebContents } from "electron";
 import { IPC, type BrowserLayout, type BrowserState } from "@featra/client/bridge";
 import { createAnnotator, type Annotator } from "./annotator.ts";
 import { createEmulation } from "./browser-emulation.ts";
 import { allowBrowsing, webUrl } from "./dev-pages.ts";
+import { captureClip } from "./page-capture.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
 
 /**
@@ -39,8 +32,8 @@ export interface BrowserHandle extends BrowserTarget {
   layout: (layout: BrowserLayout) => void;
   /** Where the page shows in the window, in its pixels; null while hidden: for an overlay over it (STORY-75). */
   bounds: () => Rectangle | null;
-  /** The page as shown, or `rect` of it in the page's CSS px: for screenshots of an element or region. */
-  capture: (rect?: Rectangle) => Promise<NativeImage>;
+  /** A PNG data URL of `rect` of the page as shown, in its CSS px: an element's or region's screenshot. */
+  capture: (rect: Rectangle) => Promise<string | null>;
   /** Its annotations (STORY-75): Annotate, the list and its one owner. */
   annotations: Annotator;
   /** Gives the page the keyboard. */
@@ -192,13 +185,10 @@ export function openPane(
       void emulation.apply(device, z);
     },
     bounds: () => (view.getVisible() ? view.getBounds() : null),
-    capture: (rect) => {
-      // The page's CSS px are drawn at the device's scale times the window's zoom; with no device, at their size.
-      const k = device ? device.scale * zoom() : 1;
-      const at = (n: number) => Math.round(n * k);
-      return contents.capturePage(
-        rect && { x: at(rect.x), y: at(rect.y), width: at(rect.width), height: at(rect.height) },
-      );
+    // By the page's renderer, in its CSS px: right whatever the device, its scale, the window's zoom or a pinch.
+    capture: async (rect) => {
+      if (!contents.debugger.isAttached()) contents.debugger.attach("1.3");
+      return captureClip(contents.debugger, rect);
     },
     annotations,
     focus: () => {

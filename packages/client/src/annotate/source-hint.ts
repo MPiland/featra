@@ -54,8 +54,33 @@ export function readSourceHint(picked: Element): RawSourceHint | null {
 }
 /* oxlint-enable unicorn/consistent-function-scoping, no-underscore-dangle */
 
-/** `readSourceHint` as a function CDP calls on the element (`this`). */
-export const readSourceHintOnThis = (): string => `function () { return (${readSourceHint.toString()})(this); }`;
+/**
+ * The hint as the page may hand it back, bounded in the page before it is copied out: the page's own code (a
+ * `String.prototype.slice` of its own, a getter on `Object.prototype`) may make it anything, of any size. A fresh object
+ * of primitives only, each within its size by its primitive `length`; null when anything is not.
+ */
+export function boundSourceHint(raw: unknown): RawSourceHint | null {
+  if (raw === null || typeof raw !== "object") return null;
+  const out: RawSourceHint = {};
+  const sizes = { attr: 600, file: 600, stack: 4000 } as const;
+  for (const k of ["attr", "file", "stack"] as const) {
+    const v: unknown = Reflect.get(raw, k);
+    if (v === undefined) continue;
+    if (typeof v !== "string" || v.length > sizes[k]) return null;
+    out[k] = v;
+  }
+  for (const k of ["line", "column"] as const) {
+    const v: unknown = Reflect.get(raw, k);
+    if (v === undefined) continue;
+    if (typeof v !== "number") return null;
+    out[k] = v;
+  }
+  return out;
+}
+
+/** `readSourceHint` as a function CDP calls on the element (`this`), its answer bounded in the page. */
+export const readSourceHintOnThis = (): string =>
+  `function () { return (${boundSourceHint.toString()})((${readSourceHint.toString()})(this)); }`;
 
 /** Frames that are React's, the dev server's or a dependency's, not the app's. */
 const NOT_APP =

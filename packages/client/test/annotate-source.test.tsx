@@ -57,6 +57,27 @@ describe("reading the hint in the page", () => {
     const fn = new Function(`return (${readSourceHintOnThis()})`)() as (this: Element) => unknown;
     expect(fn.call(document.querySelector("p")!)).toEqual({ attr: "src/A.vue:3:1" });
   });
+
+  // Review fix 3: the page's own code can make what it hands back anything; it is bounded before it is copied out.
+  it("hands back nothing when the page makes the hint oversized or odd", () => {
+    document.body.innerHTML = `<p data-v-inspector="src/A.vue:3:1">Hi</p>`;
+    // oxlint-disable-next-line typescript/no-implied-eval -- the declaration main sends, called as the protocol calls it.
+    const fn = new Function(`return (${readSourceHintOnThis()})`)() as (this: Element) => unknown;
+    const slice = Object.getOwnPropertyDescriptor(String.prototype, "slice")!;
+    const huge = "x".repeat(1_000_000);
+    Reflect.defineProperty(String.prototype, "slice", { value: () => huge, configurable: true, writable: true });
+    try {
+      expect(fn.call(document.querySelector("p")!)).toBeNull();
+    } finally {
+      Reflect.defineProperty(String.prototype, "slice", slice);
+    }
+    Reflect.defineProperty(Object.prototype, "stack", { get: () => ({ length: 1 }), configurable: true });
+    try {
+      expect(fn.call(document.querySelector("p")!)).toBeNull();
+    } finally {
+      Reflect.deleteProperty(Object.prototype, "stack");
+    }
+  });
 });
 
 describe("parsing the hint in the main process", () => {

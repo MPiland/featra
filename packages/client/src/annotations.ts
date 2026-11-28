@@ -78,14 +78,18 @@ export interface Annotation {
   source: SourceHint | null;
 }
 
-/** A pane's annotations as the main process last said: whether Annotate is on, the list, and the one being edited. */
+/**
+ * A pane's annotations as the main process last said: whether Annotate is on, the list, the one being edited, and
+ * whether a pick is still being captured (it will be in the list in a moment, so it counts as unsent).
+ */
 export interface AnnotationsState {
   annotating: boolean;
   list: Annotation[];
   editing: string | null;
+  capturing: boolean;
 }
 
-export const NO_ANNOTATIONS: AnnotationsState = { annotating: false, list: [], editing: null };
+export const NO_ANNOTATIONS: AnnotationsState = { annotating: false, list: [], editing: null, capturing: false };
 
 /** Limits on what is kept of the page's text: it is the page's, and may be anything. */
 export const ANNOTATION_LIMITS = {
@@ -101,6 +105,8 @@ export const ANNOTATION_LIMITS = {
   elements: 20,
   file: 500,
   device: 60,
+  /** Annotations a pane keeps: each has a screenshot. */
+  annotations: 50,
 } as const;
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.slice(0, max) : "");
@@ -171,9 +177,12 @@ function readAnnotation(raw: unknown): Annotation | null {
 /** A pane's annotations from the host, read defensively. */
 export function normalizeAnnotations(raw: unknown): AnnotationsState {
   const r = isRecord(raw) ? raw : {};
-  const list = (Array.isArray(r.list) ? r.list : []).map(readAnnotation).filter((a): a is Annotation => a !== null);
+  const list = (Array.isArray(r.list) ? r.list : [])
+    .slice(0, ANNOTATION_LIMITS.annotations)
+    .map(readAnnotation)
+    .filter((a): a is Annotation => a !== null);
   const editing = typeof r.editing === "string" && list.some((a) => a.id === r.editing) ? r.editing : null;
-  return { annotating: r.annotating === true, list, editing };
+  return { annotating: r.annotating === true, list, editing, capturing: r.capturing === true };
 }
 
 /** The annotation half of the Browser pane's host contract (STORY-75). Each call names the pane by its key. */

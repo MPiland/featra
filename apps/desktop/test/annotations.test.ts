@@ -21,26 +21,39 @@ const captured = (over: Partial<Captured> = {}): Captured => ({
 });
 const store = () => {
   const told: AnnotationsState[] = [];
-  return { told, s: createAnnotations((state) => told.push(state)) };
+  const typed: boolean[] = [];
+  return {
+    told,
+    typed,
+    s: createAnnotations((state, t) => {
+      told.push(state);
+      typed.push(t);
+    }),
+  };
 };
 
 describe("a pane's annotations", () => {
   it("start empty, with Annotate off", () => {
-    expect(store().s.state()).toEqual({ annotating: false, list: [], editing: null });
+    expect(store().s.state()).toEqual({ annotating: false, list: [], editing: null, capturing: false });
   });
 
   it("tell the window each change, and nothing when nothing changed", () => {
     const { s, told } = store();
     s.setAnnotating(true);
     s.setAnnotating(true);
-    expect(told).toEqual([{ annotating: true, list: [], editing: null }]);
+    expect(told).toEqual([{ annotating: true, list: [], editing: null, capturing: false }]);
   });
 
   it("open a new annotation to edit, without a comment, and keep its overlay refs out of what the window sees", () => {
     const { s, told } = store();
     const id = s.add(captured(), [4]);
     expect(id).toBe("a1");
-    expect(told.at(-1)).toEqual({ annotating: false, list: [{ ...captured(), id: "a1", comment: "" }], editing: "a1" });
+    expect(told.at(-1)).toEqual({
+      annotating: false,
+      list: [{ ...captured(), id: "a1", comment: "" }],
+      editing: "a1",
+      capturing: false,
+    });
     expect(s.placed()).toEqual([{ ...captured(), id: "a1", comment: "", refs: [4], n: 1 }]);
   });
 
@@ -100,15 +113,35 @@ describe("a pane's annotations", () => {
     expect(s.editing).toBe("a1");
   });
 
+  // Review fix 8: read and cleared in one step, so nothing added between them is lost.
   it("give STORY-76 the list in order, and clear it once sent", () => {
     const { s, told } = store();
     s.add(captured({ url: "http://localhost:5173/a" }), [1]);
     s.add(captured({ url: "http://localhost:5173/b" }), [2]);
     expect(s.list().map((a) => a.url)).toEqual(["http://localhost:5173/a", "http://localhost:5173/b"]);
-    s.clear();
-    expect(told.at(-1)).toEqual({ annotating: false, list: [], editing: null });
+    expect(s.take().map((a) => a.url)).toEqual(["http://localhost:5173/a", "http://localhost:5173/b"]);
+    expect(told.at(-1)).toEqual({ annotating: false, list: [], editing: null, capturing: false });
     const before = told.length;
-    s.clear();
+    expect(s.take()).toEqual([]);
     expect(told.length).toBe(before);
+  });
+
+  // Review fix 2: each has a screenshot, so a pane keeps a bounded number.
+  it("keep " + ANNOTATION_LIMITS.annotations + " at most, ignoring more", () => {
+    const { s } = store();
+    for (let i = 0; i < ANNOTATION_LIMITS.annotations; i++) expect(s.add(captured(), [i])).not.toBeNull();
+    expect(s.add(captured(), [99])).toBeNull();
+    expect(s.list()).toHaveLength(ANNOTATION_LIMITS.annotations);
+  });
+
+  it("say when a change is only a comment typed, and when a pick is being captured", () => {
+    const { s, told, typed } = store();
+    s.add(captured(), [1]);
+    s.comment("a1", "Red");
+    expect(typed).toEqual([false, true]);
+    s.setCapturing(true);
+    s.setCapturing(true);
+    expect(told.at(-1)?.capturing).toBe(true);
+    expect(typed).toEqual([false, true, false]);
   });
 });

@@ -6,7 +6,7 @@
  * and session.
  */
 import { describe, expect, it, vi } from "vitest";
-import { fakeWindow, platform, type FakeContents } from "./browser-fakes.ts";
+import { answerScreenshots, fakeWindow, platform, type FakeContents } from "./browser-fakes.ts";
 
 vi.mock("electron", async () => (await import("./browser-fakes.ts")).fakeElectron());
 
@@ -151,19 +151,29 @@ describe("the pane's page", () => {
     pane.reload();
     expect(contents.navigationHistory.back).toBe(1);
     expect(contents.reload).toHaveBeenCalledOnce();
-    await pane.capture({ x: 0, y: 0, width: 10, height: 10 });
-    expect(contents.capturePage).toHaveBeenCalledWith({ x: 0, y: 0, width: 10, height: 10 });
+    answerScreenshots(contents);
+    expect(await pane.capture({ x: 0, y: 0, width: 10, height: 10 })).toBe("data:image/png;base64,AAAA");
+    expect(contents.commands.at(-1)).toEqual([
+      "Page.captureScreenshot",
+      { format: "png", clip: { x: 0, y: 0, width: 10, height: 10, scale: 1 } },
+    ]);
   });
 
-  // STORY-75: an annotation's screenshot is asked in the page's CSS px; a device is drawn at its scale times the zoom.
-  it("captures a region of a device's page at the device's scale times the window's zoom", async () => {
+  // STORY-75 review fix 5: the page's renderer takes it in the page's CSS px, so a device's scale, the window's zoom and
+  // a pinch need no guess; the view's own pixels would.
+  it("captures a region of a device's page in its CSS px, by its renderer, whatever the scale and zoom", async () => {
     const { pane, contents } = open(fakeWindow(1.5));
     pane.layout({
       bounds: { x: 0, y: 0, width: 400, height: 600 },
       device: { width: 375, height: 667, dpr: 3, mobile: true, scale: 0.5 },
     });
+    answerScreenshots(contents);
     await pane.capture({ x: 10, y: 20, width: 100, height: 40 });
-    expect(contents.capturePage).toHaveBeenLastCalledWith({ x: 8, y: 15, width: 75, height: 30 });
+    expect(contents.commands.findLast(([m]) => m === "Page.captureScreenshot")).toEqual([
+      "Page.captureScreenshot",
+      { format: "png", clip: { x: 10, y: 20, width: 100, height: 40, scale: 1 } },
+    ]);
+    expect(contents.capturePage).not.toHaveBeenCalled();
   });
 });
 

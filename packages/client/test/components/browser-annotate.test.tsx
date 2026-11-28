@@ -36,11 +36,12 @@ const annotation = (over: Partial<Annotation> = {}): Annotation => ({
   source: null,
   ...over,
 });
-const state = (list: Annotation[], editing: string | null = null, annotating = true): AnnotationsState => ({
-  annotating,
-  list,
-  editing,
-});
+const state = (
+  list: Annotation[],
+  editing: string | null = null,
+  annotating = true,
+  capturing = false,
+): AnnotationsState => ({ annotating, list, editing, capturing });
 
 /** The Browser pane open on STORY-5, its page served. */
 async function openAnnotate() {
@@ -227,6 +228,28 @@ describe("AC5: closing the pane with unsent annotations asks first", () => {
     expect(ask()).not.toBeNull();
     await app.user.click(within(ask()!).getByRole("button", { name: ANNOTATE_COPY.closeAnyway }));
     expect(await browserPane("STORY-6")).toBeTruthy();
+  });
+
+  // Review fix 7: a pick still being captured is an annotation in a moment.
+  it("asks while a pick is still being captured", async () => {
+    const app = await openAnnotate();
+    await app.browser.annotations(state([], null, true, true));
+    await app.user.click(within(app.pane).getByRole("button", { name: BROWSER_COPY.close }));
+    expect(ask()?.textContent).toContain(ANNOTATE_COPY.closeAsk(1));
+    expect(paneGone()).toBe(false);
+  });
+
+  // Visual review A: discarding looks like what it is, and Enter keeps the pane.
+  it("shows Close and discard as a danger, with Cancel focused so Enter keeps the pane", async () => {
+    const app = await openAnnotate();
+    await app.browser.annotations(state([annotation()]));
+    await app.user.click(within(app.pane).getByRole("button", { name: BROWSER_COPY.close }));
+    const discard = within(ask()!).getByRole("button", { name: ANNOTATE_COPY.closeAnyway });
+    expect(discard.classList.contains("danger")).toBe(true);
+    expect(document.activeElement).toBe(within(ask()!).getByRole("button", { name: ANNOTATE_COPY.keep }));
+    await app.user.keyboard("{Enter}");
+    expect(ask()).toBeNull();
+    expect(paneGone()).toBe(false);
   });
 
   it("doesn't ask with no annotations", async () => {

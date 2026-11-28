@@ -12,19 +12,22 @@ export interface Placed {
 /**
  * A Browser pane's annotations (STORY-75, ADR 0048): the one owner of its list, in the main process, for as long as the
  * pane is open; nothing keeps them past it. The window shows the list it is sent; STORY-76's Send reads it and clears
- * it. Each change calls `changed`. Numbers are places in the list, so they close up when one is deleted.
+ * it. Each change calls `changed`, saying whether it was only a comment typed. Numbers are places in the list, so they
+ * close up when one is deleted. It keeps `ANNOTATION_LIMITS.annotations` at most.
  */
-export function createAnnotations(changed: (state: AnnotationsState) => void) {
+export function createAnnotations(changed: (state: AnnotationsState, typed: boolean) => void) {
   let list: (Annotation & Placed)[] = [];
   let editing: string | null = null;
   let annotating = false;
+  let capturing = false;
   let next = 1;
   const state = (): AnnotationsState => ({
     annotating,
     list: list.map(({ refs: _refs, ...a }) => a),
     editing,
+    capturing,
   });
-  const emit = () => changed(state());
+  const emit = (typed = false) => changed(state(), typed);
   const find = (id: string) => list.find((a) => a.id === id);
   return {
     state,
@@ -38,8 +41,15 @@ export function createAnnotations(changed: (state: AnnotationsState) => void) {
       annotating = on;
       emit();
     },
-    /** Adds an annotation, open to edit; returns its id. */
-    add(captured: Captured, refs: number[]): string {
+    /** Whether a pick is being captured: it will be in the list in a moment, so it counts as unsent. */
+    setCapturing(on: boolean) {
+      if (capturing === on) return;
+      capturing = on;
+      emit();
+    },
+    /** Adds an annotation, open to edit; returns its id, or null when the list is full. */
+    add(captured: Captured, refs: number[]): string | null {
+      if (list.length >= ANNOTATION_LIMITS.annotations) return null;
       const id = `a${next++}`;
       list = [...list, { ...captured, id, comment: "", refs }];
       editing = id;
@@ -73,7 +83,7 @@ export function createAnnotations(changed: (state: AnnotationsState) => void) {
       const comment = text.slice(0, ANNOTATION_LIMITS.comment);
       if (comment === a.comment) return;
       list = list.map((x) => (x.id === id ? { ...x, comment } : x));
-      emit();
+      emit(true);
     },
     remove(id: string) {
       if (!find(id)) return;
@@ -81,14 +91,16 @@ export function createAnnotations(changed: (state: AnnotationsState) => void) {
       if (editing === id) editing = null;
       emit();
     },
-    /** The annotations, in order: what STORY-76 sends. */
+    /** The annotations, in order. */
     list: (): Annotation[] => state().list,
-    /** Clears every annotation: once STORY-76 has sent them. */
-    clear() {
-      if (!list.length) return;
+    /** The annotations, in order, cleared at once: what STORY-76 sends, with nothing added between reading and clearing. */
+    take(): Annotation[] {
+      const taken = state().list;
+      if (!taken.length) return taken;
       list = [];
       editing = null;
       emit();
+      return taken;
     },
   };
 }

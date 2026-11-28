@@ -27,6 +27,21 @@ export class FakeDebugger extends EventEmitter {
   };
 }
 
+/**
+ * Scripts a page's answers for a screenshot (STORY-75): its viewports, in the document's CSS px (scrolled by
+ * `layout`, pinched to `visual`), and the PNG its renderer gives.
+ */
+export function answerScreenshots(
+  target: { debugger: FakeDebugger } | FakeDebugger,
+  layout = { pageX: 0, pageY: 0 },
+  visual = { pageX: 0, pageY: 0, clientWidth: 800, clientHeight: 600 },
+  data = "AAAA",
+) {
+  const dbg = target instanceof FakeDebugger ? target : target.debugger;
+  dbg.answers["Page.getLayoutMetrics"] = () => ({ cssLayoutViewport: layout, cssVisualViewport: visual });
+  dbg.answers["Page.captureScreenshot"] = () => ({ data });
+}
+
 export class FakeContents extends EventEmitter {
   url = "";
   destroyed = false;

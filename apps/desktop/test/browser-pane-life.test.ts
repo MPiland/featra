@@ -90,7 +90,7 @@ describe("the pane's page, while the window's page lives", () => {
     expect(sent.at(-1)).toEqual([
       "browser:annotations",
       "browser-load-1",
-      { annotating: false, list: [], editing: null },
+      { annotating: false, list: [], editing: null, capturing: false, shots: {} },
     ]);
     contents.emit("before-input-event", {}, key("Escape"));
     expect(focus.count).toBe(1);

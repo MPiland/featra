@@ -1,17 +1,19 @@
 /**
  * The Annotate overlay (STORY-75, ADR 0048): drawn in the Browser pane's page, in an isolated world of Featra's own
  * (the page's scripts can't see its variables, and its elements are in a closed shadow root). In Annotate mode a glass
- * over the page highlights the element under the pointer; a click picks it, Shift-click adds it to the open annotation,
- * and a drag draws a region. Numbered markers stay on their elements or regions as the page scrolls, resizes or changes
- * its route, and clicking one opens its annotation. It only reports what the user did, as JSON through Featra's binding
- * (which only this world has); the main process decides what becomes an annotation.
+ * over the page highlights the element under the pointer; a click picks it, Shift-click adds it to the annotation open
+ * on this page, and a drag draws a region. Numbered markers stay on their elements or regions as the page scrolls,
+ * resizes or changes its route, and clicking one opens its annotation. It only reports what the user did, as JSON
+ * through Featra's binding (which only this world has); the main process decides what becomes an annotation.
  *
- * `installOverlay` is self-contained: the main process injects its source (`overlaySource`), so nothing outside the
- * function is in scope where it runs. Its events are the user's only: synthetic ones (`isTrusted` false) are ignored.
+ * `installOverlay` is self-contained: the main process injects its source (`overlaySource`), with its look and geometry
+ * (overlay-kit.ts), so nothing outside the function is in scope where it runs. Its events are the user's only: synthetic
+ * ones (`isTrusted` false) are ignored. A new document runs it before its root element exists; it shows once it does.
  */
 /* oxlint-disable unicorn/consistent-function-scoping -- The function runs in the page, so its helpers must be inside it rather than at module scope. */
 import type { Rect } from "../rect.ts";
 import { describeElement, type Described } from "./describe.ts";
+import { OVERLAY_CSS, overlayKit, type OverlayKit } from "./overlay-kit.ts";
 
 /** A marker as the main process gives it: its annotation, number, elements (by ref, then selector) or region. */
 export interface Marker {
@@ -21,7 +23,7 @@ export interface Marker {
   selectors: string[];
   /** The region, in the page's CSS px from the document's top left; null for elements. */
   region: Rect | null;
-  /** The page it was made on, without its hash: a region, or an element found again by selector, shows only there. */
+  /** The page it was made on, without its hash: its region, or its elements found again by selector, show only there. */
   url: string;
   active: boolean;
 }
@@ -51,6 +53,8 @@ export interface OverlayControl {
   mode: (on: boolean) => void;
   sync: (markers: Marker[]) => void;
   node: (ref: number) => Element | null;
+  /** Takes the overlay off the page: Annotate is off and no marker is left. */
+  remove: () => void;
 }
 
 /** The name of the world and of its binding. */
@@ -66,11 +70,16 @@ export function installOverlay(
   describe: (el: Element) => Described,
   send: (json: string) => void,
   trusted: (e: Event) => boolean = (e) => e.isTrusted,
+  css = "",
+  kit: OverlayKit = overlayKit(),
 ): void {
   // Its global, by name: `OVERLAY_GLOBAL` is not in scope in the page.
   const GLOBAL = "__featraOverlay";
+  // How long a marker's missing element goes unlooked for, in ms.
+  const RETRY_MS = 250;
   if (Reflect.has(globalThis, GLOBAL) || window !== window.top) return;
   const doc = document;
+  const { rectOf, union, place, badgeAt, holderOf } = kit;
   const make = (tag: string, cls: string, parent: Node) => {
     const el = doc.createElement(tag);
     el.className = cls;
@@ -80,103 +89,99 @@ export function installOverlay(
   const host = doc.createElement("featra-annotate");
   host.setAttribute("style", "all:initial;position:fixed;inset:0;z-index:2147483647;pointer-events:none;display:block");
   const root = host.attachShadow({ mode: "closed" });
-  make("style", "", root).textContent = [
-    ".glass{position:fixed;inset:0;cursor:crosshair;pointer-events:auto;display:none}",
-    ".on .glass{display:block}",
-    ".hover,.drag,.outline{position:fixed;box-sizing:border-box;pointer-events:none;display:none;border-radius:3px}",
-    ".hover{border:2px solid #3b5fcc;background:rgba(59,95,204,.14)}",
-    ".drag{border:2px dashed #3b5fcc;background:rgba(59,95,204,.1)}",
-    ".outline{border:2px dashed rgba(59,95,204,.8)}",
-    ".outline.active{border:2px solid #3b5fcc;background:rgba(59,95,204,.08)}",
-    ".mark{position:fixed;display:none;box-sizing:border-box;min-width:22px;height:22px;padding:0 6px;border:2px solid #fff;",
-    "border-radius:11px;background:#3b5fcc;color:#fff;font:600 12px/18px system-ui,sans-serif;text-align:center;",
-    "cursor:pointer;pointer-events:auto;transform:translate(-50%,-50%);box-shadow:0 1px 4px rgba(0,0,0,.35)}",
-    ".mark.active{background:#1f3fa0}",
-    ".hidden .hover,.hidden .drag,.hidden .outline,.hidden .mark{visibility:hidden}",
-  ].join("");
+  make("style", "", root).textContent = css;
   const frame = make("div", "", root);
   const glass = make("div", "glass", frame);
   const hover = make("div", "hover", frame);
   const drag = make("div", "drag", frame);
   const marks = make("div", "marks", frame);
-  doc.documentElement.appendChild(host);
+
+  let removed = false;
+  /** Puts the overlay on the page; false while the document has no root element yet. */
+  const mount = () => {
+    if (removed || host.isConnected) return true;
+    const at = doc.documentElement;
+    if (!at) return false;
+    at.appendChild(host);
+    return true;
+  };
+  if (!mount()) {
+    const waiting = new MutationObserver(() => {
+      if (mount()) waiting.disconnect();
+    });
+    waiting.observe(doc, { childList: true });
+  }
 
   const refs = new Map<number, Element>();
   let nextRef = 1;
   let markers: Marker[] = [];
-  const drawn = new Map<string, { badge: HTMLElement; outline: HTMLElement }>();
+  const drawn = new Map<string, { badge: HTMLElement; outlines: HTMLElement[] }>();
   const found = new Map<string, Element>();
-  let on = false;
+  // When a marker's element was last looked for and not found, by key.
+  const missed = new Map<string, number>();
   let start: { x: number; y: number } | null = null;
   let dragging = false;
   let loop = 0;
 
   const here = () => location.href.split("#")[0];
-  const rectOf = (r: DOMRect | Rect): Rect => ({ x: r.x, y: r.y, width: r.width, height: r.height });
-  const union = (rs: Rect[]): Rect | null => {
-    if (!rs.length) return null;
-    const x = Math.min(...rs.map((r) => r.x));
-    const y = Math.min(...rs.map((r) => r.y));
-    const right = Math.max(...rs.map((r) => r.x + r.width));
-    const bottom = Math.max(...rs.map((r) => r.y + r.height));
-    return { x, y, width: right - x, height: bottom - y };
-  };
-  const place = (el: HTMLElement, r: Rect | null) => {
-    if (r)
-      Object.assign(el.style, {
-        display: "block",
-        left: `${r.x}px`,
-        top: `${r.y}px`,
-        width: `${r.width}px`,
-        height: `${r.height}px`,
-      });
-    else el.style.display = "none";
-  };
   const viewport = () => ({ width: innerWidth, height: innerHeight, dpr: devicePixelRatio });
   const elementAt = (x: number, y: number) =>
     doc.elementsFromPoint(x, y).find((e) => e !== host && !host.contains(e)) ?? null;
+  /** Finds a marker's element again by its selector; not more than every `RETRY_MS` while it is missing. */
+  const lookFor = (key: string, selector: string | undefined) => {
+    const known = found.get(key);
+    if (known && known.isConnected) return known;
+    const last = missed.get(key);
+    if (last !== undefined && performance.now() - last < RETRY_MS) return null;
+    let again: Element | null = null;
+    try {
+      again = selector ? doc.querySelector(selector) : null;
+    } catch {
+      again = null;
+    }
+    if (again) {
+      found.set(key, again);
+      missed.delete(key);
+    } else missed.set(key, performance.now());
+    return again;
+  };
   /** A marker's elements, now: by ref while connected, else found again by selector on its own page. */
   const elementsOf = (m: Marker) =>
     m.refs
       .map((ref, i) => {
         const el = refs.get(ref);
         if (el && el.isConnected) return el;
-        if (m.url !== here()) return null;
-        const key = `${m.id}:${i}`;
-        const known = found.get(key);
-        if (known && known.isConnected) return known;
-        let again: Element | null = null;
-        const selector = m.selectors[i];
-        try {
-          again = selector ? doc.querySelector(selector) : null;
-        } catch {
-          again = null;
-        }
-        if (again) found.set(key, again);
-        return again;
+        return m.url === here() ? lookFor(`${m.id}:${i}`, m.selectors[i]) : null;
       })
       .filter((e): e is Element => e !== null);
-  const areaOf = (m: Marker): Rect | null => {
-    if (m.region) return m.url === here() ? { ...m.region, x: m.region.x - scrollX, y: m.region.y - scrollY } : null;
-    return union(elementsOf(m).map((e) => rectOf(e.getBoundingClientRect())));
+  /** The boxes a marker outlines now, in the viewport: its region, or each of its elements. */
+  const boxesOf = (m: Marker): Rect[] => {
+    if (m.region) return m.url === here() ? [{ ...m.region, x: m.region.x - scrollX, y: m.region.y - scrollY }] : [];
+    return elementsOf(m).map((e) => rectOf(e.getBoundingClientRect()));
   };
   const draw = () => {
-    if (!host.isConnected) doc.documentElement.appendChild(host);
+    mount();
     for (const m of markers) {
       const d = drawn.get(m.id);
       if (!d) continue;
-      const area = areaOf(m);
-      place(d.outline, area);
-      d.badge.style.display = area ? "block" : "none";
-      if (area) {
-        d.badge.style.left = `${Math.min(innerWidth - 12, Math.max(12, area.x))}px`;
-        d.badge.style.top = `${Math.min(innerHeight - 12, Math.max(12, area.y))}px`;
+      const boxes = boxesOf(m);
+      while (d.outlines.length < boxes.length) d.outlines.push(make("div", "outline", marks));
+      d.outlines.forEach((o, i) => {
+        place(o, boxes[i] ?? null);
+        o.classList.toggle("active", m.active);
+      });
+      const first = boxes[0];
+      d.badge.style.display = first ? "block" : "none";
+      if (first) {
+        const at = badgeAt(first, innerWidth, innerHeight);
+        d.badge.style.left = `${at.left}px`;
+        d.badge.style.top = `${at.top}px`;
       }
     }
   };
   const tick = () => {
     draw();
-    loop = markers.length ? requestAnimationFrame(tick) : 0;
+    loop = markers.length && !removed ? requestAnimationFrame(tick) : 0;
   };
   /** Hides the overlay's own drawing, lets the page paint, then reports: the screenshot shows the page alone. */
   const report = (message: OverlayMessage) => {
@@ -218,31 +223,19 @@ export function installOverlay(
         width: Math.abs(e.clientX - from.x),
         height: Math.abs(e.clientY - from.y),
       };
-      const center = elementAt(rect.x + rect.width / 2, rect.y + rect.height / 2);
-      let holder: Element | null = center;
-      while (holder && holder.parentElement) {
-        const b = holder.getBoundingClientRect();
-        if (b.left <= rect.x && b.top <= rect.y && b.right >= rect.x + rect.width && b.bottom >= rect.y + rect.height)
-          break;
-        holder = holder.parentElement;
-      }
+      const holder = holderOf(elementAt(rect.x + rect.width / 2, rect.y + rect.height / 2), rect);
       const ref = holder ? nextRef++ : null;
       if (holder && ref) refs.set(ref, holder);
-      report({
-        type: "region",
-        rect,
-        scroll: { x: scrollX, y: scrollY },
-        ref,
-        element: holder ? describe(holder) : null,
-        viewport: viewport(),
-      });
+      const element = holder ? describe(holder) : null;
+      report({ type: "region", rect, scroll: { x: scrollX, y: scrollY }, ref, element, viewport: viewport() });
       return;
     }
     const el = elementAt(e.clientX, e.clientY);
     if (!el) return;
     const ref = nextRef++;
     refs.set(ref, el);
-    const active = markers.find((m) => m.active && !m.region);
+    // Shift adds to the annotation open, when it is of elements on this page.
+    const active = markers.find((m) => m.active && !m.region && m.url === here());
     const add = e.shiftKey && active !== undefined;
     const own = rectOf(el.getBoundingClientRect());
     const rect =
@@ -250,9 +243,8 @@ export function installOverlay(
     report({ type: "pick", ref, add, element: describe(el), rect, viewport: viewport() });
   });
 
-  const control = {
-    mode(next: boolean) {
-      on = next;
+  const control: OverlayControl = {
+    mode(on: boolean) {
       frame.classList.toggle("on", on);
       if (!on) {
         start = null;
@@ -267,13 +259,12 @@ export function installOverlay(
       for (const [id, d] of drawn) {
         if (next.some((m) => m.id === id)) continue;
         d.badge.remove();
-        d.outline.remove();
+        for (const o of d.outlines) o.remove();
         drawn.delete(id);
       }
       for (const m of next) {
         let d = drawn.get(m.id);
         if (!d) {
-          const outline = make("div", "outline", marks);
           const badge = make("div", "mark", marks);
           badge.addEventListener("pointerdown", (e) => {
             if (!trusted(e)) return;
@@ -281,17 +272,24 @@ export function installOverlay(
             e.stopPropagation();
             send(JSON.stringify({ type: "open", id: m.id }));
           });
-          d = { badge, outline };
+          d = { badge, outlines: [] };
           drawn.set(m.id, d);
         }
         d.badge.textContent = String(m.n);
         d.badge.classList.toggle("active", m.active);
-        d.outline.classList.toggle("active", m.active);
       }
       draw();
       if (markers.length && !loop) loop = requestAnimationFrame(tick);
     },
     node: (ref: number) => refs.get(ref) ?? null,
+    remove() {
+      removed = true;
+      markers = [];
+      if (loop) cancelAnimationFrame(loop);
+      loop = 0;
+      host.remove();
+      Reflect.deleteProperty(globalThis, GLOBAL);
+    },
   };
   Reflect.set(globalThis, GLOBAL, control);
   send(JSON.stringify({ type: "ready" }));
@@ -299,4 +297,4 @@ export function installOverlay(
 
 /** The script the main process injects in the overlay's world: the overlay, with what it needs, reporting by binding. */
 export const overlaySource = (): string =>
-  `(${installOverlay.toString()})(${describeElement.toString()}, (m) => globalThis[${JSON.stringify(OVERLAY_BINDING)}](m));`;
+  `(${installOverlay.toString()})(${describeElement.toString()}, (m) => globalThis[${JSON.stringify(OVERLAY_BINDING)}](m), undefined, ${JSON.stringify(OVERLAY_CSS)}, (${overlayKit.toString()})());`;

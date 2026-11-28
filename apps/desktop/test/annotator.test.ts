@@ -78,8 +78,9 @@ describe("what the overlay reports", () => {
   it("counts only from the world's context now: one from a document since left is ignored", async () => {
     const t = setup();
     await t.start();
+    // A new document in the main frame: the frame keeps its id, its world is a new context.
     t.dbg.emit("message", {}, "Runtime.executionContextCreated", {
-      context: { id: 9, name: OVERLAY_WORLD, auxData: { frameId: "F2", isDefault: false } },
+      context: { id: 9, name: OVERLAY_WORLD, auxData: { frameId: "F", isDefault: false } },
     });
     t.report({ type: "ready" }, 9);
     await settle();
@@ -134,7 +135,7 @@ describe("the list, for STORY-76 and STORY-40", () => {
     await settle();
     t.annotator.comment("a1", "Bigger");
     expect(t.annotator.list().map((a) => a.comment)).toEqual(["Bigger"]);
-    t.annotator.clear();
+    expect(t.annotator.take().map((a) => a.comment)).toEqual(["Bigger"]);
     expect(t.annotator.list()).toEqual([]);
     expect(t.last().list).toEqual([]);
   });
