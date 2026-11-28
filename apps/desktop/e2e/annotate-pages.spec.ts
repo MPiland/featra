@@ -3,7 +3,7 @@ import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
 import { openStoryBrowser } from "./browser-journey.ts";
 import type { BrowserHandle } from "../src/browser-pane.ts";
-import { browserBox, browserClick, browserUrl, inBrowserPage } from "./browser-page.ts";
+import { browserBox, browserClick, browserPainted, browserUrl, inBrowserPage } from "./browser-page.ts";
 import { project } from "./draft-project.ts";
 import { freePort, setProof } from "./proof-setup.ts";
 import { atReviewSize } from "./ux-shot.ts";
@@ -57,6 +57,8 @@ test("Annotate: markers come back after a reload, picks work on later pages, and
     await inBrowserPage(app, "window.featraMark = 1");
     await browser.getByRole("button", { name: "Reload", exact: true }).click();
     await expect.poll(() => inBrowserPage(app, "typeof window.featraMark")).toBe("undefined");
+    // Shown, as the user would see it before clicking: input to a document not yet shown is dropped (browserPainted).
+    await expect.poll(() => browserPainted(app)).toBe(true);
     await expect.poll(() => hit(h1.x + 11, h1.y - 13)).toBe("FEATRA-ANNOTATE");
     const para = await browserBox(app, "main > p");
     expect(await hit(para.x + 5, para.y + para.height / 2)).toBe("P");
@@ -89,6 +91,7 @@ test("Annotate: markers come back after a reload, picks work on later pages, and
     const link = await browserBox(app, "#next");
     await browserClick(app, link.x + 5, link.y + link.height / 2);
     await expect.poll(() => browserUrl(app)).toBe(`${url}/next`);
+    await expect.poll(() => browserPainted(app)).toBe(true);
     await toggle.click();
     await expect(toggle).toHaveAttribute("aria-pressed", "true");
     const there = await browserBox(app, "h1");
@@ -100,13 +103,15 @@ test("Annotate: markers come back after a reload, picks work on later pages, and
     await page.keyboard.press("Escape");
 
     // A phone, and a page with no viewport meta: laid out at 980 px and drawn scaled, scrolled down. A screenshot of
-    // the block's rect is all the block's magenta, edge to edge.
+    // the block's rect is all the block's magenta, edge to edge. The layout is the document's width (980); innerWidth
+    // is the visual viewport, 375 px over the initial scale (375 / 980), which Chromium rounds up to a whole px.
     await browser.getByRole("combobox", { name: "Device" }).selectOption({ label: "iPhone SE" });
     const address = browser.getByRole("textbox", { name: "Address" });
     await address.fill(`${url}/plain`);
     await address.press("Enter");
     await expect.poll(() => browserUrl(app)).toBe(`${url}/plain`);
-    await expect.poll(() => inBrowserPage(app, "innerWidth")).toBe(980);
+    await expect.poll(() => inBrowserPage(app, "document.documentElement.clientWidth")).toBe(980);
+    expect(await inBrowserPage(app, "visualViewport.scale < 1")).toBe(true);
     await inBrowserPage(app, "scrollTo(0, 700)");
     await expect.poll(() => inBrowserPage(app, "scrollY")).toBe(700);
     const block = await browserBox(app, "#block");

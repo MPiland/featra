@@ -79,6 +79,14 @@ export async function browserBox(app: ElectronApplication, selector: string) {
   return box;
 }
 
+/**
+ * Whether the page's document has been shown: its first contentful paint is reported once the frame is presented.
+ * Until then Chromium drops input to a document just navigated to (paint holding keeps the last page on screen, and
+ * input meant for it must not reach the new one), so a click sent before is lost, as a user's would be.
+ */
+export const browserPainted = (app: ElectronApplication) =>
+  inBrowserPage<boolean>(app, "performance.getEntriesByType('paint').some((e) => e.name === 'first-contentful-paint')");
+
 /** How many Browser panes are open. */
 export const browserPanesOpen = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.browserPanes?.().length ?? 0);
