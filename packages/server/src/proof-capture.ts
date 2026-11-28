@@ -78,14 +78,18 @@ export function createProofCapture({ scan, lane, servers, capture, settings, log
     return { card: found.owned.card, path: found.owned.path, root: found.root, config: current.collected.config };
   }
 
-  /** The story's dev server, started in its worktree when it isn't running. */
+  /**
+   * The story's dev server, started in its worktree when it isn't running. Preview and the screenshots each hold it
+   * until the story ends, so a Browser pane closing never stops it under them (STORY-74).
+   */
   async function serverOf(
     dir: string,
     story: NonNullable<Awaited<ReturnType<typeof storyIn>>>,
+    holder: "preview" | "capture",
   ): Promise<DevServerStart> {
     const command = await settings.command(dir, story.config);
     if (!command.ok) return { ok: false, note: command.note };
-    return servers.start(dir, story.card.id, story.root, command.command, story.config.devServerUrl ?? "");
+    return servers.start(dir, story.card.id, story.root, command.command, story.config.devServerUrl ?? "", holder);
   }
 
   /** Links each criterion's new screenshot, in the card lane; an agent's own evidence linked meanwhile stays. */
@@ -118,7 +122,7 @@ export function createProofCapture({ scan, lane, servers, capture, settings, log
         else mine[target.ac] = { note: PROOF_COPY.notes.shotUnusable };
         continue;
       }
-      server ??= await serverOf(dir, story);
+      server ??= await serverOf(dir, story, "capture");
       if (!server.ok) {
         mine[target.ac] = server.output ? { note: server.note, output: server.output } : { note: server.note };
         continue;
@@ -158,7 +162,7 @@ export function createProofCapture({ scan, lane, servers, capture, settings, log
     async preview(dir: string, id: string): Promise<{ url: string }> {
       const story = await storyIn(dir, id);
       if (!story || !offersPreview(story.config.proof)) throw new ApiError(PROOF_COPY.noPreview(id));
-      const server = await serverOf(dir, story);
+      const server = await serverOf(dir, story, "preview");
       if (!server.ok) throw new ApiError(server.output ? `${server.note}\n${server.output}` : server.note);
       return { url: server.url };
     },

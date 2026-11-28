@@ -7,7 +7,7 @@ import { createServer } from "node:http";
 
 const PAGE = `<!doctype html>
 <html lang="en">
-  <head><meta charset="utf-8"><title>Shaping</title>
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Shaping</title>
   <style>
     body { margin: 0; font: 16px system-ui, sans-serif; background: #fbfbfa; color: #1c1c1e; }
     header { background: #1c1c1e; color: #fff; padding: 16px 24px; font-weight: 600; }

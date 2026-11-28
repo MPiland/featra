@@ -32,9 +32,11 @@ export const NO_PROOF: ProofView = {
   proof: null,
   devServerCommand: null,
   devServerUrl: null,
+  devServerInstall: null,
   testScreenshots: null,
   designReview: false,
   unconfirmed: false,
+  installUnconfirmed: false,
   error: null,
 };
 
@@ -85,6 +87,7 @@ export function fakeChecksServer(
         // Unset, the design review follows the proof (STORY-73), as the server reads the config.
         designReview: designReview === undefined ? now.designReview : (designReview ?? capturesScreenshots(proof)),
         unconfirmed: now.unconfirmed && !confirm && values.devServerCommand === undefined,
+        installUnconfirmed: now.installUnconfirmed && !confirm && values.devServerInstall === undefined,
       };
       proofViews.set(dir, next);
       return next;

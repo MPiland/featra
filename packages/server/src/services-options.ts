@@ -63,7 +63,7 @@ export interface Services {
   needs: ProjectNeeds;
   /** The host saved the app's settings: an app default turned on may let stories merge on their own (STORY-59). */
   settingsChanged: () => void;
-  /** The stories' dev servers Featra started (STORY-25): stopped first when the app quits (host-gone.ts). */
-  devServers: Pick<DevServers, "stopAll">;
+  /** The stories' dev servers Featra started (STORY-25): stopped first when the app quits (host-gone.ts), or one by one. */
+  devServers: Pick<DevServers, "stopAll" | "stop" | "running">;
   close: () => Promise<void>;
 }

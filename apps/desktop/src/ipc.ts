@@ -25,6 +25,7 @@ import {
 } from "@featra/client/bridge";
 import { normalizeZoom } from "@featra/client/zoom";
 import { httpsLink, isOneOf, toText } from "@featra/work-format";
+import { registerBrowserIpc } from "./browser-ipc.ts";
 import { copyable } from "./copy-text.ts";
 import { loggedEndpoint } from "./endpoint-log.ts";
 import { openEvidenceFile, type EvidenceShell } from "./evidence-open.ts";
@@ -181,6 +182,8 @@ export function registerIpc({ store, lifecycle, log, troubleshoot, projects, ser
     if (e2e) testHooks.copied.push(copied);
     else void clipboard.writeText(copied);
   });
+  // The Browser pane's page (STORY-74).
+  registerBrowserIpc((m) => log.info(m));
   ipcMain.on(IPC.appClearCacheAndRestart, () => void clearCacheAndRestart(troubleshoot));
   ipcMain.on(IPC.appResetAppData, () => void resetAppData(troubleshoot));
   ipcMain.on(IPC.appQuit, () => lifecycle.quit());

@@ -2,6 +2,9 @@ import { useEffect, useId, useRef, useState } from "react";
 import type { ChatSummary } from "@featra/work-format/chat-list";
 import { featuresLedBy } from "@featra/work-format/feature-progress";
 import { PROGRESS_COPY, WORK_COPY, type WorkBridge } from "../../work-list.ts";
+import { OpenBrowserContext } from "../browser/browser-context.tsx";
+import { CardBrowserButton } from "../browser/BrowserButton.tsx";
+import { useBrowserDock } from "../browser/useBrowserDock.tsx";
 import type { ChosenWidth } from "../work/PaneHandle.tsx";
 import { SidePane, type Docked } from "../work/SidePane.tsx";
 import { useDockedPane } from "../work/useDockedPane.ts";
@@ -26,7 +29,8 @@ export interface ChatDraftProps extends ChatViewProps {
  * and the user's edits there save to the owner copy like any card pane's. It opens by itself when the chat makes the
  * draft while it is open, leaving focus in the composer; Review draft in the header (or in Work) opens it otherwise.
  * A chat that leads a feature has Feature progress in its header, which opens that feature's progress in the same
- * place (STORY-24).
+ * place (STORY-24). A story's chat, and a chat that leads a feature, have Browser while that card can be served,
+ * which docks the running app beside the chat (STORY-74).
  */
 export function ChatDraft({ work, paneWidth, review, chatList, onOpenChat, ...view }: ChatDraftProps) {
   const list = useWorkList(work, view.dir)?.list;
@@ -40,7 +44,9 @@ export function ChatDraft({ work, paneWidth, review, chatList, onOpenChat, ...vi
   const paneId = useId();
   const reopen = useRef<HTMLButtonElement>(null);
   const progressButton = useRef<HTMLButtonElement>(null);
-  const { splitRef, split, width, onMove, choose } = useDockedPane(paneWidth);
+  const browser = useBrowserDock(view.dir, shown !== null);
+  const { splitRef, split, cardSplit, width, onMove, choose } = useDockedPane(paneWidth, browser.reserve);
+  const browsable = view.chat.story ?? led;
   const storyTurn = useStoryTurn(work, view);
   if (draft !== seen) {
     setSeen(draft);
@@ -88,46 +94,50 @@ export function ChatDraft({ work, paneWidth, review, chatList, onOpenChat, ...vi
     </button>
   ) : null;
   return (
-    <div ref={splitRef} className="work-split">
-      <ChatView
-        {...view}
-        headerExtra={
-          reviewButton || progress ? (
-            <>
-              {reviewButton}
-              {progress}
-            </>
-          ) : null
-        }
-        story={
-          storyTurn && {
-            ...storyTurn,
-            actions: {
-              stop: (id) => work.stopStory(view.dir, id),
-              resume: (id) => work.resumeStory(view.dir, id),
-            },
-            acceptance: {
-              accept: (id) => work.acceptStory(view.dir, id),
-              sendBack: (id, reason, addCriterion) => work.sendBackStory(view.dir, id, reason, addCriterion),
-            },
-            merge: (id) => work.mergeStory(view.dir, id),
+    <OpenBrowserContext.Provider value={browser.opener}>
+      <div ref={splitRef} className="work-split">
+        <ChatView
+          {...view}
+          headerExtra={
+            reviewButton || progress || browsable ? (
+              <>
+                {reviewButton}
+                {progress}
+                {browsable && <CardBrowserButton work={work} dir={view.dir} id={browsable} />}
+              </>
+            ) : null
           }
-        }
-      />
-      {shown && (
-        <SidePane
-          docked={shown}
-          onDock={setShown}
-          onClose={close}
-          work={work}
-          dir={view.dir}
-          layout={{ split, width, onMove, choose }}
-          paneId={paneId}
-          list={list}
-          chats={chatList}
-          onOpenChat={onOpenChat}
+          story={
+            storyTurn && {
+              ...storyTurn,
+              actions: {
+                stop: (id) => work.stopStory(view.dir, id),
+                resume: (id) => work.resumeStory(view.dir, id),
+              },
+              acceptance: {
+                accept: (id) => work.acceptStory(view.dir, id),
+                sendBack: (id, reason, addCriterion) => work.sendBackStory(view.dir, id, reason, addCriterion),
+              },
+              merge: (id) => work.mergeStory(view.dir, id),
+            }
+          }
         />
-      )}
-    </div>
+        {shown && (
+          <SidePane
+            docked={shown}
+            onDock={setShown}
+            onClose={close}
+            work={work}
+            dir={view.dir}
+            layout={{ split: cardSplit, width, onMove, choose }}
+            paneId={paneId}
+            list={list}
+            chats={chatList}
+            onOpenChat={onOpenChat}
+          />
+        )}
+        {browser.pane(split)}
+      </div>
+    </OpenBrowserContext.Provider>
   );
 }

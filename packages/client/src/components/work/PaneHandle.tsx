@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type RefObject } from "react";
 import { CARD_COPY } from "../../card-pane.ts";
-import { paneLimits, paneWidthFor, stepPaneWidth } from "../../pane-width.ts";
+import { paneLimits, paneWidthFor, stepPaneWidth, type PaneSpec } from "../../pane-width.ts";
 
 /** The pane width the user chose (null: the default), kept in the UI state, and how to change it. */
 export interface ChosenWidth {
@@ -32,15 +32,19 @@ interface PaneHandleProps {
   /** Called with the width to keep, at the end of a drag or on a key. */
   onChoose: (width: number) => void;
   onClose: () => void;
+  /** The pane's limits: the card pane's by default. */
+  spec?: PaneSpec;
+  /** The handle's accessible name: the card pane's by default. */
+  label?: string;
 }
 
 /**
  * The card pane's left edge: drag it, or focus it and use Left and Right (Home and End for the limits). Escape
  * closes the pane, as it does from inside it.
  */
-export function PaneHandle({ width, split, paneId, onMove, onChoose, onClose }: PaneHandleProps) {
+export function PaneHandle({ width, split, paneId, onMove, onChoose, onClose, spec, label }: PaneHandleProps) {
   const drag = useRef<{ x: number; width: number; now: number } | null>(null);
-  const { min, max } = paneLimits(split);
+  const { min, max } = paneLimits(split, spec);
 
   const onPointerDown = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
@@ -52,7 +56,7 @@ export function PaneHandle({ width, split, paneId, onMove, onChoose, onClose }: 
     const d = drag.current;
     if (!d) return;
     // The pane is on the right: moving the edge left widens it.
-    d.now = paneWidthFor(d.width + d.x - e.clientX, split);
+    d.now = paneWidthFor(d.width + d.x - e.clientX, split, spec);
     onMove(d.now);
   };
   const onPointerEnd = () => {
@@ -66,7 +70,7 @@ export function PaneHandle({ width, split, paneId, onMove, onChoose, onClose }: 
       onClose();
       return;
     }
-    const next = stepPaneWidth(width, e.key, split);
+    const next = stepPaneWidth(width, e.key, split, spec);
     if (next === null) return;
     e.preventDefault();
     onChoose(next);
@@ -76,7 +80,7 @@ export function PaneHandle({ width, split, paneId, onMove, onChoose, onClose }: 
     <div
       role="separator"
       className="pane-handle"
-      aria-label={CARD_COPY.resize}
+      aria-label={label ?? CARD_COPY.resize}
       aria-orientation="vertical"
       aria-controls={paneId}
       aria-valuenow={width}

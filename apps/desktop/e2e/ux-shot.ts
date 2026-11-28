@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ElectronApplication, Locator, Page } from "@playwright/test";
@@ -33,6 +33,19 @@ export async function uxShot(page: Page, name: string, show?: Locator): Promise<
     await show?.scrollIntoViewIfNeeded({ timeout: 2_000 }).catch(() => {});
     await mkdir(UX_DIR, { recursive: true });
     await page.screenshot({ path: join(UX_DIR, `${name}.png`), timeout: 5_000 });
+  } catch (err) {
+    process.stderr.write(`uxShot: skipped ${name}: ${err instanceof Error ? err.message : String(err)}\n`);
+  }
+}
+
+/**
+ * Saves `png`, a screen composed by the journey, as `uxShot` saves the window: for a screen the window's own capture
+ * can't show whole, such as the Browser pane's page, which is a view of its own over the window (STORY-74).
+ */
+export async function uxImage(name: string, png: Buffer): Promise<void> {
+  try {
+    await mkdir(UX_DIR, { recursive: true });
+    await writeFile(join(UX_DIR, `${name}.png`), png);
   } catch (err) {
     process.stderr.write(`uxShot: skipped ${name}: ${err instanceof Error ? err.message : String(err)}\n`);
   }

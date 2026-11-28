@@ -5,9 +5,11 @@
  * section's do (check-settings.ts), and the dev-server command runs only once the
  * user has confirmed it here: one changed through git shows as not confirmed and doesn't run.
  */
+import { readdir } from "node:fs/promises";
 import {
   CHECKS_COPY,
   designReviewOn,
+  lockfileInstall,
   PROOF_COPY,
   type ProjectConfig,
   type ProofMode,
@@ -24,22 +26,35 @@ export interface ProofSettingsDeps {
   dataDir?: string;
 }
 
-const KEYS = ["proof", "devServerCommand", "devServerUrl", "testScreenshots", "designReview"] as const;
+const KEYS = [
+  "proof",
+  "devServerCommand",
+  "devServerInstall",
+  "devServerUrl",
+  "testScreenshots",
+  "designReview",
+] as const;
 
 export function createProofSettings({ scan, dataDir }: ProofSettingsDeps) {
   const confirmed = commandStore(dataDir, "dev-server-confirmed.json");
+  // The install command a feature's checkout runs (STORY-74), confirmed as the dev-server command is.
+  const installConfirmed = commandStore(dataDir, "dev-server-install-confirmed.json");
 
   async function view(dir: string, error: string | null = null): Promise<ProofView> {
     const config = (await scan(dir).catch(() => null))?.collected.config;
     const known = (await confirmed.get(dir)).command;
     const command = config?.devServerCommand ?? null;
+    const install = config?.devServerInstall ?? null;
+    const knownInstall = (await installConfirmed.get(dir)).command;
     return {
       proof: config?.proof ?? null,
       devServerCommand: command,
+      devServerInstall: install,
       devServerUrl: config?.devServerUrl ?? null,
       testScreenshots: config?.testScreenshots ?? null,
       designReview: config ? designReviewOn(config) : false,
       unconfirmed: command !== null && command !== known,
+      installUnconfirmed: install !== null && install !== knownInstall,
       error: config ? error : (error ?? CHECKS_COPY.notFeatra),
     };
   }
@@ -58,6 +73,8 @@ export function createProofSettings({ scan, dataDir }: ProofSettingsDeps) {
       const config = (await scan(dir))?.collected.config;
       if (patch.devServerCommand !== undefined) await confirmed.set(dir, "command", patch.devServerCommand);
       else if (patch.confirm && config) await confirmed.set(dir, "command", config.devServerCommand);
+      if (patch.devServerInstall !== undefined) await installConfirmed.set(dir, "command", patch.devServerInstall);
+      else if (patch.confirm && config) await installConfirmed.set(dir, "command", config.devServerInstall);
       return view(dir);
     },
 
@@ -73,6 +90,21 @@ export function createProofSettings({ scan, dataDir }: ProofSettingsDeps) {
       if (command === null) return { ok: false, note: PROOF_COPY.notes.noCommand };
       if ((await confirmed.get(dir)).command !== command) return { ok: false, note: PROOF_COPY.notes.unconfirmed };
       return config.devServerUrl === null ? { ok: false, note: PROOF_COPY.notes.noUrl } : { ok: true, command };
+    },
+
+    /**
+     * What installs dependencies in `folder`, a feature's temporary checkout, before its dev server starts there
+     * (STORY-74): the project's install command once confirmed, else the one its lockfile means; null for none.
+     */
+    async install(
+      dir: string,
+      config: ProjectConfig,
+      folder: string,
+    ): Promise<{ ok: true; command: string | null } | { ok: false; note: string }> {
+      const set = config.devServerInstall;
+      if (set === null) return { ok: true, command: lockfileInstall(await readdir(folder).catch(() => [])) };
+      const known = (await installConfirmed.get(dir)).command;
+      return known === set ? { ok: true, command: set } : { ok: false, note: PROOF_COPY.notes.installUnconfirmed };
     },
   };
 }

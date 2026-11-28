@@ -6,6 +6,8 @@ import type { CardBridge } from "../src/card-pane.ts";
 export interface CardProof {
   notes?: ProofNotes;
   preview?: boolean;
+  /** Whether the Browser pane can serve it (STORY-74). */
+  browser?: boolean;
   /** The story's design review, as the server finds it (STORY-73). */
   designReview?: DesignReviewView;
 }
@@ -22,6 +24,7 @@ export function withProof(view: CardView, proof: CardProof | undefined): CardVie
     ...view,
     acs,
     ...(proof.preview ? { preview: true as const } : {}),
+    ...(proof.browser ? { browser: true as const } : {}),
     ...(proof.designReview ? { designReview: proof.designReview } : {}),
   };
 }

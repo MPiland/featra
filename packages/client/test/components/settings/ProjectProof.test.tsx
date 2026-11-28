@@ -17,9 +17,11 @@ const SET: ProofView = {
   proof: "both",
   devServerCommand: "pnpm dev --port {port}",
   devServerUrl: "http://localhost:5173",
+  devServerInstall: null,
   testScreenshots: null,
   designReview: true,
   unconfirmed: false,
+  installUnconfirmed: false,
   error: null,
 };
 
@@ -90,6 +92,24 @@ describe("the dev server and the tests' screenshots", () => {
     await waitFor(() => expect(within(section).queryByRole("button", { name: COPY.confirm })).toBeNull());
   });
 
+  it("STORY-74: sets the install command a feature's fresh checkout runs, and confirms one changed outside Featra", async () => {
+    const { section, user, calls } = await open(SET);
+    expect(input(section, COPY.install).value).toBe("");
+    expect(within(section).getByText(COPY.installHint)).toBeTruthy();
+    await user.type(input(section, COPY.install), "pnpm install");
+    await user.click(within(section).getByRole("button", { name: COPY.save }));
+    await waitFor(() => expect(calls).toContain(`proof.set:${PROJECT.dir}:{"devServerInstall":"pnpm install"}`));
+  });
+
+  it("STORY-74: asks to confirm an install command changed through git", async () => {
+    const changed = { ...SET, devServerInstall: "npm ci", installUnconfirmed: true };
+    const { section, user, calls } = await open(changed);
+    expect(input(section, COPY.install).value).toBe("npm ci");
+    expect(within(section).getByText(`${COPY.changed}:`)).toBeTruthy();
+    await user.click(within(section).getByRole("button", { name: COPY.confirm }));
+    await waitFor(() => expect(calls).toContain(`proof.set:${PROJECT.dir}:{"confirm":true}`));
+    await waitFor(() => expect(within(section).queryByRole("button", { name: COPY.confirm })).toBeNull());
+  });
   it("shows why the section couldn't be read or saved", async () => {
     const { section } = await open({ ...NO_PROOF, error: "Couldn't read the project's proof settings." });
     expect(within(section).getByRole("alert").textContent).toBe("Couldn't read the project's proof settings.");

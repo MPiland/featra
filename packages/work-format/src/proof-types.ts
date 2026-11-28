@@ -81,6 +81,8 @@ export interface ProofView {
   /** The project's proof; null until the user chooses. */
   proof: ProofMode | null;
   devServerCommand: string | null;
+  /** What installs dependencies in a feature's temporary checkout (STORY-74); null derives it from the lockfile. */
+  devServerInstall: string | null;
   devServerUrl: string | null;
   /** Where the project's own tests write screenshots, relative to the project; null when they don't. */
   testScreenshots: string | null;
@@ -88,6 +90,8 @@ export interface ProofView {
   designReview: boolean;
   /** The command in the project's config isn't the one the user confirmed here (changed through git): it doesn't run. */
   unconfirmed: boolean;
+  /** As `unconfirmed`, for the install command: one changed through git doesn't run. */
+  installUnconfirmed: boolean;
   /** Set when the project's config can't be read or a change was refused. */
   error: string | null;
 }
@@ -96,11 +100,12 @@ export interface ProofView {
 export interface ProofPatch {
   proof?: ProofMode | null;
   devServerCommand?: string | null;
+  devServerInstall?: string | null;
   devServerUrl?: string | null;
   testScreenshots?: string | null;
   /** Turns the design review of screenshots on or off (STORY-73); null goes back to the default. */
   designReview?: boolean | null;
-  /** Confirms the dev-server command now in the project's config as it is. */
+  /** Confirms the dev-server and install commands now in the project's config as they are. */
   confirm?: boolean;
 }
 
@@ -113,7 +118,7 @@ export function normalizeProofPatch(raw: unknown): ProofPatch | null {
     if (proof !== null && !isProofMode(proof)) return null;
     out.proof = proof;
   }
-  for (const key of ["devServerCommand", "devServerUrl", "testScreenshots"] as const) {
+  for (const key of ["devServerCommand", "devServerInstall", "devServerUrl", "testScreenshots"] as const) {
     const value = raw[key];
     if (value === undefined) continue;
     if (value !== null && typeof value !== "string") return null;
@@ -127,6 +132,17 @@ export function normalizeProofPatch(raw: unknown): ProofPatch | null {
   if (raw.confirm === true) out.confirm = true;
   return out;
 }
+
+/** The lockfiles a project may have, and the install each means, in the order they are looked for (STORY-74). */
+export const LOCKFILE_INSTALLS: readonly (readonly [lockfile: string, install: string])[] = [
+  ["pnpm-lock.yaml", "pnpm install --frozen-lockfile"],
+  ["package-lock.json", "npm ci"],
+  ["yarn.lock", "yarn install --frozen-lockfile"],
+];
+
+/** The install for a folder holding `files`: its lockfile's, or null when it has none (nothing to install). */
+export const lockfileInstall = (files: readonly string[]): string | null =>
+  LOCKFILE_INSTALLS.find(([lockfile]) => files.includes(lockfile))?.[1] ?? null;
 
 /** Why a criterion has no captured screenshot: shown next to it, as "Evidence missing" is. `output` is the server's tail. */
 export interface ProofNote {
@@ -157,6 +173,8 @@ export const PROOF_COPY = {
   notes: {
     noCommand: "No dev-server command set",
     unconfirmed: "Dev-server command not confirmed",
+    installUnconfirmed: "Install command not confirmed",
+    installFailed: "Install didn't finish",
     noUrl: "No dev-server URL set",
     notStarted: "Dev server didn't start",
     pageFailed: "Page didn't load",
@@ -169,6 +187,9 @@ export const PROOF_COPY = {
   noPreview: (id: string) =>
     `${id} has no dev server to preview: it needs its own worktree, and the project's proof needs Preview.`,
   previewTitle: (id: string) => `Preview ${id}`,
+  /** The Browser pane's refusal (STORY-74): nothing to serve `id` from. */
+  noBrowser: (id: string) =>
+    `${id} has nothing to serve: a story needs its own worktree, and a feature needs to be in progress.`,
   /** What the move to review tells the agent, after Featra captured or attached screenshots. */
   captured: (n: number, folder: string) =>
     `Featra put ${n} screenshot${n === 1 ? "" : "s"} in ${folder}; commit ${n === 1 ? "it" : "them"} with the card.`,
@@ -202,20 +223,24 @@ export function normalizeProofView(raw: unknown): ProofView {
     return {
       proof: null,
       devServerCommand: null,
+      devServerInstall: null,
       devServerUrl: null,
       testScreenshots: null,
       designReview: false,
       unconfirmed: false,
+      installUnconfirmed: false,
       error: PROOF_COPY.unreadable,
     };
   }
   return {
     proof: isProofMode(raw.proof) ? raw.proof : null,
     devServerCommand: text(raw.devServerCommand),
+    devServerInstall: text(raw.devServerInstall),
     devServerUrl: text(raw.devServerUrl),
     testScreenshots: text(raw.testScreenshots),
     designReview: raw.designReview === true,
     unconfirmed: raw.unconfirmed === true,
+    installUnconfirmed: raw.installUnconfirmed === true,
     error: text(raw.error),
   };
 }

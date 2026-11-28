@@ -4,12 +4,14 @@ import {
   IPC,
   normalizeEndpoint,
   normalizeAppSettings,
+  normalizeBrowserState,
   normalizeProjectSettings,
   normalizeProjects,
   normalizeProjectsResult,
   normalizeSettingsSnapshot,
   normalizeUiState,
   normalizeWindowState,
+  serverBrowser,
   serverChats,
   serverChecks,
   serverInbox,
@@ -84,6 +86,32 @@ const bridge: FeatraBridge = {
       };
       ipcRenderer.on(IPC.notificationsOpenChat, handler);
       return () => void ipcRenderer.removeListener(IPC.notificationsOpenChat, handler);
+    },
+  },
+  // The Browser pane (STORY-74): its dev server from the local server, its page from main.
+  browser: {
+    ...serverBrowser(server),
+    open: (key, target) => ipcRenderer.send(IPC.browserOpen, key, target),
+    focus: (key) => ipcRenderer.send(IPC.browserFocus, key),
+    onEscape: (listener) => {
+      const handler = (_e: unknown, key: unknown) => {
+        if (typeof key === "string") listener(key);
+      };
+      ipcRenderer.on(IPC.browserEscape, handler);
+      return () => void ipcRenderer.removeListener(IPC.browserEscape, handler);
+    },
+    layout: (key, layout) => ipcRenderer.send(IPC.browserLayout, key, layout),
+    navigate: (key, url) => ipcRenderer.send(IPC.browserNavigate, key, url),
+    back: (key) => ipcRenderer.send(IPC.browserBack, key),
+    forward: (key) => ipcRenderer.send(IPC.browserForward, key),
+    reload: (key) => ipcRenderer.send(IPC.browserReload, key),
+    close: (key) => ipcRenderer.send(IPC.browserClose, key),
+    onState: (listener) => {
+      const handler = (_e: unknown, key: unknown, state: unknown) => {
+        if (typeof key === "string") listener(key, normalizeBrowserState(state));
+      };
+      ipcRenderer.on(IPC.browserState, handler);
+      return () => void ipcRenderer.removeListener(IPC.browserState, handler);
     },
   },
   edit: (command) => ipcRenderer.send(IPC.edit, command),

@@ -49,6 +49,9 @@ export const platform = {
   shots: new Map<string, Capture>(),
   /** While set, each capture answers only once it settles: a capture held open (STORY-73). */
   hold: null as Promise<void> | null,
+  /** While set, a cancelled dev server keeps running until its exit in `exits` is called: a slow shutdown (STORY-74). */
+  lingers: false,
+  exits: [] as (() => void)[],
 };
 
 let clock = 0;
@@ -67,7 +70,8 @@ const devServers: DevServerDeps = {
     return {
       cancel: () => {
         proc.cancelled++;
-        exit();
+        if (platform.lingers) platform.exits.push(exit);
+        else exit();
       },
       done,
       output: () => platform.printed,

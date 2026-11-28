@@ -16,6 +16,19 @@ export interface SettingsMethods {
    * URL for the host to open in a window. Refused with why when it has none or it didn't start.
    */
   "preview.start": { params: { dir: string; id: string }; result: { url: string } };
+  /**
+   * The Browser pane (STORY-74): starts the dev server of a story (in its worktree) or of a feature in progress (in its
+   * branch's checkout, or a temporary one at its tip), or holds the one running, for the page's pane `pane`; answers
+   * with its URL. A temporary checkout installs its dependencies first: the answer is `{ installing: true }`, and
+   * asking again waits for the install and the server. Refused with why when there is nothing to serve, the install
+   * failed or the server didn't start. The pane is let go when the page's socket closes.
+   */
+  "browser.start": {
+    params: { dir: string; id: string; pane: string };
+    result: { url: string } | { installing: true };
+  };
+  /** The Browser pane closed: lets go of its dev server (stopped once nothing else holds it) and its checkout. */
+  "browser.stop": { params: { dir: string; id: string; pane: string }; result: null };
   /** The user clears a story's design review of its screenshots (STORY-73), and it moves on to Acceptance. */
   "story.clearDesignReview": { params: { dir: string; id: string }; result: null };
 }

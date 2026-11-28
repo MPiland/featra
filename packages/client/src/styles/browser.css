@@ -1,0 +1,206 @@
+/*
+ * The Browser pane (STORY-74, ADR 0047): a docked pane like the card pane, its address bar and device toolbar on top,
+ * and the viewport the host draws the page's own view over. The view covers the viewport (or the device's frame in
+ * it), so nothing the page must see goes there but the frame and Responsive's handles around it.
+ */
+.browser-pane {
+  background: var(--bg);
+}
+
+.browser-bar,
+.browser-devices {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--side);
+  font-size: 12px;
+}
+
+.browser-button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--tx2);
+  cursor: pointer;
+}
+
+.browser-button:hover:not(:disabled) {
+  background: var(--row);
+}
+
+.browser-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.browser-address,
+.browser-size,
+.browser-device,
+.browser-field input {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid color-mix(in srgb, var(--tx) 18%, transparent);
+  border-radius: 6px;
+  background: var(--menu);
+  color: var(--tx);
+  font: inherit;
+  font-size: 12px;
+}
+
+.browser-address {
+  flex: 1 1 160px;
+  min-width: 0;
+}
+
+.browser-address[aria-invalid="true"] {
+  border-color: var(--bad);
+}
+
+.browser-size {
+  width: 72px;
+}
+
+.browser-sizes,
+.browser-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--tx2);
+}
+
+.browser-devices .review-draft {
+  height: 26px;
+  margin-left: 0;
+  font-size: 12px;
+}
+
+.browser-hint,
+.browser-note {
+  flex: 1 0 100%;
+  margin: 0;
+}
+
+.browser-note {
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.browser-add {
+  display: flex;
+  flex: 1 0 100%;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.browser-field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--tx2);
+}
+
+.browser-field input[type="number"] {
+  width: 80px;
+}
+
+.browser-address:focus-visible,
+.browser-size:focus-visible,
+.browser-device:focus-visible,
+.browser-field input:focus-visible,
+.browser-button:focus-visible,
+.browser-handle:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+
+/* Where the page shows: the host's view covers it, or the device's frame in it. */
+.browser-viewport {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.browser-viewport.on-device {
+  background: var(--row);
+}
+
+.browser-frame {
+  position: absolute;
+  background: var(--bg);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+.browser-waiting {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+}
+
+/* Responsive's handles, in the gutter at the device's right and bottom edges and its corner. */
+.browser-handle {
+  position: absolute;
+  touch-action: none;
+}
+
+.browser-handle::after {
+  content: "";
+  position: absolute;
+  border-radius: 2px;
+  background: var(--tx3);
+  opacity: 0.6;
+}
+
+.browser-handle:hover::after,
+.browser-handle:active::after {
+  background: var(--acc);
+  opacity: 1;
+}
+
+.browser-handle-x {
+  cursor: ew-resize;
+}
+
+.browser-handle-x::after {
+  top: 50%;
+  left: 6px;
+  width: 4px;
+  height: 32px;
+  transform: translateY(-50%);
+}
+
+.browser-handle-y {
+  cursor: ns-resize;
+}
+
+.browser-handle-y::after {
+  top: 6px;
+  left: 50%;
+  width: 32px;
+  height: 4px;
+  transform: translateX(-50%);
+}
+
+.browser-handle-xy {
+  cursor: nwse-resize;
+}
+
+.browser-handle-xy::after {
+  top: 4px;
+  left: 4px;
+  width: 8px;
+  height: 8px;
+}

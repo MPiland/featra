@@ -246,8 +246,10 @@ export function createApi({
       case "proof.load":
       case "proof.set":
       case "preview.start":
+      case "browser.start":
+      case "browser.stop":
       case "story.clearDesignReview":
-        return proofApi(method, params);
+        return proofApi(method, params, id, connection);
       case "checks.load":
         return checkSettings.load(project(params));
       case "checks.set": {

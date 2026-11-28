@@ -3475,3 +3475,28 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - Send puts one draft in the target chat's composer, with screenshots attached; nothing is sent until the user sends it. The target is the preview's session (the story's, or the Dev Lead's for a feature) and can be switched.
 - STORY-40 stays in FEAT-10 and is built last, on the same pane.
 - Stories, in order: STORY-74 Preview in the Browser pane; STORY-75 Annotate the page; STORY-76 Send annotations to the session; STORY-40 Agents drive the in-app browser.
+
+## 2026-11-27 — STORY-74 Preview in the Browser pane (developer)
+
+- **Where it shows**: a view of its own in the main window, drawn over the pane's viewport; not an iframe or webview tag. It hides while a dialog covers the window. One pane per window; opening it for another card replaces it.
+- **Where it docks**: right of the card or chat pane, which keeps its minimum width. It has its own width limits (360 to 1920 px, half the area by default), resized by its handle like the card pane.
+- **Session**: `featra-browser`, in memory, apart from the window's and Proof's. No permissions, no downloads, the system's proxy. Any http or https address; nothing else. A page's new window loads in the pane.
+- **Feature preview**: in the feature branch's checkout, or a temporary detached worktree at its tip, removed when the pane closes. A dev server already running is reused, and only a server the pane launched is stopped.
+- **Devices**: shown through the DevTools Protocol (viewport, pixel ratio, touch), scaled down to fit, never up. The view keeps its own size (`dontSetVisibleSize`), or the page is drawn at its scale twice (found in the screens, caught by the journey). The user agent stays as is.
+- **Device choice remembered per project in the UI state**, not the project's settings as the brief suggested: those are committed, and how one person previews is theirs, as Work's layout is.
+- **Fixture page** has a viewport meta, as real dev pages do, so a phone preset reports the phone's width.
+- Recorded in ADR 0047.
+
+## 2026-11-27 — STORY-74 review fixes (developer)
+
+- **A feature's fresh checkout installs first** (Dev Lead decision): a worktree that already has the feature branch serves it as is. A temporary checkout runs the project's install command before the dev server: Proof's new optional `devServerInstall`, confirmed like the dev-server command, or else the lockfile's (`pnpm-lock.yaml` → `pnpm install --frozen-lockfile`, `package-lock.json` → `npm ci`, `yarn.lock` → `yarn install --frozen-lockfile`); no lockfile, no install. The pane says "Installing dependencies…" meanwhile and shows the install's last lines when it fails. Proved on a real npm project in `browser-install.test.ts`.
+- **Dev servers have holders**: Preview, capture and each pane hold the server they use, and it stops only when the last lets go. Closing the pane no longer stops a server Preview reuses.
+- **A page that reloads or crashes closes its pane**: the main process closes the window's pane when the window's page starts a new document or its renderer goes; the server stops a socket's panes when it closes. Pane keys carry the page load's own id, so a reloaded page never names the last one's pane.
+- **Quit**: every dev server is still stopped first and at once (host-gone.ts), but its process is kept until it exits; the panes then close, each waiting up to 3 s for its server to end before removing its checkout. A checkout whose server hasn't ended is removed when its project next opens (a sweep of `featra-feature-preview-*` in `git worktree list`). The checkout helpers are shared with a feature's checks (`temp-checkout.ts`).
+- **An address the user goes to is theirs**: it shows while the dev server starts or after it failed, and the server coming up doesn't take the page back.
+- **New windows**: only a new tab or window asked for by the page's own origin loads in the pane; a background tab, a frame of another site, and a `noreferrer` link (no referrer to check) are denied.
+- **The view hides** under the app's menus and open listboxes too, as under dialogs.
+- **Keyboard**: the page's place in the pane is a Tab stop that gives the page the keyboard; Escape in the page closes the pane, as in the other panes.
+- **Smaller fixes**: Browser in a chat's header only when its card can be served; the size fields apply on Enter or leaving them, not on each key; bare LAN addresses and `.local`, `.test` and `.localhost` names load over http; a device's pixel ratio is kept within 0.5 to 5; the pane's header reads "Browser · STORY-n"; a device scaled to fit shows its scale ("74%") beside its size, as Chrome does.
+- **For STORY-40**: `BrowserHandle` names its project and story or feature. Agent-driven navigation needs its own host allow-check (ADR 0047).
+- Recorded in ADR 0047.
