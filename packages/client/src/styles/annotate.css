@@ -1,0 +1,179 @@
+/*
+ * Annotate in the Browser pane (STORY-75, ADR 0048): the hint while it is on, and the annotations under the page,
+ * numbered as their markers on it. The page's view covers the viewport above, so the list takes its own room below.
+ */
+.browser-pane .review-draft[aria-pressed="true"] {
+  border-color: var(--accbg);
+  background: var(--accbg);
+  color: #fff;
+}
+
+.browser-annotating {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.browser-pane .draft-ask {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.annotations {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  max-height: 45%;
+  border-top: 1px solid var(--line);
+  background: var(--side);
+}
+
+.annotations-title {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  margin: 0;
+  padding: 8px 12px 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.annotation-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin: 0;
+  padding: 0 8px 8px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.annotation-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--tx);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.annotation-row:hover,
+.annotation.open > .annotation-row {
+  background: var(--row);
+}
+
+.annotation-row:focus-visible,
+.annotation-comment textarea:focus-visible {
+  outline: 2px solid var(--acc);
+  outline-offset: 1px;
+}
+
+.annotation-n {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--accbg);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.annotation-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.annotation-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 6px 4px 10px 32px;
+}
+
+.annotation-comment {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--tx2);
+  font-size: 12px;
+}
+
+.annotation-comment textarea {
+  min-height: 56px;
+  padding: 6px 8px;
+  border: 1px solid color-mix(in srgb, var(--tx) 18%, transparent);
+  border-radius: 6px;
+  background: var(--menu);
+  color: var(--tx);
+  font: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.annotation-shot {
+  align-self: flex-start;
+  max-width: 100%;
+  max-height: 160px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.annotation-more summary {
+  color: var(--tx2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.annotation-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 10px;
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.annotation-element {
+  display: contents;
+}
+
+.annotation-details dt {
+  color: var(--tx2);
+}
+
+.annotation-details dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.annotation-details pre {
+  margin: 0;
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.annotation-details .annotation-errors {
+  color: var(--bad);
+}
+
+.annotation-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}

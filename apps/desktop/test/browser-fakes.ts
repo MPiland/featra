@@ -5,13 +5,33 @@
 import { EventEmitter } from "node:events";
 import { vi } from "vitest";
 
+/** A screenshot as Electron gives it. */
+export const fakeImage = (data = "data:image/png;base64,AAAA") => ({
+  isEmpty: () => data === "",
+  toDataURL: () => data,
+});
+
+/**
+ * `webContents.debugger`: records each command, answers it as the test scripts in `answers`, and emits the protocol's
+ * events as a real one does (`emit("message", {}, method, params)`).
+ */
+export class FakeDebugger extends EventEmitter {
+  attached = false;
+  commands: [string, unknown][] = [];
+  answers: Record<string, (params: Record<string, unknown>) => unknown> = {};
+  isAttached = () => this.attached;
+  attach = () => void (this.attached = true);
+  sendCommand = async (method: string, params?: Record<string, unknown>) => {
+    this.commands.push([method, params]);
+    return this.answers[method]?.(params ?? {});
+  };
+}
+
 export class FakeContents extends EventEmitter {
   url = "";
   destroyed = false;
   focused = 0;
   loads: string[] = [];
-  commands: [string, unknown][] = [];
-  attached = false;
   setWindowOpenHandler = vi.fn<(handler: (d: Record<string, unknown>) => { action: string }) => void>();
   navigationHistory = {
     back: 0,
@@ -20,11 +40,13 @@ export class FakeContents extends EventEmitter {
     goBack: () => void this.navigationHistory.back++,
     goForward: () => {},
   };
-  debugger = {
-    isAttached: () => this.attached,
-    attach: () => void (this.attached = true),
-    sendCommand: async (method: string, params?: unknown) => void this.commands.push([method, params]),
-  };
+  debugger = new FakeDebugger();
+  get commands() {
+    return this.debugger.commands;
+  }
+  get attached() {
+    return this.debugger.attached;
+  }
   getURL = () => this.url;
   getTitle = () => "Fixture";
   isLoading = () => false;
@@ -32,7 +54,7 @@ export class FakeContents extends EventEmitter {
   close = () => void (this.destroyed = true);
   focus = () => void this.focused++;
   reload = vi.fn<() => void>();
-  capturePage = vi.fn<(rect?: unknown) => Promise<string>>(async () => "image");
+  capturePage = vi.fn<(rect?: unknown) => Promise<ReturnType<typeof fakeImage>>>(async () => fakeImage());
   async loadURL(url: string) {
     this.loads.push(url);
   }
@@ -99,10 +121,12 @@ export function fakeWindow(zoom = 1) {
   const children = new Set<FakeView>();
   const events = new EventEmitter();
   const page = new EventEmitter();
+  const focus = { count: 0 };
   const win = {
     isDestroyed: () => false,
     webContents: {
       getZoomFactor: () => zoom,
+      focus: () => void focus.count++,
       send: (...args: unknown[]) => void sent.push(args),
       on: (event: string, h: Listener) => void page.on(event, h),
       off: (event: string, h: Listener) => void page.off(event, h),
@@ -114,7 +138,7 @@ export function fakeWindow(zoom = 1) {
     once: (event: string, h: () => void) => void events.once(event, h),
     off: (event: string, h: () => void) => void events.off(event, h),
   };
-  return { win, sent, children, events, page };
+  return { win, sent, children, events, page, focus };
 }
 
 export type FakeWindow = ReturnType<typeof fakeWindow>;

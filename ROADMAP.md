@@ -62,6 +62,8 @@ epics in `.featra/cards/`.
   so any agent can use them. Off by default (tool definitions cost tokens), with per-app approval, browsers and
   terminals restricted, and macOS screen-recording and accessibility permissions. Linux under Wayland limits it. M1
   covers browser use only (STORY-40).
+- **Ask before unsent annotations go with the window's page.** Leaving the view or reloading the window closes the
+  Browser pane without asking (STORY-74); with unsent annotations (STORY-75) it could ask first, as Close does.
 
 - **Performance: unwatched projects pay two git scans per card write.** Reuse git state for lane writes on unwatched
   folders, as the watched path does (ADR 0016). Not M1 scope.

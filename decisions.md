@@ -3500,3 +3500,17 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - **Smaller fixes**: Browser in a chat's header only when its card can be served; the size fields apply on Enter or leaving them, not on each key; bare LAN addresses and `.local`, `.test` and `.localhost` names load over http; a device's pixel ratio is kept within 0.5 to 5; the pane's header reads "Browser · STORY-n"; a device scaled to fit shows its scale ("74%") beside its size, as Chrome does.
 - **For STORY-40**: `BrowserHandle` names its project and story or feature. Agent-driven navigation needs its own host allow-check (ADR 0047).
 - Recorded in ADR 0047.
+
+## 2026-11-27 — STORY-75 Annotate the page (developer)
+
+- **Injection**: the overlay runs in an isolated world of Featra's own (`featra-annotate`), over the DevTools Protocol, and reports by a binding only that world has. No preload, no Node, nothing in the page's main world. Only the world's current context counts; another world's, the page's or a left document's call is ignored. The overlay acts only on trusted (user-made) events and draws in a closed shadow root.
+- **Trust boundary**: the overlay's reports are untrusted input, read by kind, capped in size and cut to length in the main process; the window reads the list defensively again and takes only a PNG data URL as a screenshot. Page text shows as text only. The screenshot is the main process's own capture.
+- **Data model**: the main process owns the list, one per pane; the window mirrors it. `BrowserHandle.annotations` has `list()` and `clear()` for STORY-76 and STORY-40. Elements are deduped by selector. A region is kept in document coordinates with the element that holds it.
+- **Numbers close up** after a delete: they are the list's order, as the markers show.
+- **Markers** follow their element by the overlay's reference, else by selector on the same address, the hash ignored.
+- **Source hint**: React 19's dev stack, React 18's `_debugSource` and `data-inspector-*` attributes, read in the page's main world from the picked node, parsed in the main process; Vite's `/@fs/` paths keep their leading slash (a bug the test found first).
+- **Console errors**: the page's since its document loaded, the last 20, each cut to 500 characters.
+- **The close ask** covers Close, Escape, the Browser toggle and another card's Browser. Leaving the view or reloading the window closes the pane without asking (STORY-74's rule); on the roadmap.
+- **No tokens**: capturing, commenting, editing and deleting ask nothing of the server, proved in the client test.
+- **The journey** drives the pane's page by `sendInputEvent`, as Chromium marks it the user's own input.
+- Recorded in ADR 0048.

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ANNOTATE_COPY, NO_ANNOTATIONS, type AnnotationsState } from "../../annotations.ts";
 import { BLANK_STATE, BROWSER_COPY, type BrowserBridge, type BrowserState } from "../../browser.ts";
+import { ConfirmAsk } from "../work/ConfirmAsk.tsx";
 import { DockedAside } from "../work/DockedAside.tsx";
 import { AddressBar } from "./AddressBar.tsx";
+import { AnnotationPanel } from "./AnnotationPanel.tsx";
 import type { BrowserHostValue } from "./browser-context.tsx";
 import { BrowserViewport } from "./BrowserViewport.tsx";
 import { DeviceToolbar } from "./DeviceToolbar.tsx";
@@ -71,6 +74,21 @@ function useBrowserPage(host: BrowserBridge, dir: string, id: string) {
   return { key, state, serving, navigated, pageHost };
 }
 
+/** A pane's annotations as the main process says them (STORY-75), with how many there are for the pane's host. */
+function useAnnotations(host: BrowserBridge, key: string, onUnsent: (n: number) => void) {
+  const [annotations, setAnnotations] = useState<AnnotationsState>(NO_ANNOTATIONS);
+  useEffect(() => host.onAnnotations((k, s) => k === key && setAnnotations(s)), [host, key]);
+  const unsent = annotations.list.length;
+  useEffect(() => onUnsent(unsent), [onUnsent, unsent]);
+  return annotations;
+}
+
+/** The question before the pane closes with unsent annotations; its host decides what goes ahead does. */
+export interface CloseAsk {
+  confirm: () => void;
+  cancel: () => void;
+}
+
 export interface BrowserPaneProps {
   browser: BrowserHostValue;
   dir: string;
@@ -79,15 +97,22 @@ export interface BrowserPaneProps {
   paneId: string;
   width: number;
   onClose: () => void;
+  /** Hears how many unsent annotations the pane has. */
+  onUnsent: (n: number) => void;
+  /** Asks before closing, while its host waits for an answer; null otherwise. */
+  closeAsk: CloseAsk | null;
 }
 
 /**
  * The Browser pane (STORY-74, ADR 0047): a story's or feature's running app, docked beside its card or chat. The page
  * is the host's own view over the pane's viewport; the pane holds the address bar and the device toolbar.
  */
-export function BrowserPane({ browser, dir, id, paneId, width, onClose }: BrowserPaneProps) {
+export function BrowserPane(props: BrowserPaneProps) {
+  const { browser, dir, id, paneId, width, onClose, onUnsent, closeAsk } = props;
   const { host } = browser;
   const { key, state, serving, navigated, pageHost } = useBrowserPage(host, dir, id);
+  const annotations = useAnnotations(host, key, onUnsent);
+  const { annotating } = annotations;
   const [scale, setScale] = useState<number | null>(null);
   const devices = browser.devices(dir);
   const setDevices = (next: typeof devices) => browser.setDevices(dir, next);
@@ -103,10 +128,41 @@ export function BrowserPane({ browser, dir, id, paneId, width, onClose }: Browse
       id={BROWSER_COPY.title(id)}
       closeLabel={BROWSER_COPY.close}
       onClose={onClose}
+      // Escape leaves Annotate before it closes the pane.
+      onEscape={() => {
+        if (annotating) host.annotate(key, false);
+        return annotating;
+      }}
       width={width}
+      actions={
+        <button
+          type="button"
+          className="review-draft"
+          aria-pressed={annotating}
+          disabled={serving.url === null && !navigated}
+          onClick={() => host.annotate(key, !annotating)}
+        >
+          {ANNOTATE_COPY.annotate}
+        </button>
+      }
     >
       <AddressBar host={pageHost} pageKey={key} state={state} />
       <DeviceToolbar devices={devices} onChange={setDevices} scale={scale} />
+      {closeAsk && (
+        <ConfirmAsk
+          label={BROWSER_COPY.close}
+          cancel={ANNOTATE_COPY.keep}
+          onCancel={closeAsk.cancel}
+          actions={
+            <button type="button" className="btn" onClick={closeAsk.confirm}>
+              {ANNOTATE_COPY.closeAnyway}
+            </button>
+          }
+        >
+          <p>{ANNOTATE_COPY.closeAsk(annotations.list.length)}</p>
+        </ConfirmAsk>
+      )}
+      {annotating && <p className="meta browser-annotating">{ANNOTATE_COPY.annotateHint}</p>}
       {note && (
         <p className="card-error browser-note" role="alert">
           {note}
@@ -121,6 +177,7 @@ export function BrowserPane({ browser, dir, id, paneId, width, onClose }: Browse
         onChange={setDevices}
         onScale={setScale}
       />
+      <AnnotationPanel host={host} pageKey={key} state={annotations} />
     </DockedAside>
   );
 }

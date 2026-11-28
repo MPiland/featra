@@ -4,7 +4,7 @@
  * closes the pane as Escape in the other panes does, and focusing the pane's place gives it the keyboard. Fakes only
  * Electron (browser-fakes.ts).
  */
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, type Mock } from "vitest";
 import { fakeWindow, platform, type FakeContents } from "./browser-fakes.ts";
 
 vi.mock("electron", async () => (await import("./browser-fakes.ts")).fakeElectron());
@@ -12,7 +12,8 @@ vi.mock("electron", async () => (await import("./browser-fakes.ts")).fakeElectro
 const pages = await import("../src/dev-pages.ts");
 platform.onContents = (contents: FakeContents) => pages.guardContents(contents as never);
 const { openPane, openPanes, paneOf } = await import("../src/browser-pane.ts");
-const { targetOf } = await import("../src/browser-ipc.ts");
+const { registerBrowserIpc, targetOf } = await import("../src/browser-ipc.ts");
+const { ipcMain, BrowserWindow } = await import("electron");
 
 const TARGET = { dir: "D:/p", id: "FEAT-2" };
 const open = (w = fakeWindow(), key = "browser-load-1") => {
@@ -77,6 +78,25 @@ describe("the pane's page, while the window's page lives", () => {
     expect(sent.filter(([channel]) => channel === "browser:escape")).toEqual([["browser:escape", "browser-load-1"]]);
   });
 
+  // STORY-75: Escape leaves Annotate before it closes anything; the window takes the keyboard back to ask first.
+  it("leaves Annotate on Escape, before telling the window, which takes the keyboard back", async () => {
+    const { pane, contents, sent, focus } = open();
+    await pane.annotations.annotate(true);
+    const e = { prevented: false, preventDefault: () => void (e.prevented = true) };
+    contents.emit("before-input-event", e, key("Escape"));
+    expect(e.prevented).toBe(true);
+    expect(pane.annotations.state().annotating).toBe(false);
+    expect(sent.filter(([channel]) => channel === "browser:escape")).toEqual([]);
+    expect(sent.at(-1)).toEqual([
+      "browser:annotations",
+      "browser-load-1",
+      { annotating: false, list: [], editing: null },
+    ]);
+    contents.emit("before-input-event", {}, key("Escape"));
+    expect(focus.count).toBe(1);
+    expect(sent.filter(([channel]) => channel === "browser:escape")).toEqual([["browser:escape", "browser-load-1"]]);
+  });
+
   it("takes the keyboard when focused", () => {
     const { pane, contents } = open();
     pane.focus();
@@ -91,5 +111,44 @@ describe("what a pane shows, as the page sends it", () => {
     expect(targetOf({ dir: "D:/p", id: 4 })).toBeNull();
     expect(targetOf({ dir: "D:/p", id: "x".repeat(101) })).toBeNull();
     expect(targetOf("D:/p")).toBeNull();
+  });
+});
+
+describe("the page's Annotate calls (STORY-75)", () => {
+  type Handler = (e: unknown, ...args: unknown[]) => void;
+  // The fake's `ipcMain.on`, which records each handler the app registers.
+  const ipc = ipcMain as unknown as { on: Mock<(channel: string, h: Handler) => void> };
+  const handlers = () => {
+    ipc.on.mockClear();
+    registerBrowserIpc(() => {});
+    return new Map(ipc.on.mock.calls);
+  };
+
+  it("drive the window's own pane by key, with ids and text checked", async () => {
+    const w = fakeWindow();
+    const { pane } = open(w, "browser-ipc-1");
+    const fromWindow = vi.fn<() => typeof w.win>(() => w.win);
+    Object.assign(BrowserWindow, { fromWebContents: fromWindow });
+    const h = handlers();
+    const call = (channel: string, ...args: unknown[]) => h.get(channel)!({ sender: {} }, ...args);
+    call("browser:annotate", "browser-ipc-1", true);
+    await new Promise<void>((r) => setImmediate(r));
+    expect(pane.annotations.state().annotating).toBe(true);
+    call("browser:annotate", "browser-other", false);
+    call("browser:annotate", "browser-ipc-1", "yes");
+    expect(pane.annotations.state().annotating).toBe(false);
+    const edit = vi.spyOn(pane.annotations, "edit");
+    const comment = vi.spyOn(pane.annotations, "comment");
+    const remove = vi.spyOn(pane.annotations, "remove");
+    call("browser:annotation-edit", "browser-ipc-1", "a1");
+    call("browser:annotation-edit", "browser-ipc-1", 7);
+    call("browser:annotation-comment", "browser-ipc-1", "a1", "Bigger");
+    call("browser:annotation-comment", "browser-ipc-1", "a1", { html: "<b>" });
+    call("browser:annotation-comment", "browser-ipc-1", "x".repeat(101), "Bigger");
+    call("browser:annotation-remove", "browser-ipc-1", "a1");
+    call("browser:annotation-remove", "browser-ipc-1", null);
+    expect(edit.mock.calls).toEqual([["a1"], [null]]);
+    expect(comment.mock.calls).toEqual([["a1", "Bigger"]]);
+    expect(remove.mock.calls).toEqual([["a1"]]);
   });
 });

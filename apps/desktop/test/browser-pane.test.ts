@@ -154,6 +154,17 @@ describe("the pane's page", () => {
     await pane.capture({ x: 0, y: 0, width: 10, height: 10 });
     expect(contents.capturePage).toHaveBeenCalledWith({ x: 0, y: 0, width: 10, height: 10 });
   });
+
+  // STORY-75: an annotation's screenshot is asked in the page's CSS px; a device is drawn at its scale times the zoom.
+  it("captures a region of a device's page at the device's scale times the window's zoom", async () => {
+    const { pane, contents } = open(fakeWindow(1.5));
+    pane.layout({
+      bounds: { x: 0, y: 0, width: 400, height: 600 },
+      device: { width: 375, height: 667, dpr: 3, mobile: true, scale: 0.5 },
+    });
+    await pane.capture({ x: 10, y: 20, width: 100, height: 40 });
+    expect(contents.capturePage).toHaveBeenLastCalledWith({ x: 8, y: 15, width: 75, height: 30 });
+  });
 });
 
 describe("the device it shows", () => {

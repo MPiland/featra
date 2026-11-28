@@ -67,6 +67,9 @@ Terms used across the code, cards and docs. Keep definitions short; link ADRs fo
   the user confirmed. One per story, reused; it serves captured screenshots and **Preview**, the window that opens it.
 - **Browser pane** — a pane docked in the main window beside a card or chat, showing a story's or feature's dev
   server, or any web address, as a device of the user's choice. Closing it stops the dev server it started.
+- **Annotation** — a comment on an element, several elements or a region of the Browser pane's page, with what Annotate
+  captured there: a screenshot, the viewport, the address, selectors, DOM snippets, styles, console errors and a source-file
+  hint. Numbered on the page by a marker. Unsent ones last until the pane closes (ADR 0048).
 - **Evidence state** — what is actually known about a story:
   - **Reported** — an agent said so (ticked a task, moved a stage).
   - **Verified** — the PR's CI checks passed.

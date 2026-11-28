@@ -4,6 +4,7 @@ import {
   IPC,
   normalizeEndpoint,
   normalizeAppSettings,
+  normalizeAnnotations,
   normalizeBrowserState,
   normalizeProjectSettings,
   normalizeProjects,
@@ -112,6 +113,18 @@ const bridge: FeatraBridge = {
       };
       ipcRenderer.on(IPC.browserState, handler);
       return () => void ipcRenderer.removeListener(IPC.browserState, handler);
+    },
+    // Annotate (STORY-75): the main process owns each pane's annotations; the window shows them and asks for changes.
+    annotate: (key, on) => ipcRenderer.send(IPC.browserAnnotate, key, on),
+    editAnnotation: (key, id) => ipcRenderer.send(IPC.browserAnnotationEdit, key, id),
+    comment: (key, id, text) => ipcRenderer.send(IPC.browserAnnotationComment, key, id, text),
+    removeAnnotation: (key, id) => ipcRenderer.send(IPC.browserAnnotationRemove, key, id),
+    onAnnotations: (listener) => {
+      const handler = (_e: unknown, key: unknown, state: unknown) => {
+        if (typeof key === "string") listener(key, normalizeAnnotations(state));
+      };
+      ipcRenderer.on(IPC.browserAnnotations, handler);
+      return () => void ipcRenderer.removeListener(IPC.browserAnnotations, handler);
     },
   },
   edit: (command) => ipcRenderer.send(IPC.edit, command),

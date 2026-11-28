@@ -19,6 +19,9 @@ export function targetOf(raw: unknown): BrowserTarget | null {
     : null;
 }
 
+/** An annotation's id from the page; null when malformed. */
+const annotationId = (v: unknown) => (typeof v === "string" && v.length <= 100 ? v : null);
+
 export function registerBrowserIpc(log: (message: string) => void): void {
   ipcMain.on(IPC.browserOpen, (e, key: unknown, target: unknown) => {
     const w = win(e);
@@ -36,4 +39,20 @@ export function registerBrowserIpc(log: (message: string) => void): void {
   ipcMain.on(IPC.browserReload, (e, key: unknown) => pane(e, key)?.reload());
   ipcMain.on(IPC.browserFocus, (e, key: unknown) => pane(e, key)?.focus());
   ipcMain.on(IPC.browserClose, (e, key: unknown) => closePane(win(e), key));
+  // Annotate (STORY-75): the pane's annotations are main's; the page asks for changes by id.
+  ipcMain.on(
+    IPC.browserAnnotate,
+    (e, key: unknown, on: unknown) => void pane(e, key)?.annotations.annotate(on === true),
+  );
+  ipcMain.on(IPC.browserAnnotationEdit, (e, key: unknown, which: unknown) =>
+    pane(e, key)?.annotations.edit(annotationId(which)),
+  );
+  ipcMain.on(IPC.browserAnnotationComment, (e, key: unknown, which: unknown, text: unknown) => {
+    const a = annotationId(which);
+    if (a && typeof text === "string") pane(e, key)?.annotations.comment(a, text);
+  });
+  ipcMain.on(IPC.browserAnnotationRemove, (e, key: unknown, which: unknown) => {
+    const a = annotationId(which);
+    if (a) pane(e, key)?.annotations.remove(a);
+  });
 }

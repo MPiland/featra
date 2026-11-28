@@ -5,6 +5,7 @@
   "license": "MIT",
   "type": "module",
   "exports": {
+    "./annotate": "./src/annotate/index.ts",
     "./bridge": "./src/bridge.ts",
     "./shortcuts": "./src/shortcuts.ts",
     "./zoom": "./src/zoom.ts"

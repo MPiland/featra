@@ -8,6 +8,7 @@ import {
   type WebContents,
 } from "electron";
 import { IPC, type BrowserLayout, type BrowserState } from "@featra/client/bridge";
+import { createAnnotator, type Annotator } from "./annotator.ts";
 import { createEmulation } from "./browser-emulation.ts";
 import { allowBrowsing, webUrl } from "./dev-pages.ts";
 import { e2e, testHooks } from "./test-hooks.ts";
@@ -27,7 +28,7 @@ export interface BrowserTarget {
   id: string;
 }
 
-/** What drives an open pane's page: the page's own calls now, and later an agent's (STORY-40) or annotation (STORY-75). */
+/** What drives an open pane's page: the page's own calls, its annotations (STORY-75), and later an agent's (STORY-40). */
 export interface BrowserHandle extends BrowserTarget {
   key: string;
   contents: WebContents;
@@ -38,8 +39,10 @@ export interface BrowserHandle extends BrowserTarget {
   layout: (layout: BrowserLayout) => void;
   /** Where the page shows in the window, in its pixels; null while hidden: for an overlay over it (STORY-75). */
   bounds: () => Rectangle | null;
-  /** The page as shown, or `rect` of it (in the page's CSS px at its scale): for screenshots of an element or region. */
+  /** The page as shown, or `rect` of it in the page's CSS px: for screenshots of an element or region. */
   capture: (rect?: Rectangle) => Promise<NativeImage>;
+  /** Its annotations (STORY-75): Annotate, the list and its one owner. */
+  annotations: Annotator;
   /** Gives the page the keyboard. */
   focus: () => void;
 }
@@ -124,8 +127,32 @@ export function openPane(
     failed = description || `error ${code}`;
     send();
   });
-  contents.on("before-input-event", (_e, input) => {
-    if (isEscape(input) && !win.isDestroyed()) win.webContents.send(IPC.browserEscape, key);
+  const annotations = createAnnotator({
+    page: {
+      getURL: () => contents.getURL(),
+      onConsole: (listener) => contents.on("console-message", (...args: unknown[]) => listener(...args)),
+      onNavigate: (listener) => contents.on("did-navigate", () => listener()),
+      debugger: contents.debugger,
+    },
+    capture: (rect) => pane.capture(rect),
+    device: () => device?.name ?? null,
+    send: (state) => {
+      if (!win.isDestroyed()) win.webContents.send(IPC.browserAnnotations, key, state);
+    },
+    focusWindow: () => {
+      if (!win.isDestroyed()) win.webContents.focus();
+    },
+    log,
+  });
+  contents.on("before-input-event", (e, input) => {
+    if (!isEscape(input) || win.isDestroyed()) return;
+    // Escape leaves Annotate first; then, as in the other panes, it closes the pane.
+    if (annotations.escape()) e.preventDefault();
+    else {
+      // The window takes the keyboard back, as it may ask before the pane closes.
+      win.webContents.focus();
+      win.webContents.send(IPC.browserEscape, key);
+    }
   });
   const pageGone = (details: { isMainFrame: boolean; isSameDocument: boolean }) => {
     if (details.isMainFrame && !details.isSameDocument) pane.close();
@@ -165,7 +192,15 @@ export function openPane(
       void emulation.apply(device, z);
     },
     bounds: () => (view.getVisible() ? view.getBounds() : null),
-    capture: (rect) => contents.capturePage(rect),
+    capture: (rect) => {
+      // The page's CSS px are drawn at the device's scale times the window's zoom; with no device, at their size.
+      const k = device ? device.scale * zoom() : 1;
+      const at = (n: number) => Math.round(n * k);
+      return contents.capturePage(
+        rect && { x: at(rect.x), y: at(rect.y), width: at(rect.width), height: at(rect.height) },
+      );
+    },
+    annotations,
     focus: () => {
       if (!contents.isDestroyed()) contents.focus();
     },
