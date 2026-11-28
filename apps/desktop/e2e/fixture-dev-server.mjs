@@ -18,8 +18,21 @@ const PAGE = `<!doctype html>
 </html>
 `;
 
+/**
+ * A page with no viewport meta (STORY-75), so a phone lays it out at 980 px and draws it scaled: a magenta block well
+ * down it, for an annotation's screenshot to be checked against.
+ */
+const PLAIN = `<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><title>Plain</title></head>
+  <body style="margin:0;height:3000px;background:#fff">
+    <div id="block" style="position:absolute;left:200px;top:900px;width:300px;height:200px;background:#c828c8"></div>
+  </body>
+</html>
+`;
+
 const port = Number(process.argv[2] ?? process.env.PORT);
-createServer((_req, res) => {
+createServer((req, res) => {
   res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-  res.end(PAGE);
+  res.end(req.url === "/plain" ? PLAIN : PAGE);
 }).listen(port, "127.0.0.1", () => process.stdout.write(`Ready on http://localhost:${port}\n`));

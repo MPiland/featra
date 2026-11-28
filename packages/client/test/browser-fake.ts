@@ -1,12 +1,14 @@
 // The fake Browser pane host (STORY-74): the server's dev server start and stop, and the host's view. Both are the
 // platform's to prove (a process, a port, Chromium); the fake records each call and lets a test push the page's state.
 import { act } from "@testing-library/react";
+import type { AnnotationsState } from "../src/annotations.ts";
 import type { BrowserBridge, BrowserLayout, BrowserState, BrowserTarget } from "../src/browser.ts";
 import { BLANK_STATE } from "../src/browser.ts";
 
 export function fakeBrowserHost(calls: string[], start?: BrowserBridge["start"]) {
   const listeners = new Set<(key: string, state: BrowserState) => void>();
   const escapes = new Set<(key: string) => void>();
+  const annotated = new Set<(key: string, state: AnnotationsState) => void>();
   /** What each pane was opened on, by key. */
   const targets = new Map<string, BrowserTarget>();
   /** The pane keys each start and stop named, in order. */
@@ -49,6 +51,15 @@ export function fakeBrowserHost(calls: string[], start?: BrowserBridge["start"])
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
+    // Annotate (STORY-75): the main process owns the list (its tests prove it); the fake records each ask.
+    annotate: (key, on) => void log.push(`annotate:${key}:${on}`),
+    editAnnotation: (key, id) => void log.push(`edit:${key}:${id}`),
+    comment: (key, id, text) => void log.push(`comment:${key}:${id}:${text}`),
+    removeAnnotation: (key, id) => void log.push(`remove:${key}:${id}`),
+    onAnnotations: (listener) => {
+      annotated.add(listener);
+      return () => void annotated.delete(listener);
+    },
   };
   /** The one pane's view open now. */
   const current = () => {
@@ -70,6 +81,12 @@ export function fakeBrowserHost(calls: string[], start?: BrowserBridge["start"])
       act(async () => {
         const key = current();
         for (const l of listeners) l(key, { ...BLANK_STATE, ...state });
+      }),
+    /** The main process says the open pane's annotations now. */
+    annotations: (state: AnnotationsState) =>
+      act(async () => {
+        const key = current();
+        for (const l of annotated) l(key, state);
       }),
     /** Escape is pressed in the open pane's page. */
     escape: () =>

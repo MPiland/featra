@@ -24,20 +24,45 @@ export function useBrowserDock(dir: string, cardOpen: boolean) {
   const widthIn = (split: number) => paneWidthFor(chosen, areaOf(split), BROWSER_WIDTH);
   const reserve = (split: number) => (shown && browser ? widthIn(split) : 0);
 
-  const close = useCallback(() => {
+  // The pane's unsent annotations (STORY-75): closing it with any asks first, and `asking` is what goes ahead does.
+  const [unsent, setUnsent] = useState(0);
+  const [asking, setAsking] = useState<(() => void) | null>(null);
+  const guarded = useCallback(
+    (go: () => void) => {
+      if (unsent > 0) setAsking(() => go);
+      else go();
+    },
+    [unsent],
+  );
+  const closeNow = useCallback(() => {
     setShown(null);
+    setUnsent(0);
     const to = opener.current;
     opener.current = null;
     if (to?.isConnected) to.focus();
   }, []);
+  const close = useCallback(() => guarded(closeNow), [guarded, closeNow]);
   const toggle = useCallback(
     (id: string) => {
       if (shown === id) return close();
-      opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      setShown(id);
+      const from = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      guarded(() => {
+        opener.current = from;
+        setUnsent(0);
+        setShown(id);
+      });
     },
-    [shown, close],
+    [shown, close, guarded],
   );
+  const closeAsk = asking
+    ? {
+        confirm: () => {
+          setAsking(null);
+          asking();
+        },
+        cancel: () => setAsking(null),
+      }
+    : null;
   const openerValue = useMemo<BrowserOpener | null>(
     () => (browser ? { shown, paneId, toggle } : null),
     [browser, shown, paneId, toggle],
@@ -61,7 +86,17 @@ export function useBrowserDock(dir: string, cardOpen: boolean) {
           }}
           onClose={close}
         />
-        <BrowserPane key={shown} browser={browser} dir={dir} id={shown} paneId={paneId} width={width} onClose={close} />
+        <BrowserPane
+          key={shown}
+          browser={browser}
+          dir={dir}
+          id={shown}
+          paneId={paneId}
+          width={width}
+          onClose={close}
+          onUnsent={setUnsent}
+          closeAsk={closeAsk}
+        />
       </>
     );
   };

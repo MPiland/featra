@@ -4,6 +4,7 @@ import {
   IPC,
   normalizeEndpoint,
   normalizeAppSettings,
+  createAnnotationsReader,
   normalizeBrowserState,
   normalizeProjectSettings,
   normalizeProjects,
@@ -24,6 +25,13 @@ import {
 
 // The local server's WebSocket (ADR 0015). Main hands out its address and token; the page never sees either.
 const server = createServerClient(async () => normalizeEndpoint(await ipcRenderer.invoke(IPC.serverEndpoint)));
+
+/** Each screenshot comes once (STORY-75): the open pane's reader keeps those it was sent, for every listener. */
+let annotations: { key: string; read: ReturnType<typeof createAnnotationsReader> } | null = null;
+function readAnnotations(key: string, state: unknown) {
+  if (annotations?.key !== key) annotations = { key, read: createAnnotationsReader() };
+  return annotations.read(state);
+}
 
 const bridge: FeatraBridge = {
   platform: process.platform,
@@ -112,6 +120,19 @@ const bridge: FeatraBridge = {
       };
       ipcRenderer.on(IPC.browserState, handler);
       return () => void ipcRenderer.removeListener(IPC.browserState, handler);
+    },
+    // Annotate (STORY-75): the main process owns each pane's annotations; the window shows them and asks for changes.
+    annotate: (key, on) => ipcRenderer.send(IPC.browserAnnotate, key, on),
+    editAnnotation: (key, id) => ipcRenderer.send(IPC.browserAnnotationEdit, key, id),
+    comment: (key, id, text) => ipcRenderer.send(IPC.browserAnnotationComment, key, id, text),
+    removeAnnotation: (key, id) => ipcRenderer.send(IPC.browserAnnotationRemove, key, id),
+    onAnnotations: (listener) => {
+      const handler = (_e: unknown, key: unknown, state: unknown) => {
+        if (typeof key !== "string") return;
+        listener(key, readAnnotations(key, state));
+      };
+      ipcRenderer.on(IPC.browserAnnotations, handler);
+      return () => void ipcRenderer.removeListener(IPC.browserAnnotations, handler);
     },
   },
   edit: (command) => ipcRenderer.send(IPC.edit, command),

@@ -3500,3 +3500,30 @@ Built on the card's decisions of 2026-11-24 (dev lead); ADR 0044 records the dev
 - **Smaller fixes**: Browser in a chat's header only when its card can be served; the size fields apply on Enter or leaving them, not on each key; bare LAN addresses and `.local`, `.test` and `.localhost` names load over http; a device's pixel ratio is kept within 0.5 to 5; the pane's header reads "Browser · STORY-n"; a device scaled to fit shows its scale ("74%") beside its size, as Chrome does.
 - **For STORY-40**: `BrowserHandle` names its project and story or feature. Agent-driven navigation needs its own host allow-check (ADR 0047).
 - Recorded in ADR 0047.
+
+## 2026-11-27 — STORY-75 Annotate the page (developer)
+
+- **Injection**: the overlay runs in an isolated world of Featra's own (`featra-annotate`), over the DevTools Protocol, and reports by a binding only that world has. No preload, no Node, nothing in the page's main world. Only the world's current context counts; another world's, the page's or a left document's call is ignored. The overlay acts only on trusted (user-made) events and draws in a closed shadow root.
+- **Trust boundary**: the overlay's reports are untrusted input, read by kind, capped in size and cut to length in the main process; the window reads the list defensively again and takes only a PNG data URL as a screenshot. Page text shows as text only. The screenshot is the main process's own capture.
+- **Data model**: the main process owns the list, one per pane; the window mirrors it. `BrowserHandle.annotations` has `list()` and `clear()` for STORY-76 and STORY-40. Elements are deduped by selector. A region is kept in document coordinates with the element that holds it.
+- **Numbers close up** after a delete: they are the list's order, as the markers show.
+- **Markers** follow their element by the overlay's reference, else by selector on the same address, the hash ignored.
+- **Source hint**: React 19's dev stack, React 18's `_debugSource` and `data-inspector-*` attributes, read in the page's main world from the picked node, parsed in the main process; Vite's `/@fs/` paths keep their leading slash (a bug the test found first).
+- **Console errors**: the page's since its document loaded, the last 20, each cut to 500 characters.
+- **The close ask** covers Close, Escape, the Browser toggle and another card's Browser. Leaving the view or reloading the window closes the pane without asking (STORY-74's rule); on the roadmap.
+- **No tokens**: capturing, commenting, editing and deleting ask nothing of the server, proved in the client test.
+- **The journey** drives the pane's page by `sendInputEvent`, as Chromium marks it the user's own input.
+- Recorded in ADR 0048.
+
+## 2026-11-28 — STORY-75 review of PR #96 (developer)
+
+- **Later pages**: the overlay waits for a new document's root element before it mounts, so it shows after a reload or a link; proved by a unit test and the new journey (annotate-pages.spec.ts).
+- **The wire**: the window gets the list without screenshots and each screenshot once; a comment being typed is sent once the typing rests (300 ms). A pane keeps 50 annotations, and its log says when one more is dropped.
+- **Shift** adds only on the open annotation's own page (hash ignored), checked in the overlay and in the main process.
+- **Screenshots** are the renderer's (`Page.captureScreenshot`, clip in document CSS px, cut to the visual viewport), so a device, a page without a viewport meta and a pinch are right. The old capture test asserted the scaling that was wrong; it now asserts the clip.
+- **Annotate on/off** run in order and the last one asked holds; a pick still being captured counts as unsent for the close ask; `take()` replaces `clear()`, returning and emptying the list at once.
+- **Frames and calls**: only the main frame's world counts; each call into the page has its own object group; the debugger let go turns Annotate off and the next start sets up again.
+- **Source hint** is bounded in the page (primitives within size) before it is copied out.
+- **Stop when idle**: Annotate off with no marker left removes the new-document script; the page showing keeps its overlay until left.
+- **Visual review**: Close and discard is a danger button, Cancel focused; each element of an annotation has its own outline (marker 1 had covered the heading and the button as one union box); the badge sits just outside the first box's top-left corner; a region is drawn exactly where it was stored (the journey's drag now spans the paragraph's whole line box).
+- ADR 0048 updated, with what the page can still do: hide or cover the overlay, use the top layer, and tell Featra is there.

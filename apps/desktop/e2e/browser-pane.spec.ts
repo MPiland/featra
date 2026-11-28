@@ -1,11 +1,10 @@
 import { expect, test, type ElectronApplication } from "./fixtures.ts";
 import { FAKE_SDK, PATH_KEY, standInClaude } from "./agent.ts";
 import { launch, tempUserData } from "./app.ts";
+import { openStoryBrowser } from "./browser-journey.ts";
 import { browserPanesOpen, browserShot, browserTopRight, browserUrl, inBrowserPage } from "./browser-page.ts";
-import { draftInNewChat, pane } from "./draft-chat.ts";
-import { git, project } from "./draft-project.ts";
+import { project } from "./draft-project.ts";
 import { freePort, setProof } from "./proof-setup.ts";
-import { awaitStoryWorktree } from "./story-worktree.ts";
 import { atReviewSize } from "./ux-shot.ts";
 
 /**
@@ -30,29 +29,8 @@ test("Browser pane: a story's dev server shows beside its card, as any device, a
     await atReviewSize(app, page);
     await setProof(page, "Preview", url);
 
-    const draft = await draftInNewChat(page, "FEAT-2");
-    await draft.getByRole("button", { name: "Approve", exact: true }).click();
-    await expect
-      .poll(() => git(repo.dir, "status", "--porcelain", "--", ".featra/cards"), { timeout: 30_000 })
-      .toBe("");
-    await draft.getByRole("button", { name: "Start", exact: true }).click();
-    await expect.poll(() => git(repo.dir, "branch", "--format=%(refname:short)")).toContain("feature/2-shaping");
-
-    await page.getByRole("navigation", { name: "Featra" }).getByRole("button", { name: "Work" }).click();
-    await page.getByRole("button", { name: "Shaping", exact: true }).click();
-    const row = page.getByRole("row", { name: /Draft a feature/ });
-    await row.getByRole("button", { name: /^Start STORY-\d+$/ }).click();
-    const { id } = await awaitStoryWorktree(repo.dir, "draft-a-feature");
-    await row.getByRole("button", { name: "Draft a feature" }).click();
-    const card = pane(page, id);
-
     // Browser, from the story's card: the pane docks beside it, the dev server starts and its page shows.
-    await card.getByRole("button", { name: "Browser", exact: true }).click();
-    const browser = page.getByRole("complementary", { name: `${id} browser` });
-    await expect(browser).toBeVisible();
-    await expect(browser.getByText(`Browser · ${id}`, { exact: true })).toBeVisible();
-    await expect.poll(() => browserUrl(app), { timeout: 60_000 }).toBe(`${url}/`);
-    await expect.poll(() => inBrowserPage(app, "document.querySelector('h1')?.textContent")).toBe("Draft a feature");
+    const { card, browser } = await openStoryBrowser(app, page, repo.dir, url);
     const address = browser.getByRole("textbox", { name: "Address" });
     await expect(address).toHaveValue(`${url}/`);
 

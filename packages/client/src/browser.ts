@@ -4,8 +4,12 @@
  * late calls never touch the next one's view. Part of the host contract (bridge.ts).
  */
 import { errorMessage, isRecord } from "@featra/work-format/guards";
+import { ANNOTATE_IPC, noAnnotate, type AnnotateBridge } from "./annotations.ts";
 import type { PreviewResult } from "./card-pane.ts";
+import { rectOf, type Rect } from "./rect.ts";
 import type { ServerClient } from "./server-client.ts";
+
+export { rectOf, type Rect } from "./rect.ts";
 
 /** The Browser pane's words: short and sentence case. */
 export const BROWSER_COPY = {
@@ -65,14 +69,6 @@ export const BLANK_STATE: BrowserState = {
   failed: null,
 };
 
-/** A rectangle in the window's CSS px. */
-export interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 /** A device the page is shown as: its viewport in CSS px, its pixel ratio, and whether it is a touch phone or tablet. */
 export interface DeviceMetrics {
   width: number;
@@ -87,7 +83,7 @@ export interface DeviceMetrics {
  */
 export interface BrowserLayout {
   bounds: Rect | null;
-  device: (DeviceMetrics & { scale: number }) | null;
+  device: (DeviceMetrics & { scale: number; name?: string }) | null;
 }
 
 /** A start's answer: the dev server's URL, that dependencies install first (start again to wait), or why not. */
@@ -99,7 +95,7 @@ export interface BrowserTarget {
   id: string;
 }
 
-export interface BrowserBridge {
+export interface BrowserBridge extends AnnotateBridge {
   /**
    * Starts the dev server of story or feature `id` for pane `key`, or holds the one running; its URL, or why not. A
    * feature's fresh checkout installs its dependencies first: the answer says so, and the next start waits for it.
@@ -137,6 +133,7 @@ export const BROWSER_IPC = {
   browserState: "browser:state",
   browserFocus: "browser:focus",
   browserEscape: "browser:escape",
+  ...ANNOTATE_IPC,
 } as const;
 
 /** The pixel ratios a device may have: what Chromium shows sensibly. */
@@ -161,16 +158,6 @@ export function normalizeBrowserState(raw: unknown): BrowserState {
   };
 }
 
-function rectOf(raw: unknown): Rect | null {
-  if (!isRecord(raw)) return null;
-  const x = finite(raw.x);
-  const y = finite(raw.y);
-  const width = finite(raw.width);
-  const height = finite(raw.height);
-  if (x === null || y === null || width === null || height === null || width < 0 || height < 0) return null;
-  return { x, y, width, height };
-}
-
 /** A layout from the page, read defensively: what isn't valid hides the view or drops the device. */
 export function normalizeBrowserLayout(raw: unknown): BrowserLayout {
   const r = isRecord(raw) ? raw : {};
@@ -184,6 +171,7 @@ export function normalizeBrowserLayout(raw: unknown): BrowserLayout {
           dpr: Math.min(DPR.max, Math.max(DPR.min, dpr)),
           scale,
           mobile: d.mobile === true,
+          ...(typeof d.name === "string" && d.name ? { name: d.name.slice(0, 60) } : {}),
         }
       : null;
   return { bounds: rectOf(r.bounds), device };
@@ -223,5 +211,6 @@ export function noBrowser(error: string): BrowserBridge {
     reload() {},
     close() {},
     onState: () => () => {},
+    ...noAnnotate(),
   };
 }

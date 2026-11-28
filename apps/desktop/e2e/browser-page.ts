@@ -37,6 +37,56 @@ export const browserTopRight = (app: ElectronApplication) =>
     return Math.round(((bitmap[at] ?? 0) + (bitmap[at + 1] ?? 0) + (bitmap[at + 2] ?? 0)) / 3);
   });
 
+/** An input event as Electron's `sendInputEvent` takes it: a mouse event at the page's CSS px, or a key. */
+export type PageInput = {
+  type: "mouseMove" | "mouseDown" | "mouseUp" | "keyDown" | "keyUp";
+  x?: number;
+  y?: number;
+  button?: "left";
+  clickCount?: number;
+  modifiers?: "shift"[];
+  keyCode?: string;
+};
+
+/**
+ * Sends `events` to the open pane's page as the user's own input: Chromium marks them trusted, as the overlay asks
+ * (STORY-75). Playwright's input reaches only the window's page, not the pane's view.
+ */
+export const browserInput = (app: ElectronApplication, events: PageInput[]) =>
+  app.evaluate((_e, list) => {
+    const pane = (globalThis as MainGlobal).featraTest.browserPanes?.()[0];
+    for (const event of list)
+      pane?.contents.sendInputEvent(event as Parameters<typeof pane.contents.sendInputEvent>[0]);
+  }, events);
+
+/** A click at `x`, `y` in the pane's page, with Shift if `shift`. */
+export const browserClick = (app: ElectronApplication, x: number, y: number, shift = false) => {
+  const at = { x: Math.round(x), y: Math.round(y), ...(shift ? { modifiers: ["shift" as const] } : {}) };
+  return browserInput(app, [
+    { type: "mouseMove", ...at },
+    { type: "mouseDown", button: "left", clickCount: 1, ...at },
+    { type: "mouseUp", button: "left", clickCount: 1, ...at },
+  ]);
+};
+
+/** The box of the first element `selector` finds in the pane's page, in its CSS px. */
+export async function browserBox(app: ElectronApplication, selector: string) {
+  const box = await inBrowserPage<{ x: number; y: number; width: number; height: number }>(
+    app,
+    `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; })()`,
+  );
+  if (!box) throw new Error(`No ${selector} in the Browser pane's page.`);
+  return box;
+}
+
+/**
+ * Whether the page's document has been shown: its first contentful paint is reported once the frame is presented.
+ * Until then Chromium drops input to a document just navigated to (paint holding keeps the last page on screen, and
+ * input meant for it must not reach the new one), so a click sent before is lost, as a user's would be.
+ */
+export const browserPainted = (app: ElectronApplication) =>
+  inBrowserPage<boolean>(app, "performance.getEntriesByType('paint').some((e) => e.name === 'first-contentful-paint')");
+
 /** How many Browser panes are open. */
 export const browserPanesOpen = (app: ElectronApplication) =>
   app.evaluate(() => (globalThis as MainGlobal).featraTest.browserPanes?.().length ?? 0);

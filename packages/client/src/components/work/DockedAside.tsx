@@ -18,6 +18,8 @@ export interface DockedAsideProps {
   width: number;
   /** The pane's own element, for a host that moves focus back into it. */
   paneRef?: RefObject<HTMLElement | null>;
+  /** Escape that something in the pane uses first (the Browser pane's Annotate); true when it did. */
+  onEscape?: () => boolean;
   /** A class besides `card-pane`, for a pane with a layout of its own (the Browser pane). */
   className?: string;
   children: ReactNode;
@@ -39,6 +41,7 @@ export function DockedAside(props: DockedAsideProps) {
     focusOnOpen = true,
     width,
     paneRef,
+    onEscape,
     className,
     children,
   } = props;
@@ -50,7 +53,7 @@ export function DockedAside(props: DockedAsideProps) {
   const onKey = (e: KeyboardEvent) => {
     if (e.key !== "Escape" || e.defaultPrevented) return;
     e.preventDefault();
-    onClose();
+    if (!onEscape?.()) onClose();
   };
   return (
     // The pane takes focus on open so Escape reaches it; it isn't a stop in the Tab order.

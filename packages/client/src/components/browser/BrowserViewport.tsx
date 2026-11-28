@@ -93,7 +93,14 @@ export function BrowserViewport(props: BrowserViewportProps) {
       : null;
   const emulated =
     device && fit
-      ? { width: device.width, height: device.height, dpr: device.dpr, mobile: device.mobile, scale: fit.scale }
+      ? {
+          width: device.width,
+          height: device.height,
+          dpr: device.dpr,
+          mobile: device.mobile,
+          scale: fit.scale,
+          name: device.name,
+        }
       : null;
   const layout = JSON.stringify({ bounds, device: emulated });
   useEffect(() => {
